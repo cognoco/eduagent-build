@@ -291,6 +291,45 @@ export type BillingAliasReceivedEvent = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
+// [WI-2346] Terminal deletion-teardown dead-letter events
+//
+// These events live in Inngest's third-party event store and feed the launch
+// health alert/dashboard surface. Keep them to opaque identifiers, the Inngest
+// run id, a coarse error class, and time. Raw provider responses and error
+// messages can contain payer/account PII or secrets and must never ride here.
+// Account-level events legitimately omit profileId (AGENTS.md known exception).
+// ---------------------------------------------------------------------------
+const terminalFailureEventBaseSchema = z.object({
+  runId: z.string().min(1).nullable(),
+  errorName: z.string().min(1).max(128),
+  timestamp: isoDateField,
+});
+
+export const accountDeletionTeardownFailedEventSchema =
+  terminalFailureEventBaseSchema.extend({
+    accountId: z.string().min(1).nullable(),
+  });
+export type AccountDeletionTeardownFailedEvent = z.infer<
+  typeof accountDeletionTeardownFailedEventSchema
+>;
+
+export const billingSubscriptionStoreTeardownFailedEventSchema =
+  terminalFailureEventBaseSchema.extend({
+    accountId: z.string().min(1).nullable(),
+  });
+export type BillingSubscriptionStoreTeardownFailedEvent = z.infer<
+  typeof billingSubscriptionStoreTeardownFailedEventSchema
+>;
+
+export const billingAliasMergeFailedEventSchema =
+  terminalFailureEventBaseSchema.extend({
+    eventId: z.string().min(1).nullable(),
+  });
+export type BillingAliasMergeFailedEvent = z.infer<
+  typeof billingAliasMergeFailedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
 // S5 visibility contract events
 // ---------------------------------------------------------------------------
 
@@ -426,16 +465,54 @@ export type SessionTranscriptPurgedEvent = z.infer<
   typeof sessionTranscriptPurgedEventSchema
 >;
 
-/** BUG-993 — emitted when sessions are past day-37 without llmSummary/learnerRecap. */
+/** BUG-993 — emitted when sessions are past day-37 with incomplete purge prerequisites. */
 export const sessionPurgeDelayedEventSchema = z.object({
   delayedCount: z.number().int().positive(),
   sessionIds: z.array(z.string().uuid()),
   missingPreconditionCount: z.number().int().nonnegative(),
+  // Optional/defaulted for in-flight events emitted before WI-2739.
+  nullSummaryGeneratedAtCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .default(0),
   // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
   timestamp: isoDateField,
 });
 export type SessionPurgeDelayedEvent = z.infer<
   typeof sessionPurgeDelayedEventSchema
+>;
+
+/** WI-2739 — emitted when eligible purge volume exceeds daily dispatch capacity. */
+export const sessionPurgeBacklogEventSchema = z
+  .object({
+    dailyCapacity: z.number().int().positive(),
+    minimumEligibleCount: z.number().int().positive(),
+    minimumDeferredCount: z.number().int().positive(),
+    timestamp: isoDateField,
+  })
+  .superRefine((data, context) => {
+    if (data.minimumEligibleCount <= data.dailyCapacity) {
+      context.addIssue({
+        code: 'custom',
+        path: ['minimumEligibleCount'],
+        message: 'must exceed dailyCapacity',
+      });
+    }
+    if (
+      data.minimumDeferredCount !==
+      data.minimumEligibleCount - data.dailyCapacity
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['minimumDeferredCount'],
+        message: 'must equal minimumEligibleCount minus dailyCapacity',
+      });
+    }
+  });
+export type SessionPurgeBacklogEvent = z.infer<
+  typeof sessionPurgeBacklogEventSchema
 >;
 
 /** BUG-994 — emitted when reconciliation cron requeues sessions for summary work. */

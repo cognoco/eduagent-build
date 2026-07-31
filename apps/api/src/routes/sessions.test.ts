@@ -98,13 +98,13 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by /summary, /summary/retry-feedback,
-// /recall-bridge, and /subjects/:subjectId/sessions/first-curriculum — the
-// request-time LLM routes OUTSIDE the exchange pipeline) runs
+// assertLlmConsent (called by /summary, /summary/retry-feedback, and
+// /recall-bridge — the pure request-time LLM routes outside the exchange
+// pipeline) runs
 // isLlmExchangeConsentAllowed, which reads db.query.membership /
 // consentGrant — real queries with no controllable behavior on this file's
 // mock DB. Defaults to allowed (resolves undefined = no throw); the
-// consent-withdrawal test suite below overrides with
+// consent-withdrawal test suites below override with
 // mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
 // refusal path. Mirrors the subjects.test.ts pattern. The exchange pipeline
 // itself (/messages, /stream) is gated separately inside the mocked
@@ -1184,21 +1184,18 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). startFirstCurriculumSession's topic-intent matcher
-  // (matchTopicByIntent -> routeAndCall) dispatches the LLM when
-  // MATCHER_ENABLED and multiple candidate topics exist; gated
-  // unconditionally since this endpoint is the only entry point.
+  // [WI-2543] Consent gate lives inside the first-curriculum service at each
+  // LLM dispatch boundary; deterministic service branches remain callable.
   // -------------------------------------------------------------------------
-  describe('[WI-2396] first-curriculum consent-withdrawal gate', () => {
+  describe('[WI-2543] first-curriculum granular consent gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls startFirstCurriculumSession when consent is withdrawn', async () => {
-      // Clear call history from the preceding describe's tests so
-      // .not.toHaveBeenCalled() below asserts this request's behavior, not
-      // an earlier test's leftover call count.
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
       jest.mocked(startFirstCurriculumSession).mockClear();
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      assertLlmConsentMock.mockClear();
+      jest
+        .mocked(startFirstCurriculumSession)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
@@ -1213,26 +1210,33 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(startFirstCurriculumSession).not.toHaveBeenCalled();
+      expect(startFirstCurriculumSession).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
-      const res = await app.request(
-        `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
-        },
-        TEST_ENV,
-      );
+    it('delegates deterministic service branches after consent withdrawal', async () => {
+      assertLlmConsentMock.mockClear();
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+      try {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              sessionType: 'learning',
+              inputMode: 'text',
+            }),
+          },
+          TEST_ENV,
+        );
 
-      expect(res.status).toBe(201);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
-      expect(startFirstCurriculumSession).toHaveBeenCalled();
+        expect(res.status).toBe(201);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(startFirstCurriculumSession).toHaveBeenCalled();
+      } finally {
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
     });
   });
 

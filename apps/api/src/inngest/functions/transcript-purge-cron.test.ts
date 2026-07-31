@@ -1,44 +1,57 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
+
 const mockGetStepDatabase = jest.fn();
 const mockGetStepRetentionPurgeEnabled = jest.fn();
 const mockGetStepVoyageApiKey = jest.fn();
 const mockPurgeSessionTranscript = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockGetStepDatabase(),
-    getStepRetentionPurgeEnabled: () => mockGetStepRetentionPurgeEnabled(),
-    getStepVoyageApiKey: () => mockGetStepVoyageApiKey(),
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: cron unit test injects DB and request-scoped env values; real helpers require live bindings */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockGetStepDatabase(),
+      getStepRetentionPurgeEnabled: () => mockGetStepRetentionPurgeEnabled(),
+      getStepVoyageApiKey: () => mockGetStepVoyageApiKey(),
+    };
+  },
+);
 
-jest.mock('../../services/transcript-purge', () => {
-  const actual = jest.requireActual(
-    '../../services/transcript-purge',
-  ) as typeof import('../../services/transcript-purge');
-  return {
-    ...actual,
-    purgeSessionTranscript: (...args: unknown[]) =>
-      mockPurgeSessionTranscript(...args),
-  };
-});
+jest.mock(
+  '../../services/transcript-purge' /* gc1-allow: handler unit test isolates destructive DB and Voyage side effects; real service requires live dependencies */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/transcript-purge',
+    ) as typeof import('../../services/transcript-purge');
+    return {
+      ...actual,
+      purgeSessionTranscript: (...args: unknown[]) =>
+        mockPurgeSessionTranscript(...args),
+    };
+  },
+);
 
-jest.mock('../../services/sentry', () => {
-  const actual = jest.requireActual(
-    '../../services/sentry',
-  ) as typeof import('../../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  '../../services/sentry' /* gc1-allow: cron unit test asserts escalation metadata; real SDK does not expose captured calls */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { sessionSummaryRegenerate } from './summary-regenerate';
 import {
+  computeRotatingDelayedOffset,
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
@@ -51,6 +64,117 @@ describe('transcriptPurgeCron', () => {
     mockGetStepVoyageApiKey.mockReturnValue('voyage-key');
   });
 
+  it('[WI-2739] rotates a bounded remediation page across every stable stale-null row', () => {
+    const totalCount = 101;
+    const seen = new Set<number>();
+
+    for (let utcDay = 0; utcDay < totalCount; utcDay += 1) {
+      const offset = computeRotatingDelayedOffset(
+        totalCount,
+        utcDay * 86_400_000,
+      );
+      for (let index = 0; index < 50; index += 1) {
+        seen.add((offset + index) % totalCount);
+      }
+    }
+
+    expect(seen.size).toBe(totalCount);
+  });
+
+  it('[WI-2739] keeps wrap-around remediation duplicate-safe through consumer idempotency', () => {
+    const opts = (sessionSummaryRegenerate as any).opts;
+    expect(opts.idempotency).toBe('event.data.sessionId');
+  });
+
+  it('[WI-2739] wires the rotating offset and wrap page into null-timestamp remediation', async () => {
+    mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
+    jest.useFakeTimers().setSystemTime(new Date('1970-01-03T00:00:00.000Z'));
+
+    const candidate = (index: number) => ({
+      sessionSummaryId: `summary-${index}`,
+      sessionId: `session-${index}`,
+      profileId: `profile-${index}`,
+      summaryGeneratedAt: null,
+      subjectId: `subject-${index}`,
+      topicId: null,
+    });
+    const offsets: number[] = [];
+    const pageBuilder = (rows: ReturnType<typeof candidate>[]) => ({
+      from: jest.fn().mockReturnValue({
+        innerJoin: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                offset: jest.fn((offset: number) => {
+                  offsets.push(offset);
+                  return Promise.resolve(rows);
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+    const select = jest
+      .fn()
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ totalCount: 101 }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce(pageBuilder([candidate(100)]))
+      .mockReturnValueOnce(
+        pageBuilder(Array.from({ length: 49 }, (_, index) => candidate(index))),
+      );
+    mockGetStepDatabase.mockReturnValue({ select });
+
+    try {
+      const { step, sendEventCalls } = createInngestStepRunner();
+      const handler = (transcriptPurgeCron as any).fn;
+      const result = await handler({ step });
+
+      expect(offsets).toEqual([100, 0]);
+      expect(result).toEqual(
+        expect.objectContaining({
+          delayed: 101,
+          nullSummaryGeneratedAtCount: 101,
+        }),
+      );
+      const remediation = sendEventCalls.find(
+        (call) => call.name === 'fan-out-remediate-null-summary-timestamps',
+      );
+      expect(remediation?.payload).toHaveLength(50);
+      expect(remediation?.payload).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({ sessionId: 'session-100' }),
+          }),
+          expect.objectContaining({
+            data: expect.objectContaining({ sessionId: 'session-0' }),
+          }),
+        ]),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   // [BUG-189] The 30-day cutoff was previously computed at handler entry, then
   // captured by the find-purge-candidates step closure. On an Inngest replay
   // the function re-enters the handler, the closure rebinds to a freshly
@@ -61,12 +185,21 @@ describe('transcriptPurgeCron', () => {
   it('[BUG-189] computes cutoff INSIDE find-purge-candidates step.run for replay stability', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
     const limit = jest.fn().mockResolvedValue([]);
-    const where = jest.fn().mockReturnValue({ limit });
-    const from = jest.fn().mockReturnValue({ where });
+    const orderBy = jest.fn().mockReturnValue({ limit });
+    const where = jest.fn().mockReturnValue({ limit, orderBy });
+    const innerJoin = jest.fn().mockReturnValue({ where });
+    const from = jest.fn().mockReturnValue({ where, innerJoin });
     const select = jest.fn().mockReturnValue({ from });
     mockGetStepDatabase.mockReturnValue({ select });
 
-    const { step } = createInngestStepRunner();
+    const { step } = createInngestStepRunner({
+      runResults: {
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [],
+          totalCount: 0,
+        },
+      },
+    });
     const handler = (transcriptPurgeCron as any).fn;
     await handler({ step });
 
@@ -77,7 +210,54 @@ describe('transcriptPurgeCron', () => {
     expect(select).toHaveBeenCalled();
     expect(from).toHaveBeenCalled();
     expect(where).toHaveBeenCalled();
-    expect(limit).toHaveBeenCalledWith(100);
+    expect(limit).toHaveBeenCalledWith(101);
+  });
+
+  it('[WI-2739] detects null summaryGeneratedAt rows past the delayed cutoff', async () => {
+    mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T05:00:00.000Z'));
+    const nullTimestampWhere = jest.fn().mockResolvedValue([{ totalCount: 0 }]);
+    const select = jest
+      .fn()
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: nullTimestampWhere,
+          }),
+        }),
+      });
+    mockGetStepDatabase.mockReturnValue({ select });
+
+    try {
+      const { step } = createInngestStepRunner();
+      const handler = (transcriptPurgeCron as any).fn;
+      await handler({ step });
+
+      const delayedWhere = nullTimestampWhere.mock.calls[0]?.[0];
+      const rendered = new PgDialect().sqlToQuery(delayedWhere as never);
+
+      expect(rendered.sql).toMatch(
+        /"session_summaries"\."summary_generated_at" is null/i,
+      );
+      expect(rendered.sql).toMatch(/"learning_sessions"\."ended_at" <=/i);
+      expect(rendered.params).toContain('2026-06-24T05:00:00.000Z');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('skips entirely while RETENTION_PURGE_ENABLED is false', async () => {
@@ -103,13 +283,20 @@ describe('transcriptPurgeCron', () => {
             profileId: 'profile-1',
           },
         ],
-        'find-delayed-purge-candidates': [
-          {
-            sessionSummaryId: 'summary-2',
-            sessionId: 'session-2',
-            profileId: 'profile-2',
-          },
-        ],
+        'find-delayed-purge-candidates': [],
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [
+            {
+              sessionSummaryId: 'summary-2',
+              sessionId: 'session-2',
+              profileId: 'profile-2',
+              summaryGeneratedAt: null,
+              subjectId: 'subject-2',
+              topicId: 'topic-2',
+            },
+          ],
+          totalCount: 1,
+        },
       },
     });
 
@@ -126,6 +313,21 @@ describe('transcriptPurgeCron', () => {
     expect(sendEventCalls).toEqual(
       expect.arrayContaining([
         {
+          name: 'fan-out-remediate-null-summary-timestamps',
+          payload: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'app/session.summary.regenerate',
+              data: expect.objectContaining({
+                sessionSummaryId: 'summary-2',
+                sessionId: 'session-2',
+                profileId: 'profile-2',
+                subjectId: 'subject-2',
+                topicId: 'topic-2',
+              }),
+            }),
+          ]),
+        },
+        {
           name: 'fan-out-transcript-purge',
           payload: expect.arrayContaining([
             expect.objectContaining({ name: 'app/session.transcript.purge' }),
@@ -139,11 +341,185 @@ describe('transcriptPurgeCron', () => {
               delayedCount: 1,
               sessionIds: ['session-2'],
               missingPreconditionCount: 1,
+              nullSummaryGeneratedAtCount: 1,
             }),
           }),
         },
       ]),
     );
+  });
+
+  it('[WI-2739] remediates a stale null timestamp independently of a full delayed page', async () => {
+    mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
+    const blockedNonNullRows = Array.from({ length: 50 }, (_, index) => ({
+      sessionSummaryId: `blocked-summary-${index}`,
+      sessionId: `blocked-session-${index}`,
+      profileId: `blocked-profile-${index}`,
+      summaryGeneratedAt: new Date('2026-06-01T00:00:00.000Z'),
+      subjectId: `blocked-subject-${index}`,
+      topicId: null,
+    }));
+    const staleNullRow = {
+      sessionSummaryId: 'stale-null-summary',
+      sessionId: 'stale-null-session',
+      profileId: 'stale-null-profile',
+      summaryGeneratedAt: null,
+      subjectId: 'stale-null-subject',
+      topicId: null,
+    };
+
+    const { step, sendEventCalls } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': [],
+        'find-delayed-purge-candidates': blockedNonNullRows,
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [staleNullRow],
+          totalCount: 1,
+        },
+      },
+    });
+
+    const handler = (transcriptPurgeCron as any).fn;
+    const result = await handler({ step });
+
+    expect(result).toEqual(
+      expect.objectContaining({ delayed: 51, nullSummaryGeneratedAtCount: 1 }),
+    );
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'fan-out-remediate-null-summary-timestamps',
+          payload: [
+            expect.objectContaining({
+              name: 'app/session.summary.regenerate',
+              data: expect.objectContaining({
+                sessionSummaryId: 'stale-null-summary',
+                sessionId: 'stale-null-session',
+              }),
+            }),
+          ],
+        },
+        {
+          name: 'notify-purge-delayed',
+          payload: expect.objectContaining({
+            name: 'app/session.purge.delayed',
+            data: expect.objectContaining({
+              delayedCount: 51,
+              nullSummaryGeneratedAtCount: 1,
+            }),
+          }),
+        },
+      ]),
+    );
+  });
+
+  it('[WI-2739] queues only daily capacity and emits an alertable over-cap backlog signal', async () => {
+    mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
+    const candidates = Array.from({ length: 101 }, (_, index) => ({
+      sessionSummaryId: `summary-${index}`,
+      sessionId: `session-${index}`,
+      profileId: `profile-${index}`,
+    }));
+
+    const { step, sendEventCalls, runNames } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': candidates,
+        'find-delayed-purge-candidates': [],
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [],
+          totalCount: 0,
+        },
+      },
+    });
+
+    const handler = (transcriptPurgeCron as any).fn;
+    const result = await handler({ step });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        queued: 100,
+        backlog: true,
+        minimumEligibleCount: 101,
+      }),
+    );
+    const fanOut = sendEventCalls.find(
+      (call) => call.name === 'fan-out-transcript-purge',
+    );
+    expect(fanOut?.payload).toHaveLength(100);
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'notify-purge-backlog',
+          payload: expect.objectContaining({
+            name: 'app/session.purge.backlog',
+            data: expect.objectContaining({
+              dailyCapacity: 100,
+              minimumEligibleCount: 101,
+              minimumDeferredCount: 1,
+            }),
+          }),
+        },
+      ]),
+    );
+    expect(runNames()).toContain('capture-purge-backlog');
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('at least 101 eligible session(s)'),
+      }),
+      expect.objectContaining({
+        tags: { surface: 'transcript-purge', signal: 'backlog' },
+        extra: expect.objectContaining({
+          surface: 'transcript-purge-backlog',
+          dailyCapacity: 100,
+          minimumEligibleCount: 101,
+          minimumDeferredCount: 1,
+        }),
+      }),
+    );
+  });
+
+  it('[WI-2739] does not signal backlog at exact daily capacity', async () => {
+    mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
+    const candidates = Array.from({ length: 100 }, (_, index) => ({
+      sessionSummaryId: `summary-${index}`,
+      sessionId: `session-${index}`,
+      profileId: `profile-${index}`,
+    }));
+
+    const { step, sendEventCalls, runNames } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': candidates,
+        'find-delayed-purge-candidates': [],
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [],
+          totalCount: 0,
+        },
+      },
+    });
+
+    const handler = (transcriptPurgeCron as any).fn;
+    const result = await handler({ step });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        queued: 100,
+        backlog: false,
+        minimumEligibleCount: 100,
+      }),
+    );
+    expect(runNames()).not.toContain('capture-purge-backlog');
+    expect(
+      sendEventCalls.find(
+        (call) =>
+          (call.payload as { name?: string }).name ===
+          'app/session.purge.backlog',
+      ),
+    ).toBeUndefined();
+    const backlogCaptures = mockCaptureException.mock.calls.filter(
+      (call) =>
+        (call[1] as { tags?: { signal?: string } })?.tags?.signal === 'backlog',
+    );
+    expect(backlogCaptures).toHaveLength(0);
   });
 
   // [BUG-993] captureException must be called alongside app/session.purge.delayed
@@ -170,6 +546,10 @@ describe('transcriptPurgeCron', () => {
             profileId: 'profile-2',
           },
         ],
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [],
+          totalCount: 0,
+        },
       },
     });
 
@@ -212,6 +592,10 @@ describe('transcriptPurgeCron', () => {
             profileId: 'profile-4',
           },
         ],
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [],
+          totalCount: 0,
+        },
       },
     });
 
@@ -262,6 +646,10 @@ describe('transcriptPurgeCron', () => {
           },
         ],
         'find-delayed-purge-candidates': [],
+        'find-null-timestamp-delayed-candidates': {
+          candidates: [],
+          totalCount: 0,
+        },
       },
     });
 

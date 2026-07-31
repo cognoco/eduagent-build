@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -23,6 +23,8 @@ import {
 } from '../../../hooks/use-eligible-supportees';
 import { useProfile } from '../../../lib/profile';
 import { firstParam } from '../../../lib/route-params';
+import { clearFamilyIntentOnboarding } from '../../../lib/family-intent-onboarding-state';
+import { Sentry } from '../../../lib/sentry';
 
 // A pre-filled `relation` param (e.g. from `pushLinkInitiateForManagedPerson`)
 // is parsed as-is; a param-less arrival (the inline picker path below)
@@ -52,6 +54,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
   const { activeProfile } = useProfile();
   const eligibleManagedPersons = useEligibleManagedPersons();
   const params = useLocalSearchParams<{
+    target?: string | string[];
     supporteePersonId?: string | string[];
     supporteeName?: string | string[];
     relation?: string | string[];
@@ -59,16 +62,31 @@ export default function InitiateLinkScreen(): React.ReactElement {
   }>();
   const paramSupporteePersonId = firstParam(params.supporteePersonId);
   const paramSupporteeName = firstParam(params.supporteeName);
+  const paramTarget = firstParam(params.target);
   const managedTier = firstParam(params.managedTier) === 'true';
 
+  useEffect(() => {
+    if (paramTarget !== 'existingTeen') return;
+    // The source gate keeps this destination durably pending until this route
+    // mounts. Both the V2 invitation form and the older-shell unavailable gate
+    // are terminal, non-authorizing destinations; consuming here prevents a
+    // relaunch from replaying either one. If deletion fails, the marker remains
+    // recoverable and a later remount safely retries the same destination.
+    void clearFamilyIntentOnboarding().catch((error: unknown) => {
+      Sentry.captureException(error);
+    });
+  }, [paramTarget]);
+
   const [target, setTarget] = useState<SupporteeTarget | null>(() =>
-    paramSupporteePersonId
-      ? {
-          kind: 'managedPerson',
-          personId: paramSupporteePersonId,
-          displayName: paramSupporteeName,
-        }
-      : null,
+    paramTarget === 'existingTeen'
+      ? { kind: 'existingTeen' }
+      : paramSupporteePersonId
+        ? {
+            kind: 'managedPerson',
+            personId: paramSupporteePersonId,
+            displayName: paramSupporteeName,
+          }
+        : null,
   );
   const [relation, setRelation] = useState<SupporterRelation>(() =>
     parseRelation(firstParam(params.relation)),

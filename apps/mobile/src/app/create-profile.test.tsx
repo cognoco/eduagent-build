@@ -9,6 +9,7 @@ import {
 import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import {
   __resetMentorBornCeremonyForTests,
@@ -18,6 +19,7 @@ import {
   MENTOR_BORN_PENDING_KEY,
   mentorBirthSeenKey,
 } from '../lib/secure-store-keys';
+import { FAMILY_INTENT_ONBOARDING_KEY } from '../lib/family-intent-onboarding-state';
 
 import {
   resolveNavigationContract,
@@ -227,6 +229,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 const CreateProfileScreen = require('./create-profile').default;
 const expoSecureStoreMock = jest.requireMock('expo-secure-store') as {
   __store: Map<string, string>;
+  setItemAsync: jest.Mock;
 };
 
 describe('CreateProfileScreen', () => {
@@ -1205,8 +1208,6 @@ describe('CreateProfileScreen', () => {
         isOwner: true,
       });
       let resolveCreate: ((response: Response) => void) | undefined = undefined;
-      let resolveAppContext: ((response: Response) => void) | undefined =
-        undefined;
       let resolveSwitch: (() => void) | undefined = undefined;
       mockSwitchProfile.mockImplementationOnce(
         () =>
@@ -1214,20 +1215,15 @@ describe('CreateProfileScreen', () => {
             resolveSwitch = resolve;
           }),
       );
-      mockFetch
-        .mockImplementationOnce(() => {
-          return new Promise<Response>((resolve) => {
-            resolveCreate = resolve;
-          });
-        })
-        .mockImplementationOnce(() => {
-          return new Promise<Response>((resolve) => {
-            resolveAppContext = resolve;
-          });
+      mockFetch.mockImplementationOnce(() => {
+        return new Promise<Response>((resolve) => {
+          resolveCreate = resolve;
         });
+      });
 
-      // Parent audience → the family PATCH (2nd fetch) fires; this test
-      // exercises the timeout interplay across both the POST and the PATCH.
+      // Parent audience now records the family-intent chooser without creating
+      // family state. Keep profile switching pending to prove the POST-only
+      // timeout is cancelled while slower success work continues.
       mockAudience = 'parent';
       render(<CreateProfileScreen />, { wrapper: Wrapper });
 
@@ -1263,13 +1259,11 @@ describe('CreateProfileScreen', () => {
         await Promise.resolve();
       });
 
-      // Use interval:1 so waitFor advances only 1ms of fake time per poll
-      // instead of the default 50ms. Default 50ms × ~200 polls = 10s of fake
-      // time, which from t=20s pushes past the 30s abort threshold before
-      // setCreatePostPending(false) can cancel the timer.
       await waitFor(
         () => {
-          expect(mockFetch).toHaveBeenCalledTimes(2);
+          expect(mockSwitchProfile).toHaveBeenCalledWith(
+            PROFILE_IDS.slowFamilySuccess,
+          );
         },
         { interval: 1 },
       );
@@ -1284,19 +1278,7 @@ describe('CreateProfileScreen', () => {
           ?.disabled,
       ).toBe(true);
 
-      await act(async () => {
-        resolveAppContext?.(
-          new Response(JSON.stringify({ profile: newProfile }), {
-            status: 200,
-          }),
-        );
-        await Promise.resolve();
-      });
-      await waitFor(() => {
-        expect(mockSwitchProfile).toHaveBeenCalledWith(
-          PROFILE_IDS.slowFamilySuccess,
-        );
-      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
       await act(async () => {
         resolveSwitch?.();
         await Promise.resolve();
@@ -2409,7 +2391,7 @@ describe('CreateProfileScreen', () => {
       screen.getByText('Tell us about you');
       screen.getByText('Your display name');
       screen.getByText('Your birth date');
-      screen.getByText(/You can add your child next/);
+      screen.getByText(/We'll ask who's going to learn next/);
       expect(screen.queryByText("Who's the learner?")).toBeNull();
     });
 
@@ -2426,21 +2408,13 @@ describe('CreateProfileScreen', () => {
       ).toBeFalsy();
     });
 
-    it('parent audience (adult): PATCHes app-context to family and routes to add-a-child', async () => {
+    it('[WI-2532] parent audience (adult): persists the learner-target fork and never redirects to child creation', async () => {
       mockAudience = 'parent';
-      const patchedProfile = { ...adultOwner, defaultAppContext: 'family' };
-      // 1st call = POST /profiles, 2nd = PATCH /profiles/:id/app-context
-      mockFetch
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify({ profile: adultOwner }), {
-            status: 200,
-          }),
-        )
-        .mockResolvedValueOnce(
-          new Response(JSON.stringify({ profile: patchedProfile }), {
-            status: 200,
-          }),
-        );
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: adultOwner }), {
+          status: 200,
+        }),
+      );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
@@ -2451,29 +2425,91 @@ describe('CreateProfileScreen', () => {
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(2);
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
       });
 
-      const patchCall = mockFetch.mock.calls[1];
-      expect(String(patchCall?.[0])).toContain(
-        `/profiles/${PROFILE_IDS.adult}/app-context`,
+      // Creating the adult and recording a pending UI choice must not create
+      // family-mode, child, guardianship, or supportership state.
+      expect(
+        mockFetch.mock.calls.some(
+          ([url, init]) =>
+            String(url).includes('/app-context') &&
+            (init as RequestInit | undefined)?.method === 'PATCH',
+        ),
+      ).toBe(false);
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockBack.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSwitchProfile.mock.invocationCallOrder[0] ??
+          Number.POSITIVE_INFINITY,
       );
-      const patchInit = patchCall?.[1] as RequestInit | undefined;
-      expect(patchInit?.method).toBe('PATCH');
-      const patchBody = JSON.parse(String(patchInit?.body)) as Record<
-        string,
-        unknown
-      >;
-      expect(patchBody.defaultAppContext).toBe('family');
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+      );
+      expect(mockReplace).not.toHaveBeenCalledWith({
+        pathname: '/create-profile',
+        params: { for: 'child' },
+      });
+      expect(
+        expoSecureStoreMock.__store.get(FAMILY_INTENT_ONBOARDING_KEY),
+      ).toBe(
+        JSON.stringify({
+          version: 1,
+          profileId: PROFILE_IDS.adult,
+          step: 'learner-target',
+        }),
+      );
+      expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
+    });
+
+    it('[WI-2532] retries only the durable learner-target write when storage fails after profile creation', async () => {
+      mockAudience = 'parent';
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: adultOwner }), {
+          status: 200,
+        }),
+      );
+      expoSecureStoreMock.setItemAsync.mockRejectedValueOnce(
+        new Error('storage unavailable'),
+      );
+      jest
+        .mocked(AsyncStorage.setItem)
+        .mockRejectedValueOnce(new Error('recovery unavailable'));
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith({
-          pathname: '/create-profile',
-          params: { for: 'child', firstSetup: 'true' },
-        });
+        screen.getByText(
+          "Your profile was created, but we couldn't save the next setup step. Try again.",
+        );
       });
-      expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
-      expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+      expect(mockBack).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(
+        expoSecureStoreMock.__store.get(FAMILY_INTENT_ONBOARDING_KEY),
+      ).toContain('"step":"learner-target"');
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockBack.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSwitchProfile.mock.invocationCallOrder[0] ??
+          Number.POSITIVE_INFINITY,
+      );
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home',
+      );
     });
 
     it('learner audience (adult): no PATCH, no add-child redirect, uses the shell-aware completion', async () => {
@@ -2558,7 +2594,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       screen.getByText(
-        'Parent accounts need an adult birth date. Enter your own details first, then add your child next.',
+        "Family setup needs an adult birth date. Enter your own details first, then choose who's going to learn.",
       );
       expect(mockFetch).not.toHaveBeenCalled();
       expect(mockSwitchProfile).not.toHaveBeenCalled();

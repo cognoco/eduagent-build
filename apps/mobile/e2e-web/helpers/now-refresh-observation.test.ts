@@ -6,31 +6,38 @@ import {
   assertArmedBeforeAction,
   assertRequestAttempted,
   captureNowRefreshPayload,
+  observeCapturedNowRefresh,
   observeExactNowRefresh,
   observeNowRefreshRequestAttempt,
 } from './now-refresh-observation';
 
 describe('exact Now-feed payload lifetime (WI-2961)', () => {
-  it('captures the successful payload as soon as the exact response settles', async () => {
+  it('returns settled only after the response settles and its body parses (variant c: parsed response)', async () => {
     const payload = {
       scope: 'self',
       generatedAt: '2026-07-31T12:00:00.000Z',
     };
     const response = { json: jest.fn().mockResolvedValue(payload) };
 
-    await expect(
+    const outcome = observeCapturedNowRefresh(
       captureNowRefreshPayload(Promise.resolve(response), (settledResponse) =>
         settledResponse.json(),
       ),
-    ).resolves.toEqual({ response, payload });
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+
+    await expect(outcome).resolves.toEqual({
+      kind: 'settled',
+      response: { response, payload },
+    });
     expect(response.json).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves rejection/abort classification when the response never arrives', async () => {
+  it('preserves rejection/abort classification when the response never arrives (variant a: response rejection)', async () => {
     const error = new Error('net::ERR_ABORTED');
     const readPayload = jest.fn<Promise<unknown>, [unknown]>();
 
-    const outcome = await observeExactNowRefresh(
+    const outcome = await observeCapturedNowRefresh(
       captureNowRefreshPayload(Promise.reject(error), readPayload),
       { armedAtMs: 0, actionAtMs: 1 },
     );
@@ -39,11 +46,11 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     expect(readPayload).not.toHaveBeenCalled();
   });
 
-  it('keeps a non-settling response bounded instead of hanging while capture is armed', async () => {
+  it('keeps a non-settling response bounded instead of hanging while capture is armed (variant b: response non-settlement)', async () => {
     jest.useFakeTimers();
     try {
       const neverSettles = new Promise<never>(() => undefined);
-      const outcomePromise = observeExactNowRefresh(
+      const outcomePromise = observeCapturedNowRefresh(
         captureNowRefreshPayload(neverSettles, async () => undefined),
         { armedAtMs: 0, actionAtMs: 1 },
       );
@@ -57,6 +64,22 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('hard-fails with the original error when the response settles but its body cannot be read (variant d: body-read rejection)', async () => {
+    const bodyReadError = new Error(
+      'Protocol error (Network.getResponseBody): No data found for resource with given identifier',
+    );
+    const response = {};
+
+    const outcome = observeCapturedNowRefresh(
+      captureNowRefreshPayload(Promise.resolve(response), async () => {
+        throw bodyReadError;
+      }),
+      { armedAtMs: 0, actionAtMs: 1 },
+    );
+
+    await expect(outcome).rejects.toBe(bodyReadError);
   });
 
   it('retains the captured payload after navigation releases the Playwright response body', async () => {
@@ -87,7 +110,15 @@ describe('exact Now-feed payload lifetime (WI-2961)', () => {
     await expect(readPayload(response)).rejects.toThrow(
       /No data found for resource/,
     );
-    await expect(capturedPromise).resolves.toEqual({ response, payload });
+    await expect(
+      observeCapturedNowRefresh(capturedPromise, {
+        armedAtMs: 0,
+        actionAtMs: 1,
+      }),
+    ).resolves.toEqual({
+      kind: 'settled',
+      response: { response, payload },
+    });
   });
 
   it('arms payload capture before Back and never reads the retained response afterward', () => {

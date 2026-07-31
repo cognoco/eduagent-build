@@ -274,9 +274,24 @@ wording so the trigger cannot be read against the core product:
 *Source: [`DPO exchanges/2026-07-30-reply-consolidated-response-draft.md`](DPO%20exchanges/2026-07-30-reply-consolidated-response-draft.md)
 §6, question Q4, sent 2026-07-30.*
 
-**[OPEN — needs input: DPO answer to Q4.]** Until that answer arrives, **T2 stands in the DPO's original
-wording** as recorded in the table above. The proposed narrowing is recorded here as a pending refinement,
-not as an adopted position, and must not be relied on operationally.
+**RESOLVED 2026-07-31 — the DPO agreed with the substance and supplied final trigger wording, adopted
+verbatim as T2:**
+
+> "Outputs are transferred to or relied upon by teachers or educational institutions to evaluate learning
+> outcomes or determine grades, placement, promotion, certification, access to education or the direction
+> of formal learning, where such reliance forms part of the system's intended purpose, is arranged,
+> integrated, marketed or contracted by ZWIZZLY, or the system is otherwise used by or on behalf of an
+> educational or vocational-training institution.
+>
+> Mere incidental, learner-initiated use of AI-assisted outputs in the learner's ordinary schoolwork does
+> not by itself trigger reclassification. A reassessment is nevertheless required if the intended purpose,
+> product functionality, marketing, contractual arrangements or actual systematic institutional use
+> materially changes."
+
+*Source: DPO reply to Q4, received 2026-07-31 (correspondence log in the action-register tracker). This
+wording supersedes both the DPO's original T2 formulation in the table above and management's proposed
+narrowing — the consumer-side homework use case is preserved, and systematic institutional adoption or a
+change of intended purpose triggers reassessment.*
 
 ---
 
@@ -357,7 +372,7 @@ Article 50(1) is satisfied for the conversational surface.
 *[OPEN — needs input: DPO confirmation that the shipped implementation is sufficient. He required the
 obligation to be addressed; he has not yet inspected the implementation.]*
 
-### 10.4 Article 50(2) — machine-readable marking and detectability of synthetic content: OPEN
+### 10.4 Article 50(2) — machine-readable marking and detectability of synthetic content: scope ruled 2026-07-31, assessment pending
 
 **Timing.** The DPO's authoritative statement:
 
@@ -384,8 +399,27 @@ content that can *leave* that context, rather than to the ephemeral chat stream 
 *Source: [`DPO exchanges/2026-07-30-reply-consolidated-response-draft.md`](DPO%20exchanges/2026-07-30-reply-consolidated-response-draft.md)
 §6, question Q5, sent 2026-07-30.*
 
-**[OPEN — needs input: DPO answer to Q5. Until it arrives, the Article 50(2) implementation scope is
-undetermined and no engineering commitment should be made either way.]**
+**ANSWERED 2026-07-31 — the DPO did NOT confirm the exportable-only limitation.** His ruling (reply to
+Q5, correspondence log in the action-register tracker):
+
+- Article 50(1) and 50(2) are **separate obligations** — a visible AI-interaction disclosure does not by
+  itself remove the machine-readable marking and detectability requirement for synthetic text.
+- The implementation assessment must cover **both** exportable/shareable content (including recap
+  documents) **and** synthetic text displayed in the interactive chat. Identical technical measures need
+  not apply to both surfaces, but the chat stream **stays inside the assessment** rather than being
+  excluded in advance.
+- **Exportable content is an immediate and clearly applicable implementation item.**
+- Before a final technical position, the Company must document: (i) all synthetic-output surfaces;
+  (ii) whether ZWIZZLY qualifies as the relevant provider for each surface; (iii) what marking or
+  provenance functionality the underlying model providers supply; (iv) the technical feasibility and
+  current state of the art for chat-based text; (v) the proposed machine-readable mechanism for each
+  applicable surface; and (vi) any specific exclusion or proportionality argument relied upon.
+- The final position is then documented by reference to the Commission's Article 50 Guidelines, the
+  applicable Code of Practice, and the system architecture.
+
+**Consequence:** WI-2915 (Art 50(2) scoping) is unblocked with this broader scope — its output is the
+six-point implementation assessment above, with exportable-surface marking (mentor-memory share, privacy
+export) as the first build item. The surface table below is the starting inventory for point (i).
 
 **Candidate surfaces already identified in code** (recorded so the scoping decision has a concrete target,
 not as an admission that each requires marking):

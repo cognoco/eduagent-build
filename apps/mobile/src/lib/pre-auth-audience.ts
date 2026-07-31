@@ -4,8 +4,8 @@
 // The pre-auth welcome chooser asks the audience question ("I want to learn"
 // vs "I'm done fighting over homework") BEFORE sign-in. That answer has to
 // survive the Clerk signup wall so first-profile setup can honour it without
-// asking again: a `parent` choice skips the Study/Family picker and routes to
-// the add-a-child screen; a `learner` choice gets a clean solo setup.
+// asking again: a `parent` choice creates the adult's own profile and opens
+// the learner-target fork; a `learner` choice gets a clean solo setup.
 //
 // Like `intro-state.ts`, SecureStore writes are async but the chooser must
 // persist and immediately navigate. We pair a synchronous in-memory value

@@ -1,5 +1,7 @@
 import * as sentry from '../../services/sentry';
+import * as safeNonCore from '../../services/safe-non-core';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { inngest } from '../client';
 import { billingSubscriptionStoreTeardown } from './billing-subscription-store-teardown';
 
 const handler = (billingSubscriptionStoreTeardown as any).fn as (args: {
@@ -17,6 +19,7 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[WI-885] declares account-scoped idempotency and concurrency', () => {
@@ -77,6 +80,58 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
           runId: 'run-store-teardown',
         }),
       }),
+    );
+  });
+
+  it('[BREAK WI-2346] safeSends a PII-minimized subscription teardown dead-letter event', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const safeSendSpy = jest
+      .spyOn(safeNonCore, 'safeSend')
+      .mockResolvedValue(undefined);
+    const inngestSendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] });
+    const onFailure = (billingSubscriptionStoreTeardown as any).opts
+      .onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'org-terminal' } },
+          run_id: 'run-store-teardown',
+        },
+      },
+      error: new Error('RevenueCat response contained private context'),
+    });
+
+    expect(safeSendSpy).toHaveBeenCalledTimes(1);
+    const call = safeSendSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) return;
+    const [sendThunk, surface, context] = call;
+    expect(surface).toBe(
+      'billing-subscription-store-teardown.terminal_failure',
+    );
+    expect(context).toEqual({
+      accountId: 'org-terminal',
+      runId: 'run-store-teardown',
+    });
+
+    await expect(sendThunk()).resolves.not.toThrow();
+    expect(inngestSendSpy).toHaveBeenCalledWith({
+      name: 'app/billing.subscription_store_teardown.failed',
+      data: {
+        accountId: 'org-terminal',
+        runId: 'run-store-teardown',
+        errorName: 'Error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'private context',
     );
   });
 

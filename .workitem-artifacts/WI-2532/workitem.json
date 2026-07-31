@@ -1,0 +1,18 @@
+{
+  "pageId": "3a38bce9-1f7c-8188-812a-e3336ac14d21",
+  "id": "WI-2532",
+  "name": "Add the Me-or-someone-else fork to family-intent onboarding",
+  "description": "After an adult chooses the homework-support welcome path and creates their own identity, the app currently skips the learner-target decision and redirects into managed-child creation instead of the launch-relevant credentialed-learner invitation flow.",
+  "acceptanceCriteria": "After family-intent signup creates the adult's own Person, present a plain-language learner-target choice: Me or Someone else. Me continues ordinary learner onboarding without creating family, guardianship, or supportership state. Someone else asks whether the learner has their own login; the launch path routes credentialed learners to the existing family-join invitation form, while any unavailable managed-child path is clearly gated rather than silently selected. The choice survives auth/profile remount and relaunch, remains non-authorizing, and has focused mobile tests plus a preview E2E proving the adult can reach the invitation form without first holding a supportership edge. Remove the current unconditional parent-intent redirect to /create-profile?for=child.",
+  "riskImpact": "P1 activation gap: the primary adult acquisition path cannot reach the launch credentialed-learner invitation and instead enters a dormant managed-child flow.",
+  "type": "Feature",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}
