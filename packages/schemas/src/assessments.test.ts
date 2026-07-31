@@ -1,4 +1,5 @@
 import {
+  assessmentAnswerSchema,
   evaluateAssessmentSchema,
   evaluateEligibilitySchema,
   evaluateDifficultyRungSchema,
@@ -33,6 +34,47 @@ describe('verificationTypeSchema', () => {
 
   it('rejects unknown type', () => {
     expect(() => verificationTypeSchema.parse('unknown')).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assessmentAnswerSchema — [WI-2472] active app shell
+// ---------------------------------------------------------------------------
+
+describe('assessmentAnswerSchema', () => {
+  it('accepts an answer that reports the v2 shell', () => {
+    expect(
+      assessmentAnswerSchema.parse({
+        answer: 'Where are my notes?',
+        shell: 'v2',
+      }),
+    ).toEqual({ answer: 'Where are my notes?', shell: 'v2' });
+  });
+
+  it('accepts an answer that reports the v0 shell', () => {
+    expect(
+      assessmentAnswerSchema.parse({
+        answer: 'Where are my notes?',
+        shell: 'v0',
+      }),
+    ).toEqual({ answer: 'Where are my notes?', shell: 'v0' });
+  });
+
+  it('accepts an answer with no shell (older clients / direct API callers)', () => {
+    const parsed = assessmentAnswerSchema.parse({ answer: 'Gravity pulls.' });
+    expect(parsed).toEqual({ answer: 'Gravity pulls.' });
+    expect(parsed.shell).toBeUndefined();
+  });
+
+  it('rejects a shell value outside the enum, so it can never select V2', () => {
+    for (const shell of ['v1', 'V2', 'v3', '', null]) {
+      expect(
+        assessmentAnswerSchema.safeParse({
+          answer: 'Where are my notes?',
+          shell,
+        }).success,
+      ).toBe(false);
+    }
   });
 });
 

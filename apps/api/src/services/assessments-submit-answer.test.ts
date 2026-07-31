@@ -121,4 +121,96 @@ describe('submitAssessmentAnswer', () => {
       expect.objectContaining({ masteryScore: 0.8 }),
     );
   });
+
+  // [WI-2472] The app-help branch is reached before the transaction, so only
+  // the two deps below run. The rest satisfy the dependency contract.
+  describe('[WI-2472] active app shell', () => {
+    function makeAppHelpDeps(): SubmitAssessmentAnswerDependencies {
+      return {
+        getAssessment: jest
+          .fn()
+          .mockResolvedValue(makeAssessment({ masteryScore: 0.4 })),
+        buildAssessmentAppHelpEvaluation: jest.fn().mockReturnValue({
+          feedback: 'app-help reply',
+          passed: false,
+          shouldEscalateDepth: false,
+          masteryScore: 0.4,
+          qualityRating: 0,
+          weakAreas: [],
+        }),
+        loadAssessmentTopicContext: jest.fn(),
+        lockAssessmentForAnswerSubmission: jest.fn(),
+        shouldEndAssessmentForReview: jest.fn(),
+        buildNeedsReviewEvaluation: jest.fn(),
+        evaluateAssessmentAnswer: jest.fn(),
+        resolveAssessmentStatus: jest.fn(),
+        updateAssessment: jest.fn(),
+        mapEvaluateQualityToSm2: jest.fn(),
+        updateRetentionFromSession: jest.fn(),
+        insertSessionXpEntry: jest.fn(),
+        recordAssessmentCompletionActivity: jest.fn(),
+        logger: { error: jest.fn() },
+        captureException: jest.fn(),
+      };
+    }
+
+    const db = {
+      transaction: jest.fn(),
+    } as unknown as Database;
+
+    it('forwards the reported v2 shell to the app-help evaluation', async () => {
+      const deps = makeAppHelpDeps();
+
+      const result = await submitAssessmentAnswer(
+        db,
+        PROFILE_ID,
+        ASSESSMENT_ID,
+        'Where are my notes?',
+        { deps, shell: 'v2' },
+      );
+
+      expect(result?.kind).toBe('app_help');
+      expect(deps.buildAssessmentAppHelpEvaluation).toHaveBeenCalledWith(
+        'Where are my notes?',
+        0.4,
+        'v2',
+      );
+    });
+
+    it('forwards the reported v0 shell to the app-help evaluation', async () => {
+      const deps = makeAppHelpDeps();
+
+      await submitAssessmentAnswer(
+        db,
+        PROFILE_ID,
+        ASSESSMENT_ID,
+        'Where are my notes?',
+        { deps, shell: 'v0' },
+      );
+
+      expect(deps.buildAssessmentAppHelpEvaluation).toHaveBeenCalledWith(
+        'Where are my notes?',
+        0.4,
+        'v0',
+      );
+    });
+
+    it('forwards no shell when the caller reported none', async () => {
+      const deps = makeAppHelpDeps();
+
+      await submitAssessmentAnswer(
+        db,
+        PROFILE_ID,
+        ASSESSMENT_ID,
+        'Where are my notes?',
+        { deps },
+      );
+
+      expect(deps.buildAssessmentAppHelpEvaluation).toHaveBeenCalledWith(
+        'Where are my notes?',
+        0.4,
+        undefined,
+      );
+    });
+  });
 });

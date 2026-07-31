@@ -19,6 +19,7 @@ import {
   submitAssessmentAnswerResponseSchema,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
@@ -138,7 +139,13 @@ export function useSubmitAnswer(assessmentId: string) {
       }
       const res = await client.assessments[':assessmentId'].answer.$post({
         param: { assessmentId: targetAssessmentId },
-        json: { answer: input.answer },
+        json: {
+          answer: input.answer,
+          // [WI-2472] Active app shell — an app-navigation question typed as an
+          // assessment answer takes the server's app-help branch, which would
+          // otherwise answer every learner from the retired V0 map.
+          shell: FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'v2' : 'v0',
+        },
       });
       await assertOk(res);
       return parseJson(

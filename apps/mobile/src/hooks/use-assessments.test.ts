@@ -257,6 +257,80 @@ describe('useSubmitAnswer', () => {
     expect(requestUrl).toContain('/assessments/created-assess-1/answer');
   });
 
+  // [WI-2472] An app-navigation question typed as an answer takes the server's
+  // app-help branch. The server can only answer from the V2 destination map if
+  // the client reports the shell it is actually rendering.
+  describe('[WI-2472] active app shell in the request body', () => {
+    async function readSubmittedBody(): Promise<Record<string, unknown>> {
+      const [input, init] = mockFetch.mock.calls[0] as [
+        Request | URL | string,
+        RequestInit | undefined,
+      ];
+      const raw =
+        typeof init?.body === 'string'
+          ? init.body
+          : input instanceof Request
+            ? await input.text()
+            : '';
+      return JSON.parse(raw) as Record<string, unknown>;
+    }
+
+    async function submitAnswerWithV2Flag(enabled: boolean) {
+      const flags = require('../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = enabled;
+        mockFetch.mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              evaluation: {
+                passed: false,
+                shouldEscalateDepth: false,
+                masteryScore: 0,
+                qualityRating: 0,
+                feedback: 'app-help reply',
+              },
+              status: 'in_progress',
+            }),
+            { status: 200 },
+          ),
+        );
+
+        const { result } = renderHook(() => useSubmitAnswer('assess-1'), {
+          wrapper: createWrapper(),
+        });
+
+        await act(async () => {
+          result.current.mutate({ answer: 'Where are my notes?' });
+        });
+
+        await waitFor(() => {
+          expect(result.current.isSuccess).toBe(true);
+        });
+
+        return await readSubmittedBody();
+      } finally {
+        flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED = original;
+      }
+    }
+
+    it('reports shell v2 when MODE_NAV_V2_ENABLED is on', async () => {
+      expect(await submitAnswerWithV2Flag(true)).toEqual({
+        answer: 'Where are my notes?',
+        shell: 'v2',
+      });
+    });
+
+    it('reports shell v0 when MODE_NAV_V2_ENABLED is off', async () => {
+      expect(await submitAnswerWithV2Flag(false)).toEqual({
+        answer: 'Where are my notes?',
+        shell: 'v0',
+      });
+    });
+  });
+
   it('handles submission errors', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('Submission failed', { status: 500 }),

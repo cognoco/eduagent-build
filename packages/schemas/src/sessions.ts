@@ -79,14 +79,21 @@ export type ExtractedInterviewSignals = z.infer<
 // unaffected.
 import {
   ENGAGEMENT_SIGNALS,
+  appShellSchema,
   engagementSignalSchema,
   sessionTypeSchema,
+  type AppShell,
   type EngagementSignal,
   type SessionType,
 } from './session-enums.ts';
 
-export { ENGAGEMENT_SIGNALS, engagementSignalSchema, sessionTypeSchema };
-export type { EngagementSignal, SessionType };
+export {
+  ENGAGEMENT_SIGNALS,
+  appShellSchema,
+  engagementSignalSchema,
+  sessionTypeSchema,
+};
+export type { AppShell, EngagementSignal, SessionType };
 
 // Session schemas
 
@@ -95,11 +102,6 @@ export type InputMode = z.infer<typeof inputModeSchema>;
 
 export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
 export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
-
-/** Active app nav shell (WI-2220). V1 maps to 'v0' client-side — see
- *  apps/api/src/services/app-help-map.ts for the shell-to-map contract. */
-export const appShellSchema = z.enum(['v0', 'v2']);
-export type AppShell = z.infer<typeof appShellSchema>;
 
 export const homeworkProblemSourceSchema = z.enum(['ocr', 'manual']);
 export type HomeworkProblemSource = z.infer<typeof homeworkProblemSourceSchema>;

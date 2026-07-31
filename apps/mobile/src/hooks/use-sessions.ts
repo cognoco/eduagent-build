@@ -18,6 +18,7 @@ import type {
   MentorNoticePolicyObservation,
   MessageResult,
   ParkingLotItem,
+  SessionMessageInput,
   SessionMetadata,
   SessionAnalyticsEventInput,
   SessionStartResult,
@@ -334,9 +335,15 @@ export function useSendMessage(
 
   return useMutation({
     mutationFn: async (input: { message: string }) => {
+      const body: SessionMessageInput = {
+        ...input,
+        // [WI-2472] Match useStreamMessage: the non-stream turn hits the same
+        // app-help prompt composition, so it must report the active shell too.
+        shell: FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'v2' : 'v0',
+      };
       const res = await client.sessions[':sessionId'].messages.$post({
         param: { sessionId },
-        json: input,
+        json: body,
       });
       await assertOk(res);
       const result = await parseJson(
