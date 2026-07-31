@@ -1,16 +1,16 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+import { parse as parseYaml } from 'yaml';
 
 const REPO_ROOT = join(__dirname, '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'doppler-run.mjs');
 const SCRIPT_URL = pathToFileURL(SCRIPT).href;
-const FAKE_DOPPLER_DIR = join(
-  REPO_ROOT,
-  'scripts',
-  '__fixtures__',
-  'doppler-run',
-);
+const CI_WORKFLOW = join(REPO_ROOT, '.github', 'workflows', 'ci.yml');
+const FAKE_DOPPLER_PRELOAD =
+  './scripts/__fixtures__/doppler-run/fake-doppler-preload.cjs';
 const EMPTY_PATH_DIR = join(REPO_ROOT, 'scripts', '__fixtures__'); // has no `doppler` executable
 
 /**
@@ -68,13 +68,37 @@ function entryGuardTest(entry: {
 }
 
 function packageScriptTest(script: string) {
-  return spawnSync('corepack', ['pnpm', 'run', script], {
+  const pnpmCli = process.env.npm_execpath;
+  if (!pnpmCli) {
+    throw new Error(
+      'npm_execpath is required; run this suite through `pnpm test:doppler-run`.',
+    );
+  }
+
+  return spawnSync(process.execPath, [pnpmCli, 'run', script], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
-    env: {
-      ...process.env,
-      PATH: `${FAKE_DOPPLER_DIR}:${process.env.PATH}`,
-    },
+    env: fakeDopplerEnv(),
+  });
+}
+
+function fakeDopplerEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    NODE_OPTIONS: [
+      process.env.NODE_OPTIONS,
+      `--require=${FAKE_DOPPLER_PRELOAD}`,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  };
+}
+
+function dopplerRun(args: string[]) {
+  return spawnSync(process.execPath, [SCRIPT, ...args], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: fakeDopplerEnv(),
   });
 }
 
@@ -155,19 +179,17 @@ describe('doppler-run.mjs entry-point guard (WI-2522)', () => {
 });
 
 describe('doppler-run.mjs real invocation (WI-1247)', () => {
-  test('resolves the fake doppler fixture via PATH and forwards args verbatim (no reparsing)', () => {
-    const result = spawnSync(
-      process.execPath,
-      [SCRIPT, 'run', '-c', 'stg', '--', 'pnpm', 'eval:llm', '--', '--live'],
-      {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          PATH: `${FAKE_DOPPLER_DIR}:${process.env.PATH}`,
-        },
-      },
-    );
+  test('resolves the fake doppler preload and forwards args verbatim (no reparsing)', () => {
+    const result = dopplerRun([
+      'run',
+      '-c',
+      'stg',
+      '--',
+      'pnpm',
+      'eval:llm',
+      '--',
+      '--live',
+    ]);
     expect(result.stdout).toContain(
       'ARGS:run -c stg -- pnpm eval:llm -- --live',
     );
@@ -175,11 +197,7 @@ describe('doppler-run.mjs real invocation (WI-1247)', () => {
   });
 
   test('a non-zero child exit code propagates through the wrapper (must-have: never mask a failing script as green)', () => {
-    const result = spawnSync(process.execPath, [SCRIPT, '--exit-check'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      env: { ...process.env, PATH: `${FAKE_DOPPLER_DIR}:${process.env.PATH}` },
-    });
+    const result = dopplerRun(['--exit-check']);
     expect(result.status).toBe(7);
   });
 
@@ -223,5 +241,26 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
       'ARGS:run -- jest --config tests/integration/jest.config.cjs --no-coverage',
     );
     expect(result.status).toBe(0);
+  });
+});
+
+describe('native Windows CI gate (WI-2522)', () => {
+  test('runs the focused doppler wrapper suite in the required Windows job', () => {
+    const workflow = parseYaml(readFileSync(CI_WORKFLOW, 'utf8')) as {
+      jobs?: Record<
+        string,
+        {
+          'runs-on'?: string;
+          steps?: Array<{ name?: string; run?: string }>;
+        }
+      >;
+    };
+    const windowsJob = workflow.jobs?.['wi2176-windows-orion-contract'];
+    const dopplerStep = windowsJob?.steps?.find(
+      (step) => step.name === 'Run WI-2522 doppler-run Windows contract',
+    );
+
+    expect(windowsJob?.['runs-on']).toBe('windows-latest');
+    expect(dopplerStep?.run).toBe('pnpm test:doppler-run');
   });
 });

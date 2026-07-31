@@ -58,6 +58,9 @@ jobs:
           apps/mobile/scripts/run-wi2176-orion-evidence.test.ts
           --runInBand --no-coverage
 
+      - name: Run WI-2522 doppler-run Windows contract
+        run: pnpm test:doppler-run
+
   main:
     needs: wi2176-windows-orion-contract
     if: ${{ always() }}
