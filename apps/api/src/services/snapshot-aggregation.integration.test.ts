@@ -19,6 +19,9 @@ import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
+  curricula,
+  curriculumBooks,
+  curriculumTopics,
   generateUUIDv7,
   milestones,
   progressSnapshots,
@@ -188,6 +191,66 @@ describe('[BUG-872] buildKnowledgeInventory includes subjects added after the ca
     expect(
       inventory.subjects.map((s: SubjectInventory) => s.subjectId),
     ).toEqual([mathId]);
+  });
+});
+
+describe('snapshot aggregation uses the shared latest curriculum accessor [WI-2463]', () => {
+  it('counts only v2 topics when an owned subject has v1 and v2 curricula', async () => {
+    const profileId = await seedProfile();
+    const subjectId = await seedSubject(profileId, 'Versioned Snapshot');
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId,
+        title: 'Versioned Snapshot Book',
+        sortOrder: 0,
+        topicsGenerated: true,
+      })
+      .returning({ id: curriculumBooks.id });
+    const curriculumRows = await db
+      .insert(curricula)
+      .values([
+        { subjectId, version: 1 },
+        { subjectId, version: 2 },
+      ])
+      .returning({ id: curricula.id, version: curricula.version });
+    const v1 = curriculumRows.find((row) => row.version === 1);
+    const v2 = curriculumRows.find((row) => row.version === 2);
+    if (!v1 || !v2) {
+      throw new Error('Expected version 1 and version 2 curriculum fixtures');
+    }
+    await db.insert(curriculumTopics).values([
+      {
+        curriculumId: v1.id,
+        bookId: book!.id,
+        title: 'Old topic one',
+        description: 'Historical topic',
+        sortOrder: 0,
+        estimatedMinutes: 20,
+      },
+      {
+        curriculumId: v1.id,
+        bookId: book!.id,
+        title: 'Old topic two',
+        description: 'Historical topic',
+        sortOrder: 1,
+        estimatedMinutes: 20,
+      },
+      {
+        curriculumId: v2.id,
+        bookId: book!.id,
+        title: 'Current topic',
+        description: 'Current topic',
+        sortOrder: 0,
+        estimatedMinutes: 20,
+      },
+    ]);
+
+    const inventory = await buildKnowledgeInventory(db, profileId);
+
+    expect(
+      inventory.subjects.find((subject) => subject.subjectId === subjectId),
+    ).toMatchObject({ topics: { total: 1 } });
   });
 });
 

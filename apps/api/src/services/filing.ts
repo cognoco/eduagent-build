@@ -32,6 +32,7 @@ import { extractFirstJsonObject } from './llm/extract-json';
 import { escapeXml } from './llm/sanitize';
 import { captureException } from './sentry';
 import { assertBookTopicWriteAvailable } from './curriculum-core';
+import { getLatestCurriculum } from './curriculum';
 
 const MAX_TOPIC_SUMMARIES = 50;
 
@@ -734,9 +735,11 @@ export async function resolveFilingResult(
     // Lock order is book → curriculum, matching expansion persistence. Doing
     // this before the book fence creates a deadlock window on legacy books
     // whose curriculum row has not been materialized yet.
-    const existingCurriculum = await txDb.query.curricula.findFirst({
-      where: eq(curricula.subjectId, shelfId),
-    });
+    const existingCurriculum = await getLatestCurriculum(
+      txDb,
+      profileId,
+      shelfId,
+    );
     let curriculumId: string;
     if (existingCurriculum) {
       curriculumId = existingCurriculum.id;
