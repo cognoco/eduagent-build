@@ -98,7 +98,7 @@ function packageScriptTest(script: string, args: string[] = []) {
 }
 
 function fakeDopplerEnv(
-  options: { executeChild?: boolean } = {},
+  options: { executeChild?: boolean; forceMissing?: boolean } = {},
 ): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -112,6 +112,7 @@ function fakeDopplerEnv(
           DOPPLER_RUN_FAKE_EXEC_CHILD: '1',
         }
       : {}),
+    ...(options.forceMissing ? { DOPPLER_RUN_FAKE_MISSING: '1' } : {}),
     NODE_OPTIONS: [
       process.env.NODE_OPTIONS,
       `--require=${FAKE_DOPPLER_PRELOAD}`,
@@ -256,7 +257,10 @@ describe('doppler-run.mjs real invocation (WI-1247)', () => {
       {
         cwd: REPO_ROOT,
         encoding: 'utf8',
-        env: { ...process.env, PATH: EMPTY_PATH_DIR },
+        env: {
+          ...fakeDopplerEnv({ forceMissing: true }),
+          PATH: EMPTY_PATH_DIR,
+        },
       },
     );
     expect(result.status).not.toBe(0);

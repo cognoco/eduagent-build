@@ -212,6 +212,30 @@ violations in `doppler-run.mjs`. Formatting changed only those
 `resolveDopplerBinary()`/`selfTest()` lines; the approved entry-guard logic was
 unchanged.
 
+## Hermetic missing-Doppler case after fifth adversarial review
+
+At the fifth-review head, the negative real-invocation test replaced `PATH` but
+still called the host filesystem for `C:/Tools/doppler/doppler.exe`. A native
+Windows machine with Doppler installed at that supported fallback could
+therefore make the missing-Doppler test dispatch the real executable.
+
+The existing test preload now has a conditional missing-Doppler mode. For that
+one negative case it returns `ENOENT` for the `doppler` PATH probe and `false`
+for the exact Windows fallback path. Production code and behavior are
+unchanged.
+
+Fifth-review TDD cycle under Node `v22.16.0`:
+
+1. **RED:** enabled the requested test mode before implementing it. The preload
+   continued reporting fake Doppler as present: 1 failed, 17 passed.
+2. **GREEN:** implemented both test-only resolver interceptions:
+   18 passed, 0 failed.
+3. **SEAM-ONLY REVERT RED:** disabled only the new test-mode request while
+   holding its assertion and preload implementation fixed:
+   1 failed, 17 passed.
+4. **RESTORE GREEN:** restored the test-mode request:
+   18 passed, 0 failed.
+
 ## Package-script dispatch coverage
 
 The focused suite runs `pnpm test`, `pnpm test:api:integration`, and

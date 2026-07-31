@@ -1,9 +1,12 @@
 const childProcess = require('node:child_process');
+const fs = require('node:fs');
 const { syncBuiltinESMExports } = require('node:module');
 const { join } = require('node:path');
 
 const realSpawnSync = childProcess.spawnSync;
+const realExistsSync = fs.existsSync;
 const childBoundary = join(__dirname, 'child-boundary.cjs');
+const windowsFallback = 'C:/Tools/doppler/doppler.exe';
 
 function fakeResult(status) {
   return {
@@ -15,6 +18,25 @@ function fakeResult(status) {
     signal: null,
   };
 }
+
+function fakeMissingResult(binary) {
+  return {
+    ...fakeResult(null),
+    error: Object.assign(new Error(`spawnSync ${binary} ENOENT`), {
+      code: 'ENOENT',
+    }),
+  };
+}
+
+fs.existsSync = function existsSync(path) {
+  if (
+    process.env.DOPPLER_RUN_FAKE_MISSING === '1' &&
+    path === windowsFallback
+  ) {
+    return false;
+  }
+  return Reflect.apply(realExistsSync, this, [path]);
+};
 
 function runChildBoundary(command, args, options) {
   return realSpawnSync(
@@ -32,6 +54,10 @@ function pnpmArgs(binary, args) {
 }
 
 childProcess.spawnSync = function spawnSync(binary, args = [], options) {
+  if (process.env.DOPPLER_RUN_FAKE_MISSING === '1' && binary === 'doppler') {
+    return fakeMissingResult(binary);
+  }
+
   if (process.env.DOPPLER_RUN_FAKE_EXEC_CHILD === '1') {
     const packageManagerArgs = pnpmArgs(binary, args);
     if (packageManagerArgs?.[0] === 'exec' && packageManagerArgs[1] === 'nx') {
