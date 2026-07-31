@@ -104,10 +104,12 @@ Last reconciled: 2026-07-31 11:08 CEST
   remain prerequisites.
 - WI-2936 — Ready and unclaimed. Execution needs an operator ruling because the
   mandatory repo worktree script always runs Doppler `env:sync`, while the item scope
-  forbids touching Doppler. The currently presented recommendation is a narrow
-  exception permitting read-only development sync into the normal ignored local
-  file, while forbidding remote mutation, secret output/commit, and any
-  staging/production access.
+  forbids touching Doppler. The operator authorized a one-worktree exception in
+  comment `3ae8bce9-1f7c-8166-8f54-001da619ca14`: create the canonical isolated
+  worktree and install dependencies, skip `pnpm env:sync`, and use only existing
+  local credentials without printing, committing, uploading, rotating, or remotely
+  synchronizing them. Dispatch waits only for a WIP slot. FO-2080 /
+  `OCC-894322F2C99D` records the broader setup observation without creating a WI.
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.

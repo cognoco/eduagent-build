@@ -92,7 +92,10 @@ Delivery Batch as `Done`.
   - WI-2826 — instrumentation/live hosted proof gate.
   - WI-2922 — bounded shared-development database reconciliation gate.
   - WI-2923 — bounded development Clerk/Doppler mutation gate.
-  - WI-2936 — no-Doppler worktree-setup exception gate.
+  - WI-2936 — operator-authorized one-worktree exception: use the canonical
+    isolated worktree and install dependencies, skip `pnpm env:sync`, and use only
+    already-existing local credentials without printing, committing, uploading,
+    rotating, or remotely synchronizing them. Dispatch waits only for a WIP slot.
 - Finding Occurrences, not new Work Items, now preserve delivery observations:
   FO-2075 (`OCC-F968A7988008`) records the intake/scope correction; FO-2076
   (`OCC-B9142581EAF8`) records the WI-2755 completion/PR mismatch; FO-2077
@@ -107,9 +110,10 @@ Delivery Batch as `Done`.
 - Same-owner claims for WI-2790, WI-2921, and WI-2939 are verified future through
   12:07 UTC / 14:07 CEST; WI-2755's same-owner claim was freshly renewed after
   its local merge reconciliation.
-- The next operator ruling presented is WI-2936's narrow standard-worktree setup
-  exception: read development Doppler values into the normal ignored local file,
-  with no remote mutation, secret output/commit, or staging/production access.
+- WI-2936's worktree exception is authorized in Cosmo comment
+  `3ae8bce9-1f7c-8166-8f54-001da619ca14`. FO-2080
+  (`OCC-894322F2C99D`) records that mandatory `env:sync` has broader staging and
+  remote-mutation effects than isolated local setup; no new Work Item was created.
 - Checkpoint branch `bid-48-lane-state` is pushed through `02c8ba9c8`.
 - The historical sections below are retained only as an audit trail. This section,
   Cosmo, and GitHub supersede every stale lifecycle position below.
