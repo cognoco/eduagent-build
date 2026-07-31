@@ -4561,7 +4561,9 @@
       "structuralOnly": "Nur strukturelle Fakten. Keine Roh-Notizen oder Chat-Texte.",
       "errorTitle": "Gemeinsamer Bericht konnte nicht geladen werden",
       "errorMessage": "Gleich erneut versuchen.",
-      "retry": "Erneut versuchen"
+      "retry": "Erneut versuchen",
+      "unavailable_one": "1 Aktualisierung konnte gerade nicht geladen werden.",
+      "unavailable_other": "{{count}} Aktualisierungen konnten gerade nicht geladen werden."
     },
     "appeal": {
       "label": "Aufmerksamkeitsbericht anfordern",

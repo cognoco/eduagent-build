@@ -43,6 +43,26 @@ const RECORD: SharedRecord = {
 };
 
 describe('SharedRecordView', () => {
+  // [WI-2232 P2] A durable report that fails to project is dropped from the
+  // list so one drifted row cannot break the Journal — but it must not vanish
+  // silently, so the count is surfaced to the reader.
+  it('marks durable updates that could not be loaded', () => {
+    render(
+      <SharedRecordView record={{ ...RECORD, unavailableFactCount: 2 }} />,
+    );
+
+    screen.getByTestId('visibility-shared-record-unavailable');
+    screen.getByText("2 updates couldn't be loaded right now.");
+  });
+
+  it('shows no unavailable marker when every update loaded', () => {
+    render(<SharedRecordView record={RECORD} />);
+
+    expect(
+      screen.queryByTestId('visibility-shared-record-unavailable'),
+    ).toBeNull();
+  });
+
   it('renders structural facts without artifact text', () => {
     render(<SharedRecordView record={RECORD} />);
 

@@ -4385,7 +4385,9 @@
       "structuralOnly": "Structural facts only. No raw notes or chat text.",
       "errorTitle": "Couldn't load the shared record",
       "errorMessage": "Try again in a moment.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "unavailable_one": "1 update couldn't be loaded right now.",
+      "unavailable_other": "{{count}} updates couldn't be loaded right now."
     },
     "appeal": {
       "label": "Request attention report",

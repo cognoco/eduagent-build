@@ -4696,7 +4696,11 @@
       "structuralOnly": "Tylko fakty strukturalne. Bez surowych notatek i treści czatów.",
       "errorTitle": "Nie udało się wczytać udostępnionych danych",
       "errorMessage": "Spróbuj ponownie za chwilę.",
-      "retry": "Spróbuj ponownie"
+      "retry": "Spróbuj ponownie",
+      "unavailable_one": "Nie udało się teraz wczytać 1 aktualizacji.",
+      "unavailable_few": "Nie udało się teraz wczytać {{count}} aktualizacji.",
+      "unavailable_many": "Nie udało się teraz wczytać {{count}} aktualizacji.",
+      "unavailable_other": "Nie udało się teraz wczytać {{count}} aktualizacji."
     },
     "appeal": {
       "label": "Poproś o raport uwagi",

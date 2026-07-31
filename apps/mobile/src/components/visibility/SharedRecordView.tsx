@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type {
   AppealReport,
@@ -107,6 +107,16 @@ export function SharedRecordView({
         appeal={appeal}
         testID="visibility-shared-record"
       />
+      {record?.unavailableFactCount ? (
+        <Text
+          testID="visibility-shared-record-unavailable"
+          className="mt-2 text-caption text-text-secondary"
+        >
+          {t('visibility.sharedRecord.unavailable', {
+            count: record.unavailableFactCount,
+          })}
+        </Text>
+      ) : null}
       {record && onAppeal && appealError ? (
         <View className="mt-4 border-t border-border pt-4">
           <ErrorFallback

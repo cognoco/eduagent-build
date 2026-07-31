@@ -104,6 +104,11 @@ export const sharedRecordSchema = z.object({
   supportershipId: z.string().uuid(),
   generatedAt: isoDateField,
   factIds: z.array(z.string().min(1)).readonly(),
+  // [WI-2232] Durable artifacts that exist but could not be projected (schema
+  // drift on a persisted row). Present only when at least one was dropped, so
+  // absent means "nothing was withheld" — the UI shows a marker when it is set
+  // rather than letting the artifact vanish without a trace.
+  unavailableFactCount: z.number().int().positive().optional(),
   supporterView: sharedRecordViewSchema.extend({
     audience: z.literal('supporter'),
   }),

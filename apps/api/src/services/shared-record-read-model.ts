@@ -46,20 +46,29 @@ function metadataString(metadata: unknown, key: string): string | undefined {
 
 function projectWeeklyReportFact(
   row: typeof weeklyReports.$inferSelect,
-  invalidRow: 'skip' | 'throw' = 'skip',
+  opts: {
+    context:
+      | 'projectSharedRecordForSupportee'
+      | 'projectSharedArtifactForSupportee';
+    invalidRow: 'skip' | 'throw';
+  },
 ): CandidateReportFact | null {
   const parsed = weeklyReportDataSchema.safeParse(row.reportData);
   if (!parsed.success) {
-    if (invalidRow === 'skip') return null;
+    // [WI-2232 P2] Capture BEFORE the mode branch. The list path skips the row
+    // so one drifted report cannot take the whole Journal down, but skipping is
+    // not the same as silence: the failure is always reported to Sentry, and the
+    // caller counts the skips so the response can surface them to the user.
     captureException(parsed.error, {
       profileId: row.profileId,
       extra: {
-        context: 'projectSharedArtifactForSupportee',
+        context: opts.context,
         reportId: row.id,
         childProfileId: row.childProfileId,
         issues: parsed.error.issues,
       },
     });
+    if (opts.invalidRow === 'skip') return null;
     throw new SchemaDriftError('WeeklyReport', parsed.error.issues);
   }
   const stat = parsed.data.headlineStat;
@@ -125,13 +134,30 @@ async function projectSharedRecordForSupportee(
   },
 ): Promise<SharedRecord> {
   const supporteeRepo = createScopedRepository(db, input.supporteePersonId);
+  const supporterRepo = createScopedRepository(db, input.supporterPersonId);
 
-  const [supportee, weeklyRows, recapRows, milestoneRows] = await Promise.all([
+  const [
+    supportee,
+    selfOwnedRows,
+    supporterOwnedRows,
+    recapRows,
+    milestoneRows,
+  ] = await Promise.all([
     db.query.person.findFirst({
       where: eq(person.id, input.supporteePersonId),
       columns: { displayName: true },
     }),
+    // Shape A — the learner's own weekly report (weekly-self-reports.ts writes
+    // profileId === childProfileId === the learner).
     supporteeRepo.weeklyReports.findMany(
+      eq(weeklyReports.childProfileId, input.supporteePersonId),
+    ),
+    // Shape B — the digest delivered to this supporter (weekly-digest.ts writes
+    // profileId = the supporter, childProfileId = the supportee). Only these two
+    // owners are authorized: childProfileId pins the row to this supportee, and
+    // the scoped profileId keeps a third party's digest about the same supportee
+    // out of this supporter's Journal.
+    supporterRepo.weeklyReports.findMany(
       eq(weeklyReports.childProfileId, input.supporteePersonId),
     ),
     supporteeRepo.sessionSummaries.findMany(
@@ -143,9 +169,29 @@ async function projectSharedRecordForSupportee(
     supporteeRepo.milestones.findMany(undefined, desc(milestones.createdAt)),
   ]);
 
+  // Dedupe strictly by report identity — never by week. Two distinct rows may
+  // legitimately describe the same week, and choosing a winner between them is a
+  // product decision that has not been ruled; both stay visible.
+  const weeklyRows = [
+    ...new Map(
+      [...selfOwnedRows, ...supporterOwnedRows].map((row) => [row.id, row]),
+    ).values(),
+  ].sort(
+    (a, b) =>
+      b.reportWeek.localeCompare(a.reportWeek) || a.id.localeCompare(b.id),
+  );
+
+  let unavailableFactCount = 0;
   const weeklyFacts = weeklyRows.flatMap((row) => {
-    const fact = projectWeeklyReportFact(row);
-    return fact ? [fact] : [];
+    const fact = projectWeeklyReportFact(row, {
+      context: 'projectSharedRecordForSupportee',
+      invalidRow: 'skip',
+    });
+    if (!fact) {
+      unavailableFactCount += 1;
+      return [];
+    }
+    return [fact];
   });
 
   const recapFacts: CandidateReportFact[] = recapRows.flatMap((row) => {
@@ -181,6 +227,7 @@ async function projectSharedRecordForSupportee(
       supportershipId: input.supportershipId,
       supporteeDisplayName: supportee?.displayName,
       facts: [...weeklyFacts, ...recapFacts, ...milestoneFacts],
+      unavailableFactCount,
     }),
   );
 }
@@ -196,6 +243,22 @@ async function projectSharedArtifactForSupportee(
   },
 ): Promise<SharedRecord> {
   const supporteeRepo = createScopedRepository(db, input.supporteePersonId);
+  const supporterRepo = createScopedRepository(db, input.supporterPersonId);
+
+  // The exact link must resolve through the same two authorized ownership shapes
+  // the list reads. weeklyReports.id is the primary key, so at most one of these
+  // lookups can match — there is no precedence question on this path.
+  const findAuthorizedWeeklyReport = async () => {
+    const artifactWhere = and(
+      eq(weeklyReports.id, input.artifactId),
+      eq(weeklyReports.childProfileId, input.supporteePersonId),
+    );
+    return (
+      (await supporteeRepo.weeklyReports.findFirst(artifactWhere)) ??
+      (await supporterRepo.weeklyReports.findFirst(artifactWhere)) ??
+      null
+    );
+  };
 
   const [supportee, fact] = await Promise.all([
     db.query.person.findFirst({
@@ -203,14 +266,14 @@ async function projectSharedArtifactForSupportee(
       columns: { displayName: true },
     }),
     input.artifactKind === 'weekly_report'
-      ? supporteeRepo.weeklyReports
-          .findFirst(
-            and(
-              eq(weeklyReports.id, input.artifactId),
-              eq(weeklyReports.childProfileId, input.supporteePersonId),
-            ),
-          )
-          .then((row) => (row ? projectWeeklyReportFact(row, 'throw') : null))
+      ? findAuthorizedWeeklyReport().then((row) =>
+          row
+            ? projectWeeklyReportFact(row, {
+                context: 'projectSharedArtifactForSupportee',
+                invalidRow: 'throw',
+              })
+            : null,
+        )
       : supporteeRepo.sessionSummaries
           .findFirst(
             and(

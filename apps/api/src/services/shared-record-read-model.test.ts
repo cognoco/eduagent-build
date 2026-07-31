@@ -29,6 +29,9 @@ const UUID = {
   olderSession: '00000000-0000-4000-8000-000000000010',
   summary: '00000000-0000-4000-8000-000000000006',
   milestone: '00000000-0000-4000-8000-000000000007',
+  supporterDigest: '00000000-0000-4000-8000-000000000011',
+  stranger: '00000000-0000-4000-8000-000000000012',
+  strangerDigest: '00000000-0000-4000-8000-000000000013',
 } as const;
 
 const weeklyReportData: WeeklyReportData = {
@@ -50,7 +53,22 @@ const weeklyReportData: WeeklyReportData = {
   },
 };
 
-const productionWeeklyReport = {
+type WeeklyReportRow = {
+  id: string;
+  profileId: string;
+  childProfileId: string;
+  reportWeek: string;
+  // Deliberately `unknown`: schema-drift cases persist rows that no longer
+  // satisfy weeklyReportDataSchema, which is exactly what the read model parses.
+  reportData: unknown;
+  viewedAt: Date | null;
+  createdAt: Date;
+};
+
+// Ownership shape A — the learner's OWN weekly report.
+// Mirrors weekly-self-reports.ts:346-352, which writes
+// `profileId: profileId, childProfileId: profileId` (both = the learner).
+const selfOwnedWeeklyReport: WeeklyReportRow = {
   id: UUID.weeklyReport,
   profileId: UUID.supportee,
   childProfileId: UUID.supportee,
@@ -60,17 +78,60 @@ const productionWeeklyReport = {
   createdAt: new Date('2026-06-29T12:00:00.000Z'),
 };
 
-function weeklyReportQueryMatches(
+// Ownership shape B — the delivered digest the supporter received.
+// Mirrors weekly-digest.ts:168-175, which writes
+// `profileId: parentId (the supporter), childProfileId (the supportee)`.
+// A distinct reportWeek from shape A: whether two rows may describe the SAME
+// week is an unruled product question, so no fixture asserts that behavior.
+const supporterOwnedWeeklyDigest: WeeklyReportRow = {
+  id: UUID.supporterDigest,
+  profileId: UUID.supporter,
+  childProfileId: UUID.supportee,
+  reportWeek: '2026-06-15',
+  reportData: weeklyReportData,
+  viewedAt: null,
+  createdAt: new Date('2026-06-22T12:00:00.000Z'),
+};
+
+// Negative wall — a THIRD party's digest about the same supportee. Same
+// childProfileId as the two authorized shapes, so only the profileId scope
+// keeps it out of this supporter's Journal.
+const strangerOwnedWeeklyDigest: WeeklyReportRow = {
+  id: UUID.strangerDigest,
+  profileId: UUID.stranger,
+  childProfileId: UUID.supportee,
+  reportWeek: '2026-06-08',
+  reportData: weeklyReportData,
+  viewedAt: null,
+  createdAt: new Date('2026-06-15T12:00:00.000Z'),
+};
+
+// Dispatches on the scoped profileId (params[0]) so each scoped repository call
+// only ever sees the rows it is genuinely authorized to read. Returning the same
+// row for both scopes would let the test pass without proving either shape.
+function weeklyReportRowsFor(
   query: { where?: unknown },
-  row: typeof productionWeeklyReport,
+  rows: readonly WeeklyReportRow[],
   exact: boolean,
-): boolean {
-  if (!query.where) return false;
+): WeeklyReportRow[] {
+  if (!query.where) return [];
   const params = new PgDialect().sqlToQuery(query.where as never).params;
-  return params[0] === row.profileId && (!exact || params.includes(row.id));
+  return rows.filter(
+    (row) =>
+      params[0] === row.profileId &&
+      params.includes(row.childProfileId) &&
+      (!exact || params.includes(row.id)),
+  );
 }
 
-function createDb(authorized = true): Database {
+function createDb(
+  authorized = true,
+  weeklyRows: readonly WeeklyReportRow[] = [
+    selfOwnedWeeklyReport,
+    supporterOwnedWeeklyDigest,
+    strangerOwnedWeeklyDigest,
+  ],
+): Database {
   const authChain = {
     from: jest.fn(),
     innerJoin: jest.fn(),
@@ -114,17 +175,14 @@ function createDb(authorized = true): Database {
       weeklyReports: {
         findFirst: jest
           .fn()
-          .mockImplementation(async (query) =>
-            weeklyReportQueryMatches(query, productionWeeklyReport, true)
-              ? productionWeeklyReport
-              : null,
+          .mockImplementation(
+            async (query) =>
+              weeklyReportRowsFor(query, weeklyRows, true)[0] ?? null,
           ),
         findMany: jest
           .fn()
           .mockImplementation(async (query) =>
-            weeklyReportQueryMatches(query, productionWeeklyReport, false)
-              ? [productionWeeklyReport]
-              : [],
+            weeklyReportRowsFor(query, weeklyRows, false),
           ),
       },
       sessionSummaries: {
@@ -184,7 +242,7 @@ function createDb(authorized = true): Database {
 
 describe('readSharedRecordForSupportee', () => {
   it('projects real report, recap, and milestone facts without raw artifacts', async () => {
-    const db = createDb();
+    const db = createDb(true, [selfOwnedWeeklyReport]);
     const record = await readSharedRecordForSupportee(db, {
       supporterPersonId: UUID.supporter,
       supporteePersonId: UUID.supportee,
@@ -239,8 +297,8 @@ describe('readSharedRecordForSupportee', () => {
   });
 
   it('keeps every durable report and accepted recap discoverable in the Journal', async () => {
-    const db = createDb();
-    jest.mocked(db.query.weeklyReports.findMany).mockResolvedValueOnce(
+    const db = createDb(
+      true,
       Array.from({ length: 4 }, (_, index) => ({
         id: `00000000-0000-4000-8000-${String(100 + index).padStart(12, '0')}`,
         profileId: UUID.supportee,
@@ -341,16 +399,17 @@ describe('readSharedRecordForSupportee', () => {
   });
 
   it('loads an older weekly report by id without depending on the capped Journal projection', async () => {
-    const db = createDb();
-    jest.mocked(db.query.weeklyReports.findFirst).mockResolvedValueOnce({
-      id: UUID.olderWeeklyReport,
-      profileId: UUID.supportee,
-      childProfileId: UUID.supportee,
-      reportWeek: '2026-06-15',
-      reportData: weeklyReportData,
-      viewedAt: null,
-      createdAt: new Date('2026-06-22T12:00:00.000Z'),
-    });
+    const db = createDb(true, [
+      {
+        id: UUID.olderWeeklyReport,
+        profileId: UUID.supportee,
+        childProfileId: UUID.supportee,
+        reportWeek: '2026-06-15',
+        reportData: weeklyReportData,
+        viewedAt: null,
+        createdAt: new Date('2026-06-22T12:00:00.000Z'),
+      },
+    ]);
 
     const record = await readSharedArtifactForSupportee(db, {
       supporterPersonId: UUID.supporter,
@@ -369,16 +428,17 @@ describe('readSharedRecordForSupportee', () => {
   });
 
   it('surfaces schema drift when an existing weekly report cannot be projected', async () => {
-    const db = createDb();
-    jest.mocked(db.query.weeklyReports.findFirst).mockResolvedValueOnce({
-      id: UUID.olderWeeklyReport,
-      profileId: UUID.supportee,
-      childProfileId: UUID.supportee,
-      reportWeek: '2026-06-15',
-      reportData: { headlineStat: 'invalid' },
-      viewedAt: null,
-      createdAt: new Date('2026-06-22T12:00:00.000Z'),
-    });
+    const db = createDb(true, [
+      {
+        id: UUID.olderWeeklyReport,
+        profileId: UUID.supportee,
+        childProfileId: UUID.supportee,
+        reportWeek: '2026-06-15',
+        reportData: { headlineStat: 'invalid' },
+        viewedAt: null,
+        createdAt: new Date('2026-06-22T12:00:00.000Z'),
+      },
+    ]);
 
     await expect(
       readSharedArtifactForSupportee(db, {
@@ -484,5 +544,136 @@ describe('readSharedRecordForSupportee', () => {
         artifactId: UUID.olderSession,
       }),
     ).rejects.toThrow('Journal artifact not found');
+  });
+
+  // [WI-2232 P1] Two ownership shapes are authorized for one supportership, and
+  // which one exists depends on the relationship: weekly-self-reports.ts skips
+  // linked children, so a guardian's supportee only ever has the delivered
+  // digest (shape B), while a non-guardian supportee only has self reports
+  // (shape A). Reading a single shape strands one whole population.
+  it('lists self-owned reports and supporter-owned delivered digests together', async () => {
+    const db = createDb();
+
+    const record = await readSharedRecordForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+    });
+
+    expect(
+      record.supporterView.facts.flatMap((fact) =>
+        fact.artifact?.kind === 'weekly_report' ? [fact.artifact.id] : [],
+      ),
+    ).toEqual([UUID.weeklyReport, UUID.supporterDigest]);
+  });
+
+  it('excludes a third party digest about the same supportee from the list', async () => {
+    const db = createDb();
+
+    const record = await readSharedRecordForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+    });
+
+    expect(JSON.stringify(record)).not.toContain(UUID.strangerDigest);
+  });
+
+  it('loads a supporter-owned delivered digest through its exact Journal link', async () => {
+    const db = createDb();
+
+    const record = await readSharedArtifactForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+      artifactKind: 'weekly_report',
+      artifactId: UUID.supporterDigest,
+    });
+
+    expect(record.supporterView.facts[0]?.artifact).toEqual({
+      kind: 'weekly_report',
+      id: UUID.supporterDigest,
+    });
+  });
+
+  it('refuses an exact link to a third party digest about the same supportee', async () => {
+    const db = createDb();
+
+    await expect(
+      readSharedArtifactForSupportee(db, {
+        supporterPersonId: UUID.supporter,
+        supporteePersonId: UUID.supportee,
+        artifactKind: 'weekly_report',
+        artifactId: UUID.strangerDigest,
+      }),
+    ).rejects.toThrow('Journal artifact not found');
+  });
+
+  it('dedupes the merged weekly reports by report identity', async () => {
+    // Same row reachable from both scopes (profileId === supporter === the row
+    // owner) must still project exactly one fact.
+    const db = createDb(true, [
+      { ...supporterOwnedWeeklyDigest, profileId: UUID.supportee },
+      supporterOwnedWeeklyDigest,
+    ]);
+
+    const record = await readSharedRecordForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+    });
+
+    const weeklyIds = record.supporterView.facts.flatMap((fact) =>
+      fact.artifact?.kind === 'weekly_report' ? [fact.artifact.id] : [],
+    );
+    expect(weeklyIds).toEqual([UUID.supporterDigest]);
+    expect(new Set(record.supporterView.factIds).size).toBe(
+      record.supporterView.factIds.length,
+    );
+  });
+
+  // [WI-2232 P2] A row that no longer satisfies weeklyReportDataSchema must not
+  // vanish without a trace, but it must also not take the whole Journal list
+  // down with it: the good rows still render, the failure is captured, and the
+  // response carries a count the UI can surface.
+  it('keeps the Journal list usable when one weekly report cannot be projected', async () => {
+    const db = createDb(true, [
+      selfOwnedWeeklyReport,
+      {
+        ...supporterOwnedWeeklyDigest,
+        reportData: { headlineStat: 'invalid' },
+      },
+    ]);
+
+    const record = await readSharedRecordForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+    });
+
+    expect(
+      record.supporterView.facts.flatMap((fact) =>
+        fact.artifact?.kind === 'weekly_report' ? [fact.artifact.id] : [],
+      ),
+    ).toEqual([UUID.weeklyReport]);
+    expect(record.unavailableFactCount).toBe(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        profileId: UUID.supporter,
+        extra: expect.objectContaining({
+          context: 'projectSharedRecordForSupportee',
+          reportId: UUID.supporterDigest,
+          childProfileId: UUID.supportee,
+          issues: expect.any(Array),
+        }),
+      }),
+    );
+  });
+
+  it('omits the unavailable count when every weekly report projects cleanly', async () => {
+    const db = createDb();
+
+    const record = await readSharedRecordForSupportee(db, {
+      supporterPersonId: UUID.supporter,
+      supporteePersonId: UUID.supportee,
+    });
+
+    expect(record.unavailableFactCount).toBeUndefined();
   });
 });

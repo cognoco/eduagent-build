@@ -4526,7 +4526,9 @@
       "structuralOnly": "Solo datos estructurales. Sin notas ni textos de chat en bruto.",
       "errorTitle": "No se pudo cargar el registro compartido",
       "errorMessage": "Inténtalo de nuevo en un momento.",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "unavailable_one": "No se ha podido cargar 1 actualización en este momento.",
+      "unavailable_other": "No se han podido cargar {{count}} actualizaciones en este momento."
     },
     "appeal": {
       "label": "Solicitar informe de atención",

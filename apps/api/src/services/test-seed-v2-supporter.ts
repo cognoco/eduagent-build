@@ -252,6 +252,8 @@ export async function seedV2SupporterAccepted(
     profileId: richSupportee.personId,
     subjectId,
     topicId,
+    learnerRecap:
+      'The learner explained the topic in their own words and corrected one step independently.',
   });
   const { sessionId: secondSessionId, summaryId: secondSessionSummaryId } =
     await insertSessionWithRecap(db, {
@@ -261,6 +263,8 @@ export async function seedV2SupporterAccepted(
       endedDaysAgo: 2,
       recapContent:
         'A second persisted recap proves the person Journal survives relaunch with history.',
+      learnerRecap:
+        'The learner connected this session to the earlier topic and described what changed.',
     });
 
   const { reportId: weeklyReportId } = await insertWeeklyReport(db, {

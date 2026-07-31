@@ -4526,7 +4526,9 @@
       "structuralOnly": "Kun strukturelle fakta. Ingen rånotater eller chattetekst.",
       "errorTitle": "Kunne ikke laste den delte oversikten",
       "errorMessage": "Prøv igjen om et øyeblikk.",
-      "retry": "Prøv igjen"
+      "retry": "Prøv igjen",
+      "unavailable_one": "1 oppdatering kunne ikke lastes inn akkurat nå.",
+      "unavailable_other": "{{count}} oppdateringer kunne ikke lastes inn akkurat nå."
     },
     "appeal": {
       "label": "Be om oppmerksomhetsrapport",
