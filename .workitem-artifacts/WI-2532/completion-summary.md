@@ -62,7 +62,9 @@ unavailable and is presented as such. This change does not activate or authorize
 that path. The branch was merge-forwarded through current authoritative main,
 preserving landed WI-2231 routing, WI-2399 resubmit-generation guards, WI-1556
 first-Mentor language confirmation, WI-2820/WI-2944 test-seed batching, and
-WI-2653 profile-authority behavior; no history was rewritten.
+WI-2653 profile-authority behavior. The later learner-egress filter merge was
+also zero-overlap and its focused API unit set completed successfully; no
+history was rewritten.
 The Work Item remains Executing until its PR lands; lifecycle completion must
 not run while the PR is open. Final attributable E2E evidence must come from
 the published exact head.

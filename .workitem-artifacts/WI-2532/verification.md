@@ -48,6 +48,9 @@
 - After merging authoritative main `09a383cf5`, the affected API unit set for
   the landed test-seed and profile-authority changes passed 3 suites / 203
   tests under Doppler `dev`.
+- After merging authoritative main `59906b359`, the affected learner-egress
+  filter, embeddings, and LLM-router unit set passed 3 suites / 40 tests under
+  Doppler `dev`.
 - The main-identical metering integration suite remains 4/4 red on the
   pre-repoint Orion development database. Exact command:
   `doppler run --project mentomate --config dev -- pnpm exec jest --config
@@ -88,7 +91,8 @@ published exact head.
   `09a383cf5a10dbb96e4f6ad395e3f3ce6f223de3`, which includes landed WI-2231
   PR #2704, WI-2399 PR #2722, WI-1556 PR #2727, WI-2639 PR #2730, WI-2820
   PR #2713, WI-2790 PR #2733, WI-2944 (established test-seed profile
-  confirmation) PR #2743, and WI-2653 PR #2739.
+  confirmation) PR #2743, WI-2653 PR #2739, and WI-2737 (learner PII egress
+  filtering) PR #2745.
 - The known create-profile overlap was reconciled without rebase or history
   rewrite. WI-2532 retains the durable non-authorizing fork and adopts WI-2231's
   current `handleCompleted` / `getPostAuthDefaultPath` completion behavior
@@ -120,6 +124,9 @@ published exact head.
   14-suite / 472-test WI-2532 mobile union and 3 suites / 203 tests of affected
   API unit coverage. Its pre-repoint metering integration baseline is recorded
   explicitly above and was not patched on this branch.
+- The subsequent zero-direct-overlap WI-2737 API/docs merge passed its focused
+  learner-egress filter, embeddings, and LLM-router unit set (3 suites / 40
+  tests) under Doppler `dev`.
 - `scripts/run-api-integration.test.ts` remains 6/12 red on Orion because its
   fake Corepack executables are extensionless shebang files that Windows
   `spawnSync` does not resolve. The batch orchestrator dispositioned this as an
