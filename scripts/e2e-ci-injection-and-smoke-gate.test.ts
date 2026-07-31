@@ -7390,6 +7390,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
       {
         extendedWaitUntil: {
+          visible: { id: 'assistant-response-complete-.*' },
+          timeout: 60000,
+        },
+      },
+      {
+        extendedWaitUntil: {
           visible: { id: 'mentor-opener-persisted-once' },
           timeout: 30000,
         },
@@ -7403,12 +7409,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             ],
           },
           timeout: 30000,
-        },
-      },
-      {
-        extendedWaitUntil: {
-          visible: { id: 'assistant-response-complete-.*' },
-          timeout: 60000,
         },
       },
       { assertNotVisible: { id: 'mentor-opener-persisted-more-than-once' } },
