@@ -55,7 +55,56 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-07-31 09:22 CEST
+## Live reconciliation — 2026-07-31 11:10 CEST
+
+- The live Brief and membership relation agree on 41 authoritative members.
+  The operator retracted WI-2941 from BID-48 and routed it to Nexus / Cosmo
+  Lifecycle Tooling; WI-2946 remains outside the batch in Nexus / Clacks. Both
+  are Backlog/Active neutral issue reports with no Sprint or Delivery Batch.
+- All eight shepherd-created infrastructure Work Items are assigned to Nexus and
+  normalized as factual issue reports. Their original solution-oriented records
+  are preserved verbatim in dated page comments.
+- Current lifecycle slice: 27 Closed, 4 Executing, and 10 Ready.
+- Operator-authorized compare-before-write recovery cleared seven unchanged expired
+  claims: WI-2643, WI-2755, WI-2795, WI-2798, WI-2802, WI-2805, and WI-2826.
+  Every item-specific environment, database, credential, merge, and review gate
+  remains controlling.
+- Active execution WIP:
+  - WI-2790 — portable Lancre integration target; landed source repair, awaiting
+    WI-2939's disposable-schema proof.
+  - WI-2802 — J-01 Account readiness diagnosis; one authorized run failed before
+    browser start because the disposable checkout lacked Playwright. A properly
+    prepared retry is now authorized and in progress.
+  - WI-2921 — local Playwright seed-secret alignment; strict-green PR #2718 remains
+    blocked by WI-2936.
+  - WI-2939 — disposable API schema bootstrap; draft PR #2741 remains blocked by
+    WI-2826 evidence and its explicit live-bootstrap gate.
+- Ready queue:
+  - WI-2643 — shared integration-role mutation gate.
+  - WI-2755 — review-bounced source-artifact rework; the landed revision still
+    times out and leaves its scratch database.
+  - WI-2795 — Workers Logs or controlled telemetry-reproduction gate.
+  - WI-2798 — controlled trace-enabled hosted-reproduction gate.
+  - WI-2800 — depends on WI-2826 plus hosted evidence.
+  - WI-2805 — controlled hosted-reproduction gate.
+  - WI-2826 — instrumentation/live hosted proof gate.
+  - WI-2922 — bounded shared-development database reconciliation gate.
+  - WI-2923 — bounded development Clerk/Doppler mutation gate.
+  - WI-2936 — no-Doppler worktree-setup exception gate.
+- Finding Occurrences, not new Work Items, now preserve delivery observations:
+  FO-2075 (`OCC-F968A7988008`) records the intake/scope correction; FO-2076
+  (`OCC-B9142581EAF8`) records the WI-2755 completion/PR mismatch; FO-2077
+  (`OCC-42DF599F8508`) records its persistent database teardown failure; FO-2078
+  (`OCC-A7536C9B0020`) records the missing-Playwright pre-browser failure.
+- Marketplace PR #166 for WI-2941 is preserved open/draft at `9652d7d`; its clean
+  local worktree was removed and its local/remote proposal branch remains.
+- Same-owner claims for WI-2790, WI-2921, and WI-2939 are verified future through
+  12:07 UTC / 14:07 CEST; WI-2802 is future through 12:03 UTC / 14:03 CEST.
+- Checkpoint branch `bid-48-lane-state` is pushed through `24d9d4ec0`.
+- The historical sections below are retained only as an audit trail. This section,
+  Cosmo, and GitHub supersede every stale lifecycle position below.
+
+## Historical reconciliation — 2026-07-31 09:22 CEST
 
 - The live Brief and membership relation agree on 42 authoritative members.
   WI-2941 was captured from six expired cross-owner BID-48 claims, triaged and
@@ -121,7 +170,7 @@ Delivery Batch as `Done`.
 - Historical per-item rows below are retained as an audit trail; this reconciliation
   supersedes their stale lifecycle positions.
 
-## Units / live slice
+## Historical units / stale snapshot
 
 | WI | Item | Initial route | Current position |
 |---|---|---|---|
