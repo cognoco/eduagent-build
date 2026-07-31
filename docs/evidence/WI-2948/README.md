@@ -91,6 +91,8 @@ A main refresh was still mandatory because a new proof must identify and exercis
 
 During non-Playwright validation, `origin/main` advanced to `25162e5d61a9b0a7dba955eda969384495514409`. Those three additional commits changed API export coverage, disposable-schema bootstrap tooling, and documentation only; they did not touch the E2E workflow, Playwright config/setup, seeded-sign-in helper, or Playwright dependency lock. That base was merged normally as a second refresh, leaving the candidate zero commits behind `origin/main` at this audit.
 
+The final read-only fetch advanced `origin/main` once more to `da7a1842066765796ed1f1a4ef988b13a5bd01a4`. That commit changed supporter-authority API code, API tests, and evidence only. It was merged normally as a third refresh and likewise introduced no E2E/Playwright/config/setup/dependency prerequisite or conflict.
+
 ## Safe early-run classification
 
 The local proof harness now emits only allowlisted metadata from early failures: Playwright top-level error count, setup-scenario count, the sanitized setup-result array, and `FAILURE_CLASSES=early-run-before-setup` when the setup count is zero. It never copies top-level error messages or raw console text into the durable classification. A synthetic JSON fixture containing sentinel raw error/console material first failed because the classifier did not exist, then passed after the classifier was wired into the proof wrapper; no Playwright command or staging endpoint was used for that test.
