@@ -18,6 +18,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../test-utils/conversation-language-confirmation';
 
 // ---------------------------------------------------------------------------
 // Test Seed Service — Unit Tests
@@ -544,6 +545,34 @@ describe('seedScenario', () => {
     expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
   });
+
+  it.each([
+    'onboarding-complete',
+    'parent-multi-child',
+    'v2-account-non-owner-child',
+  ] as const)(
+    '[WI-2944] seeds the established %s profile with a confirmed conversation language',
+    async (scenario) => {
+      const db = createMockDb();
+      const result = await seedScenario(
+        db,
+        scenario,
+        'established@example.com',
+      );
+      const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+        | { values?: jest.Mock }
+        | undefined;
+      const insertedRows =
+        insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
+
+      expect(insertedRows).toContainEqual(
+        expect.objectContaining({
+          id: result.profileId,
+          conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
+        }),
+      );
+    },
+  );
 
   it('[WI-2554] seeds a credentialed learner-only person without an admin role or managed-child guardianship', async () => {
     const db = createMockDb();

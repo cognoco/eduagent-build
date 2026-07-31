@@ -107,7 +107,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
           merged_text: 'likes fractions and fraction work',
         },
         modelVersion: 'test',
-        provider: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -183,7 +183,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'supersede' },
         modelVersion: 'test',
-        provider: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -246,7 +246,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'keep_both' },
         modelVersion: 'test',
-        provider: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -308,7 +308,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
-        provider: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -387,7 +387,7 @@ describe('memory_facts dedup — action branches (real DB)', () => {
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
-        provider: 'test',
+        provider: 'anthropic',
       }),
     });
 

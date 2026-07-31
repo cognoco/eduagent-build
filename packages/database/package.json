@@ -22,6 +22,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./profile-scoped-tables": {
+      "types": "./src/profile-scoped-tables.ts",
+      "@eduagent/source": "./src/profile-scoped-tables.ts",
+      "import": "./src/profile-scoped-tables.ts",
+      "default": "./src/profile-scoped-tables.ts"
+    },
     "./package.json": "./package.json"
   },
   "devDependencies": {

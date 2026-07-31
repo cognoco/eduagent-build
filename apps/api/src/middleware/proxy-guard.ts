@@ -32,11 +32,10 @@ const proxyModeBody = {
  * could omit the header to gain full write access on a child profile, or
  * send it spuriously to suppress writes on a non-proxy session.
  *
- * The authoritative signal is `profileMeta.isOwner`, set server-side by
- * profileScopeMiddleware after verifying that X-Profile-Id resolves to a
- * profile belonging to the authenticated account. When the resolved profile
- * is NOT the owner profile (i.e., a parent is acting on behalf of a child),
- * the request is by definition in proxy mode regardless of any header.
+ * The authoritative signals are the verified selected `profileId` and the
+ * server-resolved `callerPersonId`. A non-owner selecting themselves is a
+ * credentialed self-session; a different caller selecting that non-owner is
+ * a proxy session regardless of any header.
  *
  * The X-Proxy-Mode header is still honored as a belt-and-suspenders signal
  * (e.g., a parent explicitly sending it from the owner profile during a
@@ -82,8 +81,22 @@ export async function assertNotProxyMode(
     });
   }
 
-  // Server-derived: any non-owner profile is a proxy session.
-  if (profileMeta.isOwner === false) {
+  const profileId = (c as Context<ProfileScopeEnv>).get('profileId');
+  const callerPersonId = (c as unknown as CallerIdentitySource).get(
+    'callerPersonId',
+  );
+  if (!profileId) {
+    throw new HTTPException(403, {
+      message: PROXY_MODE_MESSAGE,
+      res: c.json(proxyModeBody, 403),
+    });
+  }
+
+  // [WI-2653] A non-owner role does not itself mean proxy mode: a
+  // credentialed non-owner may select their own verified profile. It is proxy
+  // mode only when the server-resolved caller differs from that selection.
+  // Missing caller identity also fails closed through the mismatch.
+  if (profileMeta.isOwner === false && callerPersonId !== profileId) {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
       res: c.json(proxyModeBody, 403),
@@ -117,13 +130,6 @@ export async function assertNotProxyMode(
   // explicitly selected by the checks above); assertCanWriteProfile proves
   // the server-resolved caller actually has write authority over it (self or
   // active guardian of an uncredentialed charge), not merely org membership.
-  const profileId = (c as Context<ProfileScopeEnv>).get('profileId');
-  if (!profileId) {
-    throw new HTTPException(403, {
-      message: PROXY_MODE_MESSAGE,
-      res: c.json(proxyModeBody, 403),
-    });
-  }
   try {
     await assertCanWriteProfile(
       c as unknown as CallerIdentitySource,

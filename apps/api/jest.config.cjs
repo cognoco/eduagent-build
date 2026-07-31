@@ -48,6 +48,8 @@ module.exports = {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
     '^@eduagent/retention$': '<rootDir>/packages/retention/src/index.ts',
     '^@eduagent/database$': '<rootDir>/packages/database/src/index.ts',
+    '^@eduagent/database/profile-scoped-tables$':
+      '<rootDir>/packages/database/src/profile-scoped-tables.ts',
     '^@eduagent/test-utils$': '<rootDir>/packages/test-utils/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },

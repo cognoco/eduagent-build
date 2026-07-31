@@ -1,13 +1,14 @@
 // @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
-// Transcript-Purge Observability — observable terminus for three events
+// Transcript-Purge Observability — observable terminus for four events
 // emitted by transcript-purge-cron.ts:
 //
-//   app/session.purge.delayed            — sessions past day-37 without summary
+//   app/session.purge.delayed            — sessions past day-37 with incomplete purge prerequisites
+//   app/session.purge.backlog            — eligible volume above daily dispatch capacity
 //   app/session.transcript.purged        — successful purge (SLO success signal)
 //   app/session.transcript.purge.skipped — purge skipped (missing preconditions)
 //
-// Bug-369: all three fired into the void with no registered listener. Purge
+// Bug-369: the original three fired into the void with no registered listener. Purge
 // success/skip rates and delayed-purge counts were completely invisible in the
 // Inngest dashboard. This module provides the observable terminus.
 //
@@ -16,6 +17,7 @@
 
 import { z } from 'zod';
 import {
+  sessionPurgeBacklogEventSchema,
   sessionPurgeDelayedEventSchema,
   sessionTranscriptPurgedEventSchema,
   summarizeRawPayload,
@@ -73,6 +75,7 @@ export const sessionPurgeDelayedObserve = inngest.createFunction(
     logger.warn('session.purge.delayed.received', {
       delayedCount: data.delayedCount,
       missingPreconditionCount: data.missingPreconditionCount,
+      nullSummaryGeneratedAtCount: data.nullSummaryGeneratedAtCount,
       sessionIdSample: data.sessionIds.slice(0, 5),
       receivedAt: new Date().toISOString(),
     });
@@ -80,6 +83,48 @@ export const sessionPurgeDelayedObserve = inngest.createFunction(
     return {
       status: 'logged' as const,
       delayedCount: data.delayedCount,
+    };
+  },
+);
+
+export const sessionPurgeBacklogObserve = inngest.createFunction(
+  {
+    id: 'session-purge-backlog-observe',
+    name: 'Session purge backlog observability',
+  },
+  { event: 'app/session.purge.backlog' },
+  async ({ event }) => {
+    const parsed = sessionPurgeBacklogEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      logger.error('session.purge.backlog.schema_drift', {
+        issues: parsed.error.issues,
+        rawData: summarizeRawPayload(event.data),
+      });
+      captureException(
+        new Error(
+          '[session-purge-backlog] invalid event payload — schema drift or bad event',
+        ),
+        {
+          extra: {
+            issues: parsed.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
+      );
+      return { status: 'schema_error' as const };
+    }
+    const data = parsed.data;
+
+    logger.warn('session.purge.backlog.received', {
+      dailyCapacity: data.dailyCapacity,
+      minimumEligibleCount: data.minimumEligibleCount,
+      minimumDeferredCount: data.minimumDeferredCount,
+      receivedAt: new Date().toISOString(),
+    });
+
+    return {
+      status: 'logged' as const,
+      minimumEligibleCount: data.minimumEligibleCount,
     };
   },
 );

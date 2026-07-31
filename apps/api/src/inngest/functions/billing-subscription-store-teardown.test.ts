@@ -4,6 +4,7 @@ import { billingSubscriptionStoreTeardown } from './billing-subscription-store-t
 
 const handler = (billingSubscriptionStoreTeardown as any).fn as (args: {
   event: { data: unknown };
+  runId?: string;
   step: ReturnType<typeof createInngestStepRunner>['step'];
 }) => Promise<{
   status: string;
@@ -127,6 +128,84 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
         },
       ],
     });
+  });
+
+  it('[BREAK WI-2390] records completed provider teardown outside Postgres with the Inngest run id', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    const consoleSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const { step, runNames } = createInngestStepRunner();
+
+    const result = await handler({
+      event: {
+        data: {
+          accountId: 'org-audit-proof',
+          identityVersion: 'v2',
+          reason: 'whole_org_erasure',
+          requestedAt: '2026-07-31T00:00:00.000Z',
+          subscriptions: [
+            {
+              subscriptionId: 'subrow-audit-proof',
+              planTier: 'plus',
+              status: 'active',
+              stripe: { customerId: null, subscriptionId: null },
+              revenueCat: {
+                originalAppUserId: null,
+                storeProductId: null,
+                storePlatform: null,
+              },
+            },
+          ],
+        },
+      },
+      runId: 'run-store-audit-proof',
+      step,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        accountId: 'org-audit-proof',
+        subscriptionsProcessed: 1,
+      }),
+    );
+    expect(runNames()).toContain('record-store-teardown-completion');
+    expect(captureSpy).toHaveBeenCalledWith(
+      'billing.store_teardown.completed',
+      {
+        level: 'info',
+        tags: {
+          surface: 'billing.store_teardown.completed',
+          stripe: 'not_applicable',
+          revenueCat: 'not_applicable',
+        },
+        extra: {
+          accountId: 'org-audit-proof',
+          runId: 'run-store-audit-proof',
+          subscriptionsProcessed: 1,
+        },
+      },
+    );
+
+    const completionLog = consoleSpy.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .find((entry) => entry.message === 'billing.store_teardown.completed');
+    expect(completionLog).toEqual(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({
+          event: 'billing.store_teardown.completed',
+          accountId: 'org-audit-proof',
+          runId: 'run-store-audit-proof',
+          subscriptionsProcessed: 1,
+          stripe: 'not_applicable',
+          revenueCat: 'not_applicable',
+        }),
+      }),
+    );
   });
 
   it('[WI-885] rejects a malformed payload with invalid_payload and never runs teardown', async () => {
