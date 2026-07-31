@@ -59,6 +59,12 @@ rg -q -F "recordPreloadPhase('setup-test-body-entered')" \
   exit 1
 }
 
+rg -q -F "recordPreloadPhase('web-server-command-started')" \
+  apps/mobile/e2e-web/helpers/serve-exported-web.mjs || {
+  print -u2 'configured web-server command has no bounded start marker'
+  exit 1
+}
+
 fixture_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wi2948-classifier-test.XXXXXX")
 trap 'rm -rf -- "$fixture_tmp"' EXIT
 fixture_json="$fixture_tmp/early-run.json"
@@ -66,10 +72,10 @@ fixture_console="$fixture_tmp/early-run.log"
 fixture_phases="$fixture_tmp/preload-phases.txt"
 print -r -- '{"suites":[],"errors":[{"message":"SENSITIVE_ERROR_SENTINEL"}],"stats":{"unexpected":0}}' >"$fixture_json"
 print -r -- 'SENSITIVE_CONSOLE_SENTINEL' >"$fixture_console"
-print -r -- 'reporter-ready' >"$fixture_phases"
+print -r -- $'reporter-ready\nweb-server-command-started' >"$fixture_phases"
 
 classification=$(zsh "$classifier" "$fixture_json" "$fixture_phases")
-expected_classification=$'PLAYWRIGHT_REPORTER_OUTPUT_VALID=1\nPLAYWRIGHT_TOP_LEVEL_ERROR_COUNT=1\nSETUP_SCENARIO_COUNT=0\nSETUP_PASSED_COUNT=0\nSETUP_FAILED_COUNT=0\nSETUP_SKIPPED_COUNT=0\nSETUP_OTHER_COUNT=0\nSETUP_ATTEMPT_COUNT=0\nSETUP_RETRY_COUNT=0\nPHASE_EVENTS_VALID=1\nPHASE_REPORTER_READY_COUNT=1\nPHASE_GLOBAL_SETUP_STARTED_COUNT=0\nPHASE_GLOBAL_SETUP_COMPLETED_COUNT=0\nPHASE_GLOBAL_SETUP_FAILED_COUNT=0\nPHASE_DISCOVERY_COMPLETED_COUNT=0\nPHASE_SETUP_TEST_BEGIN_COUNT=0\nPHASE_SETUP_BODY_ENTERED_COUNT=0\nFAILURE_CLASSES=web-server-startup-timeout'
+expected_classification=$'PLAYWRIGHT_REPORTER_OUTPUT_VALID=1\nPLAYWRIGHT_TOP_LEVEL_ERROR_COUNT=1\nSETUP_SCENARIO_COUNT=0\nSETUP_PASSED_COUNT=0\nSETUP_FAILED_COUNT=0\nSETUP_SKIPPED_COUNT=0\nSETUP_OTHER_COUNT=0\nSETUP_ATTEMPT_COUNT=0\nSETUP_RETRY_COUNT=0\nPHASE_EVENTS_VALID=1\nPHASE_REPORTER_READY_COUNT=1\nPHASE_WEB_SERVER_COMMAND_STARTED_COUNT=1\nPHASE_GLOBAL_SETUP_STARTED_COUNT=0\nPHASE_GLOBAL_SETUP_COMPLETED_COUNT=0\nPHASE_GLOBAL_SETUP_FAILED_COUNT=0\nPHASE_DISCOVERY_COMPLETED_COUNT=0\nPHASE_SETUP_TEST_BEGIN_COUNT=0\nPHASE_SETUP_BODY_ENTERED_COUNT=0\nFAILURE_CLASSES=web-server-startup-timeout'
 [[ "$classification" == "$expected_classification" ]] || {
   print -u2 'early-run classification did not preserve the safe allowlisted contract'
   exit 1

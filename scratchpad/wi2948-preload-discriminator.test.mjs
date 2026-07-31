@@ -137,6 +137,15 @@ test('synthetic preload probe', async () => {});
   if (name === 'configuration') {
     config = `throw new Error('${secretSentinel}');\n`;
   } else if (name === 'web-server') {
+    const failingServer = path.join(dir, 'failing-server.cjs');
+    await writePrivate(
+      failingServer,
+      `
+const fs = require('node:fs');
+fs.appendFileSync(process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE, 'web-server-command-started\\n');
+process.exit(19);
+`,
+    );
     config = `
 const path = require('node:path');
 module.exports = {
@@ -147,7 +156,7 @@ module.exports = {
   workers: 1,
   projects: [{ name: 'setup' }],
   webServer: {
-    command: ${JSON.stringify(`${process.execPath} -e "process.exit(19)"`)},
+    command: ${JSON.stringify(`${process.execPath} ${failingServer}`)},
     url: 'http://127.0.0.1:65534',
     reuseExistingServer: false,
     timeout: 1_000,
@@ -211,7 +220,7 @@ function mutateEvents(name, events) {
   const lines = events.split('\n').filter(Boolean);
   if (name === 'configuration') return 'global-setup-completed\n';
   const decisive = {
-    'web-server': 'reporter-ready',
+    'web-server': 'web-server-command-started',
     'global-setup': 'global-setup-started',
     'test-discovery': 'global-setup-completed',
     'browser-launch': 'tests-discovered',
@@ -265,9 +274,22 @@ try {
     fail('unknown-shape-fail-closed');
   }
 
+  const preGlobalUnknownPhases = path.join(
+    unknownDir,
+    'pre-global-unknown-phases.txt',
+  );
+  await writePrivate(preGlobalUnknownPhases, 'reporter-ready\n');
+  const preGlobalUnknown = await classify(unknownJson, preGlobalUnknownPhases);
+  if (
+    !preGlobalUnknown.ok ||
+    preGlobalUnknown.failureClass !== 'unclassified-preload'
+  ) {
+    fail('pre-global-without-web-command-marker-fail-closed');
+  }
+
   if (!process.exitCode) {
     process.stdout.write(
-      `WI-2948 preload discriminator probes OK cases=${caseCount} mutations=${mutationCount} sentinel_leaks=0\n`,
+      `WI-2948 preload discriminator probes OK cases=${caseCount} mutations=${mutationCount} pre_global_unknowns=1 sentinel_leaks=0\n`,
     );
   }
 } finally {

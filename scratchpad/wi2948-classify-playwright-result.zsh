@@ -28,7 +28,7 @@ fi
 phase_events_valid=0
 if [[ -f "$phase_events" ]]; then
   phase_events_valid=1
-  if rg -q -v '^(reporter-ready|global-setup-started|global-setup-completed|global-setup-failed|tests-discovered|setup-test-begin|setup-test-body-entered)$' "$phase_events"; then
+  if rg -q -v '^(reporter-ready|web-server-command-started|global-setup-started|global-setup-completed|global-setup-failed|tests-discovered|setup-test-begin|setup-test-body-entered)$' "$phase_events"; then
     phase_events_valid=0
   fi
 fi
@@ -44,6 +44,7 @@ count_phase() {
 }
 
 reporter_ready_count=$(count_phase reporter-ready)
+web_server_command_started_count=$(count_phase web-server-command-started)
 global_setup_started_count=$(count_phase global-setup-started)
 global_setup_completed_count=$(count_phase global-setup-completed)
 global_setup_failed_count=$(count_phase global-setup-failed)
@@ -69,6 +70,7 @@ printf 'SETUP_ATTEMPT_COUNT=%s\n' "$setup_attempt_count"
 printf 'SETUP_RETRY_COUNT=%s\n' "$setup_retry_count"
 printf 'PHASE_EVENTS_VALID=%s\n' "$phase_events_valid"
 printf 'PHASE_REPORTER_READY_COUNT=%s\n' "$reporter_ready_count"
+printf 'PHASE_WEB_SERVER_COMMAND_STARTED_COUNT=%s\n' "$web_server_command_started_count"
 printf 'PHASE_GLOBAL_SETUP_STARTED_COUNT=%s\n' "$global_setup_started_count"
 printf 'PHASE_GLOBAL_SETUP_COMPLETED_COUNT=%s\n' "$global_setup_completed_count"
 printf 'PHASE_GLOBAL_SETUP_FAILED_COUNT=%s\n' "$global_setup_failed_count"
@@ -80,6 +82,7 @@ failure_class=unclassified-preload
 if [[ "$phase_events_valid" == "1" ]]; then
   if ((
     reporter_ready_count == 0 &&
+    web_server_command_started_count == 0 &&
     global_setup_started_count == 0 &&
     global_setup_completed_count == 0 &&
     global_setup_failed_count == 0 &&
@@ -90,6 +93,7 @@ if [[ "$phase_events_valid" == "1" ]]; then
     failure_class=configuration-test-discovery
   elif ((
     reporter_ready_count == 1 &&
+    web_server_command_started_count == 1 &&
     global_setup_started_count == 0 &&
     global_setup_completed_count == 0 &&
     global_setup_failed_count == 0 &&
@@ -100,6 +104,7 @@ if [[ "$phase_events_valid" == "1" ]]; then
     failure_class=web-server-startup-timeout
   elif ((
     reporter_ready_count == 1 &&
+    web_server_command_started_count <= 1 &&
     global_setup_started_count == 1 &&
     global_setup_completed_count == 0 &&
     global_setup_failed_count <= 1 &&
@@ -110,6 +115,7 @@ if [[ "$phase_events_valid" == "1" ]]; then
     failure_class=global-setup-failure
   elif ((
     reporter_ready_count == 1 &&
+    web_server_command_started_count <= 1 &&
     global_setup_started_count == 1 &&
     global_setup_completed_count == 1 &&
     global_setup_failed_count == 0 &&
@@ -120,6 +126,7 @@ if [[ "$phase_events_valid" == "1" ]]; then
     failure_class=configuration-test-discovery
   elif ((
     reporter_ready_count == 1 &&
+    web_server_command_started_count <= 1 &&
     global_setup_started_count == 1 &&
     global_setup_completed_count == 1 &&
     global_setup_failed_count == 0 &&
@@ -129,6 +136,7 @@ if [[ "$phase_events_valid" == "1" ]]; then
     failure_class=browser-worker-or-fixture-pre-body
   elif ((
     reporter_ready_count == 1 &&
+    web_server_command_started_count <= 1 &&
     global_setup_started_count == 1 &&
     global_setup_completed_count == 1 &&
     global_setup_failed_count == 0 &&
