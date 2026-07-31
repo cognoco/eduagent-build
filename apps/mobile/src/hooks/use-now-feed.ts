@@ -325,14 +325,31 @@ export function useNowFeed(): NowFeedQueryResult {
   // was CACHED FOR, not against whatever pair happens to be bound at render.
   //
   // `fallbackFeed` can only ever be populated while BOUND — the effect above
-  // returns early without a `cacheBinding`. But it SURVIVES the pair going
-  // unbound (sign-out, auth teardown, profile cleared) while this component
-  // stays mounted; that is demonstrated by execution, not argued. Once unbound,
-  // `policy.suppressed(undefined)` took the unbound branch, which has no storage
-  // key, therefore no Entry, therefore no stored disable floor — so a projection
-  // for a pair whose durable floor forbids notices painted anyway.
+  // returns early without a `cacheBinding`. Whether it SURVIVES the pair going
+  // unbound (sign-out, auth teardown, profile cleared) is CONDITIONAL, and that
+  // condition is the whole reachability question: the same early-return branch
+  // clears it unless `query.isError`, so retention past an unbind requires the
+  // query to be in an error state. Measured (WI-2933 reachability run): forcing
+  // a real re-render with a null user gives `fallbackFeed = null,
+  // isError = false` — with no error the projection does not survive.
   //
-  // Remembering the populating pair is what makes the floor reachable. It is
+  // What the unbound branch would do if reached: `policy.suppressed(undefined)`
+  // takes the unbound branch, which has no storage key, therefore no Entry,
+  // therefore no stored disable floor — a projection for a pair whose durable
+  // floor forbids notices would be judged with nothing to judge it against.
+  // NO SUCH EXPOSURE HAS BEEN DEMONSTRATED. The `isError: true` AND unbound
+  // combination is unmeasured: once the pair is unbound the query stops
+  // fetching, so the harness could not drive it into an error state afterwards.
+  //
+  // That combination also got HARDER to reach while this branch was open:
+  // #2752 (WI-2949) removed the mentor-notice call from `useApiQuery`'s
+  // `onParseError` seam — the one route that produced `isError` and a stored
+  // disable floor in the same event. No production caller passes that option
+  // now.
+  //
+  // Remembering the populating pair is what would make the floor reachable if
+  // that combination ever occurs — hardening, not a fix for a demonstrated
+  // exposure. It is
   // also the ONLY defensible answer to "what is the safe default when the pair
   // is unknowable": for this payload the pair is not unknowable — the payload
   // exists *because* a pair was bound. A device that has NEVER been bound has no

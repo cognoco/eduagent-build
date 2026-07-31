@@ -523,10 +523,23 @@ const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   // from this one — so the old comment justified a field of this literal by
   // citing values this literal does not hold.
   //
-  // Rationale corrected rather than value changed: flipping to `false` would
-  // make `noticesSuppressedForPayload` treat an unbound pair as blind-read and
-  // suppress unconditionally, which is the fleet-wide blanking this item's AC-2
-  // forbids. The value was never the defect; the reasoning was.
+  // Rationale corrected rather than value changed — and the FIRST correction
+  // was wrong the same way. It claimed flipping this to `false` would make
+  // `noticesSuppressedForPayload` suppress unconditionally. That consequence
+  // belongs to a DIFFERENT literal: the one built inline in
+  // `mentorNoticePolicySuppressesPayloadFor`'s unbound branch, which pairs
+  // `trusted: true` with `hydrated: true` and so does reach the `!trusted`
+  // check. Read that literal for the fleet-wide-blanking argument; it is the
+  // one that carries it.
+  //
+  // THIS field is read on no live path, on four counts: the only reference is
+  // `getSnapshot`'s `if (!key) return UNBOUND_SNAPSHOT`; the unbound branch
+  // above builds its own literal instead of using this one;
+  // `noticesSuppressedForPayload` returns at `!hydrated` before `trusted` is
+  // read, and this literal sets `hydrated: false`; and the hook's return masks
+  // it (`trusted: bound ? snapshot.trusted : true`). Flipping it changes
+  // nothing observable. `true` is the honest label for "no read was attempted",
+  // which is why it stays.
   trusted: true,
 };
 
