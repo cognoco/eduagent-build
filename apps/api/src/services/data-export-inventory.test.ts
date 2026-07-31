@@ -1,7 +1,7 @@
 import {
   getProfileScopedTables,
   PROFILE_SCOPED_SCAN_EXCEPTIONS,
-} from '@eduagent/database';
+} from '@eduagent/database/profile-scoped-tables';
 import { dataExportSchema } from '@eduagent/schemas';
 
 import { PROFILE_SCOPED_EXPORT_INVENTORY } from './data-export-inventory';
