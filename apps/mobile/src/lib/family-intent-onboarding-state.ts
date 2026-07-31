@@ -28,6 +28,8 @@ export type FamilyIntentOnboardingState = {
 };
 
 let memoryState: FamilyIntentOnboardingState | null = null;
+let publicationRevision = 0;
+const publicationListeners = new Set<() => void>();
 let recoveryGeneration = 0;
 let desiredRecoverySerialized: string | null = null;
 let recoveryRepairQueue: Promise<void> = Promise.resolve();
@@ -299,6 +301,19 @@ export async function startFamilyIntentOnboarding(
   profileId: string,
 ): Promise<void> {
   await persist({ version: 1, profileId, step: 'learner-target' }, true);
+  publicationRevision += 1;
+  for (const listener of publicationListeners) listener();
+}
+
+export function getFamilyIntentOnboardingPublicationRevision(): number {
+  return publicationRevision;
+}
+
+export function subscribeFamilyIntentOnboardingPublications(
+  listener: () => void,
+): () => void {
+  publicationListeners.add(listener);
+  return () => publicationListeners.delete(listener);
 }
 
 export async function readFamilyIntentOnboarding(): Promise<FamilyIntentOnboardingState | null> {

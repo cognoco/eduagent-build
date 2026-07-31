@@ -61,7 +61,9 @@ import { PostApprovalLanding } from './_components/PostApprovalLanding';
 import { CreateProfileGate } from './_components/CreateProfileGate';
 import { FamilyIntentOnboardingGate } from '../../components/onboarding/FamilyIntentOnboardingGate';
 import {
+  getFamilyIntentOnboardingPublicationRevision,
   readFamilyIntentOnboarding,
+  subscribeFamilyIntentOnboardingPublications,
   type FamilyIntentOnboardingState,
 } from '../../lib/family-intent-onboarding-state';
 import { ConsentWithdrawnGate } from './_components/ConsentWithdrawnGate';
@@ -578,6 +580,11 @@ export default function AppLayout() {
     React.useState(false);
   const [familyIntentProbeAttempt, setFamilyIntentProbeAttempt] =
     React.useState(0);
+  const familyIntentPublicationRevision = React.useSyncExternalStore(
+    subscribeFamilyIntentOnboardingPublications,
+    getFamilyIntentOnboardingPublicationRevision,
+    getFamilyIntentOnboardingPublicationRevision,
+  );
   const [familyIntentInvitationRequested, setFamilyIntentInvitationRequested] =
     React.useState(false);
 
@@ -676,7 +683,12 @@ export default function AppLayout() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [activeProfile?.id, familyIntentProbeAttempt, isSignedIn]);
+  }, [
+    activeProfile?.id,
+    familyIntentProbeAttempt,
+    familyIntentPublicationRevision,
+    isSignedIn,
+  ]);
 
   // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
   // iteration had:

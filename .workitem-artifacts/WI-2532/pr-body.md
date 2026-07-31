@@ -11,6 +11,8 @@
 - dismiss the pushed profile-creation modal before activating the adult so one
   existing app shell restores the durable fork; retain Home as the no-history
   fallback, including the marker-only retry path
+- publish successful marker creation through an observable revision so an
+  already-active shell that previously settled the marker absent reprobes
 - add focused mobile coverage, translated copy, and a preview browser journey
 
 ## Verification
@@ -57,6 +59,10 @@
   durable handoffs, and the corrected tests pass GREEN before republishing
 - corrective semantic union: 6 suites / 277 tests passed; full TypeScript,
   warning-free touched-file ESLint, Prettier, and whitespace checks passed
+- retry-publication RED/GREEN: an already-active shell initially kept Tabs
+  visible after retry; the focused case and the profile-creation, durable-state,
+  and full app-layout boundary set now pass 3 suites / 229 tests; the full
+  affected union passes 6 suites / 278 tests
 - review hardening covers stale-read invalidation after sign-out, recovery-only
   primary repair, all-mode terminal marker consumption, and an inaccessible
   restore-probe navigator that retains requested route state

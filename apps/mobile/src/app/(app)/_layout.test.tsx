@@ -32,6 +32,7 @@ import {
   FAMILY_INTENT_ONBOARDING_KEY,
   FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
   __resetFamilyIntentOnboardingForTests,
+  startFamilyIntentOnboarding,
 } from '../../lib/family-intent-onboarding-state';
 
 const mockFetch = createRoutedMockFetch();
@@ -580,6 +581,25 @@ describe('AppLayout', () => {
     );
 
     renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-target-me');
+      screen.getByTestId('family-intent-target-someone-else');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] reveals a retry-published family-intent marker in an already-active shell', async () => {
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('tabs');
+    });
+    expect(screen.queryByTestId('family-intent-onboarding-gate')).toBeNull();
+
+    await act(async () => {
+      await startFamilyIntentOnboarding('p1');
+    });
 
     await waitFor(() => {
       screen.getByTestId('family-intent-target-me');

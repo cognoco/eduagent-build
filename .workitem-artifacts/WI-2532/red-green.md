@@ -136,3 +136,20 @@ destination mount and marker consumption. GREEN proves Tabs are mounted at
 push time and remain present after the path transition; the route-level suite
 retains its marker-consumption assertion. The post-fix semantic union passed
 472 tests across fourteen suites.
+
+## Retry publication lifecycle RED/GREEN
+
+Independent pre-publication review traced a second timing boundary through
+`useCreateProfile`: the successful POST optimistically inserts the new owner,
+so `ProfileProvider` can auto-activate that profile while both initial marker
+writes are failing. The existing `AppLayout` then settles its storage probe as
+absent. On retry, persisting the marker and switching the already-active ID did
+not change any probe dependency.
+
+Focused RED mounted an already-active shell, waited for its absent probe to
+show Tabs, then successfully published the retry marker. The test failed with
+Tabs still visible and no learner-target gate. Successful start publication
+now advances an observable revision consumed by `AppLayout`, which reruns the
+same fail-closed authoritative read. The focused test passes GREEN, and the
+profile-creation, durable-state, and full app-layout suites pass 229 tests. The
+full six-suite affected union passes 278 tests.

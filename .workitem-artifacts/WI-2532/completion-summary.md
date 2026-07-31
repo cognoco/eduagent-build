@@ -23,6 +23,9 @@ profile creation.
   no-history entry replaces to Home as the fallback. This prevents two app
   shells from restoring the same durable gate while preserving cancel,
   pending-consent, and ordinary add-child behavior.
+- A successful post-create retry publishes an observable carrier revision, so
+  an already-mounted shell that previously probed the marker as absent
+  immediately re-reads it instead of waiting for an app relaunch.
 - Dedicated translated copy, focused mobile coverage, and a preview browser
   journey were added.
 
@@ -77,6 +80,14 @@ cases pass GREEN. Final attributable E2E evidence must be re-established on
 the corrective published head. The corrective semantic union passed 6 suites /
 277 tests; full TypeScript, warning-free touched-file ESLint, Prettier, and
 whitespace checks also passed.
+An independent pre-publication audit then found the real profile-cache
+auto-activation race: the app shell could settle an absent probe before a
+failed storage write was retried, while switching the already-active profile
+would not rerun that probe. A focused mounted-shell test failed RED with Tabs
+still visible after retry publication and passes GREEN with the observable
+publication revision. Profile creation, durable state, and the full app-layout
+set pass 3 suites / 229 tests after the correction; the full six-suite affected
+union passes 278 tests.
 Review-bounce coverage also verifies stale-read rejection, recovery-primary
 repair, all-mode terminal destination consumption, and a
 mounted-but-inaccessible blocked navigator. A pre-WI-1556 preview journey

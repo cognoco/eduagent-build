@@ -20,6 +20,9 @@
   falls back to Home. This prevents duplicate app shells while cancel,
   pending-consent, and ordinary add-child paths retain their existing close
   semantics.
+- Successful marker publication advances an observable revision, so an
+  already-active app shell that previously settled its storage probe as absent
+  reruns the authoritative fail-closed restore after retry.
 
 ## Focused mobile verification
 
@@ -39,6 +42,11 @@
   the fork component, durable state, invitation routing, and sign-out cleanup:
   6 suites / 277 tests passed. Full TypeScript, warning-free touched-file
   ESLint, exact-file Prettier, and whitespace checks passed.
+- Retry-publication focused RED mounted an already-active shell, let its probe
+  settle absent, then published the marker and still observed Tabs. The
+  observable publication revision makes that case GREEN; profile creation,
+  durable state, and full app-layout coverage pass 3 suites / 229 tests, and
+  the full six-suite affected union passes 278 tests.
 - The two focused route-preservation cases passed: a pending restore keeps the
   requested Tabs navigator mounted but hidden, and a failed restore retry
   preserves the requested route.
