@@ -135,6 +135,45 @@ const RUN = !!process.env.DATABASE_URL;
           .where(eq(person.id, profileId));
         expect(row?.conversationLanguage).not.toBe('de');
       });
+
+      // [WI-1556] The confirm flag drives a real column write. The unit test
+      // asserts the update payload against a recording double, which cannot
+      // prove the column exists or that omitting confirm leaves it untouched.
+      it('sets conversation_language_confirmed_at only when confirm is true', async () => {
+        const orgId = await seedOrg();
+        const profileId = await seedPerson(orgId);
+
+        // confirm=false must leave the learner unconfirmed: this is the state
+        // the first-Mentor guard fails closed on.
+        expect(
+          await updateConversationLanguageV2(db, profileId, orgId, 'de', false),
+        ).toBe(true);
+        const [unconfirmed] = await db
+          .select({
+            conversationLanguage: person.conversationLanguage,
+            conversationLanguageConfirmedAt:
+              person.conversationLanguageConfirmedAt,
+          })
+          .from(person)
+          .where(eq(person.id, profileId));
+        expect(unconfirmed?.conversationLanguage).toBe('de');
+        expect(unconfirmed?.conversationLanguageConfirmedAt).toBeNull();
+
+        // confirm=true stamps the column alongside the language write.
+        expect(
+          await updateConversationLanguageV2(db, profileId, orgId, 'cs', true),
+        ).toBe(true);
+        const [confirmed] = await db
+          .select({
+            conversationLanguage: person.conversationLanguage,
+            conversationLanguageConfirmedAt:
+              person.conversationLanguageConfirmedAt,
+          })
+          .from(person)
+          .where(eq(person.id, profileId));
+        expect(confirmed?.conversationLanguage).toBe('cs');
+        expect(confirmed?.conversationLanguageConfirmedAt).toBeInstanceOf(Date);
+      });
     });
 
     // -------------------------------------------------------------------------
