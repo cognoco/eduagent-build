@@ -120,18 +120,19 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       oldGuardCall: OLD_GUARD_SCRUB,
       newGateCall: /safeMisconception\(target\)/g,
     },
-    // --- still on the English-only guard: the [WI-2628] follow-up's scope ---
-    // Each gates text derived from a read taken INSIDE a transaction, so the
-    // async gate cannot be evaluated before the transaction opens without
-    // restructuring. Until that lands the OLD guard is what protects them, so
-    // this ratchet keeps requiring it here — removing it would leave the
-    // boundary bare.
     {
+      // MOVED to the gate by the AC-5 remainder work. The builders here are pure
+      // and synchronous, so they cannot consult the async gate: they emit
+      // CANDIDATE rows, and the one application below —
+      // `filterGatedMemoryFactRows` — drops the rows the caller's pre-transaction
+      // batch did not clear. Check/write identity is structural rather than
+      // conventional: the filter reads `row.text` and the caller writes that same
+      // `row.text` on the same object, with nothing re-derived in between.
       file: 'memory/backfill-mapping.ts',
-      control: 'english-only-guard',
+      control: 'multilingual-gate',
       applications: 1,
       oldGuardCall: OLD_GUARD_SCRUB,
-      newGateCall: null,
+      newGateCall: /isContentSafe\(/g,
     },
     {
       // MOVED to the gate by the AC-5 remainder work. `applyDedupAction` runs
@@ -146,11 +147,24 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       newGateCall: /isContentSafe\(/g,
     },
     {
+      // MOVED to the gate by the AC-5 remainder work. Three applications of the
+      // per-string verdict, all in `applyAnalysis`: the pre-transaction sanitise
+      // that derives the memory-fact candidate set, the in-transaction sanitise
+      // that produces the projection actually written, and the struggle-
+      // notification filter.
+      //
+      // The memory-fact leg of this file (three write paths through
+      // `writeMemoryFactsForAnalysis` / `writeMemoryFactsForDeletion`) is
+      // deliberately NOT counted here, because it is ratcheted by the TYPE SYSTEM
+      // instead: those functions take `learningTextGate` as a REQUIRED parameter,
+      // so a new write path cannot reach them ungated without a compile error.
+      // That is a stronger guarantee than a source-text count, and the count that
+      // would express it textually would be brittle.
       file: 'learner-profile.ts',
-      control: 'english-only-guard',
-      applications: 1,
+      control: 'multilingual-gate',
+      applications: 3,
       oldGuardCall: OLD_GUARD_SCRUB,
-      newGateCall: null,
+      newGateCall: /isContentSafe\(/g,
     },
   ];
 

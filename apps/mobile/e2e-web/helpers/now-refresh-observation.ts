@@ -33,6 +33,26 @@ export type NowRefreshOutcome<Response> =
   | { kind: 'rejected'; error: unknown }
   | { kind: 'unsettled' };
 
+export interface CapturedNowRefreshPayload<Response, Payload> {
+  response: Response;
+  payload: Payload;
+}
+
+/**
+ * [WI-2961] Starts consuming the response body as soon as the already-armed
+ * Playwright response promise settles. Call this before the navigation action:
+ * Chromium may release the Network body once navigation completes, while the
+ * plain `Response` handle itself remains settled and otherwise looks healthy.
+ */
+export async function captureNowRefreshPayload<Response, Payload>(
+  responsePromise: Promise<Response>,
+  readPayload: (response: Response) => Promise<Payload>,
+): Promise<CapturedNowRefreshPayload<Response, Payload>> {
+  const response = await responsePromise;
+  const payload = await readPayload(response);
+  return { response, payload };
+}
+
 /**
  * Throws when the observation was armed at or after the triggering action —
  * the exact hold-then-late-wait ordering bug this WI fixes. Arming must

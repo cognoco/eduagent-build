@@ -1107,12 +1107,6 @@ export function useMentorNoticePolicy(
   trusted: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
-  /**
-   * Record a fail-closed `malformed` signal when the observation could not be
-   * reached at all — e.g. the whole response failed schema validation, so no
-   * observation value exists to pass to `observe`.
-   */
-  observeMalformed: () => void;
   /** Whether THIS payload's notice content must be suppressed. */
   suppressed: (
     observation: MentorNoticePolicyObservation | undefined,
@@ -1172,10 +1166,6 @@ export function useMentorNoticePolicy(
     [actorId, profileId],
   );
 
-  const observeMalformed = useCallback(() => {
-    foldMentorNoticePolicyFor(actorId, profileId, 'malformed');
-  }, [actorId, profileId]);
-
   // Reads the LIVE store rather than this render's snapshot. In render the two
   // agree (both come from the same entry, and `useSyncExternalStore` re-renders
   // on every commit). The difference matters in an imperative callback that has
@@ -1195,7 +1185,6 @@ export function useMentorNoticePolicy(
       hydrated: bound ? snapshot.hydrated : true,
       trusted: bound ? snapshot.trusted : true,
       observe,
-      observeMalformed,
       suppressed,
     }),
     [
@@ -1205,7 +1194,6 @@ export function useMentorNoticePolicy(
       snapshot.trusted,
       bound,
       observe,
-      observeMalformed,
       suppressed,
     ],
   );
