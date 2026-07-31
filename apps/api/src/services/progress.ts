@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, gte, inArray } from 'drizzle-orm';
+import { eq, and, asc, gte, inArray } from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -41,6 +41,7 @@ import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from './curriculum-topic-ownership';
+import { getLatestCurriculum, getLatestCurricula } from './curriculum';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -147,18 +148,6 @@ function computeThreeStateTopicSets(
   return { masteredTopics, learningTopics };
 }
 
-function firstCurriculumBySubject<T extends { subjectId: string }>(
-  curriculumRows: T[],
-): Map<string, T> {
-  const bySubject = new Map<string, T>();
-  for (const curriculum of curriculumRows) {
-    if (!bySubject.has(curriculum.subjectId)) {
-      bySubject.set(curriculum.subjectId, curriculum);
-    }
-  }
-  return bySubject;
-}
-
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
@@ -175,10 +164,7 @@ export async function getSubjectProgress(
   if (!subject) return null;
 
   // Find curriculum for this subject
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-    orderBy: desc(curricula.version),
-  });
+  const curriculum = await getLatestCurriculum(db, profileId, subjectId);
 
   if (!curriculum) {
     return {
@@ -530,14 +516,13 @@ export async function getOverallProgress(
 
   const subjectIds = allSubjects.map((s) => s.id);
 
-  // Fetch all curricula for these subjects in one query
-  const allCurricula = await db.query.curricula.findMany({
-    where: inArray(curricula.subjectId, subjectIds),
-    orderBy: desc(curricula.version),
-  });
-
+  const curriculumBySubject = await getLatestCurricula(
+    db,
+    profileId,
+    subjectIds,
+  );
+  const allCurricula = [...curriculumBySubject.values()];
   const curriculumIds = allCurricula.map((c) => c.id);
-  const curriculumBySubject = firstCurriculumBySubject(allCurricula);
 
   // Fetch all topics for all curricula in one query
   const allTopics =
@@ -820,14 +805,13 @@ export async function getOverallProgressBatch(
 
   const allSubjectIds = allSubjects.map((s) => s.id);
 
-  // 2. Fetch all curricula for all subjects — 1 query
-  const allCurricula = await db.query.curricula.findMany({
-    where: inArray(curricula.subjectId, allSubjectIds),
-    orderBy: desc(curricula.version),
-  });
-
+  const curriculumBySubject = await getLatestCurricula(
+    db,
+    [...subjectsByProfile.keys()],
+    allSubjectIds,
+  );
+  const allCurricula = [...curriculumBySubject.values()];
   const curriculumIds = allCurricula.map((c) => c.id);
-  const curriculumBySubject = firstCurriculumBySubject(allCurricula);
 
   // 3. Fetch all topics for all curricula — 1 query
   const allTopics =
@@ -1530,22 +1514,22 @@ export async function getLearningResumeTarget(
     )
   ).filter(isRealLearningSession);
 
-  const curriculumRows = await db
-    .select({
-      id: curricula.id,
-      subjectId: curricula.subjectId,
-      version: curricula.version,
-    })
-    .from(curricula)
-    .where(inArray(curricula.subjectId, subjectIds))
-    .orderBy(desc(curricula.version));
-
-  const latestCurriculumBySubject = new Map<string, string>();
-  for (const curriculum of curriculumRows) {
-    if (!latestCurriculumBySubject.has(curriculum.subjectId)) {
-      latestCurriculumBySubject.set(curriculum.subjectId, curriculum.id);
-    }
-  }
+  const [curriculumRows, latestCurricula] = await Promise.all([
+    db
+      .select({
+        id: curricula.id,
+        subjectId: curricula.subjectId,
+      })
+      .from(curricula)
+      .where(inArray(curricula.subjectId, subjectIds)),
+    getLatestCurricula(db, profileId, subjectIds),
+  ]);
+  const latestCurriculumBySubject = new Map(
+    [...latestCurricula].map(([subjectId, curriculum]) => [
+      subjectId,
+      curriculum.id,
+    ]),
+  );
 
   const curriculumIds = curriculumRows.map((curriculum) => curriculum.id);
   if (curriculumIds.length === 0) {
@@ -1810,24 +1794,24 @@ export async function getContinueSuggestion(
       resumableBySubject.set(session.subjectId, list);
     }
   }
-  const curriculumRows = await db
-    .select({
-      id: curricula.id,
-      subjectId: curricula.subjectId,
-      version: curricula.version,
-    })
-    .from(curricula)
-    .where(inArray(curricula.subjectId, subjectIds))
-    .orderBy(desc(curricula.version));
+  const [curriculumRows, latestCurricula] = await Promise.all([
+    db
+      .select({
+        id: curricula.id,
+        subjectId: curricula.subjectId,
+      })
+      .from(curricula)
+      .where(inArray(curricula.subjectId, subjectIds)),
+    getLatestCurricula(db, profileId, subjectIds),
+  ]);
+  const latestCurriculumBySubject = new Map(
+    [...latestCurricula].map(([subjectId, curriculum]) => [
+      subjectId,
+      curriculum.id,
+    ]),
+  );
 
-  const latestCurriculumBySubject = new Map<string, string>();
-  for (const curriculum of curriculumRows) {
-    if (!latestCurriculumBySubject.has(curriculum.subjectId)) {
-      latestCurriculumBySubject.set(curriculum.subjectId, curriculum.id);
-    }
-  }
-
-  const curriculumIds = [...new Set(latestCurriculumBySubject.values())];
+  const curriculumIds = curriculumRows.map((curriculum) => curriculum.id);
   if (curriculumIds.length === 0) return null;
 
   const topics = await db.query.curriculumTopics.findMany({
@@ -1871,6 +1855,7 @@ export async function getContinueSuggestion(
   );
 
   const topicsByCurriculum = new Map<string, typeof scopedTopics>();
+  const topicsById = new Map(scopedTopics.map((topic) => [topic.id, topic]));
   for (const topic of scopedTopics) {
     const list = topicsByCurriculum.get(topic.curriculumId) ?? [];
     list.push(topic);
@@ -1881,32 +1866,45 @@ export async function getContinueSuggestion(
     const curriculumId = latestCurriculumBySubject.get(subject.id);
     if (!curriculumId) continue;
 
+    const resumable = (resumableBySubject.get(subject.id) ?? [])
+      .filter((session) => session.topicId && topicsById.has(session.topicId))
+      .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+
     const nextTopic = (topicsByCurriculum.get(curriculumId) ?? []).find(
       (topic) =>
         !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id),
     );
 
-    if (nextTopic) {
-      // [F-001] lastSessionId MUST match nextTopic.id — otherwise the client
-      // navigates to nextTopic but with a sessionId that belongs to a
-      // different topic, causing the session handler to either refuse the
-      // mismatch or append events to the wrong `learning_sessions` row.
-      // Previous behavior took the most-recent resumable session across the
-      // whole subject regardless of topic; that's the mismatch described in
-      // F-001 of the 2026-04-18 end-user test report.
-      const resumable = (resumableBySubject.get(subject.id) ?? [])
-        .filter((session) => session.topicId === nextTopic.id)
-        .sort(
-          (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
-        );
-      const lastSession = resumable[0];
+    const resumableSession = resumable.find((session) => {
+      const topic = session.topicId ? topicsById.get(session.topicId) : null;
+      return (
+        topic?.curriculumId !== curriculumId ||
+        session.topicId === nextTopic?.id
+      );
+    });
+    if (resumableSession?.topicId) {
+      const resumableTopic = topicsById.get(resumableSession.topicId);
+      if (resumableTopic) {
+        return {
+          subjectId: subject.id,
+          subjectName: subject.name,
+          topicId: resumableTopic.id,
+          topicTitle: resumableTopic.title,
+          lastSessionId: resumableSession.id,
+        };
+      }
+    }
 
+    if (nextTopic) {
+      // [F-001] A current-version session is reusable only when it matches the
+      // selected next topic. Historical-version sessions remain resumable, but
+      // never outrank a newer matching current-version session.
       return {
         subjectId: subject.id,
         subjectName: subject.name,
         topicId: nextTopic.id,
         topicTitle: nextTopic.title,
-        lastSessionId: lastSession?.id ?? null,
+        lastSessionId: null,
       };
     }
   }

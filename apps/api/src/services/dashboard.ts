@@ -24,7 +24,6 @@ import {
   progressSnapshots,
   sessionEvents,
   subjects,
-  curricula,
   curriculumTopics,
   sessionSummaries,
   streaks,
@@ -56,6 +55,7 @@ import {
   getTopicProgressBatch,
 } from './progress';
 import type { OverallProgressResult } from './progress';
+import { getLatestCurriculum } from './curriculum';
 import {
   buildKnowledgeInventory,
   buildProgressHistory,
@@ -1378,9 +1378,7 @@ export async function getChildSubjectTopics(
   if (!childSubject) return [];
 
   // Get curriculum for subject
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-  });
+  const curriculum = await getLatestCurriculum(db, childProfileId, subjectId);
   if (!curriculum) return [];
 
   // Get all topics in the curriculum

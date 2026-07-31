@@ -50,11 +50,10 @@ jest.mock(
   },
 );
 
-import { desc } from 'drizzle-orm';
-
 import {
   createScopedRepository,
   curricula,
+  curriculumTopics,
   type Database,
 } from '@eduagent/database';
 import type { SubjectProgress } from '@eduagent/schemas';
@@ -250,7 +249,9 @@ function createMockDb({
   topicSubjectJoinRows?: Array<{ topicId: string }>;
   ownedTopicRows?: ReturnType<typeof mockOwnedTopicRow>[];
 } = {}): Database {
-  let selectedCurriculumId: string | undefined;
+  let selectedCurriculumId = curriculumFindFirstRows
+    ? [...curriculumFindFirstRows].sort((a, b) => b.version - a.version)[0]?.id
+    : undefined;
   const curriculumFindFirstMock = jest
     .fn()
     .mockImplementation(async (config?: { orderBy?: unknown }) => {
@@ -279,7 +280,16 @@ function createMockDb({
         ? [mockOwnedTopicRow(topicFindFirst)]
         : topicsFindMany.map(mockOwnedTopicRow));
   const orderBy = jest.fn().mockResolvedValue(curriculumSelectRows);
-  const selectWhere = jest.fn().mockReturnValue({ orderBy });
+  const selectWhereResult = Object.assign(
+    { orderBy },
+    {
+      then: (
+        resolve: (value: typeof curriculumSelectRows) => unknown,
+        reject?: (reason: unknown) => unknown,
+      ) => Promise.resolve(curriculumSelectRows).then(resolve, reject),
+    },
+  );
+  const selectWhere = jest.fn().mockReturnValue(selectWhereResult);
   const ownedTopicLimit = jest.fn().mockResolvedValue(effectiveOwnedTopicRows);
   const ownedTopicWhereResult = Object.assign(
     { limit: ownedTopicLimit },
@@ -300,15 +310,55 @@ function createMockDb({
   const ownedTopicFirstJoin = jest.fn().mockReturnValue({
     innerJoin: ownedTopicSecondJoin,
   });
-  const from = jest.fn().mockReturnValue({
-    where: selectWhere,
+  const ownedTopicFrom = {
     innerJoin: ownedTopicFirstJoin,
+  };
+  const latestCurriculumRows = (
+    curriculumFindFirstRows ??
+    (curriculumFindFirst
+      ? [curriculumFindFirst]
+      : curriculaFindMany.length > 0
+        ? curriculaFindMany
+        : curriculumSelectRows)
+  )
+    .map((curriculum) => ({
+      ...curriculum,
+      version:
+        'version' in curriculum && typeof curriculum.version === 'number'
+          ? curriculum.version
+          : 1,
+    }))
+    .sort((a, b) => b.version - a.version);
+  const latestCurriculumOrderBy = jest.fn().mockResolvedValue(
+    latestCurriculumRows.map((curriculum) => ({
+      curricula: curriculum,
+      subjects: {
+        id: curriculum.subjectId,
+        profileId,
+      },
+    })),
+  );
+  const latestCurriculumWhere = jest.fn().mockReturnValue({
+    orderBy: latestCurriculumOrderBy,
   });
+  const latestCurriculumInnerJoin = jest.fn().mockReturnValue({
+    where: latestCurriculumWhere,
+  });
+  const curriculumFrom = {
+    where: selectWhere,
+    innerJoin: latestCurriculumInnerJoin,
+  };
 
   return {
-    select: jest.fn().mockReturnValue({
-      from,
-    }),
+    __allCurriculumOrderBy: orderBy,
+    __latestCurriculumOrderBy: latestCurriculumOrderBy,
+    select: jest.fn().mockImplementation(() => ({
+      from: jest.fn((table: unknown) => {
+        if (table === curricula) return curriculumFrom;
+        if (table === curriculumTopics) return ownedTopicFrom;
+        throw new Error('Unexpected table in progress database fixture');
+      }),
+    })),
     query: {
       curricula: {
         findFirst: curriculumFindFirstMock,
@@ -465,9 +515,8 @@ describe('getSubjectProgress', () => {
       topicsCompleted: 0,
       topicsVerified: 0,
     });
-    expect(db.query.curricula.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: desc(curricula.version) }),
-    );
+    expect(db.select).toHaveBeenCalledWith();
+    expect(db.query.curricula.findFirst).not.toHaveBeenCalled();
   });
 
   it('counts topics, completed, and verified correctly', async () => {
@@ -1715,6 +1764,77 @@ describe('getOverallProgress', () => {
 // ---------------------------------------------------------------------------
 
 describe('getLearningResumeTarget', () => {
+  it('[WI-2463] resumes a v1 session while choosing new work from v2 through the shared latest accessor', async () => {
+    const historicalTopic = mockTopicRow({
+      id: 'topic-v1',
+      title: 'Historical algebra',
+      curriculumId: 'curriculum-v1',
+    });
+    const latestTopic = mockTopicRow({
+      id: 'topic-v2',
+      title: 'Current geometry',
+      curriculumId: 'curriculum-v2',
+    });
+    const curriculumRows = [
+      { id: 'curriculum-v1', subjectId, version: 1 },
+      { id: 'curriculum-v2', subjectId, version: 2 },
+    ];
+
+    setupScopedRepo({
+      subjectsFindMany: [mockSubjectRow()],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'historical-session',
+          topicId: historicalTopic.id,
+          status: 'paused',
+        }),
+      ],
+    });
+    const resumeDb = createMockDb({
+      curriculumSelectRows: curriculumRows,
+      topicsFindMany: [historicalTopic, latestTopic],
+    }) as Database & {
+      __allCurriculumOrderBy: jest.Mock;
+      __latestCurriculumOrderBy: jest.Mock;
+    };
+
+    const resume = await getLearningResumeTarget(resumeDb, profileId);
+
+    expect(resume).toMatchObject({
+      topicId: historicalTopic.id,
+      topicTitle: historicalTopic.title,
+      sessionId: 'historical-session',
+      resumeKind: 'paused_session',
+    });
+    expect(resumeDb.__latestCurriculumOrderBy).toHaveBeenCalled();
+    expect(resumeDb.__allCurriculumOrderBy).not.toHaveBeenCalled();
+
+    setupScopedRepo({
+      subjectsFindMany: [mockSubjectRow()],
+      sessionsFindMany: [],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+    });
+    const nextDb = createMockDb({
+      curriculumSelectRows: curriculumRows,
+      topicsFindMany: [historicalTopic, latestTopic],
+    }) as Database & {
+      __allCurriculumOrderBy: jest.Mock;
+      __latestCurriculumOrderBy: jest.Mock;
+    };
+
+    const next = await getLearningResumeTarget(nextDb, profileId);
+
+    expect(next).toMatchObject({
+      topicId: latestTopic.id,
+      topicTitle: latestTopic.title,
+      sessionId: null,
+      resumeKind: 'next_topic',
+    });
+    expect(nextDb.__latestCurriculumOrderBy).toHaveBeenCalled();
+    expect(nextDb.__allCurriculumOrderBy).not.toHaveBeenCalled();
+  });
+
   it('returns the newest active session as the global resume target', async () => {
     const subject = mockSubjectRow();
     const topic = mockTopicRow({ id: 'topic-1', title: 'Algebra' });
@@ -2022,6 +2142,98 @@ describe('getLearningResumeTarget', () => {
 // ---------------------------------------------------------------------------
 
 describe('getContinueSuggestion', () => {
+  it('[WI-2463] resumes a paused v1 topic before selecting new work from v2', async () => {
+    const historicalTopic = mockTopicRow({
+      id: 'topic-v1',
+      title: 'Historical algebra',
+      curriculumId: 'curriculum-v1',
+    });
+    const latestTopic = mockTopicRow({
+      id: 'topic-v2',
+      title: 'Current geometry',
+      curriculumId: 'curriculum-v2',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [mockSubjectRow()],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'historical-session',
+          topicId: historicalTopic.id,
+          status: 'paused',
+        }),
+      ],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [
+        { id: 'curriculum-v1', subjectId, version: 1 },
+        { id: 'curriculum-v2', subjectId, version: 2 },
+      ],
+      topicsFindMany: [historicalTopic, latestTopic],
+    }) as Database & {
+      __allCurriculumOrderBy: jest.Mock;
+      __latestCurriculumOrderBy: jest.Mock;
+    };
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).toMatchObject({
+      topicId: historicalTopic.id,
+      topicTitle: historicalTopic.title,
+      lastSessionId: 'historical-session',
+    });
+    expect(db.__latestCurriculumOrderBy).toHaveBeenCalled();
+    expect(db.__allCurriculumOrderBy).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2463] prefers a newer matching v2 session over an older paused v1 session', async () => {
+    const historicalTopic = mockTopicRow({
+      id: 'topic-v1',
+      title: 'Historical algebra',
+      curriculumId: 'curriculum-v1',
+    });
+    const latestTopic = mockTopicRow({
+      id: 'topic-v2',
+      title: 'Current geometry',
+      curriculumId: 'curriculum-v2',
+    });
+    setupScopedRepo({
+      subjectsFindMany: [mockSubjectRow()],
+      sessionsFindMany: [
+        mockSessionRow({
+          id: 'historical-session',
+          topicId: historicalTopic.id,
+          status: 'paused',
+          lastActivityAt: new Date('2026-02-15T08:00:00.000Z'),
+        }),
+        mockSessionRow({
+          id: 'current-session',
+          topicId: latestTopic.id,
+          status: 'active',
+          lastActivityAt: new Date('2026-02-15T09:00:00.000Z'),
+        }),
+      ],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculumSelectRows: [
+        { id: 'curriculum-v1', subjectId, version: 1 },
+        { id: 'curriculum-v2', subjectId, version: 2 },
+      ],
+      topicsFindMany: [historicalTopic, latestTopic],
+    });
+
+    const result = await getContinueSuggestion(db, profileId);
+
+    expect(result).toMatchObject({
+      topicId: latestTopic.id,
+      topicTitle: latestTopic.title,
+      lastSessionId: 'current-session',
+    });
+  });
+
   it('returns null when no subjects', async () => {
     setupScopedRepo({ subjectsFindMany: [] });
     const db = createMockDb();
