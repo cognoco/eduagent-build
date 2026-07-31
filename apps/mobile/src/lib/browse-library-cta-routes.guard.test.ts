@@ -2,20 +2,35 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as ts from 'typescript';
 
-// [WI-2467] Scoped sibling-site forward guard: enumerates the four WI-2467
-// empty-state "browse Library" CTAs outside WI-2219's Practice/
-// assessment-picker/quiz scope
-// (apps/mobile/src/app/(app)/practice/browse-recovery-routes.test.ts). Each
+// [WI-2219 / WI-2467] Cross-cutting forward guard: enumerates every
+// empty-state / recovery "browse Library" CTA that can send a learner with
+// no eligible content to the app's browse destination -- the original
+// WI-2219 Practice/assessment-picker/quiz sites (formerly
+// apps/mobile/src/app/(app)/practice/browse-recovery-routes.test.ts, now
+// consolidated here) plus the WI-2467 sibling sites outside that scope. Each
 // CTA must select its destination via FEATURE_FLAGS.MODE_NAV_V2_ENABLED (V2
 // on -> /(app)/subjects, off -> /(app)/library) rather than hardcoding
 // /(app)/library unconditionally -- the same V0/V1->V2 cutover regression
-// WI-2219 fixed, at these sibling sites its enumeration guard didn't cover.
-// Any future CTA added to one of these four files that pushes
+// WI-2219 fixed. Any future CTA added to one of these files that pushes
 // /(app)/library outside that flag-gated ternary fails this test (3+
-// sibling-sites Fix Development Rule). This guard covers exactly the four
-// WI-2467 AC-listed sites -- it is not an app-wide scan of every
-// /(app)/library reference in the codebase.
+// sibling-sites Fix Development Rule). This guard covers exactly the sites
+// enumerated below -- it is not an app-wide scan of every /(app)/library
+// reference in the codebase.
 const BROWSE_LIBRARY_CTA_SITES: readonly { file: string; testID: string }[] = [
+  // WI-2219 — Practice / assessment-picker / quiz recovery CTAs.
+  {
+    file: 'apps/mobile/src/app/(app)/practice/assessment-picker.tsx',
+    testID: 'assessment-picker-browse',
+  },
+  {
+    file: 'apps/mobile/src/app/(app)/practice/index.tsx',
+    testID: 'review-empty-browse',
+  },
+  {
+    file: 'apps/mobile/src/app/(app)/quiz/index.tsx',
+    testID: 'quiz-vocab-locked',
+  },
+  // WI-2467 — sibling empty-state browse-Library CTAs.
   {
     file: 'apps/mobile/src/components/progress/AccordionTopicList.tsx',
     testID: 'accordion-topics-browse',
@@ -32,10 +47,15 @@ const BROWSE_LIBRARY_CTA_SITES: readonly { file: string; testID: string }[] = [
     file: 'apps/mobile/src/app/(app)/progress/index.tsx',
     testID: 'progress-start-learning',
   },
+  {
+    file: 'apps/mobile/src/app/(app)/progress/saved.tsx',
+    testID: 'saved-empty-library-cta',
+  },
 ];
 
 const LIBRARY_ROUTE = '/(app)/library';
 const SUBJECTS_ROUTE = '/(app)/subjects';
+const V2_FLAG_OBJECT = 'FEATURE_FLAGS';
 const V2_FLAG_PROPERTY = 'MODE_NAV_V2_ENABLED';
 
 function repoRoot(): string {
@@ -46,21 +66,20 @@ function isLibraryRouteLiteral(node: ts.Node): node is ts.StringLiteralLike {
   return ts.isStringLiteralLike(node) && node.text === LIBRARY_ROUTE;
 }
 
-function referencesV2Flag(node: ts.Node): boolean {
-  let found = false;
-  function visit(current: ts.Node): void {
-    if (found) return;
-    if (
-      ts.isPropertyAccessExpression(current) &&
-      current.name.text === V2_FLAG_PROPERTY
-    ) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(current, visit);
-  }
-  visit(node);
-  return found;
+/**
+ * True only for the exact positive condition `FEATURE_FLAGS.MODE_NAV_V2_ENABLED`
+ * -- i.e. a property access on the `FEATURE_FLAGS` identifier reading the
+ * `MODE_NAV_V2_ENABLED` property, with no negation and no other object. A
+ * differently-named object with a same-named property (`other.MODE_NAV_V2_ENABLED`)
+ * or a negated read (`!FEATURE_FLAGS.MODE_NAV_V2_ENABLED`) does not match.
+ */
+function isV2FlagPositiveCondition(node: ts.Node): boolean {
+  return (
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === V2_FLAG_OBJECT &&
+    node.name.text === V2_FLAG_PROPERTY
+  );
 }
 
 type UnguardedLibraryPush = {
@@ -72,7 +91,8 @@ type UnguardedLibraryPush = {
  * Finds every `/(app)/library` string literal in the file that is NOT the
  * `whenFalse` branch of a `FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects'
  * : '/(app)/library'`-shaped ternary -- i.e. every unconditional/unflagged
- * library push.
+ * library push, every push guarded by a differently-named or negated
+ * condition, and every push with the branches swapped or repointed.
  */
 function findUnguardedLibraryPushes(absPath: string): UnguardedLibraryPush[] {
   const source = readFileSync(absPath, 'utf-8');
@@ -92,7 +112,7 @@ function findUnguardedLibraryPushes(absPath: string): UnguardedLibraryPush[] {
       const isGuardedFalseBranch =
         ts.isConditionalExpression(parent) &&
         parent.whenFalse === node &&
-        referencesV2Flag(parent.condition) &&
+        isV2FlagPositiveCondition(parent.condition) &&
         ts.isStringLiteralLike(parent.whenTrue) &&
         parent.whenTrue.text === SUBJECTS_ROUTE;
 
@@ -114,9 +134,9 @@ function findUnguardedLibraryPushes(absPath: string): UnguardedLibraryPush[] {
   return violations;
 }
 
-describe('Empty-state browse-Library CTA routes [WI-2467]', () => {
+describe('Empty-state / recovery browse-Library CTA routes [WI-2219, WI-2467]', () => {
   it.each(BROWSE_LIBRARY_CTA_SITES)(
-    'keeps $testID ($file) present as a known empty-state browse-Library CTA',
+    'keeps $testID ($file) present as a known browse-Library CTA',
     ({ file, testID }) => {
       const source = readFileSync(resolve(repoRoot(), file), 'utf-8');
       expect(source).toContain(`testID="${testID}"`);
@@ -134,10 +154,11 @@ describe('Empty-state browse-Library CTA routes [WI-2467]', () => {
             violations
               .map((v) => `  - line ${v.line}: ${v.snippet}`)
               .join('\n') +
-            `\n\nEvery empty-state browse-Library CTA must select its ` +
-            `destination via FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? ` +
-            `'${SUBJECTS_ROUTE}' : '${LIBRARY_ROUTE}' -- never push ` +
-            `'${LIBRARY_ROUTE}' unconditionally.`,
+            `\n\nEvery browse-Library CTA must select its destination via ` +
+            `${V2_FLAG_OBJECT}.${V2_FLAG_PROPERTY} ? '${SUBJECTS_ROUTE}' : ` +
+            `'${LIBRARY_ROUTE}' -- never push '${LIBRARY_ROUTE}' ` +
+            `unconditionally, behind a differently-named/negated condition, ` +
+            `or with the branches swapped.`,
         );
       }
     },
