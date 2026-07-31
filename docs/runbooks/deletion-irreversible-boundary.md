@@ -115,10 +115,11 @@ person/org, and are the only state that outlives the erasure:
 | `financial_record` (×2 per person: `person_deletion_tax_retain`, `person_deletion_chargeback_retain`) | `deletion-v2.ts:1056-1085` | `NULL` — counsel-owned, provisional | Tax / chargeback retain-tier; carries a JSON snapshot of the org's subscriptions at delete time. No FK to person/org (survives by construction) |
 | `deletion_audit` | One row per deleted person (`deletion-v2.ts:524-530`) | `NULL` — counsel-owned | `deleted_by` (nullable) + `reason` (`user_initiated` / `guardian_initiated` / `abandonment`) audit trail |
 
-All three retention periods are explicitly left `NULL` pending counsel — the
+All three database retention periods are explicitly left `NULL` pending counsel — the
 code comments (`deletion-v2.ts:43-46`, `:1046-1049`) are explicit that this is
 provisional, not an oversight; do not treat `NULL` as "forever" or "never" in
-an incident response.
+an incident response. The restore-independent completion records described in
+Section 5 are separate observability records, not database retain-tier rows.
 
 **Not retained** (hard-deleted, no retain tier): guardianship/supportership
 edges, the `subscription` row(s), the `person`/`organization` rows themselves,
@@ -166,7 +167,39 @@ then. **Operationally**: if a user reports lost data after deletion, the
 correct question is "did you use Export My Data before confirming delete?" —
 the product does not guarantee they were prompted to.
 
-## 5. Dead-letter procedure for partial external deletion failure
+## 5. Restore-independent completion proof
+
+WI-2390 adds two success records outside Postgres so a point-in-time restore
+cannot erase the only evidence that an erasure completed:
+
+- After the Postgres transaction commits and Clerk erasure succeeds (or no
+  Clerk login exists), the `record-deletion-completion` Inngest step writes the
+  structured event `account_deletion.completed` and the Sentry message
+  `account.deletion.completed`. Query Sentry with the tag
+  `surface:account.deletion.completed`; the record carries the opaque
+  `accountId`, Inngest `runId`, DB outcome, Clerk outcome, and whether
+  subscription-store teardown was requested or not applicable.
+- When Stripe/RevenueCat teardown completes, the
+  `record-store-teardown-completion` step writes the structured event and
+  Sentry message `billing.store_teardown.completed`. Query Sentry with
+  `surface:billing.store_teardown.completed`; the record carries `accountId`,
+  `runId`, number of subscriptions processed, and the non-PII provider outcome
+  summary.
+
+For an account with no subscription-store targets,
+`account_deletion.completed` with `subscriptionStoreTeardown=not_applicable`
+is the terminal success proof. When teardown targets exist, require both
+success records for end-to-end completion. Correlate on `accountId`; use each
+record's `runId` to inspect its Inngest run. After a PITR restore, query these
+records before treating restored person/organization rows as valid—the records
+do not depend on those rows and identify deletions that may need replay.
+
+The observability calls are deliberately fault-isolated after their structured
+log write: a Sentry transport exception must not retry an already-completed
+irreversible deletion. Terminal failures use the separate signals below; the
+durable dead-letter dispatch mechanism remains owned by WI-2346.
+
+## 6. Dead-letter procedure for partial external deletion failure
 
 "Partial external deletion" = the DB hard-delete transaction (Section 2)
 committed — the person/org data is gone — but one of the two external erasure
@@ -279,10 +312,11 @@ Compare this to the sibling GDPR cascade-delete pipeline,
 `captureMessage` (`consent-revocation.ts:63-122`) — an explicit, queryable,
 ops-consumable dead-letter signal that survives independent of Sentry.
 `account-deletion.ts` and `billing-subscription-store-teardown.ts` both stop
-at the Sentry capture; there is no equivalent `app/account.deletion.failed`
+at the Sentry capture for terminal failure; there is no equivalent
+`app/account.deletion.failed`
 (or similar) event, and no dashboard/alerting is wired to page on this signal
 today. Today's remediation is entirely manual and depends on someone noticing
-the Sentry issue. Recommend a follow-up work item to add the same
-`safeSend`-dispatched dead-letter event pattern used by `consent-revocation.ts`
-to both `account-deletion.ts`'s `delete-clerk-user` failure path and
+the Sentry issue. WI-2346 owns adding the same `safeSend`-dispatched dead-letter
+event pattern used by `consent-revocation.ts` to both
+`account-deletion.ts`'s `delete-clerk-user` failure path and
 `billing-subscription-store-teardown.ts`.
