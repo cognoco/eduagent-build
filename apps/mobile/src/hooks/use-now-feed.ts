@@ -198,26 +198,7 @@ export function useNowFeed(): NowFeedQueryResult {
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        let data: NowResponse;
-        try {
-          data = await parseJson(okRes, nowResponseSchema, 'GET /now');
-        } catch (err) {
-          // [WI-2627] A malformed `mentorNoticePolicy` fails the WHOLE response
-          // schema, so `parseJson` throws and the fold below never runs. Left
-          // there, the reducer is never REACHED: TanStack Query retains the
-          // prior notice-bearing `data` after a failed background refetch,
-          // policy stays enabled, and those cards keep rendering indefinitely —
-          // "missing/malformed never exposes data" defeated by a route that
-          // never gets to the reducer.
-          //
-          // Deliberately over-broad: this fires on ANY unparseable /now body,
-          // not only a bad policy field, because we cannot tell which field
-          // failed without a second read of a single-use body. That is the
-          // correct side to err on — a response we cannot parse is one whose
-          // policy we cannot confirm, and notices are the private feature.
-          policy.observeMalformed();
-          throw err;
-        }
+        const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
         // [WI-2627] This response is also the ORDERED observation. Fold it
         // before the cache write below, so a response that carries a rollback
         // is not persisted with its own notice cards intact.
@@ -440,17 +421,6 @@ export function useNowOverflow(
         { query: { scope: 'self' } },
         { init: { signal } },
       ),
-    // [WI-2627 rework] `select` runs AFTER the wrapper's parse, so a malformed
-    // `mentorNoticePolicy` fails the whole schema and the fold below is never
-    // reached — and TanStack Query then RETAINS the prior notice-bearing page
-    // and keeps rendering it with policy still enabled. `onParseError` is the
-    // wrapper's seam for exactly that: it fires before the error propagates, so
-    // the store goes fail-closed and the suppression memo below re-evaluates
-    // and strips the data the query kept.
-    //
-    // Deliberately over-broad, as in `useNowFeed`: a body we cannot parse is one
-    // whose policy we cannot confirm, and notices are the private feature.
-    onParseError: () => policy.observeMalformed(),
     // [WI-2627] The fold happens HERE, not in an effect. `useApiQuery` runs
     // `select` inside the query fn, i.e. BEFORE the query publishes — which is
     // the only place a fold can sit without the surface painting a frame first.

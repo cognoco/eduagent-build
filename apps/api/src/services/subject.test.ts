@@ -97,15 +97,21 @@ function setupScopedRepo(options: ScopedRepoSetup = {}) {
   nextScopedRepoSetup = options;
 }
 
-function createSubjectQueryMocks() {
+function createSubjectQueryMocks(defaultFindFirst?: SubjectRow) {
   const setup = nextScopedRepoSetup;
   nextScopedRepoSetup = {};
+  const findFirstResult = Object.prototype.hasOwnProperty.call(
+    setup,
+    'findFirstResult',
+  )
+    ? setup.findFirstResult
+    : defaultFindFirst;
   return {
     findMany:
       setup.findManyMock ??
       jest.fn().mockResolvedValue(setup.findManyResult ?? []),
     findFirst:
-      setup.findFirstMock ?? jest.fn().mockResolvedValue(setup.findFirstResult),
+      setup.findFirstMock ?? jest.fn().mockResolvedValue(findFirstResult),
   };
 }
 
@@ -113,12 +119,43 @@ afterEach(() => {
   nextScopedRepoSetup = {};
 });
 
+function withLatestCurriculumSelect<T extends object>(db: T): T {
+  const mutableDb = db as T & { select?: jest.Mock };
+  const originalSelect = mutableDb.select;
+  mutableDb.select = jest.fn((selection?: Record<string, unknown>) => {
+    if (selection === undefined) {
+      return {
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockResolvedValue([
+                {
+                  curricula: mockCurriculumRow(),
+                  subjects: mockSubjectRow({
+                    id: uuidSubjectId,
+                    profileId: uuidProfileId,
+                  }),
+                },
+              ]),
+            }),
+          }),
+        }),
+      };
+    }
+    if (!originalSelect) {
+      throw new Error('Unexpected selected query in subject test fixture');
+    }
+    return originalSelect(selection);
+  });
+  return mutableDb;
+}
+
 // [WI-855] createSubject now opens a cap-locked transaction on the broad/narrow/
 // language paths. Attach a no-op `execute` (advisory lock SQL) and a
 // `transaction` that runs the callback against the SAME db so the in-lock
 // recount reads the configured rows. Returns the db typed as Database.
 function withCapTransaction<T extends object>(db: T): Database {
-  const withTx = db as T & {
+  const withTx = withLatestCurriculumSelect(db) as T & {
     execute?: jest.Mock;
     transaction?: jest.Mock;
   };
@@ -711,7 +748,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
 
     const db = {
       query: {
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(subjectRow),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -740,7 +777,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
       async (fn: (tx: typeof db) => unknown) => fn(db),
     );
 
-    return db as unknown as Database;
+    return withLatestCurriculumSelect(db) as unknown as Database;
   }
 
   beforeEach(() => {
@@ -1006,7 +1043,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     const db = withCapTransaction({
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap.
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(subjectRow),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -1049,7 +1086,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap, so
         // execution proceeds to the getPersonAge read that this test rejects.
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(subjectRow),
       },
       insert: jest.fn(() => ({
         values: jest.fn(() => ({
@@ -1083,7 +1120,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     const db = withCapTransaction({
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap.
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(subjectRow),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -1189,7 +1226,7 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     setupScopedRepo({ findManyResult: rows });
     const db = {
       query: {
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(existingSubject),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -1210,6 +1247,7 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     (db as unknown as { transaction: jest.Mock }).transaction = jest.fn(
       async (fn: (tx: typeof db) => unknown) => fn(db),
     );
+    withLatestCurriculumSelect(db);
 
     const result = await createSubjectWithStructure(db, uuidProfileId, {
       name: 'Botany',
@@ -1245,7 +1283,7 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     }));
     const db = withCapTransaction({
       query: {
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(subjectRow),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -1328,7 +1366,7 @@ describe('[WI-867] createSubjectWithStructure always uses getPersonAge (v2 colla
     return withCapTransaction({
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap.
-        subjects: createSubjectQueryMocks(),
+        subjects: createSubjectQueryMocks(subjectRow),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
