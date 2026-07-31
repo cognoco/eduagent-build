@@ -3872,7 +3872,6 @@
     "parentBirthDateLabel": "Sua data de nascimento",
     "childBirthDateLabel": "Data de nascimento da criança",
     "birthDateHint": "Para que seu mentor fale com você da maneira certa. A idade mínima é {{age}} anos.",
-    "parentBirthDateHint": "Isto é para o adulto que está configurando a conta. Você pode adicionar seu/sua filho(a) em seguida. A idade mínima é {{age}} anos.",
     "childBirthDateHint": "Para que o mentor do seu/sua filho(a) fale com ele(a) da maneira certa. A idade mínima é {{age}} anos.",
     "webDateFormatHint": "Insira sua data de nascimento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Insira a data de nascimento do seu/sua filho(a) como AAAA-MM-DD.",
@@ -3885,7 +3884,6 @@
     "upgradeRequiredBody": "Sua assinatura não suporta perfis adicionais. Faça o upgrade para o plano Família ou Pro.",
     "seePlans": "Ver planos",
     "minimumAgeError": "Aprendizes devem ter pelo menos {{age}} anos. Escolha uma data de nascimento anterior.",
-    "parentAdultAgeError": "Contas de pais precisam da data de nascimento de um adulto. Insira seus próprios dados primeiro e depois adicione seu/sua filho(a).",
     "a11yCloseDatePicker": "Fechar seletor de data",
     "createdChildFamilyContextFailedBody": "O perfil de {{name}} está pronto, mas não conseguimos mudar para o modo Família automaticamente.",
     "createdChildFamilyContextTerminalFailedBody": "O perfil de {{name}} está pronto, mas ainda não conseguimos mudar para o modo Família. Você pode mudar para o modo Família mais tarde em Mais > Conta.",
@@ -4617,6 +4615,33 @@
     "errorMessage": "Tente novamente daqui a pouco.",
     "cta": "Aprenda algo você mesmo",
     "hint": "Comece ou continue a sua própria aprendizagem."
+  },
+  "familyIntentOnboarding": {
+    "adultDetailsHint": "Isto é para o adulto que está a configurar a conta. A seguir, perguntaremos quem vai aprender. A idade mínima é {{age}}.",
+    "adultAgeError": "A configuração familiar precisa da data de nascimento de um adulto. Insira primeiro os seus dados e depois escolha quem vai aprender.",
+    "target": {
+      "title": "Quem vai aprender?",
+      "message": "Escolha o que quer configurar primeiro.",
+      "me": "Eu",
+      "someoneElse": "Outra pessoa"
+    },
+    "login": {
+      "title": "O aprendiz tem o seu próprio login?",
+      "message": "Escolha Sim se a pessoa iniciar sessão no MentoMate com o seu próprio e-mail.",
+      "yes": "Sim, têm",
+      "no": "Não, não têm"
+    },
+    "managedUnavailable": {
+      "title": "Perfis sem login próprio ainda não estão disponíveis",
+      "message": "Por agora, pode convidar um aprendiz que tenha o seu próprio login MentoMate."
+    },
+    "actionError": "Não foi possível salvar essa escolha. Tente novamente.",
+    "saveError": "Seu perfil foi criado, mas não foi possível salvar a próxima etapa da configuração. Tente novamente.",
+    "restoreError": {
+      "title": "Não foi possível restaurar a configuração familiar",
+      "message": "Sua escolha ainda está protegida. Tente novamente antes de continuar.",
+      "retry": "Tentar novamente"
+    }
   },
   "sharedRecord": {
     "fact": {

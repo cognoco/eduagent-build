@@ -1,0 +1,50 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The adult family-intent profile creation path records only the pending learner-target UI state; it no longer writes family context or redirects to child-profile creation, and a failed durable write retries without duplicating the profile POST.",
+      "pointer": "apps/mobile/src/app/create-profile.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "After durable initial or retry persistence, the pushed profile-creation modal is dismissed before profile activation so exactly one existing app shell restores the pending fork; a no-history entry falls back to Home without changing cancel, pending-consent, or ordinary add-child close semantics.",
+      "pointer": "apps/mobile/src/app/create-profile.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The plain-language Me and Someone else branches, own-login question, credentialed invitation route, and explicit managed-path gate are covered as one non-authorizing UI state machine.",
+      "pointer": "apps/mobile/src/components/onboarding/FamilyIntentOnboardingGate.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Profile-scoped pending state survives an in-memory reset that represents remount or relaunch, restores every unfinished step, rejects authorizing-shaped data, and never exposes a write or clear that SecureStore rejected.",
+      "pointer": "apps/mobile/src/lib/family-intent-onboarding-state.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "A storage read begun before sign-out cannot repopulate discarded state, and recovery-only state repairs the missing SecureStore primary after a successful restore.",
+      "pointer": "apps/mobile/src/lib/family-intent-onboarding-state.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The signed-in app layout restores the pending fork for the matching active profile, fails closed with retry on rejected or timed-out reads, observes successful post-create publication after an already-active shell settled the marker absent, and preserves existing preview/profile and navigation-shell gate behavior.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The existing-account target opens the family-join invitation form directly under the live V2 launch flag and consumes the durable marker only after that route mounts; older flag configurations mount the explicit unavailable state and then consume the marker so relaunch cannot replay the terminal gate.",
+      "pointer": "apps/mobile/src/app/(app)/link/initiate.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "During the restore-probe and retry window, the blocked learner shell remains React-mounted to preserve navigator state but is display-hidden, pointer-inert, and excluded from native accessibility; first-Mentor language confirmation cannot pre-empt unresolved or restored family intent, a pending invitation handoff, or the terminal invitation route through destination mount and marker consumption.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The tracked preview journey defines a no-Person/no-supportership start, adult creation, Someone else and own-login choices, and arrival at the invitation form without a visibility-link write; its pre-WI-1556 passing run is retained only as historical diagnostic evidence, while final attribution comes from hosted exact-head checks.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/v2-family-intent-onboarding.spec.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}
