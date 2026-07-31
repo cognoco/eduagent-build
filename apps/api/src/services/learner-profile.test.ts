@@ -28,6 +28,10 @@ import { ConflictError } from '../errors';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 import * as sentry from './sentry';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
+// [WI-2952 AC-4] The REAL resolver. The `./llm/router` mock below spreads
+// `jest.requireActual`, so this binding is the production implementation — the
+// exclusion is decided by the same code the judge path runs, not by a stub.
+import { resolveJudgeEligibleVendors } from './llm/router';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -1985,6 +1989,80 @@ describe('analyzeSessionTranscript — flow label (FCR-2026-05-23-L15.LOW3)', ()
       { flow?: string },
     ];
     expect(options?.flow).toBe('learner-profile-analysis');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2952 AC-4] analyzeSessionTranscript — judge independence
+//
+// Asserted where the exclusion is actually DECIDED. The threaded value feeds
+// `resolveJudgeEligibleVendors`, which filters a VENDOR pool, so the
+// discriminating assertion is not "a producer string was returned" but "the
+// producing vendor is ABSENT from the resolved pool". A model id satisfies the
+// former and fails the latter — and the matrix rejects only a *blank* vendor, so
+// a model id sits in the field, matches no exclusion-vocabulary member, and lets
+// the producing vendor grade its own output without failing closed. That exact
+// defect shipped once already here (a fixture threading 'cerebras' kept hundreds
+// of tests green while production threaded a model id). Precedent for the shape:
+// `memory/dedup-llm.test.ts` [WI-2628].
+// ---------------------------------------------------------------------------
+
+describe('analyzeSessionTranscript — judge independence (WI-2952 AC-4)', () => {
+  const PRODUCER_VENDOR = 'anthropic';
+  const PRODUCER_MODEL = 'claude-sonnet-4-6';
+
+  const events = [
+    { eventType: 'user_message', content: 'I keep messing up long division.' },
+    { eventType: 'ai_response', content: 'Let us walk one through together.' },
+    { eventType: 'user_message', content: 'That helped, thanks.' },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRouteAndCall.mockResolvedValue({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+      model: PRODUCER_MODEL,
+      provider: PRODUCER_VENDOR,
+    });
+  });
+
+  it('returns a vendor that ACTUALLY EXCLUDES itself from the judge pool', async () => {
+    const result = await analyzeSessionTranscript(
+      events,
+      'Math',
+      'Division',
+      null,
+    );
+
+    expect(result?.author.provenance).toBe('llm');
+    if (result?.author.provenance !== 'llm') return;
+
+    // The property: the value threaded downstream removes its own vendor.
+    expect(
+      resolveJudgeEligibleVendors({
+        mode: 'model-output',
+        producerVendor: result.author.producerVendor,
+      }),
+    ).not.toContain(PRODUCER_VENDOR);
+
+    // The control that makes the assertion above non-trivial: the MODEL id —
+    // the value a threading mistake substitutes — excludes nothing at all, so
+    // the producer stays eligible to grade its own output.
+    expect(
+      resolveJudgeEligibleVendors({
+        mode: 'model-output',
+        producerVendor: PRODUCER_MODEL,
+      }),
+    ).toContain(PRODUCER_VENDOR);
   });
 });
 
