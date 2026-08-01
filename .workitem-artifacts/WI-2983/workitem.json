@@ -1,0 +1,18 @@
+{
+  "pageId": "3af8bce9-1f7c-814b-b3f1-de997deeb8e3",
+  "id": "WI-2983",
+  "name": "Make payment-failed alert integration deadline time-independent",
+  "description": "The integration fixture hard-codes periodEndAt to 2026-08-01, so its expected current-access billing card became expired on that date and now deterministically blocks unrelated strict-green PRs.",
+  "acceptanceCriteria": "1. Replace the fixed 2026-08-01 period-end fixture with a deadline derived relative to the test run and assert against that exact derived ISO value. 2. Preserve the test intent: payer self-scope receives the highest-priority past-due billing card with current access before the derived deadline, while child self-scope receives no billing card. 3. Record red evidence from GitHub Actions runs 30653298824 and 30687802948, then prove the focused real-database integration test and both normal and IDENTITY_V2_ENABLED CI lanes green after the fix. 4. No production billing, access-resolution, notification, database-schema, or environment behavior changes.",
+  "riskImpact": "P1 because the deterministic date rollover blocks every API-changing PR from satisfying the armed merge gate.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

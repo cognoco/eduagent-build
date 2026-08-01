@@ -1,0 +1,26 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The fixture derives one future period end and reuses its exact value for database setup, reset, and the card assertion.",
+      "pointer": "apps/api/src/services/billing/payment-failed-alert.integration.test.ts:37"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The existing payer and child self-scope assertions remain intact around the corrected derived deadline.",
+      "pointer": "apps/api/src/services/billing/payment-failed-alert.integration.test.ts:245"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The red CI runs, local validation, and required exact-head green proof are recorded together.",
+      "pointer": ".workitem-artifacts/WI-2983/red-green.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The complete diff is confined to the co-located integration test fixture.",
+      "pointer": "git diff --check origin/main...HEAD"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": ".workitem-artifacts/WI-2983/red-green.md"
+}

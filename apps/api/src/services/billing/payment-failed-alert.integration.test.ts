@@ -34,6 +34,7 @@ const RUN = !!process.env.DATABASE_URL;
   const childPersonId = generateUUIDv7();
   const payerLoginId = generateUUIDv7();
   const subscriptionId = generateUUIDv7();
+  const periodEndAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000);
   let originalFetch: typeof globalThis.fetch;
   let previousResendApiKey: string | undefined;
   let requestedUrls: string[];
@@ -91,7 +92,7 @@ const RUN = !!process.env.DATABASE_URL;
       payerPersonId,
       planTier: 'plus',
       status: 'past_due',
-      periodEndAt: new Date('2026-08-01T00:00:00.000Z'),
+      periodEndAt,
     });
     previousResendApiKey = process.env['RESEND_API_KEY'];
     process.env['RESEND_API_KEY'] = 'resend-payment-failed-integration';
@@ -152,7 +153,7 @@ const RUN = !!process.env.DATABASE_URL;
       .update(subscription)
       .set({
         status: 'past_due',
-        periodEndAt: new Date('2026-08-01T00:00:00.000Z'),
+        periodEndAt,
       })
       .where(eq(subscription.id, subscriptionId));
   });
@@ -259,7 +260,7 @@ const RUN = !!process.env.DATABASE_URL;
       params: {
         planTier: 'plus',
         accessState: 'current',
-        deadlineAt: '2026-08-01T00:00:00.000Z',
+        deadlineAt: periodEndAt.toISOString(),
       },
       deepLink: {
         route: 'billing.manage',
