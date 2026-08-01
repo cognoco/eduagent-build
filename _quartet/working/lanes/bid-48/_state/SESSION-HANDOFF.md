@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 15:10 CEST
+Last reconciled: 2026-08-01 15:13 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,11 +19,11 @@ Last reconciled: 2026-08-01 15:10 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 30 Closed, 5 Executing, 1 Reviewing, 5 Ready.
+- Live stage count at checkpoint: 31 Closed, 5 Executing, 5 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 15:10 CEST
+### Latest authoritative boundary — 2026-08-01 15:13 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -80,8 +80,10 @@ Last reconciled: 2026-08-01 15:10 CEST
   as `9a3415b5`. All 23 landed checks concluded green/skipped, corrected completion
   artifacts passed the sanctioned validator, and execute-complete returned the item
   to Reviewing with durable tracked provenance and claim cleared. A distinct reviewer
-  is independently re-establishing the DoD. WI-2790 and WI-2939 remain dependency/
-  authority-bound Executing items.
+  independently re-established the DoD and the live item is now Closed/Done. Both
+  merged PR branches and isolated worktrees (`WI-2921`, `WI-2921-evidence-r2`) were
+  removed locally and remotely after closure; landed commits and PR/Cosmo evidence
+  remain durable. WI-2790 and WI-2939 remain dependency/authority-bound Executing.
 - WI-2922 was live-reconciled Ready/Active/unclaimed, then properly claimed as
   `codex:wi2922-repository-executor:WI-2922` in isolated worktree `WI-2922`. Its
   repository-only frontier is published in draft PR #2830 at `f8320a9d`. Focused

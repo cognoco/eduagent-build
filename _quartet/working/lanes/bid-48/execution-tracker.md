@@ -56,12 +56,12 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 15:10 CEST
+## Live reconciliation — 2026-08-01 15:13 CEST
 
 ### Latest authoritative boundary
 
-- Brief/relation parity remains 41 members. Live slice: 30 Closed, 5 Executing,
-  1 Reviewing, 5 Ready.
+- Brief/relation parity remains 41 members. Live slice: 31 Closed, 5 Executing,
+  5 Ready.
 - WI-2936 is independently Closed/Done at `08d75f40` after evidence-only rework
   removed a non-durable local pointer and accurately recorded 13 successful checks
   plus one intentional skip.
@@ -98,7 +98,8 @@ Delivery Batch as `Done`.
   squash-landed it as `9a3415b5`. All 23 landed checks concluded green/skipped;
   corrected completion artifacts passed validation and execute-complete returned the
   item to Reviewing with durable tracked provenance and claim cleared. Independent
-  re-review is running under a distinct reviewer identity.
+  re-review passed and the live item is Closed/Done. Its two merged PR branches and
+  isolated worktrees were removed locally/remotely after closure.
 - WI-2922 is properly claimed/Executing in isolated worktree `WI-2922` for only its
   repository guard and disposable-schema test frontier. Draft PR #2830 at `f8320a9d`
   has focused 33/33 and fast change-class 4 commands/62 tests green. No database or
