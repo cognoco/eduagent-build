@@ -1,4 +1,5 @@
 import { apiBaseUrl, buildTestSeedHeaders, seedEmailPrefix } from './runtime';
+import { alignPlaywrightClerkSecret } from './clerk-secret-identity';
 
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
 
@@ -175,7 +176,7 @@ export async function resetSeededAccounts(
 }
 
 async function verifySeededClerkEmail(email: string): Promise<void> {
-  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  const clerkSecretKey = alignPlaywrightClerkSecret(process.env);
   if (!clerkSecretKey) return;
 
   const emailAddressId = await findSeededClerkEmailAddressId(
