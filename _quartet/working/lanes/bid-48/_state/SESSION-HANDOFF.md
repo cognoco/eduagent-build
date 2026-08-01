@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 13:26 CEST
+Last reconciled: 2026-08-01 13:41 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -23,7 +23,7 @@ Last reconciled: 2026-08-01 13:26 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 13:26 CEST
+### Latest authoritative boundary — 2026-08-01 13:41 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -58,10 +58,14 @@ Last reconciled: 2026-08-01 13:26 CEST
   and normal pre-push green. No hosted run occurred; its controlled seeded-account
   reproduction remains a later operator gate after WI-2939 is concluded. FO-2086 /
   `OCC-1B3E2CB142B3` records stale-local-main change-class over-selection without a WI.
-- WI-2921 is published normally at exact PR #2718 head `bb8f07df`; its fresh local
-  contract proof passed 3 suites/18 tests and its exact Playwright run passed 4/4
-  with one worker and zero retries. Fresh CI/review is running. WI-2790 and WI-2939
-  remain dependency/authority-bound Executing items.
+- WI-2921 head `bb8f07df` passed every gate except full CI: two existing mocked
+  remote-API success-path tests had not installed the now-required explicit fake
+  seed secret. FO-2087 / `OCC-D2E82DA0564A` records the factual CI occurrence.
+  Bounded test-only repair `938a041d` now declares remote helper mode and an explicit
+  fake test-process secret, restores both variables after each case, and touches no
+  production code or real credentials. Focused 4 suites/20 tests are green; normal
+  push published exact PR #2718 head `938a041d` and fresh CI/review is running.
+  WI-2790 and WI-2939 remain dependency/authority-bound Executing items.
 - The operator clarified that the four-WIP figure is throughput guidance, not a
   reason to leave Ready work idle while executor capacity exists. Dependency/authority
   waits do not consume practical dispatch capacity.

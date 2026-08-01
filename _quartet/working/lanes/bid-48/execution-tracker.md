@@ -56,7 +56,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 13:26 CEST
+## Live reconciliation — 2026-08-01 13:41 CEST
 
 ### Latest authoritative boundary
 
@@ -81,10 +81,13 @@ Delivery Batch as `Done`.
 - WI-2826 draft PR #2811 at `140c5233` contains only the locally verified eight-file
   instrumentation scope. Its hosted run is untouched. FO-2086 /
   `OCC-1B3E2CB142B3` records stale-local-main change-class over-selection.
-- WI-2921 is published normally at exact PR #2718 head `bb8f07df`; local 3-suite/18
-  test contract and exact one-worker/zero-retry Playwright 4/4 are green. Fresh
-  exact-head CI and automated review are running. The four-WIP figure remains
-  throughput guidance; blocked waits do not suppress otherwise safe dispatch.
+- WI-2921 head `bb8f07df` failed only full CI because two mocked remote-API helper
+  tests lacked the stricter contract's explicit fake secret. FO-2087 /
+  `OCC-D2E82DA0564A` records the occurrence. Test-only repair `938a041d` restores
+  explicit remote mode and fake secret setup/teardown without production or real
+  credential changes; focused 4 suites/20 tests pass. Exact PR #2718 head is now
+  `938a041d` with fresh gates running. The four-WIP figure remains throughput
+  guidance; blocked waits do not suppress otherwise safe dispatch.
 
 - The live Brief and membership relation agree on 41 authoritative members.
   The operator retracted WI-2941 from BID-48 and routed it to Nexus / Cosmo
