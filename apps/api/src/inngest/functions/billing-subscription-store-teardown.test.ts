@@ -128,6 +128,78 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
     expect(JSON.stringify(sendEventCalls)).not.toContain('alice@example.test');
   });
 
+  it('[BREAK WI-2994] propagates durable-step rejection so Inngest can retry', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const transportError = new Error('event transport unavailable');
+    const { step, sendEventCalls } = createInngestStepRunner({
+      sendEventErrors: {
+        'dispatch-billing-subscription-store-teardown-terminal-failure':
+          transportError,
+      },
+    });
+    const onFailure = (billingSubscriptionStoreTeardown as any).opts
+      .onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
+    }) => Promise<unknown>;
+
+    await expect(
+      onFailure({
+        event: {
+          data: {
+            event: { data: { accountId: 'org-terminal' } },
+            run_id: 'run-store-teardown',
+          },
+        },
+        error: new Error('terminal provider failure'),
+        step,
+      }),
+    ).rejects.toBe(transportError);
+    expect(sendEventCalls).toHaveLength(1);
+  });
+
+  it('[BREAK WI-2994] uses a stable memoization key across replay', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const transport = jest.fn().mockResolvedValue({ ids: ['event-1'] });
+    const memoized = new Map<string, Promise<unknown>>();
+    const sendEvent = jest.fn((name: string, payload: unknown) => {
+      const prior = memoized.get(name);
+      if (prior) return prior;
+      const dispatched = transport(payload);
+      memoized.set(name, dispatched);
+      return dispatched;
+    });
+    const onFailure = (billingSubscriptionStoreTeardown as any).opts
+      .onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+      step: { sendEvent: typeof sendEvent };
+    }) => Promise<unknown>;
+    const args = {
+      event: {
+        data: {
+          event: { data: { accountId: 'org-terminal' } },
+          run_id: 'run-store-teardown',
+        },
+      },
+      error: new Error('terminal provider failure'),
+      step: { sendEvent },
+    };
+
+    await onFailure(args);
+    await onFailure(args);
+
+    expect(sendEvent).toHaveBeenCalledTimes(2);
+    expect(sendEvent.mock.calls[0]?.[0]).toBe(
+      'dispatch-billing-subscription-store-teardown-terminal-failure',
+    );
+    expect(sendEvent.mock.calls[1]?.[0]).toBe(
+      'dispatch-billing-subscription-store-teardown-terminal-failure',
+    );
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
   it('[WI-885] orchestrates teardown for a valid payload (all-null providers → not_applicable, no provider calls)', async () => {
     // No internal mocks and no external boundaries needed: with both provider
     // identifiers null, needsStripe/needsRevenueCat are false, so the step never

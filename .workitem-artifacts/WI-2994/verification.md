@@ -31,7 +31,8 @@ Primary sources:
 ## Verification
 
 - Focused red/green/revert/restore: see `red-green-revert.md`; final 2 / 2
-  suites and 42 / 42 cases pass.
+  suites and 44 / 44 cases pass, including rejection and replay-key parity for
+  both terminal-deletion handlers.
 - Routed validation:
   `DATABASE_URL=postgresql://vetinari@localhost:5432/tests_v2 bash scripts/check-change-class.sh --run --fast`
   exited `0`; the full incremental TypeScript gate passed.

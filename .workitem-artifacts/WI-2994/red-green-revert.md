@@ -21,7 +21,7 @@ pnpm exec jest --config apps/api/jest.config.cjs --runInBand --silent \
 | `apps/api/src/inngest/functions/account-deletion.ts` | `d38d6bda661eb1f875d51bcd453e174e48b9470c3f00c841f519a030677b7071` | `52b34f265d470898ac67c4fb8237b62429fa818a3ea5c188e6351dc894377323` |
 | `apps/api/src/inngest/functions/account-deletion.test.ts` | `5d50a63765f2f5271cb1a3e330b11b955a1f0e952ba38c3c9a91f4ec5c5826d9` | `bad01c1a3971e76d67e8aebf91062aea9015dfc52a234ccd7db14b20a3abb226` |
 | `apps/api/src/inngest/functions/billing-subscription-store-teardown.ts` | `b99ec3c6168edf658f013242be7676ecaff29f84ed2b792d40dac38a2a927aea` | `f8362553b6a7eb67374f1756e25c89d52a963c24576ae2f7a00aaf566509d208` |
-| `apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts` | `bef565ccedff7e3abd76b13fc3056c3bf022411aa00e5439d958b90b905a0416` | `32fdcd47538a661a67de9a75194f265f9fd02b9a2c802c7fce753a5f60142c3c` |
+| `apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts` | `bef565ccedff7e3abd76b13fc3056c3bf022411aa00e5439d958b90b905a0416` | `d98c3e3685d1dd0eca157d8ca7b710d519081752a1e7e91d3f635a6e7b505f56` |
 
 ## Test-first RED
 
@@ -61,3 +61,14 @@ The two production handlers were restored to their candidate hashes. The
 focused command returned to 2 / 2 suites and 42 / 42 cases passing. No schema,
 migration, database record, staging environment, provider console, or alert
 rule was touched.
+
+## Exact-head review rework parity
+
+The mandatory review requested explicit billing-handler parity for rejection
+propagation and stable replay memoization. With those two tests added, the
+focused two-suite command returned 44 / 44. Restoring only
+`billing-subscription-store-teardown.ts` to `origin/main` made the billing suite
+fail as expected: the new rejection test resolved instead of rejecting and the
+new replay test observed zero durable step calls. Restoring the candidate
+handler returned the billing suite to 9 / 9 and the combined focused run to
+44 / 44.
