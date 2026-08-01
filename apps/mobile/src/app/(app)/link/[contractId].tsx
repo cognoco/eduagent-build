@@ -17,7 +17,7 @@ import { useApiQuery } from '../../../hooks/use-api-query';
 import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, V2_TAB_TITLE_KEYS } from '../../../lib/navigation';
 import { parseJson } from '../../../lib/parse-json';
 import { useProfile } from '../../../lib/profile';
 import { firstParam } from '../../../lib/route-params';
@@ -130,7 +130,12 @@ export default function LinkContractScreen(): React.ReactElement {
           testID: 'visibility-link-wrong-profile-switch',
         }}
         secondaryAction={{
-          label: t('common.goBack'),
+          // Named destination: this screen's Back fallback is always the
+          // Mentor root (matching visibility-link-back below), so the label
+          // says so instead of a generic "Go Back".
+          label: t('common.backTo', {
+            destination: t(V2_TAB_TITLE_KEYS.mentor),
+          }),
           onPress: () => goBackOrReplace(router, '/(app)/mentor'),
           testID: 'visibility-link-wrong-profile-back',
         }}

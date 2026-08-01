@@ -229,7 +229,11 @@ describe('LinkContractScreen', () => {
     renderScreen();
 
     await screen.findByTestId('visibility-link-wrong-profile');
-    screen.getByText('This invite is for a different profile');
+    screen.getByText('This invite is for a specific profile');
+    screen.getByText(
+      'This invite can only be opened with the profile it was sent to. Choose that profile, then open the invite again.',
+    );
+    screen.getByText('Back to Mentor');
     expect(screen.queryByTestId('visibility-contract-card')).toBeNull();
     expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
     expect(screen.queryByTestId('visibility-link-review')).toBeNull();
@@ -239,6 +243,23 @@ describe('LinkContractScreen', () => {
 
     fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-back'));
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('returns a historyless wrong-profile invite to the Mentor root via the named Back action', async () => {
+    mockActiveProfileId = '00000000-0000-4000-8000-000000000099';
+    mockCanGoBack.mockReturnValue(false);
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) return CONTRACT;
+      return {};
+    });
+
+    renderScreen();
+
+    await screen.findByTestId('visibility-link-wrong-profile');
+    fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('explains a restamped supportee invite opened with the wrong profile instead of a view-only card', async () => {

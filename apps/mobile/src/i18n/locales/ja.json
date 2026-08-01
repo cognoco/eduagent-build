@@ -4581,9 +4581,9 @@
       "existingTeenInviteSentTitle": "招待を送信しました",
       "existingTeenInviteSentMessage": "そのメールアドレスがMentoMateアカウントに登録されている場合、招待を送信しました。お子様にMentoMateを開いて招待を承認するようお伝えください。",
       "existingTeenInviteErrorTitle": "招待を送信できませんでした",
-      "wrongProfileTitle": "この招待は別のプロフィール宛てです",
-      "wrongProfileMessage": "現在使用中のプロフィールはこの招待の対象ではありません。招待が送られたプロフィールに切り替えてから、もう一度開いてください。",
-      "wrongProfileSwitch": "プロフィールを切り替える"
+      "wrongProfileTitle": "特定のプロフィール向けの招待です",
+      "wrongProfileMessage": "この招待は、送信先のプロフィールでのみ開くことができます。そのプロフィールを選択してから、もう一度招待を開いてください。",
+      "wrongProfileSwitch": "プロフィールを選択"
     }
   },
   "supporterColdStart": {
