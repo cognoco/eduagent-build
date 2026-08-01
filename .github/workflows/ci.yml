@@ -178,6 +178,13 @@ jobs:
         working-directory: packages/database
         run: pnpm exec drizzle-kit migrate
 
+      # WI-2643: explicit local-only setup for non-owner RLS assertions.
+      # The command refuses every non-loopback target; repository tests never
+      # create or grant external/shared roles implicitly.
+      - name: Provision local RLS isolation test role
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm db:setup:rls-test-role:local
+
       # Clean stale build artifacts — composite mode (tsconfig.base.json) uses dist/*.d.ts
       # to verify source-output consistency. Nx remote cache can restore stale dist/ and
       # .tsbuildinfo from a previous build, causing TS6305 false positives when source files
@@ -422,6 +429,7 @@ jobs:
           node --test packages/database/scripts/check-development-schema.test.mjs
           node --test packages/database/scripts/check-identity-fk-drift.test.mjs
           node --test packages/database/scripts/reconcile-development-schema.test.mjs
+          node --test packages/database/scripts/setup-rls-isolation-test-role.test.mjs
 
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
@@ -617,6 +625,9 @@ jobs:
       - name: Apply database migrations (drizzle-kit migrate)
         working-directory: packages/database
         run: pnpm exec drizzle-kit migrate
+
+      - name: Provision local RLS isolation test role
+        run: pnpm db:setup:rls-test-role:local
 
       # Run the full integration suite with the flag on.
       # Reds here are expected (D1-D4/FG1/:709 defects) and are the diagnostic

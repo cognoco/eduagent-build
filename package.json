@@ -40,6 +40,8 @@
     "db:reconcile:dev-integration-schema": "node scripts/doppler-run.mjs run -c dev_integration -- node packages/database/scripts/reconcile-development-schema.mjs --target=dev_integration",
     "db:bootstrap:api-integration": "node scripts/doppler-run.mjs run --project mentomate --config dev_integration -- node scripts/bootstrap-api-integration-schema.mjs",
     "db:check-identity-fks": "node packages/database/scripts/check-identity-fk-drift.mjs",
+    "db:check:rls-test-role": "node packages/database/scripts/setup-rls-isolation-test-role.mjs",
+    "db:setup:rls-test-role:local": "node packages/database/scripts/setup-rls-isolation-test-role.mjs --apply-local",
     "db:check-identity-fks:dev": "node scripts/doppler-run.mjs run -c dev -- pnpm db:check-identity-fks",
     "db:generate:dev": "node scripts/doppler-run.mjs run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate:dev": "node -e \"console.error('db:migrate:dev is disabled: dev Neon is push/direct-only (WI-649). Use db:push:dev instead.'); process.exit(1)\"",
