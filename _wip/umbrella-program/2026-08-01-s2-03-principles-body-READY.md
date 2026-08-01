@@ -91,6 +91,8 @@ writing new code.
 ## 4. Product Interaction Invariants
 
 Product-level invariants that bind feature surfaces the same way §1 binds
-code. Carried into this catalog per the WI-1856/OPQ-62 ruling (2026-07-11).
+code. Carried into this catalog per the WI-1856/OPQ-62 operator ruling
+(2026-07-11) — that ruling, and the standing operator directive it carried
+forward, is what makes this entry binding.
 
-- **Every AI-driven interaction carries a human override.** Wherever the system suggests, ranks, orders, or decides, the user must be able to reach an outcome the system did not propose: suggestion sets accept free input, recommended order is advisory (never enforced), in-session direction is redirectable, and the override is discoverable at the point of constraint. This governs pedagogical and organisational output only — it never licenses routing around safety refusals, age-resolved gating, or consent requirements. Full decision, boundaries, and the per-screen audit question: [`MMT-ADR-0046`](../adr/MMT-ADR-0046-every-ai-driven-interaction-carries-a-human-override.md).
+- **Every AI-driven interaction carries a human override.** Wherever the system suggests, ranks, orders, or decides, the user must be able to reach an outcome the system did not propose: suggestion sets accept free manual input, recommended order is advisory (never enforced), and in-session direction is redirectable — the learner can skip, redirect, or challenge any suggestion. This governs pedagogical and organisational output only; it never licenses routing around safety refusals, age-resolved gating, or consent requirements. (Operator-ruled; inclusion here mandated by the OPQ-62 carry-over, 2026-07-11.) A formalization with the full clause set and the per-screen audit question is drafted in [`MMT-ADR-0046`](../adr/MMT-ADR-0046-every-ai-driven-interaction-carries-a-human-override.md) — **Status: Proposed, pending Architecture sign-off**; per `MMT-ADR-0000` rule 3 (agents propose, a human representing Architecture ratifies) its clauses gain ADR authority only on acceptance, and this catalog entry does not confer it.

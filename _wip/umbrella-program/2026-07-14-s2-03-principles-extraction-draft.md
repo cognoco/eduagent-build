@@ -1,6 +1,6 @@
 ---
 title: "S2-03 — docs/canon/principles.md Extraction Draft (FINALIZED)"
-status: "FINAL under WI-2051 (2026-08-01). D4 ruled Option 1 + all four boundary calls ruled 2026-07-15 sitting 2 (B1 MOVE, B2 STAY/next-lever, B3 STAY/follow-on, B4 future-slice) — all incorporated. Content still NOT applied; lands via WI-2052 (S2-04). ⚠ NEW FINDING §1: on the 2026-08-01 file the ruled scope alone no longer clears the 40k ceiling — see §1.3 for the gap and the lever options WI-2052 needs ruled."
+status: "FINAL under WI-2051 (2026-08-01). D4 ruled Option 1 + all four boundary calls ruled 2026-07-15 sitting 2 (B1 MOVE, B2 STAY/next-lever, B3 STAY/follow-on, B4 future-slice) — all incorporated. Content still NOT applied; lands via WI-2052 (S2-04). ⚠ TWO DECISIONS GATE WI-2052 (§1.3): D1 the ruled scope alone no longer clears the 40k ceiling (lever amendment needed); D2 catalog shape vs MMT-ADR-0000 §I.3 index rule (PR #2827 review finding, verified real)."
 date: 2026-08-01 (supersedes the 2026-07-14 Wave-0 draft in place)
 repo: cognoco/eduagent-build
 stream: Stream 2 — Deferred Estate-Canon Drain (PRG-20)
@@ -57,6 +57,22 @@ What DID change is the world underneath it:
      of "Family = Gemini-only".
 5. **The 07-14 §6 residual risk "no CI script parses the moved sections" is
    now verified with evidence** — see §7.1.
+6. **PR #2827 review findings (Codex, both verified REAL) incorporated:**
+   - *§4 human-override entry reworded* — `MMT-ADR-0046` is `Status: Proposed`
+     (pending Architecture sign-off), and per `MMT-ADR-0000` rule 3 a canon
+     entry must not ratify a Proposed ADR by restating its clauses as
+     accepted. The entry now rests its authority on the OPQ-62 operator
+     ruling, names 0046 as the Proposed formalization, and states explicitly
+     that the catalog entry confers no ADR authority. If 0046 is Accepted by
+     the time WI-2052 lands, simplify the pointer to a plain ADR cite.
+   - *Catalog-shape conflict logged as DECISION 2 (§1.3)* — `MMT-ADR-0000`
+     §I.3 (Accepted, constitutional) defines `principles.md` as "principles +
+     pointers, never a content mirror" (terse ID + one-line + pointer
+     entries), while the D4 ruling (2026-07-15, later in time) approved this
+     draft's content-extraction shape ("extract rule catalogs to
+     `docs/canon/principles.md`", prep artifact reviewed at the gate). The
+     two cannot both hold at landing; this draft-only WI reverses neither.
+     See §1.3 DECISION 2 for the reconciliation options.
 
 ## 1. Ceiling arithmetic — measured 2026-08-01, in bytes (`wc -c`)
 
@@ -105,7 +121,7 @@ to squeak under with B2-only would gut exactly the reflexive floors the ruling
 demands, and would land at ~40.0k with zero margin against a file that has
 grown ~3k/month for two months running.
 
-**Options for WI-2052 (needs a one-line ruling amendment before landing):**
+**DECISION 1 — the size lever (needs a one-line ruling amendment before landing):**
 
 - **RECOMMENDED — pull B2 AND B3 together: lands at 39,143, margin 857.**
   Both levers were pre-identified in the ruled boundary analysis (B2 "next
@@ -124,6 +140,32 @@ grown ~3k/month for two months running.
 The principles body (§2) and the four ruled stubs (§4.1) are correct and
 landable under EVERY option — the amendment only decides whether §4.3/§4.4
 contingency blocks land alongside them.
+
+**DECISION 2 — catalog shape vs `MMT-ADR-0000` §I.3 (raised by PR #2827
+review, verified real):** ADR-0000 §I.3 (Accepted, constitutional) defines
+`docs/canon/principles.md` as an index — "principles + pointers, never a
+content mirror"; terse entries of stable principle ID + one-line statement +
+pointer into the domain canon that elaborates the rule. The D4 ruling
+(2026-07-15, later in time, prep artifact reviewed at the gate) approved this
+draft's opposite shape: full rule content extracted INTO `principles.md`. The
+collision is genuine because the promoted rules have no elaborated home in
+domain canon today — an index-only catalog would point at text that exists
+nowhere, failing the zero-semantic-loss AC. Options for the ruling sitting:
+
+- **2a — land as drafted (content-bearing catalog) + amend ADR-0000 §I.3 in
+  lockstep** to sanction this catalog as content-owning for cross-cutting
+  engineering rules (or carve a named exception). Cheapest; preserves the D4
+  shape and the 40k arithmetic; one lockstep edit to ADR-0000.
+- **2b — conform to ADR-0000 §I.3 as written:** route the full rule text into
+  `architecture.md` (whose L1 charter already owns "technical
+  principles/patterns/standards/constraints"), leave `principles.md` as
+  ID+one-liner+pointer entries. Structurally cleanest, but a materially
+  different landing than D4 ruled: re-targets every §4.1 stub, re-runs the
+  §1.2 arithmetic (architecture.md grows ~19k), needs an ID scheme minted,
+  and re-opens the D4 gate. Not executable from this draft without a new
+  ruling and a drafting pass.
+- Either way the choice belongs to the same sitting as DECISION 1; this WI
+  (draft-only) reverses neither the ruling nor the constitution.
 
 ## 2. Ready-to-land `docs/canon/principles.md` body
 
@@ -455,7 +497,12 @@ scope note stays inline as required. No delta between draft and ruling.
 
 ## 8. WI-2052 handoff checklist (mechanical)
 
-1. Obtain the §1.3 lever ruling (recommended: B2+B3). One operator line.
+1. Obtain BOTH §1.3 rulings: DECISION 1 the size lever (recommended: B2+B3)
+   and DECISION 2 the catalog shape (2a lands this draft as-is + lockstep
+   ADR-0000 §I.3 amendment; 2b requires a new drafting pass first).
+1b. Check `MMT-ADR-0046`'s status at landing: if Accepted, simplify the §4
+   pointer to a plain ADR cite (see §0 item 6); if still Proposed, land the
+   §4 entry exactly as drafted — it deliberately confers no ADR authority.
 2. `cp` the READY sibling → `docs/canon/principles.md`; if levers ruled,
    append §5–§8 per §4.4 (verbatim sections, renumbered headers).
 3. Insert §3's Languages block into `architecture.md` (end of Implementation
