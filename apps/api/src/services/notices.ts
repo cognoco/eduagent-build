@@ -105,6 +105,7 @@ export async function activatePendingNotice(
 export async function deleteStalePreparedNotices(
   db: Database,
 ): Promise<number> {
+  // scope-allow: retention cleanup intentionally deletes stale hidden notices across profiles.
   const rows = await db
     .delete(pendingNotices)
     .where(
