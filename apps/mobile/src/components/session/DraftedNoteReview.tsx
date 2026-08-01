@@ -2,16 +2,21 @@ import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { VoiceInputControl, appendTranscript } from '../common';
+
 export function DraftedNoteReview({
   initialContent,
   fallbackPrompt,
   onSave,
   onSkip,
+  voiceLocale,
 }: {
   initialContent: string | null;
   fallbackPrompt?: string;
   onSave: (content: string) => Promise<unknown>;
   onSkip: () => void;
+  /** Voice locale for the note-edit mic (WI-2551), resolved by the screen. */
+  voiceLocale?: string;
 }) {
   const { t } = useTranslation();
   const [content, setContent] = useState(initialContent ?? '');
@@ -35,14 +40,26 @@ export function DraftedNoteReview({
         </Text>
       ) : null}
       {editing ? (
-        <TextInput
-          multiline
-          value={content}
-          onChangeText={setContent}
-          placeholder={fallbackPrompt}
-          className="text-text-primary min-h-[120px] rounded-xl bg-surface p-3"
-          testID="drafted-note-input"
-        />
+        <>
+          <TextInput
+            multiline
+            value={content}
+            onChangeText={setContent}
+            placeholder={fallbackPrompt}
+            className="text-text-primary min-h-[120px] rounded-xl bg-surface p-3"
+            testID="drafted-note-input"
+          />
+          <View className="mt-2">
+            <VoiceInputControl
+              value={content}
+              voiceLocale={voiceLocale}
+              testID="drafted-note-mic"
+              onTranscript={(finalTranscript) =>
+                setContent((prev) => appendTranscript(prev, finalTranscript))
+              }
+            />
+          </View>
+        </>
       ) : (
         <Text className="text-text-primary" testID="drafted-note-preview">
           {content}

@@ -261,6 +261,8 @@ describe('QuizPlayScreen', () => {
 
     screen.getByTestId('quiz-free-text-input');
     screen.getByTestId('quiz-free-text-field');
+    // WI-2551: shared transcription-only mic renders with the free-text field.
+    screen.getByTestId('quiz-free-text-mic');
     expect(screen.queryByTestId('quiz-option-0')).toBeNull();
 
     fireEvent.changeText(

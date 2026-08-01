@@ -27,7 +27,13 @@ import type {
   QuestionResult,
 } from '@eduagent/schemas';
 import { useCheckAnswer, useCompleteRound } from '../../../hooks/use-quiz';
-import { PolarStar } from '../../../components/common';
+import { useProfile } from '../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
+import {
+  PolarStar,
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../components/common';
 import { LearningRewardMoment } from '../../../components/learning-surface';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
@@ -80,6 +86,10 @@ function appendFirstQuestionResult(
 
 export default function QuizPlayScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const { activeProfile } = useProfile();
+  const quizVoiceLocale = getVoiceLocaleForLanguage(
+    activeProfile?.conversationLanguage,
+  );
   const announce = useAnnounce();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -936,6 +946,19 @@ export default function QuizPlayScreen(): React.ReactElement {
                   returnKeyType="done"
                   onSubmitEditing={handleFreeTextSubmit}
                 />
+                <View className="mt-2">
+                  <VoiceInputControl
+                    value={freeTextAnswer}
+                    disabled={answerState !== 'unanswered'}
+                    voiceLocale={quizVoiceLocale}
+                    testID="quiz-free-text-mic"
+                    onTranscript={(finalTranscript) =>
+                      setFreeTextAnswer((prev) =>
+                        appendTranscript(prev, finalTranscript),
+                      )
+                    }
+                  />
+                </View>
                 <Pressable
                   testID="quiz-free-text-submit"
                   className={`mt-3 min-h-[48px] items-center justify-center rounded-button px-6 py-3 ${
@@ -993,6 +1016,7 @@ export default function QuizPlayScreen(): React.ReactElement {
               question={question}
               onCheckAnswer={handleCheckGuessWhoAnswer}
               onResolved={handleGuessWhoResolved}
+              voiceLocale={quizVoiceLocale}
             />
           </View>
         ) : null}

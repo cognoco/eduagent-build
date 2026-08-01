@@ -39,6 +39,8 @@ describe('ParkingLotModal accessibility (BUG-647 [ACC-3])', () => {
     // pre-fix code had no accessibilityLabel, so a screen reader would only
     // announce the visible placeholder once and then stay silent.
     expect(input.props.accessibilityLabel).toBe('Parking lot note');
+    // WI-2551: shared transcription-only mic renders with the draft field.
+    getByTestId('parking-lot-mic');
   });
 
   it('exposes a hint that explains the field purpose', () => {

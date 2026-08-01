@@ -16,6 +16,7 @@ import type {
 } from '../../hooks/use-sessions';
 import type { useCurriculum } from '../../hooks/use-curriculum';
 import { useThemeColors } from '../../lib/theme';
+import { VoiceInputControl, appendTranscript } from '../common';
 
 // ─── ParkingLotModal ─────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ export interface ParkingLotModalProps {
   onClose: () => void;
   parkingLotDraft: string;
   setParkingLotDraft: React.Dispatch<React.SetStateAction<string>>;
+  /** Voice locale for the parking-lot mic (WI-2551), resolved by the screen. */
+  voiceLocale?: string;
   handleSaveParkingLot: () => Promise<void>;
   parkingLot: ReturnType<typeof useParkingLot>;
   addParkingLotItem: ReturnType<typeof useAddParkingLotItem>;
@@ -35,6 +38,7 @@ export function ParkingLotModal({
   onClose,
   parkingLotDraft,
   setParkingLotDraft,
+  voiceLocale,
   handleSaveParkingLot,
   parkingLot,
   addParkingLotItem,
@@ -78,6 +82,19 @@ export function ParkingLotModal({
             accessibilityLabel={t('session.parkingLot.inputLabel')}
             accessibilityHint={t('session.parkingLot.inputHint')}
           />
+          <View className="mt-2">
+            <VoiceInputControl
+              value={parkingLotDraft}
+              disabled={addParkingLotItem.isPending}
+              voiceLocale={voiceLocale}
+              testID="parking-lot-mic"
+              onTranscript={(finalTranscript) =>
+                setParkingLotDraft((prev) =>
+                  appendTranscript(prev, finalTranscript),
+                )
+              }
+            />
+          </View>
 
           <Pressable
             onPress={() => void handleSaveParkingLot()}

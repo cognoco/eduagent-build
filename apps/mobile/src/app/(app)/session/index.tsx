@@ -1946,6 +1946,7 @@ function SessionScreenInner() {
         fallbackPrompt={draftedNote.fallbackPrompt}
         onSave={handleSaveDraftedNote}
         onSkip={handleSkipDraftedNote}
+        voiceLocale={languageVoiceLocale}
       />
     </View>
   ) : null;
@@ -2239,6 +2240,7 @@ function SessionScreenInner() {
         onClose={() => setShowParkingLot(false)}
         parkingLotDraft={parkingLotDraft}
         setParkingLotDraft={setParkingLotDraft}
+        voiceLocale={languageVoiceLocale}
         handleSaveParkingLot={handleSaveParkingLot}
         parkingLot={parkingLot}
         addParkingLotItem={addParkingLotItem}
