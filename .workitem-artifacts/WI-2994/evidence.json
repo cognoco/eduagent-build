@@ -1,16 +1,4 @@
 {
-  "deliveryReference": {
-    "deliveryClass": "Code",
-    "landingPath": "pr",
-    "repo": "cognoco/eduagent-build",
-    "targetBase": "main",
-    "submittedCommit": "50a9547aed73731c2f9156ae260759e9e7e1f150",
-    "attemptId": "WI-2994-step-send"
-  },
-  "redGreenDeclaration": {
-    "applicable": true,
-    "pointer": ".workitem-artifacts/WI-2994/red-green-revert.md"
-  },
   "noiseBaselineVersion": "2026-08-01",
   "claims": [
     {
@@ -34,5 +22,5 @@
       "pointer": "apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts:86"
     }
   ],
-  "gateVersion": "0.1.0"
+  "redGreenPointer": ".workitem-artifacts/WI-2994/red-green-revert.md"
 }
