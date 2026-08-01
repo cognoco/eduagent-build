@@ -40,7 +40,8 @@ indistinguishable from a legitimate retry.
 | Cost | Migration + table + cron + DPIA sign-off, PLUS the lease/takeover/fencing protocol design and its tests; M-L | No migration; S, plus pooling verification and long-open txns | XS-S — one config field + one opts-assertion test; 15+ in-repo precedents (§6) |
 | Failure residuals | Repays on pay-then-die like C (absent provider idempotency); adds claim-row leak/GC and lease-steal-vs-zombie overlap | Crash between lock and write re-pays (same as C); pooling defects void the lock with no signal | Not exactly-once: per-attempt/per-run/cross-run repayment bounds and acceptance status in §7 |
 
-A does not fully close the zombie case with a pre-call claim alone — the
+A does not fully close the hypothetical zombie case (§7) with a pre-call
+claim alone — the
 marginal coverage it can buy requires a takeover/fencing protocol or provider
 idempotency on top of a new pre-launch PII surface. B's guarantee rests on
 advisory-lock-under-pooling semantics. C rests on scheduler semantics the repo
@@ -52,9 +53,11 @@ failure mode (BUG-148).
 The provider-supported design AC-1 names would thread a client-generated
 idempotency key (the natural choice: `learnerMessageEventId`) on the paid
 provider request so the provider dedupes retries server-side. **Finding: no
-qualifying provider-supported idempotency design exists on the current call
-path** — none of the routed providers documents or implements such a contract
-(evidence below), so this option is HYPOTHETICAL and is described here for
+qualifying design is implemented on the current route or shared abstraction**
+— official request schemas were checked only for Cerebras and Gemini, and the
+remaining evidence is limited to the local adapters sending no idempotency
+parameter (details below) — so this option is HYPOTHETICAL and is described
+here for
 AC-1 completeness, not offered as coverage. If AC-1 is read as literally
 requiring a selectable provider-supported design, that requirement needs an
 explicit architecture ruling or waiver (§9). **Retry semantics (REQUIRED, not
@@ -238,10 +241,14 @@ exposure. Stated at each level:
   run with its own per-run bound; if no attempt has ever committed the
   receipt, each such run can pay again. (A same-receipt re-fire after any
   successful commit resolves from the committed row and pays nothing.)
-- **Written-off zombie:** a slow paid call pushed past the attempt's
-  write-off frees the concurrency slot while the worker still runs; a retry
-  may then overlap the zombie pre-commit and both may pay — scheduler-level
-  serialization cannot arbitrate an executor the scheduler no longer tracks.
+- **Written-off zombie (HYPOTHETICAL — mechanism unverified):** IF the
+  Inngest scheduler stops tracking a still-executing attempt (e.g. a slow
+  paid call outliving the attempt's write-off) AND releases its concurrency
+  slot while the worker continues, a retry could overlap the zombie
+  pre-commit and both could pay. No primary Inngest documentation verifying
+  this exact write-off/slot-release behavior was found — the concurrency
+  guide (<https://www.inngest.com/docs/guides/concurrency>) does not specify
+  it — so this is carried as an OPEN risk (§9), not asserted as fact.
 
 **Acceptance status (AC-3):** no residual acceptance is durably recorded on
 the Work Item. Every residual above is OPEN and listed in §9 with its
@@ -251,10 +258,11 @@ Row-level invariant in every case above: the deterministic
 `learnerMessageEventId` PK with `onConflictDoNothing` ensures at most one
 `retrieval_events` row per receipt, and a lost conflict reloads the canonical
 row (lines 308-320, 358-370). No broader corruption-prevention claim is made
-for other fields, write paths, or external calls. Closing the
-zombie/pay-then-die windows would require a qualifying provider-side
-idempotency contract (Option D, §2 — none found) or Option A's full
-lease/takeover/fencing protocol (§2 records its cost). Not residuals:
+for other fields, write paths, or external calls. Closing the pay-then-die
+window — and the hypothetical zombie overlap, if its mechanism is confirmed —
+would require a qualifying provider-side idempotency contract (Option D, §2 —
+none found) or Option A's full lease/takeover/fencing protocol (§2 records
+its cost). Not residuals:
 in-window duplicates (idempotency), executions after a successful receipt
 commit (WI-2009 receipt path), insert-conflict divergence (conflict reload).
 
@@ -298,7 +306,7 @@ above. Everything below is OPEN, with its decision owner:
    accept the Option D no-qualifying-design finding as satisfying AC-1's
    comparison requirement, or issue a waiver (§2).
 3. **Residual-risk acceptance** (owner: operator): every §7 residual —
-   narrow pre-commit crash repayment, zombie-overlap double payment,
-   per-attempt provider fan-out (up to 8 requests), per-run accumulation (up
-   to 24 requests), and the unbounded cross-run aggregate — none is recorded
-   as accepted in any durable source.
+   narrow pre-commit crash repayment, the hypothetical zombie-overlap double
+   payment (§7 — mechanism unverified), per-attempt provider fan-out (up to
+   8 requests), per-run accumulation (up to 24 requests), and the unbounded
+   cross-run aggregate — none is recorded as accepted in any durable source.
