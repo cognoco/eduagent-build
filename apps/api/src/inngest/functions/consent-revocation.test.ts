@@ -108,6 +108,8 @@ jest.mock(
 // deletePersonIfConsentWithdrawnV2 runs a multi-step db.transaction
 // (tx.query.consentGrant.findFirst + tx.delete(person)) — unseedable; mock whole.
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn();
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
 jest.mock(
   '../../services/identity-v2/deletion-v2' /* gc1-allow: deletePersonIfConsentWithdrawnV2 — runs a db.transaction (read consentGrant THEN delete person) that cannot execute against the mocked DB boundary. Twin: apps/api/src/services/identity-v2/consent-v2.integration.test.ts (5 references) */,
   () => {
@@ -118,9 +120,21 @@ jest.mock(
       ...actual,
       deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
         mockDeletePersonIfConsentWithdrawnV2(...args),
+      getPersonClerkUserIdsV2: (...args: unknown[]) =>
+        mockGetPersonClerkUserIdsV2(...args),
     };
   },
 );
+
+jest.mock('../../services/clerk-user', () => {
+  const actual = jest.requireActual(
+    '../../services/clerk-user',
+  ) as typeof import('../../services/clerk-user');
+  return {
+    ...actual,
+    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+  };
+});
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock('../../services/notifications', () => {
@@ -251,6 +265,8 @@ beforeEach(() => {
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
   // deletePersonIfConsentWithdrawnV2 returns true (= deleted) by default.
   mockDeletePersonIfConsentWithdrawnV2.mockResolvedValue(true);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   // archivePersonOnRevocationV2 returns true (= archived) by default.
   mockArchivePersonOnRevocationV2.mockResolvedValue(true);
 });
@@ -511,9 +527,38 @@ describe('consentRevocation', () => {
         'load-child-profile',
         'choose-final-action',
         'notify-child',
+        'capture-child-clerk-user-ids',
         'delete-child-profile',
         'notify-parent',
       ]);
+    });
+
+    it('deletes every captured Clerk identity after the child DB erasure', async () => {
+      mockGetPersonClerkUserIdsV2.mockResolvedValue([
+        'clerk-child-001',
+        'clerk-child-002',
+      ]);
+
+      const { runner } = await executeRevocation({
+        childProfileId: 'child-001',
+        parentProfileId: 'parent-001',
+        revokedAt: '2026-05-01T00:00:01.000Z',
+      });
+
+      expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+      expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'clerk-child-001' }),
+      );
+      expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'clerk-child-002' }),
+      );
+      expect(runner.runNames()).toEqual(
+        expect.arrayContaining([
+          'capture-child-clerk-user-ids',
+          'delete-child-profile',
+          'delete-child-clerk-users',
+        ]),
+      );
     });
   });
 

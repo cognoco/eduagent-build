@@ -1,9 +1,13 @@
 // @inngest-admin: event-profile (profileId from event; consent check + hard delete scoped by that profileId)
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
 import { resolveLatestConsentSetStatusAnyBasis } from '../../services/identity-v2/consent-status-v2';
 import { getPersonForConsentRevocationV2 } from '../../services/identity-v2/consent-v2';
-import { deleteArchivedPersonIfStillEligibleV2 } from '../../services/identity-v2/deletion-v2';
+import {
+  deleteArchivedPersonIfStillEligibleV2,
+  getPersonClerkUserIdsV2,
+} from '../../services/identity-v2/deletion-v2';
+import { deleteClerkUser } from '../../services/clerk-user';
 import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
 
 const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -27,45 +31,66 @@ export const archiveCleanup = inngest.createFunction(
 
     await step.sleep('archive-window', '30d');
 
-    await step.run('hard-delete-archived-profile', async () => {
-      const db = getStepDatabase();
+    const clerkUserIds = await step.run(
+      'capture-archived-person-clerk-user-ids',
+      () => getPersonClerkUserIdsV2(getStepDatabase(), profileId),
+    );
 
-      // Cheap early-outs for observability (these read-then-return reasons let
-      // the dashboard distinguish WHY a run was a no-op). They do NOT guard the
-      // delete on their own — a restoreConsent() landing after these reads but
-      // before the delete is the F-122 TOCTOU.
+    const deletionResult = await step.run(
+      'hard-delete-archived-profile',
+      async () => {
+        const db = getStepDatabase();
 
-      // [CUT-B2] Dispatch to v2 consent model when flag is enabled.
-      const orgId = await resolveOrgIdForPerson(db, profileId);
-      if (orgId !== null) {
-        const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
+        // Cheap early-outs for observability (these read-then-return reasons let
+        // the dashboard distinguish WHY a run was a no-op). They do NOT guard the
+        // delete on their own — a restoreConsent() landing after these reads but
+        // before the delete is the F-122 TOCTOU.
+
+        // [CUT-B2] Dispatch to v2 consent model when flag is enabled.
+        const orgId = await resolveOrgIdForPerson(db, profileId);
+        if (orgId !== null) {
+          const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
+            db,
+            profileId,
+            orgId,
+          );
+          if (consentStatus === 'CONSENTED') {
+            return { deleted: false, reason: 'consent_restored' };
+          }
+        }
+
+        const person = await getPersonForConsentRevocationV2(db, profileId);
+        if (!person?.archivedAt) {
+          return { deleted: false, reason: 'not_archived' };
+        }
+        if (Date.now() - person.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
+          return { deleted: false, reason: 'retention_window_not_elapsed' };
+        }
+
+        const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
+        const deleted = await deleteArchivedPersonIfStillEligibleV2(
           db,
           profileId,
-          orgId,
+          retentionCutoff,
         );
-        if (consentStatus === 'CONSENTED') {
-          return { deleted: false, reason: 'consent_restored' };
-        }
-      }
+        return deleted
+          ? { deleted: true }
+          : { deleted: false, reason: 'consent_restored_or_unarchived' };
+      },
+    );
 
-      const person = await getPersonForConsentRevocationV2(db, profileId);
-      if (!person?.archivedAt) {
-        return { deleted: false, reason: 'not_archived' };
-      }
-      if (Date.now() - person.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
-        return { deleted: false, reason: 'retention_window_not_elapsed' };
-      }
-
-      const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
-      const deleted = await deleteArchivedPersonIfStillEligibleV2(
-        db,
-        profileId,
-        retentionCutoff,
+    if (deletionResult.deleted && clerkUserIds.length > 0) {
+      await step.run('delete-archived-person-clerk-users', () =>
+        Promise.all(
+          clerkUserIds.map((userId) =>
+            deleteClerkUser({
+              userId,
+              clerkSecretKey: getStepClerkSecretKey(),
+            }),
+          ),
+        ),
       );
-      return deleted
-        ? { deleted: true }
-        : { deleted: false, reason: 'consent_restored_or_unarchived' };
-    });
+    }
 
     return { status: 'complete', profileId };
   },

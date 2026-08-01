@@ -16,12 +16,16 @@
 import { NonRetriableError } from 'inngest';
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
 import {
   isConsentRevocationGenerationCurrentV2,
   getPersonDisplayNameV2,
 } from '../../services/identity-v2/consent-v2';
-import { deletePersonIfConsentWithdrawnV2 } from '../../services/identity-v2/deletion-v2';
+import {
+  deletePersonIfConsentWithdrawnV2,
+  getPersonClerkUserIdsV2,
+} from '../../services/identity-v2/deletion-v2';
+import { deleteClerkUser } from '../../services/clerk-user';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
@@ -234,6 +238,10 @@ export const consentEmailRevocation = inngest.createFunction(
     // FK cascades remove all associated data.
     // No archive branch: the email-parent restores via the undo link within
     // grace, and after grace there is no in-app parent to archive for.
+    const clerkUserIds = await step.run(
+      'capture-charge-clerk-user-ids',
+      async () => getPersonClerkUserIdsV2(getStepDatabase(), chargePersonId),
+    );
     const deleted = await step.run('delete-charge-person', async () => {
       const db = getStepDatabase();
       return deletePersonIfConsentWithdrawnV2(
@@ -245,6 +253,19 @@ export const consentEmailRevocation = inngest.createFunction(
 
     if (!deleted) {
       return { status: 'restored', chargePersonId };
+    }
+
+    if (clerkUserIds.length > 0) {
+      await step.run('delete-charge-clerk-users', () =>
+        Promise.all(
+          clerkUserIds.map((userId) =>
+            deleteClerkUser({
+              userId,
+              clerkSecretKey: getStepClerkSecretKey(),
+            }),
+          ),
+        ),
+      );
     }
 
     return { status: 'deleted', chargePersonId };

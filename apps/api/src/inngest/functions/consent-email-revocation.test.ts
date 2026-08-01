@@ -64,6 +64,8 @@ jest.mock(
 // fixture. This gc1-allow mock follows the same pattern as the other DB-backed
 // identity-v2 function mocks above.
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn().mockResolvedValue(true);
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
 jest.mock('../../services/identity-v2/deletion-v2', () => {
   const actual = jest.requireActual(
     '../../services/identity-v2/deletion-v2',
@@ -72,6 +74,18 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
     ...actual,
     deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
       mockDeletePersonIfConsentWithdrawnV2(...args),
+    getPersonClerkUserIdsV2: (...args: unknown[]) =>
+      mockGetPersonClerkUserIdsV2(...args),
+  };
+});
+
+jest.mock('../../services/clerk-user', () => {
+  const actual = jest.requireActual(
+    '../../services/clerk-user',
+  ) as typeof import('../../services/clerk-user');
+  return {
+    ...actual,
+    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
   };
 });
 
@@ -130,6 +144,8 @@ beforeEach(() => {
   mockIsConsentRevocationGenerationCurrentV2.mockResolvedValue(true);
   mockGetPersonDisplayNameV2.mockResolvedValue('Alex');
   mockDeletePersonIfConsentWithdrawnV2.mockResolvedValue(true);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   mockSendPushNotification.mockResolvedValue({ sent: true });
   mockGetRecentNotificationCount.mockResolvedValue(0);
 });
@@ -337,8 +353,36 @@ describe('still-withdrawn path', () => {
       'send-warning-push',
       'check-restoration',
       'notify-child',
+      'capture-charge-clerk-user-ids',
       'delete-charge-person',
     ]);
+  });
+
+  it('deletes every captured Clerk identity after the person erasure commits', async () => {
+    mockGetPersonClerkUserIdsV2.mockResolvedValue([
+      'clerk-charge-001',
+      'clerk-charge-002',
+    ]);
+
+    const { runner } = await executeEmailRevocation({
+      chargePersonId: 'charge-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'clerk-charge-001' }),
+    );
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'clerk-charge-002' }),
+    );
+    expect(runner.runNames()).toEqual(
+      expect.arrayContaining([
+        'capture-charge-clerk-user-ids',
+        'delete-charge-person',
+        'delete-charge-clerk-users',
+      ]),
+    );
   });
 
   it('pushes consent_warning at day 6 and consent_expired to child before delete', async () => {

@@ -2,7 +2,7 @@
 import { NonRetriableError } from 'inngest';
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
 // [WI-367] calculateAgeFromParts (not calculateAge): the v2-only revocation path
 // now reads birthMonth/birthDay via getPersonForConsentRevocationV2 and computes
 // the COPPA hard-delete boundary on exact age, falling back to year-only when the
@@ -15,7 +15,11 @@ import {
   archivePersonOnRevocationV2,
 } from '../../services/identity-v2/consent-v2';
 import { getFamilyOwnerPersonIdV2 } from '../../services/identity-v2/family-v2';
-import { deletePersonIfConsentWithdrawnV2 } from '../../services/identity-v2/deletion-v2';
+import {
+  deletePersonIfConsentWithdrawnV2,
+  getPersonClerkUserIdsV2,
+} from '../../services/identity-v2/deletion-v2';
+import { deleteClerkUser } from '../../services/clerk-user';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import {
@@ -403,6 +407,9 @@ export const consentRevocation = inngest.createFunction(
     // getFamilyOwnerProfileId would fall back to the event-sender
     // parentProfileId and could land the notice on the wrong account in
     // multi-parent families.
+    const clerkUserIds = await step.run('capture-child-clerk-user-ids', () =>
+      getPersonClerkUserIdsV2(getStepDatabase(), childProfileId),
+    );
     const deleteResult = await step.run('delete-child-profile', async () => {
       const db = getStepDatabase();
       const childName = (await childDisplayName(db)) ?? 'Your child';
@@ -450,6 +457,19 @@ export const consentRevocation = inngest.createFunction(
         : null;
     if (!deleted) {
       return { status: 'restored', childProfileId };
+    }
+
+    if (clerkUserIds.length > 0) {
+      await step.run('delete-child-clerk-users', () =>
+        Promise.all(
+          clerkUserIds.map((userId) =>
+            deleteClerkUser({
+              userId,
+              clerkSecretKey: getStepClerkSecretKey(),
+            }),
+          ),
+        ),
+      );
     }
 
     // Notify parent of completion. [BUG-699-FOLLOWUP] same 24h dedup as the

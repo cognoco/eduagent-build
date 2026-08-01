@@ -130,6 +130,23 @@ export type DeletionReason =
   | 'guardian_initiated'
   | 'abandonment';
 
+/**
+ * Capture every external Clerk identity before a person-scoped erasure
+ * cascades the login rows. A person may have more than one login binding, so
+ * callers must delete every returned Clerk user after the database transaction
+ * commits.
+ */
+export async function getPersonClerkUserIdsV2(
+  db: Database,
+  personId: string,
+): Promise<string[]> {
+  const rows = await db.query.login.findMany({
+    where: eq(login.personId, personId),
+    columns: { clerkUserId: true },
+  });
+  return rows.map(({ clerkUserId }) => clerkUserId);
+}
+
 // ---------------------------------------------------------------------------
 // Schedule / cancel / status — v2 of the legacy accounts-stamp surface, keyed on
 // organization (organization.id = accounts.id). Logic identical; only the table
@@ -578,6 +595,7 @@ export async function deletePersonV2(
     // sees the committed delete and bails before writing anything.
     await acquirePersonLockTx(tx, personId);
     if (!(await personExistsTx(tx, personId))) return;
+    await assertPersonDeletionPreservesAdminTx(tx, personId);
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -643,6 +661,7 @@ export async function deletePersonIfConsentWithdrawnV2(
     // add an explicit person-existence re-check to guarantee no duplicate
     // retain records even if that coupling ever changes.
     if (!(await personExistsTx(tx, personId))) return false;
+    await assertPersonDeletionPreservesAdminTx(tx, personId);
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -738,6 +757,8 @@ export async function deletePersonIfNoConsentV2(
     // the loser write nothing.
     if (!(await personExistsTx(tx, personId))) return false;
 
+    await assertPersonDeletionPreservesAdminTx(tx, personId);
+
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -793,6 +814,7 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     if (current.some((grant) => !grant.withdrawnAt)) {
       return false;
     }
+    await assertPersonDeletionPreservesAdminTx(tx, personId);
     await rehomeGrantsTx(tx, personId);
     await writeFinancialRecordsForPersonTx(tx, personId);
     await tx.insert(deletionAudit).values({
@@ -923,6 +945,49 @@ async function personExistsTx(
     columns: { id: true },
   });
   return !!row;
+}
+
+/**
+ * Preserve the organization-admin invariant for every person-scoped delete.
+ *
+ * The initial membership read identifies which organization row to lock. The
+ * membership set is then re-read only AFTER that row lock is held. Two
+ * concurrent deletes of different admins therefore serialize on the same org:
+ * the winner may remove one admin, while the loser observes the committed
+ * membership set and refuses to remove the last remaining admin.
+ */
+async function assertPersonDeletionPreservesAdminTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<void> {
+  const initialMembership = await tx.query.membership.findFirst({
+    where: eq(membership.personId, personId),
+    columns: { organizationId: true },
+  });
+  if (!initialMembership) return;
+
+  const [lockedOrganization] = await tx
+    .select({ id: organization.id })
+    .from(organization)
+    .where(eq(organization.id, initialMembership.organizationId))
+    .for('update');
+  if (!lockedOrganization) return;
+
+  const memberships = await tx.query.membership.findMany({
+    where: eq(membership.organizationId, lockedOrganization.id),
+    columns: { personId: true, roles: true },
+  });
+  const target = memberships.find((row) => row.personId === personId);
+  if (!target?.roles.includes('admin')) return;
+
+  const anotherAdminExists = memberships.some(
+    (row) => row.personId !== personId && row.roles.includes('admin'),
+  );
+  if (!anotherAdminExists) {
+    throw new ConflictError(
+      'Cannot delete the last administrator of an organization',
+    );
+  }
 }
 
 /**

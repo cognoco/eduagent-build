@@ -54,6 +54,8 @@ const mockGetPersonForConsentRevocationV2 = jest.fn();
 const mockDeleteArchivedPersonIfStillEligibleV2 = jest
   .fn()
   .mockResolvedValue(true);
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
 jest.mock('../../services/identity-v2/consent-v2', () => {
   const actual = jest.requireActual(
     '../../services/identity-v2/consent-v2',
@@ -73,6 +75,18 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
     ...actual,
     deleteArchivedPersonIfStillEligibleV2: (...args: unknown[]) =>
       mockDeleteArchivedPersonIfStillEligibleV2(...args),
+    getPersonClerkUserIdsV2: (...args: unknown[]) =>
+      mockGetPersonClerkUserIdsV2(...args),
+  };
+});
+
+jest.mock('../../services/clerk-user', () => {
+  const actual = jest.requireActual(
+    '../../services/clerk-user',
+  ) as typeof import('../../services/clerk-user');
+  return {
+    ...actual,
+    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
   };
 });
 
@@ -121,6 +135,8 @@ beforeEach(() => {
     archivedAt: new Date('2026-04-01T12:00:00.000Z'),
   });
   mockDeleteArchivedPersonIfStillEligibleV2.mockResolvedValue(true);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
 });
 
 afterEach(() => {
@@ -149,6 +165,39 @@ describe('archiveCleanup', () => {
       expect.anything(),
       'profile-delete',
       expect.any(Date),
+    );
+  });
+
+  it('deletes every captured Clerk identity only after the DB erasure succeeds', async () => {
+    mockGetPersonClerkUserIdsV2.mockResolvedValue([
+      'clerk-archived-person-a',
+      'clerk-archived-person-b',
+    ]);
+
+    const { runCalls } = await executeArchiveCleanup('profile-credentialed');
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'clerk-archived-person-a' }),
+    );
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'clerk-archived-person-b' }),
+    );
+    expect(runCalls.map((call) => call.name)).toEqual(
+      expect.arrayContaining([
+        'capture-archived-person-clerk-user-ids',
+        'hard-delete-archived-profile',
+        'delete-archived-person-clerk-users',
+      ]),
+    );
+    expect(
+      runCalls.findIndex(
+        (call) => call.name === 'hard-delete-archived-profile',
+      ),
+    ).toBeLessThan(
+      runCalls.findIndex(
+        (call) => call.name === 'delete-archived-person-clerk-users',
+      ),
     );
   });
 });

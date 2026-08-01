@@ -8,6 +8,8 @@ const mockRefreshConsentTokenForRequestV2 = jest.fn().mockResolvedValue({
   freshToken: 'refreshed-token-xyz',
 });
 const mockDeletePersonIfNoConsentV2 = jest.fn().mockResolvedValue(undefined);
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
 const mockSendEmail = jest.fn();
 const mockFormatConsentReminderEmail = jest.fn(
   (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
@@ -33,6 +35,7 @@ jest.mock('../helpers', () => {
   return {
     ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
+    getStepClerkSecretKey: jest.fn(() => 'clerk-test-key'),
     getStepResendApiKey: jest.fn(() => 're_test_key'),
     getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
     getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
@@ -77,9 +80,21 @@ jest.mock(
       ...actual,
       deletePersonIfNoConsentV2: (...args: unknown[]) =>
         mockDeletePersonIfNoConsentV2(...args),
+      getPersonClerkUserIdsV2: (...args: unknown[]) =>
+        mockGetPersonClerkUserIdsV2(...args),
     };
   },
 );
+
+jest.mock('../../services/clerk-user', () => {
+  const actual = jest.requireActual(
+    '../../services/clerk-user',
+  ) as typeof import('../../services/clerk-user');
+  return {
+    ...actual,
+    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+  };
+});
 
 import { NonRetriableError } from 'inngest';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
@@ -289,6 +304,9 @@ beforeEach(() => {
     guardianEmail: 'parent@example.com',
     freshToken: 'refreshed-token-xyz',
   });
+  mockDeletePersonIfNoConsentV2.mockResolvedValue(undefined);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
 });
 
 describe('consentReminder', () => {
@@ -335,6 +353,26 @@ describe('consentReminder', () => {
       'profile-1',
       new Date('2026-05-01T00:00:00.000Z'),
     );
+  });
+
+  it('deletes every captured Clerk identity after the day-30 DB erasure', async () => {
+    mockDeletePersonIfNoConsentV2.mockResolvedValue(true);
+    mockGetPersonClerkUserIdsV2.mockResolvedValue([
+      'clerk-consent-charge-a',
+      'clerk-consent-charge-b',
+    ]);
+
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk-consent-charge-a',
+      clerkSecretKey: 'clerk-test-key',
+    });
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk-consent-charge-b',
+      clerkSecretKey: 'clerk-test-key',
+    });
   });
 
   // [IMP-2] Token URL must reach the email body, not just the format call

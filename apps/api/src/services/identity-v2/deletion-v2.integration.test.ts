@@ -61,6 +61,7 @@ import {
 } from './deletion-v2';
 import { scheduledDeletion } from '../../inngest/functions/account-deletion';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { ConflictError } from '../../errors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -324,6 +325,67 @@ const RUN = !!process.env.DATABASE_URL;
         columns: { id: true },
       });
       expect(remainingSub).toBeUndefined();
+    });
+
+    describe('[WI-2788] person-scoped deletion preserves an organization admin', () => {
+      async function addAdmin(orgId: string, displayName: string) {
+        const [admin] = await db
+          .insert(person)
+          .values({
+            displayName,
+            birthDate: '1990-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(admin!.id);
+        await db.insert(membership).values({
+          personId: admin!.id,
+          organizationId: orgId,
+          roles: ['admin'],
+        });
+        return admin!.id;
+      }
+
+      it('refuses to delete the last remaining admin', async () => {
+        const { ownerId } = await seedScheduledOrgWithOwner();
+
+        await expect(
+          deletePersonV2(db, ownerId, 'user_initiated', ownerId),
+        ).rejects.toBeInstanceOf(ConflictError);
+
+        const owner = await db.query.person.findFirst({
+          where: eq(person.id, ownerId),
+          columns: { id: true },
+        });
+        expect(owner).toBeDefined();
+      });
+
+      it('serializes concurrent deletes of two admins and preserves exactly one', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        const secondAdminId = await addAdmin(orgId, 'Second Admin');
+
+        const results = await Promise.allSettled([
+          deletePersonV2(db, ownerId, 'user_initiated', ownerId),
+          deletePersonV2(db, secondAdminId, 'user_initiated', secondAdminId),
+        ]);
+
+        expect(
+          results.filter((result) => result.status === 'fulfilled'),
+        ).toHaveLength(1);
+        const [rejected] = results.filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === 'rejected',
+        );
+        expect(rejected?.reason).toBeInstanceOf(ConflictError);
+
+        const remainingAdmins = await db.query.membership.findMany({
+          where: eq(membership.organizationId, orgId),
+          columns: { personId: true, roles: true },
+        });
+        expect(
+          remainingAdmins.filter((row) => row.roles.includes('admin')),
+        ).toHaveLength(1);
+      });
     });
 
     // -----------------------------------------------------------------------

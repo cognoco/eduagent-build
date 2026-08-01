@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { inngest } from '../client';
 import {
   getStepDatabase,
+  getStepClerkSecretKey,
   getStepResendApiKey,
   getStepEmailFrom,
   getStepEnvironment,
@@ -23,7 +24,11 @@ import {
   formatConsentReminderEmail,
   type EmailOptions,
 } from '../../services/notifications';
-import { deletePersonIfNoConsentV2 } from '../../services/identity-v2/deletion-v2';
+import {
+  deletePersonIfNoConsentV2,
+  getPersonClerkUserIdsV2,
+} from '../../services/identity-v2/deletion-v2';
+import { deleteClerkUser } from '../../services/clerk-user';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 import { captureMessage } from '../../services/sentry';
 
@@ -260,12 +265,16 @@ export const consentReminder = inngest.createFunction(
     // deletion would be both redundant and unnecessarily distressing. The
     // last actionable notice is at Day-25; Day-30 is the cutoff itself.
     await step.sleep('wait-5-more-days', '5d');
-    await step.run('auto-delete-account', async () => {
+    const clerkUserIds = await step.run(
+      'capture-consent-charge-clerk-user-ids',
+      () => getPersonClerkUserIdsV2(getStepDatabase(), profileId),
+    );
+    const deleted = await step.run('auto-delete-account', async () => {
       const db = getStepDatabase();
       // Fast guard: bail out if this GDPR request was already granted/withdrawn.
       const status = await getCurrentConsentRequestStatus();
-      if (!status || isTerminalConsentStatus(status)) return;
-      if (!requestedAt) return;
+      if (!status || isTerminalConsentStatus(status)) return false;
+      if (!requestedAt) return false;
       // CI-11: Use service function instead of raw SQL.
       // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
       // This eliminates the TOCTOU race where a parent approves consent between
@@ -276,8 +285,22 @@ export const consentReminder = inngest.createFunction(
       // same request-generation guard as legacy: thread requestedAtDate so a
       // stale day-30 run cannot delete a child who started a newer consent
       // cycle (the legacy deleteProfileIfNoConsent(requestedAt) semantics).
-      if (!requestedAtDate || Number.isNaN(requestedAtDate.getTime())) return;
-      await deletePersonIfNoConsentV2(db, profileId, requestedAtDate);
+      if (!requestedAtDate || Number.isNaN(requestedAtDate.getTime())) {
+        return false;
+      }
+      return deletePersonIfNoConsentV2(db, profileId, requestedAtDate);
     });
+    if (deleted && clerkUserIds.length > 0) {
+      await step.run('delete-consent-charge-clerk-users', () =>
+        Promise.all(
+          clerkUserIds.map((userId) =>
+            deleteClerkUser({
+              userId,
+              clerkSecretKey: getStepClerkSecretKey(),
+            }),
+          ),
+        ),
+      );
+    }
   },
 );
