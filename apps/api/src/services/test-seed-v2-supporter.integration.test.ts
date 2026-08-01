@@ -332,15 +332,25 @@ function createIntegrationDb(): Database {
 
     it('[WI-2584 route boundary] authenticated GET /v1/profiles returns the schema-valid supporter and Managed Child with no child Login, learner-only membership, and a fully accepted edge', async () => {
       const [
+        supporterPerson,
         supporterLogin,
+        managedChildPerson,
         managedChildLogin,
         managedChildMembership,
         managedChildEdge,
         managedChildContract,
       ] = await Promise.all([
+        db.query.person.findFirst({
+          where: eq(person.id, seeded.ids.supporterPersonId),
+          columns: { conversationLanguageConfirmedAt: true },
+        }),
         db.query.login.findFirst({
           where: eq(login.personId, seeded.ids.supporterPersonId),
           columns: { clerkUserId: true },
+        }),
+        db.query.person.findFirst({
+          where: eq(person.id, seeded.ids.managedChildPersonId),
+          columns: { conversationLanguageConfirmedAt: true },
         }),
         db.query.login.findFirst({
           where: eq(login.personId, seeded.ids.managedChildPersonId),
@@ -374,7 +384,11 @@ function createIntegrationDb(): Database {
         }),
       ]);
 
+      expect(supporterPerson?.conversationLanguageConfirmedAt).toBeInstanceOf(
+        Date,
+      );
       expect(supporterLogin).toBeDefined();
+      expect(managedChildPerson?.conversationLanguageConfirmedAt).toBeNull();
       expect(managedChildLogin).toBeUndefined();
       expect(managedChildMembership).toEqual({
         organizationId: seeded.ids.supporterOrganizationId,

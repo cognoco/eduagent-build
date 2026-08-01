@@ -72,6 +72,7 @@ export async function seedOwnerIdentityV2(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    conversationLanguageConfirmedAt: new Date(),
     ...(opts.conversationLanguage !== undefined
       ? { conversationLanguage: opts.conversationLanguage }
       : {}),
@@ -119,6 +120,7 @@ export async function seedChildIdentityV2(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    conversationLanguageConfirmedAt: null,
     // login_id stays null — managed child, no credential.
   });
   await db.insert(membership).values({

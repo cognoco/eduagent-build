@@ -69,7 +69,10 @@ export async function ensureV2IdentityForLegacyProfileTest(
     if (loginRow) {
       await db
         .update(person)
-        .set({ loginId: loginRow.id })
+        .set({
+          loginId: loginRow.id,
+          conversationLanguageConfirmedAt: new Date(),
+        })
         .where(eq(person.id, input.profileId));
     }
   }

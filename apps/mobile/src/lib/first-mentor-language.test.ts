@@ -69,6 +69,19 @@ describe('shouldRequireFirstMentorLanguageConfirmation', () => {
     ).toBe(false);
   });
 
+  it('gates an unconfirmed managed child when they first gain their own credential', () => {
+    expect(
+      shouldRequireFirstMentorLanguageConfirmation({
+        activeProfile: profile({
+          isOwner: false,
+          isCurrentUser: true,
+          conversationLanguageConfirmed: false,
+        }),
+        isExplicitProxyMode: false,
+      }),
+    ).toBe(true);
+  });
+
   it('resumes after relaunch until the server reports durable confirmation', () => {
     const beforeConfirmation = profile({
       conversationLanguage: 'cs',

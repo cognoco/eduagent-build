@@ -721,14 +721,10 @@ async function createBaseProfile(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
-    // [WI-1556] A seeded persona stands in for an EXISTING learner, so it is
-    // confirmed. Left null, the API reports conversationLanguageConfirmed
-    // false, the first-Mentor gate replaces the (app) shell, and E2E sign-in
-    // can never reach a landing — waitForSignedInReady sees no landing, no
-    // app-shell and no error UI, so it burns its full timeout without
-    // consuming a retry. Scenarios that need the unconfirmed first-run state
-    // must clear this explicitly rather than relying on the seed default.
-    conversationLanguageConfirmedAt: new Date(),
+    // [WI-1556] Owner seeds are existing credentialed learners and must clear
+    // the first-Mentor gate. Managed children have no credential yet, so they
+    // stay unconfirmed until a seed explicitly adds one.
+    conversationLanguageConfirmedAt: isOwner ? new Date() : null,
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
@@ -1377,7 +1373,10 @@ async function seedV2AccountNonOwnerChild(
     clerkUserId,
     email,
   });
-  await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+  await db
+    .update(person)
+    .set({ loginId, conversationLanguageConfirmedAt: new Date() })
+    .where(eq(person.id, profileId));
 
   const { subjectId } = await createSubjectWithCurriculum(
     db,
@@ -5251,6 +5250,7 @@ function makeConsentThresholdSeeder(
       birthDate: `${new Date().getFullYear() - opts.ageYears}-01-01`,
       residenceJurisdiction:
         opts.location === 'US' ? 'US' : opts.location === 'EU' ? 'EU' : 'ROW',
+      conversationLanguageConfirmedAt: new Date(),
     });
     {
       const loginId = generateUUIDv7();

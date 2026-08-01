@@ -208,6 +208,9 @@ async function cleanupByClerk(
     expect(personRow?.birthDate).toBe('1990-06-15');
     expect(personRow?.residenceJurisdiction).toBe('US');
     expect(personRow?.loginId).toBeTruthy(); // reverse circular wire
+    // [WI-1556] Production signup is the real first-run path. It must remain
+    // unconfirmed so the learner reaches the language-confirmation gate.
+    expect(personRow?.conversationLanguageConfirmedAt).toBeNull();
 
     // subscription: plus trial with a real trial_ends_at, payer = person.
     const subRow = await db.query.subscription.findFirst({
