@@ -1,0 +1,19 @@
+{
+  "id": "WI-2037",
+  "pageId": "39d8bce9-1f7c-8121-8a76-eee8e9da6c63",
+  "name": "Design the 13–16 join-my-family consent and guardian posture",
+  "batch": "BID-49",
+  "type": "Design",
+  "reviewTier": "Adversarial",
+  "claimant": "codex:builder:WI-2037",
+  "worktree": ".worktrees/WI-2037",
+  "branch": "WI-2037",
+  "baseCommit": "503f4759ec49390b838b4f95549a4bbbaddb7845",
+  "originMainAtFinalPreflight": "503f4759ec49390b838b4f95549a4bbbaddb7845",
+  "implementationSlice": "WI-2533",
+  "joinSlice": "WI-1753",
+  "authorityGate": "Provisionally satisfied by Jørn on 2026-08-01; proceed as fully approved while OPQ-160 tracks Zuzka final ratification.",
+  "operatorQueue": "OPQ-160",
+  "operatorQueueUrl": "https://app.notion.com/p/Ratify-provisional-MMT-ADR-0010-family-join-consent-rewrite-3af8bce91f7c816cb79ae87b38461c55",
+  "artifactState": "provisionally-approved-ready-to-publish"
+}
