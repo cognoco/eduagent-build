@@ -146,9 +146,6 @@ export interface RouteOwnedLlmConsentBoundary {
     | 'route-discriminant'
     | 'independent-mixed-residue';
   rationale: string;
-  preConsentBranchTokens?: readonly string[];
-  consentGateToken?: string;
-  llmDispatchToken?: string;
 }
 
 /**
@@ -194,7 +191,7 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
         'if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {',
       ],
       consentGateToken: 'await assertLlmConsent(',
-      llmDispatchToken: 'const result = await reviewDictation({',
+      llmDispatchTokens: ['const result = await reviewDictation({'],
     },
     {
       id: 'curriculum.topic-preview',

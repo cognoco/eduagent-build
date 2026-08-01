@@ -323,7 +323,7 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
       | ((typeof ROUTE_OWNED_LLM_CONSENT_BOUNDARIES)[number] & {
           preConsentBranchTokens?: readonly string[];
           consentGateToken?: string;
-          llmDispatchToken?: string;
+          llmDispatchTokens?: readonly string[];
         })
       | undefined;
     expect(boundary).toBeDefined();
@@ -337,7 +337,7 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
         'if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {',
       ],
       consentGateToken: 'await assertLlmConsent(',
-      llmDispatchToken: 'const result = await reviewDictation({',
+      llmDispatchTokens: ['const result = await reviewDictation({'],
     });
 
     const routeSource = sliceBetweenTokens(
@@ -346,13 +346,14 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
       boundary.routeEndToken,
     );
     const gateIndex = routeSource.indexOf(boundary.consentGateToken ?? '');
-    const dispatchIndex = routeSource.indexOf(boundary.llmDispatchToken ?? '');
     expect(gateIndex).toBeGreaterThanOrEqual(0);
     for (const token of boundary.preConsentBranchTokens ?? []) {
       expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
       expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
     }
-    expect(dispatchIndex).toBeGreaterThan(gateIndex);
+    for (const token of boundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
   });
 
   it('requires an explicit rationale for every remaining route-entry gate', () => {
