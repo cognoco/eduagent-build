@@ -578,6 +578,7 @@ describe('freeformFilingRetry', () => {
             name: 'app/filing.completed',
             data: expect.objectContaining({
               bookId: 'book-001',
+              topicId: 'topic-001',
               sessionId: testSessionId,
               profileId: testProfileId,
             }),
@@ -657,17 +658,18 @@ describe('freeformFilingRetry', () => {
         data: Record<string, unknown>;
       };
 
-      // Must have all four data keys that the success path emits
+      // Must have all four data keys that the success path emits.
       expect(payload.data).toHaveProperty('bookId');
-      expect(payload.data).toHaveProperty('topicTitle');
+      expect(payload.data).toHaveProperty('topicId');
       expect(payload.data).toHaveProperty('profileId', testProfileId);
       expect(payload.data).toHaveProperty('sessionId', testSessionId);
       // Resolved values from the topic lookup
       expect(payload.data.bookId).toBe(filedBookId);
-      expect(payload.data.topicTitle).toBe('Newton Laws');
+      expect(payload.data.topicId).toBe(filedTopicId);
+      expect(payload.data).not.toHaveProperty('topicTitle');
     });
 
-    it('falls back to undefined bookId/topicTitle when topicId is null [CR-FIL-CONSISTENCY-02]', async () => {
+    it('falls back to undefined bookId and null topicId when topicId is null [CR-FIL-CONSISTENCY-02]', async () => {
       // Session filed but topicId not yet written (edge case)
       mockDb.query.learningSessions.findFirst.mockResolvedValue({
         filedAt: new Date('2026-01-01T10:00:00Z'),
@@ -684,9 +686,10 @@ describe('freeformFilingRetry', () => {
       };
       // Keys must exist even when values are undefined (structure matches success path)
       expect(Object.keys(payload.data)).toContain('bookId');
-      expect(Object.keys(payload.data)).toContain('topicTitle');
+      expect(Object.keys(payload.data)).toContain('topicId');
       expect(payload.data.bookId).toBeUndefined();
-      expect(payload.data.topicTitle).toBeUndefined();
+      expect(payload.data.topicId).toBeNull();
+      expect(payload.data).not.toHaveProperty('topicTitle');
     });
 
     it('scopes the session read via createScopedRepository (not a raw profileId eq) [CR-FIL-SCOPE-05, M8b]', async () => {
@@ -718,7 +721,8 @@ describe('freeformFilingRetry', () => {
         data: Record<string, unknown>;
       };
       expect(payload.data.bookId).toBe(filedBookId);
-      expect(payload.data.topicTitle).toBe('Newton Laws');
+      expect(payload.data.topicId).toBe(filedTopicId);
+      expect(payload.data).not.toHaveProperty('topicTitle');
       // The dropped-query assertion: curriculumBooks must NOT be queried by
       // the alreadyFiled path now. If a future regression re-introduces the
       // lookup, this expectation will catch it.

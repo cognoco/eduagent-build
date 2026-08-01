@@ -11,7 +11,7 @@
  * can sign in via the app's Clerk-powered login UI. When absent (e.g., unit
  * tests), falls back to generating fake `clerk_seed_*` IDs.
  */
-import { eq, like, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, like, inArray, or, sql } from 'drizzle-orm';
 import {
   organization,
   person,
@@ -356,11 +356,27 @@ export async function createClerkTestUser(
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
-    }
+      if (res.status !== 422) {
+        throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+      }
 
-    const user = (await res.json()) as ClerkUser;
-    userId = user.id;
+      // Another seed request can create the same email between our lookup and
+      // POST. Re-read once, reuse only a seed-managed winner, and otherwise
+      // preserve the original 422. This is bounded; it is not a retry loop.
+      const racedUser = await findClerkUserByEmail(email, env);
+      if (!racedUser) {
+        throw new Error(`Clerk user creation failed (${res.status}): ${body}`);
+      }
+      if (!isSeedManagedClerkUser(racedUser)) {
+        throw new Error(
+          `Refusing to reuse non-seed Clerk user for seed email ${email}`,
+        );
+      }
+      userId = racedUser.id;
+    } else {
+      const user = (await res.json()) as ClerkUser;
+      userId = user.id;
+    }
   }
 
   // Step 3: PATCH to reliably set password + bypass CAPTCHA for E2E testing.
@@ -808,6 +824,95 @@ async function createBaseAccount(
   return { accountId };
 }
 
+/**
+ * Attach a seed credential to a newly-created person without assuming that a
+ * previous failed seed left no identity rows behind.
+ *
+ * The enclosing seed transaction holds TEST_SEED_MUTATION_LOCK. Reuse is
+ * limited to the exact Clerk credential or to a locally seed-marked login, and
+ * only after the old person has no organization membership. The login primary
+ * key and createdAt are preserved so retries are genuinely idempotent.
+ */
+async function attachSeedLoginToPerson(
+  db: Database,
+  values: { personId: string; clerkUserId: string; email: string },
+): Promise<void> {
+  const existingLogins = await db
+    .select({
+      id: login.id,
+      personId: login.personId,
+      clerkUserId: login.clerkUserId,
+      email: login.email,
+    })
+    .from(login)
+    .where(
+      or(
+        eq(login.email, values.email),
+        eq(login.clerkUserId, values.clerkUserId),
+      ),
+    );
+
+  if (existingLogins.length > 1) {
+    throw new Error(
+      `Refusing to merge split seed logins for seed email ${values.email}`,
+    );
+  }
+
+  const existing = existingLogins[0];
+  if (!existing) {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({ id: loginId, ...values });
+    await db
+      .update(person)
+      .set({ loginId })
+      .where(eq(person.id, values.personId));
+    return;
+  }
+
+  if (
+    existing.clerkUserId !== values.clerkUserId &&
+    !existing.clerkUserId.startsWith(SEED_CLERK_PREFIX)
+  ) {
+    throw new Error(
+      `Refusing to reuse non-seed login for seed email ${values.email}`,
+    );
+  }
+
+  const existingMemberships = await db
+    .select({ organizationId: membership.organizationId })
+    .from(membership)
+    .where(eq(membership.personId, existing.personId));
+  if (existingMemberships.length > 0) {
+    throw new Error(
+      `Refusing to reattach seed login with an organization for seed email ${values.email}`,
+    );
+  }
+
+  await db
+    .update(person)
+    .set({ loginId: null })
+    .where(
+      and(
+        eq(person.id, existing.personId),
+        eq(person.loginId, existing.id),
+      ),
+    );
+  await db
+    .update(login)
+    .set({
+      personId: values.personId,
+      clerkUserId: values.clerkUserId,
+      email: values.email,
+      updatedAt: new Date(),
+    })
+    .where(eq(login.id, existing.id));
+  await db.delete(person).where(eq(person.id, existing.personId));
+  await db
+    .update(person)
+    .set({ loginId: existing.id })
+    .where(eq(person.id, values.personId));
+}
+
 async function createBaseProfile(
   db: Database,
   accountId: string,
@@ -850,14 +955,11 @@ async function createBaseProfile(
         'createBaseProfile: email and clerkUserId required for owner profiles',
       );
     }
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
+    await attachSeedLoginToPerson(db, {
       personId: profileId,
       clerkUserId: opts.clerkUserId,
       email: opts.email,
     });
-    await db.update(person).set({ loginId }).where(eq(person.id, profileId));
     await db.insert(membership).values({
       personId: profileId,
       organizationId: accountId,
@@ -1471,14 +1573,11 @@ async function seedV2AccountNonOwnerChild(
     isOwner: false,
   });
 
-  const loginId = generateUUIDv7();
-  await db.insert(login).values({
-    id: loginId,
+  await attachSeedLoginToPerson(db, {
     personId: profileId,
     clerkUserId,
     email,
   });
-  await db.update(person).set({ loginId }).where(eq(person.id, profileId));
 
   const { subjectId } = await createSubjectWithCurriculum(
     db,
@@ -5353,16 +5452,7 @@ function makeConsentThresholdSeeder(
       residenceJurisdiction:
         opts.location === 'US' ? 'US' : opts.location === 'EU' ? 'EU' : 'ROW',
     });
-    {
-      const loginId = generateUUIDv7();
-      await db.insert(login).values({
-        id: loginId,
-        personId: profileId,
-        clerkUserId,
-        email,
-      });
-      await db.update(person).set({ loginId }).where(eq(person.id, profileId));
-    }
+    await attachSeedLoginToPerson(db, { personId: profileId, clerkUserId, email });
     await db.insert(membership).values({
       personId: profileId,
       organizationId: accountId,

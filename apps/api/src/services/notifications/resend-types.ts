@@ -9,6 +9,14 @@
 
 import { z } from 'zod';
 
+const resendRecipientSchema = z.union([
+  z.string(),
+  z
+    .array(z.string())
+    .min(1)
+    .transform(([recipient]) => recipient),
+]);
+
 // Resend's `email.bounced` payload carries a `bounce` sub-object whose `type`
 // distinguishes a HARD bounce (`Permanent`) from a SOFT/transient one
 // (`Transient` / `Undetermined`). Only hard bounces are permanently dead and
@@ -26,7 +34,10 @@ export const resendEmailEventDataSchema = z
   .object({
     email_id: z.string().optional(),
     from: z.string().optional(),
-    to: z.string().optional(),
+    // Resend's webhook contract sends recipients as a non-empty array. Keep
+    // scalar compatibility for recorded legacy fixtures, then normalize at
+    // the boundary so masking and suppression operate on one real address.
+    to: resendRecipientSchema.optional(),
     subject: z.string().optional(),
     bounce: resendBounceSchema.optional(),
   })

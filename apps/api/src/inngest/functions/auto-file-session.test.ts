@@ -251,7 +251,7 @@ describe('autoFileSession', () => {
             name: 'app/filing.completed',
             data: expect.objectContaining({
               bookId: '00000000-0000-4000-8000-000000000010',
-              topicTitle: 'Gravity',
+              topicId: '00000000-0000-4000-8000-000000000011',
               profileId,
               sessionId,
             }),
@@ -259,6 +259,10 @@ describe('autoFileSession', () => {
         }),
       ]),
     );
+    const completedEvent = sendEventCalls.find(
+      (call) => call.name === 'notify-filing-completed',
+    )?.payload as { data?: Record<string, unknown> } | undefined;
+    expect(completedEvent?.data).not.toHaveProperty('topicTitle');
     expect(result).toMatchObject({ status: 'completed' });
   });
 

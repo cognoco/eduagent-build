@@ -437,6 +437,79 @@ describe('seedScenario', () => {
     ]);
   });
 
+  it('[WI-2788] reattaches a stranded seed login instead of inserting a duplicate', async () => {
+    const db = createMockDb();
+    const selectChain = (db.select as unknown as jest.Mock)() as {
+      from: jest.Mock;
+      where: jest.Mock;
+    };
+    const strandedLogin = {
+      id: '01927880-0000-7000-8000-000000000001',
+      personId: '01927880-0000-7000-8000-000000000002',
+      clerkUserId: `${SEED_CLERK_PREFIX}stranded`,
+      email: 'stranded@example.com',
+    };
+    selectChain.where
+      .mockResolvedValueOnce([strandedLogin])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([strandedLogin])
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([]);
+    (db.select as unknown as jest.Mock).mockClear();
+    selectChain.from.mockClear();
+
+    const result = await seedScenario(
+      db,
+      'learning-active',
+      strandedLogin.email,
+    );
+    const insertMock = db.insert as unknown as jest.Mock;
+    expect(insertMock.mock.calls.some(([table]) => table === login)).toBe(false);
+
+    const updateMock = db.update as unknown as jest.Mock;
+    const loginUpdateIndex = updateMock.mock.calls.findIndex(
+      ([table]) => table === login,
+    );
+    const loginUpdate = updateMock.mock.results[loginUpdateIndex]?.value as
+      | { set: jest.Mock }
+      | undefined;
+    expect(loginUpdateIndex).toBeGreaterThanOrEqual(0);
+    expect(loginUpdate?.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        personId: result.profileId,
+        email: strandedLogin.email,
+        clerkUserId: expect.stringMatching(/^clerk_seed_/),
+        updatedAt: expect.any(Date),
+      }),
+    );
+  });
+
+  it('[WI-2788] refuses to reattach a non-seed login with the requested email', async () => {
+    const db = createMockDb();
+    const selectChain = (db.select as unknown as jest.Mock)() as {
+      from: jest.Mock;
+      where: jest.Mock;
+    };
+    const realLogin = {
+      id: '01927880-0000-7000-8000-000000000003',
+      personId: '01927880-0000-7000-8000-000000000004',
+      clerkUserId: 'user_real_production_account',
+      email: 'real@example.com',
+    };
+    selectChain.where
+      .mockResolvedValueOnce([realLogin])
+      .mockResolvedValueOnce([realLogin])
+      .mockResolvedValue([]);
+    (db.select as unknown as jest.Mock).mockClear();
+    selectChain.from.mockClear();
+
+    await expect(
+      seedScenario(db, 'learning-active', realLogin.email),
+    ).rejects.toThrow(
+      `Refusing to reuse non-seed login for seed email ${realLogin.email}`,
+    );
+  });
+
   it.each(MOCK_DISPATCHABLE_SCENARIOS)(
     'dispatches "%s" and returns SeedResult',
     async (scenario: SeedScenario) => {
@@ -705,7 +778,11 @@ describe('seedScenario', () => {
       }),
     });
 
-    await seedScenario(db, 'onboarding-complete', 'real@example.com');
+    await expect(
+      seedScenario(db, 'onboarding-complete', 'real@example.com'),
+    ).rejects.toThrow(
+      'Refusing to reuse non-seed login for seed email real@example.com',
+    );
 
     expect(db.delete).not.toHaveBeenCalled();
   });
@@ -894,6 +971,140 @@ describe('seedScenario', () => {
       expect.stringMatching(/\/users$/),
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('[WI-2788] reuses a seed-managed Clerk user that wins the GET-to-POST race', async () => {
+    const racedUser = {
+      id: 'user_race_winner',
+      primary_email_address_id: 'email_race_winner',
+      email_addresses: [
+        {
+          id: 'email_race_winner',
+          email_address: 'race@example.com',
+        },
+      ],
+      external_id: `${SEED_CLERK_PREFIX}race-winner`,
+    };
+    let lookupCount = 0;
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? 'GET';
+        if (url.includes('/users?')) {
+          lookupCount += 1;
+          return new Response(
+            JSON.stringify(lookupCount === 1 ? [] : [racedUser]),
+            { status: 200 },
+          );
+        }
+        if (url.endsWith('/users') && method === 'POST') {
+          return new Response('{"code":"form_identifier_exists"}', {
+            status: 422,
+          });
+        }
+        if (url.endsWith(`/users/${racedUser.id}`) && method === 'PATCH') {
+          return new Response('{}', { status: 200 });
+        }
+        if (url.endsWith(`/users/${racedUser.id}`) && method === 'GET') {
+          return new Response(JSON.stringify(racedUser), { status: 200 });
+        }
+        if (
+          url.endsWith(
+            `/email_addresses/${racedUser.primary_email_address_id}`,
+          ) &&
+          method === 'PATCH'
+        ) {
+          return new Response('{}', { status: 200 });
+        }
+        return new Response(`Unexpected Clerk mock call: ${method} ${url}`, {
+          status: 404,
+        });
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      createClerkTestUser('race@example.com', {
+        CLERK_SECRET_KEY: 'test-secret',
+        SEED_PASSWORD: 'test-password',
+      }),
+    ).resolves.toMatchObject({ clerkUserId: racedUser.id });
+    expect(lookupCount).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/users/${racedUser.id}`),
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+
+  it('[WI-2788] refuses a non-seed Clerk user returned by the 422 re-check', async () => {
+    let lookupCount = 0;
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? 'GET';
+        if (url.includes('/users?')) {
+          lookupCount += 1;
+          return new Response(
+            JSON.stringify(
+              lookupCount === 1
+                ? []
+                : [
+                    {
+                      id: 'user_real_race_winner',
+                      email_addresses: [],
+                      external_id: null,
+                    },
+                  ],
+            ),
+            { status: 200 },
+          );
+        }
+        if (url.endsWith('/users') && method === 'POST') {
+          return new Response('duplicate', { status: 422 });
+        }
+        return new Response('unexpected', { status: 500 });
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      createClerkTestUser('race@example.com', {
+        CLERK_SECRET_KEY: 'test-secret',
+        SEED_PASSWORD: 'test-password',
+      }),
+    ).rejects.toThrow('Refusing to reuse non-seed Clerk user');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/users/user_real_race_winner'),
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+
+  it('[WI-2788] preserves the original 422 when the bounded re-check is empty', async () => {
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/users?')) {
+          return new Response('[]', { status: 200 });
+        }
+        if (url.endsWith('/users') && init?.method === 'POST') {
+          return new Response('synthetic-duplicate-detail', { status: 422 });
+        }
+        return new Response('unexpected', { status: 500 });
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      createClerkTestUser('race@example.com', {
+        CLERK_SECRET_KEY: 'test-secret',
+        SEED_PASSWORD: 'test-password',
+      }),
+    ).rejects.toThrow(
+      'Clerk user creation failed (422): synthetic-duplicate-detail',
+    );
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).includes('/users?')),
+    ).toHaveLength(2);
   });
 });
 

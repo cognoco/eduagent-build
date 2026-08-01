@@ -1887,6 +1887,37 @@ async function postSigned(app: Hono, body: unknown): Promise<Response> {
 describe('hard-bounce suppression persistence', () => {
   beforeEach(() => {
     (inngest.send as jest.Mock).mockClear();
+    (captureException as jest.Mock).mockClear();
+  });
+
+  it('[WI-2788] accepts Resend recipient arrays and suppresses the real address', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    const res = await postSigned(app, {
+      type: 'email.bounced',
+      data: {
+        email_id: 'email_array_001',
+        to: ['Array.Recipient@Example.com'],
+        bounce: { type: 'Permanent', subType: 'General' },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ received: true });
+    expect(captureException).not.toHaveBeenCalled();
+    expect(db.__suppressions.get('array.recipient@example.com')).toEqual(
+      expect.objectContaining({
+        reason: 'hard_bounce',
+        emailId: 'email_array_001',
+      }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/email.bounced',
+        data: expect.objectContaining({ to: 'A***@Example.com' }),
+      }),
+    );
   });
 
   it('persists a suppression row for a HARD (Permanent) bounce', async () => {

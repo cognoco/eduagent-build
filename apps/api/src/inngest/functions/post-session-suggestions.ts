@@ -17,12 +17,13 @@ import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
+import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-ownership';
 
 const logger = createLogger();
 
 const filingCompletedDataSchema = z.object({
   bookId: z.string(),
-  topicTitle: z.string(),
+  topicId: z.string(),
   profileId: z.string(),
   sessionId: z.string().optional(),
   timestamp: z.string().optional(),
@@ -85,7 +86,7 @@ export const postSessionSuggestions = inngest.createFunction(
         timestamp: new Date().toISOString(),
       };
     }
-    const { bookId, topicTitle, profileId } = validated.data;
+    const { bookId, topicId, profileId } = validated.data;
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();
@@ -106,6 +107,20 @@ export const postSessionSuggestions = inngest.createFunction(
       });
       if (!ownerSubject)
         return { status: 'skipped' as const, reason: 'ownership mismatch' };
+
+      const completedTopic = await findOwnedCurriculumTopic(db, {
+        profileId,
+        topicId,
+      });
+      if (!completedTopic) {
+        return {
+          status: 'skipped' as const,
+          reason: 'topic not found or ownership mismatch',
+        };
+      }
+      if (completedTopic.bookId !== bookId) {
+        return { status: 'skipped' as const, reason: 'topic/book mismatch' };
+      }
 
       // [WI-116] Re-check current consent at execution time. This job runs
       // on the Inngest endpoint, outside the HTTP consent middleware, so a
@@ -164,7 +179,10 @@ export const postSessionSuggestions = inngest.createFunction(
         .map((t) => sanitizeXmlValue(t.title, 200))
         .filter((t) => t.length > 0)
         .join(', ');
-      const safeCompletedTopicTitle = sanitizeXmlValue(topicTitle, 200);
+      const safeCompletedTopicTitle = sanitizeXmlValue(
+        completedTopic.topicTitle,
+        200,
+      );
 
       const messages = [
         {
