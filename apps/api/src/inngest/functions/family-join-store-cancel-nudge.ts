@@ -97,13 +97,22 @@ export const familyJoinStoreCancelNudge = inngest.createFunction(
       if (!loginRow?.email) {
         return { sent: false, reason: 'no_email' as const };
       }
-      return sendEmail(formatFamilyJoinStoreCancelEmail(loginRow.email), {
-        db,
-        environment: getStepEnvironment(),
-        resendApiKey: getStepResendApiKey(),
-        emailFrom: getStepEmailFrom(),
-        idempotencyKey: buildFamilyJoinStoreCancelKey(teenPersonId),
-      });
+      const result = await sendEmail(
+        formatFamilyJoinStoreCancelEmail(loginRow.email),
+        {
+          db,
+          environment: getStepEnvironment(),
+          resendApiKey: getStepResendApiKey(),
+          emailFrom: getStepEmailFrom(),
+          idempotencyKey: buildFamilyJoinStoreCancelKey(teenPersonId),
+        },
+      );
+      if (!result.sent && result.retryability === 'transient') {
+        throw new Error(
+          'family-join-store-cancel-nudge transient email failure',
+        );
+      }
+      return result;
     });
 
     if (!push.sent && !email.sent) {

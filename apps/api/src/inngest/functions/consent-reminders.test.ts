@@ -348,6 +348,7 @@ beforeEach(() => {
   mockDeletePersonIfNoConsentV2.mockResolvedValue(undefined);
   mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
   mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+  mockSendEmail.mockResolvedValue({ sent: true, retryability: 'none' });
 });
 
 describe('consentReminder', () => {
@@ -424,6 +425,51 @@ describe('consentReminder', () => {
       new Date('2026-05-01T00:00:00.000Z'),
     );
   });
+
+  it.each([
+    ['day-7', 0],
+    ['day-14', 1],
+    ['day-25', 2],
+  ])(
+    '[WI-2788] rejects the workflow so Inngest retries a transient %s email failure',
+    async (_stepName, precedingSuccesses) => {
+      for (let index = 0; index < precedingSuccesses; index += 1) {
+        mockSendEmail.mockResolvedValueOnce({
+          sent: true,
+          retryability: 'none',
+        });
+      }
+      mockSendEmail.mockResolvedValueOnce({
+        sent: false,
+        reason: 'resend_503',
+        retryability: 'transient',
+      });
+
+      await expect(
+        executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']),
+      ).rejects.toThrow('consent-reminder transient email failure');
+      expect(mockSendEmail).toHaveBeenCalledTimes(precedingSuccesses + 1);
+    },
+  );
+
+  it.each([
+    ['permanent', 'invalid_recipient'],
+    ['none', 'no_resend_api_key'],
+  ])(
+    '[WI-2788] treats a %s email failure as terminal without retrying the workflow',
+    async (retryability, reason) => {
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        reason,
+        retryability,
+      });
+
+      await expect(
+        executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']),
+      ).resolves.toBeDefined();
+      expect(mockSendEmail).toHaveBeenCalledTimes(3);
+    },
+  );
 
   it('deletes every captured Clerk identity after the day-30 DB erasure', async () => {
     mockDeletePersonIfNoConsentV2.mockResolvedValue(true);

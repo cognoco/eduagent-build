@@ -21,6 +21,7 @@ import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
 import {
   sendEmail,
   formatConsentReminderEmail,
+  type EmailPayload,
   type EmailOptions,
 } from '../../services/notifications';
 import {
@@ -127,6 +128,17 @@ export const consentReminder = inngest.createFunction(
         stepId,
       ),
     });
+
+    async function sendReminderEmail(
+      payload: EmailPayload,
+      options: EmailOptions,
+    ) {
+      const result = await sendEmail(payload, options);
+      if (!result.sent && result.retryability === 'transient') {
+        throw new Error('consent-reminder transient email failure');
+      }
+      return result;
+    }
 
     /** Look up parentEmail and consentToken from the DB (never from event payload — PII). */
     async function lookupConsentDetails(): Promise<{
@@ -237,7 +249,7 @@ export const consentReminder = inngest.createFunction(
       await step.run('send-day-7-reminder', async () => {
         const { parentEmail } = await lookupConsentDetails();
         if (!parentEmail) return;
-        await sendEmail(
+        await sendReminderEmail(
           formatConsentReminderEmail(
             parentEmail,
             'your child',
@@ -265,7 +277,7 @@ export const consentReminder = inngest.createFunction(
       await step.run('send-day-14-reminder', async () => {
         const { parentEmail } = await lookupConsentDetails();
         if (!parentEmail) return;
-        await sendEmail(
+        await sendReminderEmail(
           formatConsentReminderEmail(
             parentEmail,
             'your child',
@@ -284,7 +296,7 @@ export const consentReminder = inngest.createFunction(
       if (!status || isTerminalConsentStatus(status)) return;
       const { parentEmail } = await lookupConsentDetails();
       if (!parentEmail) return;
-      await sendEmail(
+      await sendReminderEmail(
         {
           to: parentEmail,
           subject:
