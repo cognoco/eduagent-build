@@ -121,9 +121,9 @@ function createIntegrationDb(): Database {
         displayName: 'Owner-Gate Supporter (same-org)',
         isOwner: true,
       });
-      // A same-org managed child: hasOwnAccount defaults false (no writer
-      // ever sets it true — see supporter-coldstart.ts), and the membership
-      // is on the SUPPORTER's own org (mirrors createChildProfileV2's
+      // A same-org managed child: hasOwnAccount remains false because no Login
+      // is created, and the membership is on the SUPPORTER's own org (mirrors
+      // createChildProfileV2's
       // same-org child, plus a supportership edge for the coldstart card to
       // read — createChildProfileV2 only writes guardianship).
       const child = await seedPerson({
@@ -154,10 +154,10 @@ function createIntegrationDb(): Database {
         displayName: 'Owner-Gate Supporter (cross-org)',
         isOwner: true,
       });
-      // An independent account owner on their OWN org. hasOwnAccount still
-      // defaults false (no writer ever sets it true), so
-      // resolveSupporterColdStart sees this exactly as it sees a managed
-      // child — the pre-fix code could not tell them apart.
+      // A deliberately contradictory historical fixture: an independent
+      // account owner on their OWN org whose hasOwnAccount remains false.
+      // resolveSupporterColdStart must still use Login presence rather than
+      // treating it as a managed child.
       const outsider = await seedPerson({
         displayName: 'Owner-Gate Cross-Org Candidate',
         isOwner: true,
@@ -192,8 +192,8 @@ function createIntegrationDb(): Database {
 
 // [WI-2541] Credential predicate: cold-start identity is derived from Login
 // presence (a `login` row exists), NOT person.hasOwnAccount. hasOwnAccount is a
-// birthday-crossing-takeover correlate that defaults false and is set by no
-// production writer (WI-2538), so pre-fix the resolver treated EVERY
+// birthday-crossing-takeover correlate whose historical writer gap (WI-2538)
+// meant the pre-fix resolver treated EVERY
 // credentialed supportee as an uncredentialed managed candidate: same-org → a
 // wrong `managed` card, cross-org → suppressed entirely (the reported bug:
 // legitimate cross-organization granted-idle cards suppressed). These cases
@@ -217,10 +217,9 @@ function createIntegrationDb(): Database {
     });
 
     // A person + membership, optionally with a real `login` row (credentialed).
-    // hasOwnAccount is left at its schema default (false) throughout — the fix
-    // must derive credential from the login row, never from that flag, so a
-    // "credentialed" fixture is precisely a login row present with
-    // hasOwnAccount still false (the production drift that is the bug).
+    // hasOwnAccount is deliberately left false to retain the regression
+    // partition: credential identity must derive from Login presence even when
+    // historical or inconsistent data carries the wrong correlate.
     async function seedPerson(input: {
       displayName: string;
       isOwner: boolean;

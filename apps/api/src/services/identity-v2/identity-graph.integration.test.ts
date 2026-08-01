@@ -208,6 +208,7 @@ async function cleanupByClerk(
     expect(personRow?.birthDate).toBe('1990-06-15');
     expect(personRow?.residenceJurisdiction).toBe('US');
     expect(personRow?.loginId).toBeTruthy(); // reverse circular wire
+    expect(personRow?.hasOwnAccount).toBe(true);
 
     // subscription: plus trial with a real trial_ends_at, payer = person.
     const subRow = await db.query.subscription.findFirst({
@@ -343,6 +344,42 @@ async function cleanupByClerk(
     // Same graph returned; no duplicate person/org created.
     expect(second.personId).toBe(first.personId);
     expect(second.organizationId).toBe(first.organizationId);
+  });
+
+  it('[WI-2895] converges a pre-fix credentialed Person on idempotent replay without changing organization membership', async () => {
+    const clerkUserId = uniqueClerk();
+    const email = `wi2895_replay_${generateUUIDv7()}@test.local`;
+    const args = {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Legacy Credentialed Owner',
+      birthYear: 1985,
+      location: 'EU' as const,
+    };
+    const first = await createIdentityGraph(db, args);
+    const membershipsBefore = await db.query.membership.findMany({
+      where: eq(membership.personId, first.personId),
+    });
+
+    // Simulate a row created before WI-2895: the Login circular link is
+    // complete, but the persisted correlate was left at its false default.
+    await db
+      .update(person)
+      .set({ hasOwnAccount: false })
+      .where(eq(person.id, first.personId));
+
+    const replay = await createIdentityGraph(db, args);
+    const repaired = await db.query.person.findFirst({
+      where: eq(person.id, first.personId),
+    });
+    const membershipsAfter = await db.query.membership.findMany({
+      where: eq(membership.personId, first.personId),
+    });
+
+    expect(replay.personId).toBe(first.personId);
+    expect(replay.organizationId).toBe(first.organizationId);
+    expect(repaired?.hasOwnAccount).toBe(true);
+    expect(membershipsAfter).toEqual(membershipsBefore);
   });
 
   it('[BUG-411 sequential] refuses a same-email/different-clerk reclaim with the audited ConflictError', async () => {
