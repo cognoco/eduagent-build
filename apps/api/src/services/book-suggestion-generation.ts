@@ -9,6 +9,7 @@ import {
 } from '@eduagent/database';
 import {
   bookSuggestionGenerationResultSchema,
+  type AgeBracket,
   type ConversationLanguage,
 } from '@eduagent/schemas';
 
@@ -92,6 +93,7 @@ function emitFailureMetric(
 async function callBookSuggestionGenerationJson(
   messages: ChatMessage[],
   conversationLanguage?: ConversationLanguage,
+  ageBracket?: AgeBracket,
 ): Promise<BookSuggestionGenerationResult | null> {
   let lastFailure = '';
   for (let attempt = 0; attempt < BOOK_SUGGESTION_JSON_ATTEMPTS; attempt++) {
@@ -115,6 +117,7 @@ async function callBookSuggestionGenerationJson(
       flow: 'book.suggestion',
       responseFormat: 'json',
       conversationLanguage,
+      ageBracket,
     });
 
     let json: unknown;
@@ -160,7 +163,10 @@ export async function generateCategorizedBookSuggestions(
   db: Database,
   profileId: string,
   subjectId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<GenerationOutcome> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -330,6 +336,7 @@ export async function generateCategorizedBookSuggestions(
     const validated = await callBookSuggestionGenerationJson(
       messages,
       options?.conversationLanguage,
+      options?.ageBracket,
     );
     if (!validated) {
       emitFailureMetric(profileId, subjectId, 'parse');

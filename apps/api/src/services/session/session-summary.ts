@@ -7,6 +7,7 @@ import { sessionSummaries, type Database } from '@eduagent/database';
 import {
   ConflictError,
   NotFoundError,
+  type AgeBracket,
   type ConversationLanguage,
   type RetrySummaryFeedbackResult,
   type SessionSummary,
@@ -50,6 +51,7 @@ export interface SummaryLlmDependencies {
 
 export interface SummaryLlmOptions {
   conversationLanguage?: ConversationLanguage;
+  ageBracket?: AgeBracket;
   deps?: Partial<SummaryLlmDependencies>;
 }
 
@@ -219,7 +221,10 @@ export async function submitSummary(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     input.content,
-    { conversationLanguage: options?.conversationLanguage },
+    {
+      conversationLanguage: options?.conversationLanguage,
+      ageBracket: options?.ageBracket,
+    },
   );
 
   const finalStatus = evaluation.isAccepted ? 'accepted' : 'submitted';
@@ -585,7 +590,10 @@ export async function retrySummaryFeedback(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     reserved.content ?? '',
-    { conversationLanguage: options?.conversationLanguage },
+    {
+      conversationLanguage: options?.conversationLanguage,
+      ageBracket: options?.ageBracket,
+    },
   );
   const recoveredFeedback = hasAvailableSummaryFeedback(evaluation.feedback)
     ? evaluation.feedback
