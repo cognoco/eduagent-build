@@ -43,6 +43,22 @@ rg -q -F -- '--reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs' \
   exit 1
 }
 
+rg -q -F -- '--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY"' \
+  "$target" || {
+  print -u2 'proof wrapper does not inject the aligned staging Clerk backend key required by clerkSetup'
+  exit 1
+}
+
+rg -q -F '[[ -n "${CLERK_SECRET_KEY:-}" ]]' "$target" || {
+  print -u2 'proof wrapper does not fail closed when the aligned staging Clerk backend key is absent'
+  exit 1
+}
+
+if rg -q -F 'CLERK_SECRET_KEY crossed the allowlisted boundary' "$target"; then
+  print -u2 'proof wrapper still rejects the Clerk backend key that clerkSetup requires'
+  exit 1
+fi
+
 if rg -q 'trap .*classification_file|rm .*classification_file' "$target"; then
   print -u2 'classification file appears in a cleanup path'
   exit 1

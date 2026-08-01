@@ -38,11 +38,11 @@ EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true \
 PLAYWRIGHT_RUN_ID="$run_id" \
 PLAYWRIGHT_PRELOAD_PHASE_FILE="$phase_events" \
 PLAYWRIGHT_JSON_OUTPUT_FILE="$raw_json" \
-env -u CLERK_SECRET_KEY -u DOPPLER_TOKEN \
+env -u CLERK_SECRET_KEY -u CLERK_TESTING_TOKEN -u DOPPLER_TOKEN \
 mise exec node@22 -- doppler run --project mentomate --config stg \
   --no-cache --no-fallback \
-  --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY" -- \
-  zsh -f -c 'set -eu; if [[ -n "${CLERK_SECRET_KEY:-}" ]]; then print -u2 "Refusing setup proof: CLERK_SECRET_KEY crossed the allowlisted boundary"; exit 4; fi; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs' \
+  --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY" -- \
+  zsh -f -c 'set -eu; [[ -n "${CLERK_SECRET_KEY:-}" ]] || { print -u2 "Refusing setup proof: aligned staging CLERK_SECRET_KEY is absent"; exit 4; }; [[ -z "${CLERK_TESTING_TOKEN:-}" ]] || { print -u2 "Refusing setup proof: ambient CLERK_TESTING_TOKEN crossed the boundary"; exit 4; }; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs' \
   >"$raw_console" 2>&1
 run_status=$?
 set -e
@@ -80,7 +80,7 @@ then
 fi
 
 source_sha=$(shasum -a 256 "$raw_json" | cut -d ' ' -f1)
-command_shape='CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_ENABLE_MODE_NAV=true EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true PLAYWRIGHT_RUN_ID=<recorded-run-id> PLAYWRIGHT_PRELOAD_PHASE_FILE=<mode-0600-temporary-file> env -u CLERK_SECRET_KEY -u DOPPLER_TOKEN mise exec node@22 -- doppler run --project mentomate --config stg --no-cache --no-fallback --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY" -- zsh -f -c '\''require CLERK_SECRET_KEY absent; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs'\'''
+command_shape='CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_ENABLE_MODE_NAV=true EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true PLAYWRIGHT_RUN_ID=<recorded-run-id> PLAYWRIGHT_PRELOAD_PHASE_FILE=<mode-0600-temporary-file> env -u CLERK_SECRET_KEY -u CLERK_TESTING_TOKEN -u DOPPLER_TOKEN mise exec node@22 -- doppler run --project mentomate --config stg --no-cache --no-fallback --only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY" -- zsh -f -c '\''require aligned staging CLERK_SECRET_KEY present and ambient CLERK_TESTING_TOKEN absent; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; export PLAYWRIGHT_TEST_SEED_SECRET="$TEST_SEED_SECRET"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0 --reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs'\'''
 
 jq \
   --arg schema 'wi-2948.ramtop-seeded-signin-receipt.v1' \
@@ -111,7 +111,7 @@ jq \
     },
     runId: $runId,
     target: "https://api-stg.mentomate.com",
-    credentialBoundary: "Doppler stg live read; only TEST_SEED_SECRET and CLERK_PUBLISHABLE_KEY injected; CLERK_SECRET_KEY explicitly unset",
+    credentialBoundary: "Doppler stg live read; only TEST_SEED_SECRET, CLERK_PUBLISHABLE_KEY, and the aligned CLERK_SECRET_KEY injected; ambient CLERK_TESTING_TOKEN explicitly unset",
     commandShape: $commandShape,
     configuredRetries: 0,
     configuredWorkers: 1,
