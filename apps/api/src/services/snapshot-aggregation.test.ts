@@ -1270,7 +1270,9 @@ describe('refreshProgressSnapshot', () => {
         retryable: true,
       }),
     );
-    expect(addBreadcrumb.mock.calls[0]?.[3]).not.toHaveProperty('error');
+    expect(jest.mocked(addBreadcrumb).mock.calls[0]?.[3]).not.toHaveProperty(
+      'error',
+    );
   });
 
   it('[AR-13] returns cached result without recomputing when snapshot is fresh', async () => {
