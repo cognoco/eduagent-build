@@ -49,6 +49,7 @@ const REGIME_ID = 'c2533000-0000-4000-8000-000000000002';
 const COUNTRY = 'XG';
 const POLICY_VERSION = 'XG-WI-2533-v1';
 const AS_OF = new Date('2026-07-30T12:00:00.000Z');
+const ROUTE_AS_OF = new Date();
 const TOKEN_SECRET = 'guardian-authority-test-secret-at-least-32-chars';
 const VERIFIER_URL = 'https://guardian-verifier.test/v1/verify';
 const VERIFIER_KEY = 'guardian-verifier-test-key';
@@ -69,11 +70,17 @@ let verifierRequest: {
 } | null = null;
 let verifierRequestCount = 0;
 const nativeFetch = globalThis.fetch;
-installFetchInterceptor();
-mockClerkJWKS();
-addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
+if (RUN) {
+  installFetchInterceptor();
+  mockClerkJWKS();
+  addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
+}
 
-async function seedIdentity(label: string, age: number): Promise<Identity> {
+async function seedIdentity(
+  label: string,
+  age: number,
+  referenceDate = AS_OF,
+): Promise<Identity> {
   const email = `wi-2533-${RUN_ID}-${label}@test.invalid`;
   const clerkUserId = `wi-2533-${RUN_ID}-${label}`;
   emails.push(email);
@@ -82,14 +89,14 @@ async function seedIdentity(label: string, age: number): Promise<Identity> {
     clerkUserId,
     verifiedEmail: email,
     displayName: `WI-2533 ${label}`,
-    birthYear: AS_OF.getUTCFullYear() - age,
+    birthYear: referenceDate.getUTCFullYear() - age,
     location: 'EU',
     conversationLanguage: 'en',
   });
   await db
     .update(person)
     .set({
-      birthDate: `${AS_OF.getUTCFullYear() - age}-01-01`,
+      birthDate: `${referenceDate.getUTCFullYear() - age}-01-01`,
       residenceJurisdiction: COUNTRY,
       residenceKnowing: {
         method: 'verified_credential',
@@ -152,8 +159,8 @@ function assertion(
         launchStatus: 'enabled',
         launchBlockReason: null,
         legalVerificationStatus: 'verified',
-        legalReviewedAt: new Date('2026-07-01T00:00:00.000Z'),
-        legalReviewValidUntil: new Date('2027-07-01T00:00:00.000Z'),
+        legalReviewedAt: new Date('2000-01-01T00:00:00.000Z'),
+        legalReviewValidUntil: new Date('2099-01-01T00:00:00.000Z'),
         launchDayReviewRequired: false,
         processingLocationClass: 'eea_only',
         policyVersion: POLICY_VERSION,
@@ -592,6 +599,105 @@ function assertion(
       ).resolves.toEqual([]);
     });
 
+    it('requires present, non-future learner assent for joint-child-guardian policy', async () => {
+      const adult = await seedIdentity('adult-joint-assent', 40);
+      const learner = await seedIdentity('learner-joint-assent', 14);
+      await db
+        .update(countryPolicyRegistry)
+        .set({ authorizationForm: 'joint_child_guardian' })
+        .where(eq(countryPolicyRegistry.id, POLICY_ID));
+
+      const verifierResponse =
+        (learnerAssentAt: string | null) =>
+        async (_input: RequestInfo | URL, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            expected: {
+              guardianPersonId: string;
+              chargePersonId: string;
+              organizationId: string;
+              jurisdiction: string;
+              policyVersion: string;
+            };
+          };
+          return new Response(
+            JSON.stringify({
+              decision: 'approved',
+              guardianPersonId: body.expected.guardianPersonId,
+              chargePersonId: body.expected.chargePersonId,
+              organizationId: body.expected.organizationId,
+              jurisdiction: body.expected.jurisdiction,
+              policyVersion: body.expected.policyVersion,
+              assuranceLevel: 'VPC_VERIFIED',
+              assuranceMethod: 'verified_parental_responsibility_credential',
+              evidenceId: `vpc:${randomUUID()}`,
+              qualification: 'biological_parent',
+              learnerAssentAt,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        };
+
+      try {
+        await expect(
+          initiateGuardianAuthorityVerification(db, {
+            callerPersonId: adult.personId,
+            chargePersonId: learner.personId,
+            verificationHandle: `joint-null-${randomUUID()}`,
+            verifierUrl: VERIFIER_URL,
+            verifierKey: VERIFIER_KEY,
+            tokenSecret: TOKEN_SECRET,
+            now: AS_OF,
+            fetchImpl: verifierResponse(null),
+          }),
+        ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+        await expect(
+          initiateGuardianAuthorityVerification(db, {
+            callerPersonId: adult.personId,
+            chargePersonId: learner.personId,
+            verificationHandle: `joint-future-${randomUUID()}`,
+            verifierUrl: VERIFIER_URL,
+            verifierKey: VERIFIER_KEY,
+            tokenSecret: TOKEN_SECRET,
+            now: AS_OF,
+            fetchImpl: verifierResponse(
+              new Date(AS_OF.getTime() + 60_000).toISOString(),
+            ),
+          }),
+        ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+        await expect(
+          attachGuardianConsentForCredentialedLearner(db, {
+            callerPersonId: adult.personId,
+            chargePersonId: learner.personId,
+            authority: assertion(
+              adult.personId,
+              learner.personId,
+              learner.organizationId,
+              { learnerAssentAt: null },
+            ),
+            asOf: AS_OF,
+          }),
+        ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+        await expect(
+          attachGuardianConsentForCredentialedLearner(db, {
+            callerPersonId: adult.personId,
+            chargePersonId: learner.personId,
+            authority: assertion(
+              adult.personId,
+              learner.personId,
+              learner.organizationId,
+              { learnerAssentAt: new Date(AS_OF.getTime() + 60_000) },
+            ),
+            asOf: AS_OF,
+          }),
+        ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+      } finally {
+        await db
+          .update(countryPolicyRegistry)
+          .set({ authorizationForm: 'guardian' })
+          .where(eq(countryPolicyRegistry.id, POLICY_ID));
+      }
+    });
+
     it('serializes on the canonical consent lock across two database connections', async () => {
       const adult = await seedIdentity('adult-concurrency', 40);
       const learner = await seedIdentity('learner-concurrency', 14);
@@ -633,7 +739,32 @@ function assertion(
         settled = true;
       });
 
-      await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      let waiterObserved = false;
+      for (let attempt = 0; attempt < 20 && !waiterObserved; attempt += 1) {
+        const lockResult = await db.execute(sql`
+          WITH target AS (
+            SELECT hashtextextended(${consentPersonLockKey(
+              learner.personId,
+            )}, 0) AS lock_key
+          )
+          SELECT EXISTS (
+            SELECT 1
+            FROM pg_locks, target
+            WHERE locktype = 'advisory'
+              AND granted = false
+              AND classid::bigint = ((lock_key >> 32) & 4294967295)
+              AND objid::bigint = (lock_key & 4294967295)
+          ) AS waiting
+        `);
+        const rows =
+          (lockResult as unknown as { rows?: Array<{ waiting: boolean }> })
+            .rows ?? (lockResult as unknown as Array<{ waiting: boolean }>);
+        waiterObserved = rows[0]?.waiting === true;
+        if (!waiterObserved) {
+          await new Promise((resolveWait) => setTimeout(resolveWait, 25));
+        }
+      }
+      expect(waiterObserved).toBe(true);
       expect(settled).toBe(false);
       releaseBlocker();
       await expect(attachment).resolves.toEqual({
@@ -644,15 +775,15 @@ function assertion(
     });
 
     it('executes the authenticated verifier-mint-redemption HTTP path and invalidates the email token', async () => {
-      const adult = await seedIdentity('adult-route', 40);
-      const learner = await seedIdentity('learner-route', 14);
+      const adult = await seedIdentity('adult-route', 40, ROUTE_AS_OF);
+      const learner = await seedIdentity('learner-route', 14, ROUTE_AS_OF);
       const staleEmailToken = randomUUID();
       await db
         .update(consentRequest)
         .set({
           status: 'requested',
           token: staleEmailToken,
-          tokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          tokenExpiresAt: new Date(ROUTE_AS_OF.getTime() + 60 * 60 * 1000),
         })
         .where(eq(consentRequest.chargePersonId, learner.personId));
 
@@ -766,8 +897,12 @@ function assertion(
     });
 
     it('[WI-2986] recovers the original authority after response loss without redeeming the handle twice', async () => {
-      const adult = await seedIdentity('adult-response-loss', 40);
-      const learner = await seedIdentity('learner-response-loss', 14);
+      const adult = await seedIdentity('adult-response-loss', 40, ROUTE_AS_OF);
+      const learner = await seedIdentity(
+        'learner-response-loss',
+        14,
+        ROUTE_AS_OF,
+      );
       const verificationHandle = `verification-${randomUUID()}`;
       const env = {
         ...buildIntegrationEnv(),
@@ -806,10 +941,75 @@ function assertion(
       expect(verifierRequestCount - callsBefore).toBe(1);
     });
 
+    it('[WI-2986] releases a transient verifier reservation so the same ceremony can retry', async () => {
+      const adult = await seedIdentity('adult-verifier-retry', 40);
+      const learner = await seedIdentity('learner-verifier-retry', 14);
+      const verificationHandle = `verification-${randomUUID()}`;
+      let attempts = 0;
+      const fetchImpl: typeof fetch = async (_input, init) => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('simulated verifier transport failure');
+        }
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        const body = JSON.parse(String(init?.body)) as {
+          expected: {
+            guardianPersonId: string;
+            chargePersonId: string;
+            organizationId: string;
+            jurisdiction: string;
+            policyVersion: string;
+          };
+        };
+        return new Response(
+          JSON.stringify({
+            decision: 'approved',
+            guardianPersonId: body.expected.guardianPersonId,
+            chargePersonId: body.expected.chargePersonId,
+            organizationId: body.expected.organizationId,
+            jurisdiction: body.expected.jurisdiction,
+            policyVersion: body.expected.policyVersion,
+            assuranceLevel: 'VPC_VERIFIED',
+            assuranceMethod: 'verified_parental_responsibility_credential',
+            evidenceId: `vpc:${randomUUID()}`,
+            qualification: 'biological_parent',
+            learnerAssentAt: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      };
+      const input = {
+        callerPersonId: adult.personId,
+        chargePersonId: learner.personId,
+        verificationHandle,
+        verifierUrl: VERIFIER_URL,
+        verifierKey: VERIFIER_KEY,
+        tokenSecret: TOKEN_SECRET,
+        now: AS_OF,
+        fetchImpl,
+      };
+
+      await expect(
+        initiateGuardianAuthorityVerification(db, input),
+      ).rejects.toThrow();
+      await expect(
+        initiateGuardianAuthorityVerification(db, input),
+      ).resolves.toEqual({ authorityToken: expect.any(String) });
+      expect(attempts).toBe(2);
+    });
+
     it('[WI-2986] rejects a verifier handle replayed against a different learner tuple', async () => {
-      const adult = await seedIdentity('adult-mutated-replay', 40);
-      const firstLearner = await seedIdentity('learner-mutated-replay-a', 14);
-      const secondLearner = await seedIdentity('learner-mutated-replay-b', 14);
+      const adult = await seedIdentity('adult-mutated-replay', 40, ROUTE_AS_OF);
+      const firstLearner = await seedIdentity(
+        'learner-mutated-replay-a',
+        14,
+        ROUTE_AS_OF,
+      );
+      const secondLearner = await seedIdentity(
+        'learner-mutated-replay-b',
+        14,
+        ROUTE_AS_OF,
+      );
       const verificationHandle = `verification-${randomUUID()}`;
       const env = {
         ...buildIntegrationEnv(),
@@ -998,9 +1198,17 @@ function assertion(
     });
 
     it('[WI-2986] rejects a correctly signed token without its durable redemption receipt', async () => {
-      const adult = await seedIdentity('adult-missing-receipt', 40);
-      const learner = await seedIdentity('learner-missing-receipt', 14);
-      const issuedAt = new Date();
+      const adult = await seedIdentity(
+        'adult-missing-receipt',
+        40,
+        ROUTE_AS_OF,
+      );
+      const learner = await seedIdentity(
+        'learner-missing-receipt',
+        14,
+        ROUTE_AS_OF,
+      );
+      const issuedAt = ROUTE_AS_OF;
       const token = signGuardianAuthorityToken(
         assertion(adult.personId, learner.personId, learner.organizationId, {
           issuedAt,
@@ -1041,9 +1249,17 @@ function assertion(
     });
 
     it('requires a fresh organization-specific HTTP ceremony after an org move', async () => {
-      const adult = await seedIdentity('adult-route-org-move', 40);
-      const learner = await seedIdentity('learner-route-org-move', 14);
-      const destination = await seedIdentity('route-destination-org', 40);
+      const adult = await seedIdentity('adult-route-org-move', 40, ROUTE_AS_OF);
+      const learner = await seedIdentity(
+        'learner-route-org-move',
+        14,
+        ROUTE_AS_OF,
+      );
+      const destination = await seedIdentity(
+        'route-destination-org',
+        40,
+        ROUTE_AS_OF,
+      );
       const env = {
         ...buildIntegrationEnv(),
         DATABASE_URL: process.env.DATABASE_URL!,
@@ -1103,8 +1319,12 @@ function assertion(
     });
 
     it('fails closed at the authenticated initiation route for a denied VPC result', async () => {
-      const adult = await seedIdentity('adult-route-denied', 40);
-      const learner = await seedIdentity('learner-route-denied', 14);
+      const adult = await seedIdentity('adult-route-denied', 40, ROUTE_AS_OF);
+      const learner = await seedIdentity(
+        'learner-route-denied',
+        14,
+        ROUTE_AS_OF,
+      );
       const env = {
         ...buildIntegrationEnv(),
         DATABASE_URL: process.env.DATABASE_URL!,
@@ -1139,6 +1359,53 @@ function assertion(
           where: eq(consentGrant.chargePersonId, learner.personId),
         }),
       ).resolves.toEqual([]);
+    });
+
+    it('reports guardian-authority server configuration gaps as unavailable', async () => {
+      const adult = await seedIdentity('adult-route-config', 40, ROUTE_AS_OF);
+      const learner = await seedIdentity(
+        'learner-route-config',
+        14,
+        ROUTE_AS_OF,
+      );
+      const headers = buildAuthHeaders(
+        { sub: adult.clerkUserId, email: adult.email },
+        adult.personId,
+      );
+
+      const initiation = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            verificationHandle: `verification-${randomUUID()}`,
+          }),
+        },
+        {
+          ...buildIntegrationEnv(),
+          DATABASE_URL: process.env.DATABASE_URL!,
+        },
+      );
+      const attachment = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            authorityToken: 'not-a-token',
+          }),
+        },
+        {
+          ...buildIntegrationEnv(),
+          DATABASE_URL: process.env.DATABASE_URL!,
+        },
+      );
+
+      expect(initiation.status).toBe(503);
+      expect(attachment.status).toBe(503);
     });
   },
 );

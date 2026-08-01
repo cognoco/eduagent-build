@@ -8,14 +8,19 @@ import {
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   GUARDIAN_AUTHORITY_MAX_TTL_MS,
+  guardianQualificationSchema,
   guardianAuthorityTokenDigest,
   signGuardianAuthorityToken,
   verifyGuardianAuthorityToken,
 } from './guardian-attachment-token';
 import {
+  attachGuardianConsentForCredentialedLearner,
   GuardianAttachmentRejectedError,
   resolveGuardianAttachmentContext,
 } from './guardian-attachment';
+import { captureMessage } from '../sentry';
+
+const GUARDIAN_VERIFIER_TIMEOUT_MS = 10_000;
 
 const guardianAuthorityVerifierResponseSchema = z
   .object({
@@ -28,17 +33,7 @@ const guardianAuthorityVerifierResponseSchema = z
     assuranceLevel: z.literal('VPC_VERIFIED'),
     assuranceMethod: z.string().trim().min(1),
     evidenceId: z.string().trim().min(1),
-    qualification: z.enum([
-      'biological_parent',
-      'adoptive_parent',
-      'stepparent',
-      'grandparent',
-      'court_appointed_guardian',
-      'foster_parent',
-      'kinship_caregiver',
-      'sibling_with_custody',
-      'other',
-    ]),
+    qualification: guardianQualificationSchema,
     learnerAssentAt: z.string().datetime().nullable(),
   })
   .strict();
@@ -52,6 +47,13 @@ export interface GuardianAuthorityInitiationInput {
   tokenSecret: string;
   now?: Date;
   fetchImpl?: typeof fetch;
+}
+
+export class GuardianVerifierUnavailableError extends Error {
+  constructor() {
+    super('Guardian authority verification is temporarily unavailable.');
+    this.name = 'GuardianVerifierUnavailableError';
+  }
 }
 
 function verifierHandleDigest(handle: string, secret: string): string {
@@ -97,7 +99,12 @@ async function rejectReservation(
   db: Database,
   reservationId: string,
   now: Date,
+  reason: string,
 ): Promise<never> {
+  captureMessage('identity.guardian_authority_verification_rejected', {
+    level: 'warning',
+    tags: { reason },
+  });
   await db
     .update(guardianAuthorityRedemptions)
     .set({ status: 'rejected', updatedAt: now })
@@ -108,6 +115,26 @@ async function rejectReservation(
       ),
     );
   throw new GuardianAttachmentRejectedError();
+}
+
+async function releaseRetryableReservation(
+  db: Database,
+  reservationId: string,
+  reason: string,
+): Promise<never> {
+  captureMessage('identity.guardian_authority_verifier_unavailable', {
+    level: 'warning',
+    tags: { reason },
+  });
+  await db
+    .delete(guardianAuthorityRedemptions)
+    .where(
+      and(
+        eq(guardianAuthorityRedemptions.id, reservationId),
+        eq(guardianAuthorityRedemptions.status, 'redeeming'),
+      ),
+    );
+  throw new GuardianVerifierUnavailableError();
 }
 
 /**
@@ -252,10 +279,9 @@ export async function initiateGuardianAuthorityVerification(
         policyVersion: existing.policyVersion,
         assuranceMethod: existing.assuranceMethod,
         evidenceId: existing.evidenceId,
-        qualification:
-          guardianAuthorityVerifierResponseSchema.shape.qualification.parse(
-            existing.qualification,
-          ),
+        qualification: guardianQualificationSchema.parse(
+          existing.qualification,
+        ),
         decision: 'approved',
         learnerAssentAt: existing.learnerAssentAt,
         issuedAt: existing.issuedAt,
@@ -280,6 +306,7 @@ export async function initiateGuardianAuthorityVerification(
   try {
     response = await (input.fetchImpl ?? fetch)(input.verifierUrl, {
       method: 'POST',
+      signal: AbortSignal.timeout(GUARDIAN_VERIFIER_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${input.verifierKey}`,
         'Content-Type': 'application/json',
@@ -298,10 +325,14 @@ export async function initiateGuardianAuthorityVerification(
       }),
     });
   } catch {
-    return rejectReservation(db, reservation.id, now);
+    return releaseRetryableReservation(db, reservation.id, 'transport_failure');
   }
   if (!response.ok) {
-    return rejectReservation(db, reservation.id, now);
+    return releaseRetryableReservation(
+      db,
+      reservation.id,
+      `http_${response.status}`,
+    );
   }
 
   let verified: z.infer<typeof guardianAuthorityVerifierResponseSchema>;
@@ -310,20 +341,28 @@ export async function initiateGuardianAuthorityVerification(
       await response.json(),
     );
   } catch {
-    return rejectReservation(db, reservation.id, now);
+    return releaseRetryableReservation(
+      db,
+      reservation.id,
+      'malformed_response',
+    );
   }
 
+  if (verified.decision === 'pending') {
+    return releaseRetryableReservation(db, reservation.id, 'pending');
+  }
   if (
-    verified.decision !== 'approved' ||
+    verified.decision === 'denied' ||
     verified.guardianPersonId !== input.callerPersonId ||
     verified.chargePersonId !== input.chargePersonId ||
     verified.organizationId !== context.organizationId ||
     verified.jurisdiction !== context.jurisdiction ||
     verified.policyVersion !== context.policyVersion ||
     (context.authorizationForm === 'joint_child_guardian' &&
-      !verified.learnerAssentAt)
+      (!verified.learnerAssentAt ||
+        new Date(verified.learnerAssentAt).getTime() > now.getTime()))
   ) {
-    return rejectReservation(db, reservation.id, now);
+    return rejectReservation(db, reservation.id, now, 'denied_or_mismatched');
   }
 
   const assertion = {
@@ -375,4 +414,30 @@ export async function initiateGuardianAuthorityVerification(
   }
 
   return { authorityToken };
+}
+
+/**
+ * Keeps durable token verification and attachment authorization inside the
+ * service boundary; routes supply only authenticated identity and parsed input.
+ */
+export async function attachGuardianConsentFromDurableAuthorityToken(
+  db: Database,
+  input: {
+    callerPersonId: string;
+    chargePersonId: string;
+    authorityToken: string;
+    tokenSecret: string;
+  },
+) {
+  const authority = await verifyDurableGuardianAuthorityToken(
+    db,
+    input.authorityToken,
+    input.tokenSecret,
+  );
+  if (!authority) throw new GuardianAttachmentRejectedError();
+  return attachGuardianConsentForCredentialedLearner(db, {
+    callerPersonId: input.callerPersonId,
+    chargePersonId: input.chargePersonId,
+    authority,
+  });
 }

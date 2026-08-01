@@ -33,3 +33,16 @@ The green integration matrix covers ordinary success, exact response-loss
 recovery, concurrent duplicate redemption across two database connections,
 mutated learner-tuple replay, provider success followed by missing local
 persistence, and a correctly signed token without a durable receipt.
+
+## REVIEW REGRESSION — 2026-08-01
+
+RED command: `pnpm exec jest --config apps/api/jest.integration.config.cjs --runTestsByPath apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts --runInBand --no-coverage`
+
+The added same-handle transport-recovery test failed because the first transient
+provider error left a terminal rejected receipt; the retry was refused before a
+second provider call. The route-classification regression also proved missing
+server bindings returned HTTP 403 instead of service-unavailable.
+
+GREEN: the same isolated PostgreSQL suite passed 18/18 after undecided failures
+began releasing the still-redeeming reservation, provider calls gained a hard
+deadline and structured outcome events, and configuration gaps became HTTP 503.

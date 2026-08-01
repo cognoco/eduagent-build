@@ -47,7 +47,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "Fresh verification is green: token/config API unit 100/100; mobile hook 3/3 and callback 1/1; real-PostgreSQL integration 10/10; API/schema/mobile typechecks; prepush; hardcoded-JSX ratchet; targeted changed-file lint with zero findings; repository-wide lint with zero errors and only its pre-existing warning baseline.",
+      "description": "Fresh verification is green: token/config API unit 100/100; mobile hook 3/3 and callback 1/1; real-PostgreSQL integration 18/18 including retryable verifier recovery, joint assent, configuration classification, exact advisory-lock observation and wall-clock-safe route fixtures; API/schema/mobile typechecks; prepush; hardcoded-JSX ratchet; targeted changed-file lint with zero findings; repository-wide lint with zero errors and only its pre-existing warning baseline.",
       "pointer": "pnpm prepush"
     }
   ],

@@ -70,13 +70,11 @@ import {
   createSlidingWindowRateLimiter,
   resolveRateLimitIp,
 } from '../services/rate-limit';
+import { GuardianAttachmentRejectedError } from '../services/identity-v2/guardian-attachment';
 import {
-  attachGuardianConsentForCredentialedLearner,
-  GuardianAttachmentRejectedError,
-} from '../services/identity-v2/guardian-attachment';
-import {
+  attachGuardianConsentFromDurableAuthorityToken,
+  GuardianVerifierUnavailableError,
   initiateGuardianAuthorityVerification,
-  verifyDurableGuardianAuthorityToken,
 } from '../services/identity-v2/guardian-attachment-verifier';
 
 // [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
@@ -118,6 +116,21 @@ const consentRespondLimiter = createSlidingWindowRateLimiter({
   max: CONSENT_RESPOND_RATE_LIMIT_MAX,
   maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
 });
+
+const guardianAttachmentLimiter = createSlidingWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
+});
+
+function guardianAttachmentRateLimited(c: Context<ConsentRouteEnv>): boolean {
+  return guardianAttachmentLimiter.isLimited(
+    resolveRateLimitIp(
+      c.req.header('cf-connecting-ip'),
+      c.req.header('x-forwarded-for'),
+    ),
+  );
+}
 
 export function __resetConsentRespondRateLimit(): void {
   consentRespondLimiter.reset();
@@ -217,14 +230,27 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     '/consent/guardian-attachment/initiate',
     zValidator('json', guardianAttachmentInitiationRequestSchema),
     async (c) => {
+      if (guardianAttachmentRateLimited(c)) {
+        return apiError(
+          c,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Too many guardian verification attempts. Please try again later.',
+        );
+      }
       const callerPersonId = c.get('callerPersonId');
       const tokenSecret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
       const verifierUrl = c.env.GUARDIAN_AUTHORITY_VERIFIER_URL;
       const verifierKey = c.env.GUARDIAN_AUTHORITY_VERIFIER_KEY;
-      if (!callerPersonId || !tokenSecret || !verifierUrl || !verifierKey) {
-        return forbidden(
+      if (!callerPersonId) {
+        return unauthorized(c, 'No identity is provisioned for this login.');
+      }
+      if (!tokenSecret || !verifierUrl || !verifierKey) {
+        return apiError(
           c,
-          'Guardian authority is not valid for this learner.',
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Guardian authority verification is not configured.',
         );
       }
 
@@ -232,8 +258,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         const result = await initiateGuardianAuthorityVerification(
           c.get('db'),
           {
-            callerPersonId,
             ...c.req.valid('json'),
+            callerPersonId,
             verifierUrl,
             verifierKey,
             tokenSecret,
@@ -247,6 +273,14 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             'Guardian authority is not valid for this learner.',
           );
         }
+        if (error instanceof GuardianVerifierUnavailableError) {
+          return apiError(
+            c,
+            503,
+            ERROR_CODES.SERVICE_UNAVAILABLE,
+            error.message,
+          );
+        }
         throw error;
       }
     },
@@ -255,35 +289,37 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     '/consent/guardian-attachment',
     zValidator('json', guardianAttachmentRequestSchema),
     async (c) => {
+      if (guardianAttachmentRateLimited(c)) {
+        return apiError(
+          c,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Too many guardian verification attempts. Please try again later.',
+        );
+      }
       const callerPersonId = c.get('callerPersonId');
       const secret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
       const input = c.req.valid('json');
-      if (!callerPersonId || !secret) {
-        return forbidden(
-          c,
-          'Guardian authority is not valid for this learner.',
-        );
+      if (!callerPersonId) {
+        return unauthorized(c, 'No identity is provisioned for this login.');
       }
-
-      const authority = await verifyDurableGuardianAuthorityToken(
-        c.get('db'),
-        input.authorityToken,
-        secret,
-      );
-      if (!authority) {
-        return forbidden(
+      if (!secret) {
+        return apiError(
           c,
-          'Guardian authority is not valid for this learner.',
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Guardian authority verification is not configured.',
         );
       }
 
       try {
-        const result = await attachGuardianConsentForCredentialedLearner(
+        const result = await attachGuardianConsentFromDurableAuthorityToken(
           c.get('db'),
           {
             callerPersonId,
             chargePersonId: input.chargePersonId,
-            authority,
+            authorityToken: input.authorityToken,
+            tokenSecret: secret,
           },
         );
         return c.json(guardianAttachmentResultSchema.parse(result));
