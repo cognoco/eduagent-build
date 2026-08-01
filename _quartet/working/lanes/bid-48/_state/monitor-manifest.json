@@ -6,25 +6,25 @@
       "target": "BID-48 live Brief, membership relation, Status, and gates",
       "purpose": "detect membership drift, new authority gates, and batch-state changes",
       "command": "Notion fetch/query of BID-48 and its Work Items; direct data-source REST query when connector query quota is exhausted",
-      "task-id": "exec-session:54394"
+      "task-id": "thread-goal:root-direct-poll"
     },
     {
       "target": "BID-48 Work Item claims and lifecycle state",
       "purpose": "detect expired claims, review bounces, and ordinary lifecycle work",
       "command": "Cosmo execute fetch plus live Work Item relation query (connector or authenticated REST fallback)",
-      "task-id": "exec-session:54394"
+      "task-id": "thread-goal:root-direct-poll"
     },
     {
-      "target": "Every PR referenced by a non-Closed BID-48 member, currently including eduagent-build #2715/#2718/#2733/#2741 and the WI-2755 finalization anomaly #2746; checks, reviews, merge state, and origin/main",
+      "target": "Every PR referenced by a non-Closed BID-48 member, currently including eduagent-build #2715/#2718/#2733/#2741/#2746/#2789; checks, reviews, merge state, and origin/main",
       "purpose": "enforce strict-green landing and landed completion evidence",
       "command": "gh PR/check/review queries and git fetch/rev-parse",
-      "task-id": "exec-session:70842"
+      "task-id": "thread-goal:root-direct-poll"
     },
     {
       "target": "cosmo-reviewer-watch.service and Reviewing BID-48 members",
       "purpose": "detect independent-review pickup, source-artifact outcomes, bounces, and Close",
       "command": "systemd journal plus direct Cosmo Work Item state queries",
-      "task-id": "exec-session:60481"
+      "task-id": "thread-goal:root-direct-poll"
     },
     {
       "target": "external WI-2718 / WI-2725 and eduagent-build PR #2581",
