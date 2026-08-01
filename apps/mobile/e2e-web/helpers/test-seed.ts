@@ -1,4 +1,5 @@
 import { apiBaseUrl, buildTestSeedHeaders, seedEmailPrefix } from './runtime';
+import { alignPlaywrightClerkSecret } from './clerk-secret-identity';
 import type {
   OwnerJourneyPhase,
   OwnerJourneyPhaseDiagnostics,
@@ -20,6 +21,7 @@ export interface ResetResponse {
   message: string;
   deletedCount: number;
   clerkUsersDeleted: number;
+  clerkUsersSelected?: number;
 }
 
 // [BUG-532] Retry config for external seed-service resilience.
@@ -31,6 +33,10 @@ const RETRY_BASE_DELAY_MS = 1_500;
 const RETRYABLE_STATUSES = new Set([403, 429, 502, 503]);
 const CLERK_LOOKUP_MAX_ATTEMPTS = 10;
 const CLERK_LOOKUP_DELAY_MS = 750;
+// The Worker performs one list plus marker/bypass/delete requests per user.
+// Keep this in sync with apps/api/src/services/test-seed.ts.
+const MAX_WORKER_CLEANUP_BATCH_SIZE = 15;
+const MAX_WORKER_CLEANUP_BATCHES = 20;
 
 interface ClerkUser {
   id: string;
@@ -181,23 +187,42 @@ export async function resetSeededAccounts(
     url.searchParams.set('prefix', prefix);
   }
 
-  const response = await fetchWithRetry(
-    url,
-    {
-      method: 'POST',
-      headers: buildTestSeedHeaders(),
-    },
-    'Resetting seeded accounts',
-  );
+  let deletedCount = 0;
+  let clerkUsersDeleted = 0;
+  for (let batch = 1; batch <= MAX_WORKER_CLEANUP_BATCHES; batch++) {
+    const response = await fetchWithRetry(
+      url,
+      {
+        method: 'POST',
+        headers: buildTestSeedHeaders(),
+      },
+      `Resetting seeded accounts (batch ${batch})`,
+    );
+    const result = await readJsonOrThrow<ResetResponse>(
+      response,
+      `Resetting seeded accounts (batch ${batch})`,
+    );
+    deletedCount += result.deletedCount;
+    clerkUsersDeleted += result.clerkUsersDeleted;
 
-  return readJsonOrThrow<ResetResponse>(response, 'Resetting seeded accounts');
+    if (
+      (result.clerkUsersSelected ?? result.clerkUsersDeleted) <
+      MAX_WORKER_CLEANUP_BATCH_SIZE
+    ) {
+      return { ...result, deletedCount, clerkUsersDeleted };
+    }
+  }
+
+  throw new Error(
+    `Resetting seeded accounts exceeded ${MAX_WORKER_CLEANUP_BATCHES} Clerk cleanup batches for prefix ${prefix}`,
+  );
 }
 
 async function verifySeededClerkEmail(
   email: string,
   diagnostics?: OwnerJourneyPhaseDiagnostics,
 ): Promise<void> {
-  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  const clerkSecretKey = alignPlaywrightClerkSecret(process.env);
   if (!clerkSecretKey) return;
 
   const emailAddressId = await findSeededClerkEmailAddressId(

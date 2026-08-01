@@ -28,6 +28,7 @@ import {
   readLlmRequestKillSwitch,
 } from './request-context';
 import { recordLlmFallbackRateSample } from '../llm-fallback-rate-signal';
+import { filterLearnerAuthoredMessagesForEgress } from '../learner-egress-filter';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
@@ -678,7 +679,7 @@ const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
  * (§10.1 — under-18 ban, and the judge role never wants Gemini regardless of
  * age). Order matters: Anthropic first, OpenAI second (spec + WI-2624).
  */
-const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
+export const JUDGE_VENDOR_ORDER: ReadonlyArray<'anthropic' | 'openai'> = [
   'anthropic',
   'openai',
 ];
@@ -708,7 +709,7 @@ function normalizeVendorForExclusion(vendor: string): string {
  * returns an empty array from a single exclusion — the pool has 2 members
  * and a producer can match at most 1.
  */
-function resolveJudgeEligibleVendors(
+export function resolveJudgeEligibleVendors(
   independence: JudgeIndependence | undefined,
 ): ReadonlyArray<'anthropic' | 'openai'> {
   if (independence?.mode !== 'model-output') return JUDGE_VENDOR_ORDER;
@@ -1775,10 +1776,12 @@ export async function routeAndCall(
     _options && _options.capability === 'judge'
       ? _options.judgeIndependence
       : undefined;
-  const safeMessages = withSafetyPreamble(messages, _options?.ageBracket, {
-    conversationLanguage: _options?.conversationLanguage,
-    pronouns: _options?.pronouns,
-  });
+  const providerMessages = filterLearnerAuthoredMessagesForEgress(
+    withSafetyPreamble(messages, _options?.ageBracket, {
+      conversationLanguage: _options?.conversationLanguage,
+      pronouns: _options?.pronouns,
+    }),
+  );
   const config = {
     ...getModelConfig(
       rung,
@@ -1807,7 +1810,7 @@ export async function routeAndCall(
     const start = Date.now();
     try {
       const raw = await withRetry(
-        () => provider.chat(safeMessages, config, _options?.signal),
+        () => provider.chat(providerMessages, config, _options?.signal),
         config.provider,
         MAX_RETRIES,
         _options?.signal,
@@ -1899,7 +1902,7 @@ export async function routeAndCall(
         capability,
         flow: _options?.flow,
       });
-      return attemptProvider(fallbackConfig, safeMessages, rung, {
+      return attemptProvider(fallbackConfig, providerMessages, rung, {
         capability,
         conversationLanguage: _options?.conversationLanguage,
         flow: _options?.flow,
@@ -1937,7 +1940,7 @@ export async function routeAndCall(
       capability,
       flow: _options?.flow,
     });
-    return attemptProvider(fallbackConfig, safeMessages, rung, {
+    return attemptProvider(fallbackConfig, providerMessages, rung, {
       capability,
       conversationLanguage: _options?.conversationLanguage,
       flow: _options?.flow,
@@ -2307,10 +2310,12 @@ export async function routeAndStream(
     });
   }
   const capability = getMessageCapability(messages);
-  const safeMessages = withSafetyPreamble(messages, options?.ageBracket, {
-    conversationLanguage: options?.conversationLanguage,
-    pronouns: options?.pronouns,
-  });
+  const providerMessages = filterLearnerAuthoredMessagesForEgress(
+    withSafetyPreamble(messages, options?.ageBracket, {
+      conversationLanguage: options?.conversationLanguage,
+      pronouns: options?.pronouns,
+    }),
+  );
   const config = {
     ...getModelConfig(
       rung,
@@ -2357,7 +2362,7 @@ export async function routeAndStream(
       resolveUsage = resolve;
     });
     const primaryResult = normalizeStreamResult(
-      provider.chatStream(safeMessages, config),
+      provider.chatStream(providerMessages, config),
     );
     const stream = wrapStreamWithCircuitBreaker(
       primaryResult.stream,
@@ -2367,7 +2372,7 @@ export async function routeAndStream(
       primaryResult.stopReasonPromise,
       primaryResult.usagePromise ?? Promise.resolve(undefined),
       fallbackConfig,
-      safeMessages,
+      providerMessages,
       {
         conversationLanguage: options?.conversationLanguage,
         flow: options?.flow,
@@ -2454,7 +2459,7 @@ export async function routeAndStream(
       capability,
       flow: options?.flow,
     });
-    return attemptStreamProvider(fallbackConfig, safeMessages, rung, {
+    return attemptStreamProvider(fallbackConfig, providerMessages, rung, {
       capability,
       conversationLanguage: options?.conversationLanguage,
       flow: options?.flow,

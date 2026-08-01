@@ -86,6 +86,61 @@ describe('armJ01AccountReadiness', () => {
     }
   });
 
+  it('retains the first visible phase across later visible and unknown phases', async () => {
+    jest.useFakeTimers();
+    try {
+      const state = pageWith({
+        pathname: '/sign-in?redirectTo=%2Fmore&ticket=secret',
+        visibleTestIds: ['sign-in-email'],
+      });
+      const observation = armJ01AccountReadiness(state.page);
+
+      await jest.advanceTimersByTimeAsync(250);
+      state.setReadinessState({
+        pathname: '/more?ticket=secret',
+        visibleTestIds: ['profile-loading'],
+      });
+      await jest.advanceTimersByTimeAsync(250);
+      state.setReadinessState({ pathname: '/more?ticket=secret' });
+
+      await expect(observation.failureMessage(60_000)).resolves.toBe(
+        '[J-01 account-readiness:auth-redirect] account-avatar-shell remained absent within 60000ms; committedPath=/more; profiles=not-requested',
+      );
+
+      observation.dispose();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reports the first observed phase even when a later non-unknown phase remains visible at timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      const state = pageWith({
+        pathname: '/sign-in?redirectTo=%2Fmore&ticket=secret',
+        visibleTestIds: ['sign-in-email'],
+      });
+      const observation = armJ01AccountReadiness(state.page);
+
+      await jest.advanceTimersByTimeAsync(250);
+      state.setReadinessState({
+        pathname: '/more?ticket=secret',
+        visibleTestIds: ['profile-loading'],
+      });
+      await jest.advanceTimersByTimeAsync(250);
+      // profile-loading remains visible at timeout — this is the realistic
+      // later-phase-still-visible case; the first phase must not be discarded.
+
+      await expect(observation.failureMessage(60_000)).resolves.toBe(
+        '[J-01 account-readiness:auth-redirect->profile-loading] account-avatar-shell remained absent within 60000ms; committedPath=/more; profiles=not-requested',
+      );
+
+      observation.dispose();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('distinguishes profile-pending from auth-redirect when the avatar is absent in both', async () => {
     const profilePending = pageWith({
       pathname: '/more?private=value',

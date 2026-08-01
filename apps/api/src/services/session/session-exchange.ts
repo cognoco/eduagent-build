@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   assessments,
   learningSessions,
+  person,
   sessionEvents,
   sessionSummaries,
   retentionCards,
@@ -153,7 +154,7 @@ import {
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { safeSend, safeWrite } from '../safe-non-core';
-import * as learningTextGuard from '../persisted-learning-text-guard';
+import { evaluateLearningTextFields } from '../learning-text-safety/gate';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -269,9 +270,21 @@ const logger = createLogger();
 // `startMentorNoticeRecheck` keeps handing that same dead session back. See
 // `detachMentorNoticeRecheckAttempt` (offer.ts) for the full argument.
 //
-// Malformed or unavailable judgment at the cap is the ONE case that still
-// terminalizes `not_yet` (AC-4), because there no valid verdict was ever
-// obtained — nothing to preserve for a later attempt.
+// What still terminalizes `not_yet` at the cap (AC-4) is an UNRESOLVED
+// evaluation — `evaluation.kind === 'unresolved'`, the discriminant the switch
+// below actually branches on. The rationale is the discriminant's meaning, not a
+// list of causes: unresolved means no valid verdict was ever obtained, so there
+// is nothing to preserve for a later attempt.
+//
+// Deliberately NOT enumerated. This comment previously said "malformed or
+// unavailable judgment … is the ONE case", which was untrue of the code beneath
+// it: `recheck-judge.ts` reaches `UNRESOLVED` from SEVEN sites, and two of them
+// are neither malformed nor unavailable — an answer event the server cannot find
+// (`answer_event_missing`), and a verdict whose reason does not match its
+// outcome (`mismatched_pair`). Merged canon (WI-2623, 23441a032) states the
+// unresolved set is explicitly not closed by any illustrative list, so naming
+// members here would drift from canon the moment a site is added. Branch on the
+// discriminant; read `recheck-judge.ts` for the current causes.
 // ---------------------------------------------------------------------------
 
 /**
@@ -1092,6 +1105,44 @@ async function persistChallengeRoundReviewTargets(
     decision.reviewTargets.map((target) => [target.concept, target]),
   );
 
+  // [WI-2628] Gate every review target's `misconception` HERE, above the
+  // transaction. The gate can make an LLM round-trip (the independent judge), and
+  // an LLM call inside an open transaction pins a pooled connection for its whole
+  // duration — a connection-exhaustion hazard under load. The text is already
+  // known from `decision.reviewTargets`, so nothing forces the evaluation inside.
+  // One batch, so N targets cost at most one judge call per distinct text.
+  //
+  // DERIVED WRITE — unsafe data is DROPPED (the field is written null), never
+  // raised, which is the AC-5 asymmetry and matches exactly what the English-only
+  // guard did at these two sites.
+  const misconceptionGate = await evaluateLearningTextFields({
+    // Not loaded on this path; the gate then scans all ten attribution grammars
+    // and keeps the strictest verdict. Never `'en'` — that is the bug being fixed.
+    conversationLanguage: undefined,
+    provenance: 'llm',
+    // Not reachable here. AC-4: a missing producer fails closed to block/unclear
+    // rather than referring the text to the judge.
+    producerVendor: null,
+    sessionId: session.id,
+    fields: [...targetsByConcept.values()].map((target) => ({
+      key: target.concept,
+      fieldKind: 'needs_deepening' as const,
+      text: target.misconception,
+    })),
+  });
+  /**
+   * Null when the gate refused the value. `isSafe` fails closed on a concept the
+   * batch never evaluated, so a target added to the loop without being added to
+   * the batch above drops its misconception rather than persisting it ungated.
+   */
+  const safeMisconception = (target: {
+    concept: string;
+    misconception?: string | null;
+  }): string | null =>
+    misconceptionGate.isSafe(target.concept)
+      ? (target.misconception ?? null)
+      : null;
+
   // [WI-1060] Read existing rows + the per-target update/insert loop run in one
   // transaction. Each review target is a separate update-or-insert; a crash
   // mid-loop would persist some weak concepts as deepening targets and drop
@@ -1126,10 +1177,7 @@ async function persistChallengeRoundReviewTargets(
         await txDb
           .update(needsDeepeningTopics)
           .set({
-            misconception:
-              learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-                target.misconception,
-              ),
+            misconception: safeMisconception(target),
             correction: target.correction,
             ...(existing.status === 'pending_review'
               ? { pendingExpiresAt }
@@ -1153,10 +1201,7 @@ async function persistChallengeRoundReviewTargets(
         status: 'pending_review',
         source: 'challenge_round',
         concept: target.concept,
-        misconception:
-          learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-            target.misconception,
-          ),
+        misconception: safeMisconception(target),
         correction: target.correction,
         pendingExpiresAt,
         updatedAt: now,
@@ -2647,6 +2692,23 @@ export async function prepareExchangeContext(
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
     throw new NotFoundError('Session');
+  }
+
+  // [WI-1556] The mobile first-Mentor gate is UX, not authority: older
+  // installed clients can call this boundary directly. The session lookup
+  // above already binds sessionId to this exact profileId, and route-level
+  // assertNotProxyMode still proves caller write authority. Fail closed on a
+  // missing Person or confirmation before any state mutation or LLM dispatch.
+  if (session.exchangeCount === 0) {
+    const confirmedPerson = await db.query.person.findFirst({
+      columns: { conversationLanguageConfirmedAt: true },
+      where: eq(person.id, profileId),
+    });
+    if (!confirmedPerson?.conversationLanguageConfirmedAt) {
+      throw new ConflictError(
+        'Confirm your conversation language before your first Mentor exchange.',
+      );
+    }
   }
 
   const sessionMeta = ((session.metadata as
@@ -4480,6 +4542,11 @@ export async function processMessage(
         session,
         signal: result.noticedGap,
         isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+        // [WI-2628] The SAME `result` produced `noticedGap`, so `result.provider`
+        // is genuinely the producer of this copy — the same value passed as
+        // `tutorVendor` to the re-check judge below. Threading it lets the gate
+        // refer ambiguous copy to an independent judge instead of failing closed.
+        producerVendor: result.provider,
       })) ?? undefined;
   }
 
@@ -5128,6 +5195,11 @@ export async function streamMessage(
             session,
             signal: parsed.noticedGap,
             isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+            // [WI-2628] `parsed` is the parsed envelope of the SAME `result`
+            // whose `.provider` is recorded throughout this block (and passed as
+            // `tutorVendor` to the re-check judge below), so this is genuinely
+            // the vendor that produced `noticedGap` — not a guess.
+            producerVendor: result.provider,
           })) ?? undefined;
       }
 

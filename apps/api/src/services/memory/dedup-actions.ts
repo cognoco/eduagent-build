@@ -8,7 +8,10 @@ import {
 } from '@eduagent/database';
 
 import { normalizeMemoryValue } from '../learner-profile';
-import * as learningTextGuard from '../persisted-learning-text-guard';
+import {
+  isContentSafe,
+  type LearningTextGateResult,
+} from '../learning-text-safety/gate';
 import type { DedupResponse } from './dedup-prompt';
 
 type DedupActionDb = Pick<Database, 'delete' | 'insert' | 'update'>;
@@ -62,6 +65,19 @@ export interface ApplyDedupActionArgs {
   action: DedupResponse;
   candidate: MemoryFactRow;
   neighbour: MemoryFactRow;
+  /**
+   * [WI-2628] Content-addressed decisions for the candidate merge text,
+   * pre-computed by the caller BEFORE it opened the transaction this function
+   * runs in — the gate can make an LLM round-trip and must never do so with a
+   * pooled connection held.
+   *
+   * REQUIRED, deliberately not optional. An optional gate would let a caller
+   * omit it and silently persist ungated merge text; the type makes the
+   * evaluation a precondition of calling at all. A merge text absent from the
+   * batch resolves unsafe, so passing a stale or unrelated gate fails closed
+   * rather than opening a hole.
+   */
+  learningTextGate: LearningTextGateResult;
 }
 
 function maxConfidence(
@@ -154,11 +170,18 @@ export async function applyDedupAction(
   if (offendingTokens.length > 0) {
     return { kind: 'merge_rejected_new_content', offendingTokens };
   }
-  if (
-    learningTextGuard.scrubClinicalInferenceFromLearningRecord(
-      action.merged_text,
-    ) === null
-  ) {
+  // [WI-2628] The shared multilingual gate, consumed as a PRE-COMPUTED decision.
+  // This function runs inside the CALLER's transaction (`dedup-pass.ts` opens it),
+  // and the gate can make an LLM round-trip to the independent judge — holding a
+  // pooled connection across one is a connection-exhaustion hazard. So the caller
+  // evaluates `merged_text` before opening the transaction and hands the result in.
+  //
+  // The lookup is CONTENT-ADDRESSED: `isContentSafe` hashes the exact string, so a
+  // decision cannot be misapplied to different text, and a string the batch never
+  // evaluated returns false. The outcome kind is unchanged, so the caller's
+  // handling of a rejected merge is untouched — only the gate behind it changed,
+  // from an English-only regex to the ten-language gate.
+  if (!isContentSafe(args.learningTextGate, action.merged_text)) {
     return { kind: 'merge_rejected_clinical_inference' };
   }
 

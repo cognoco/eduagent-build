@@ -36,6 +36,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: DB dependency injection, no real DB in unit test environment
 
 const mockRouteAndCall = jest.fn();
+const allowLlmConsent = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
@@ -46,6 +47,7 @@ jest.mock('./llm', () => {
 });
 
 import { generateRecallBridge } from './recall-bridge';
+import { ConsentWithdrawnError } from './identity-v2/consent-errors';
 
 // generateRecallBridge now uses db.select().from().innerJoin()…limit() for the
 // topic lookup (parent-chain join — BUG-354 fix). Wire mockTopicFindFirst
@@ -113,7 +115,9 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     expect(result.topicId).toBe('topic-001');
     expect(result.topicTitle).toBe('Quadratic Equations');
@@ -122,6 +126,9 @@ describe('generateRecallBridge', () => {
   });
 
   it('returns empty questions when session has no topic', async () => {
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
     mockFindFirst.mockResolvedValue({
       id: SESSION_ID,
       profileId: PROFILE_ID,
@@ -132,24 +139,36 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent },
+    });
 
     expect(result.questions).toEqual([]);
     expect(result.topicId).toBe('');
+    expect(assertLlmConsent).not.toHaveBeenCalled();
     expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
   it('returns empty questions when session is not found', async () => {
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
     mockFindFirst.mockResolvedValue(null);
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent },
+    });
 
     expect(result.questions).toEqual([]);
+    expect(assertLlmConsent).not.toHaveBeenCalled();
     expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
   it('returns empty questions when topic is not found in DB', async () => {
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
     mockFindFirst.mockResolvedValue({
       id: SESSION_ID,
       profileId: PROFILE_ID,
@@ -162,10 +181,42 @@ describe('generateRecallBridge', () => {
     mockTopicFindFirst.mockResolvedValue(null);
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent },
+    });
 
     expect(result.questions).toEqual([]);
     expect(result.topicId).toBe('topic-deleted');
+    expect(assertLlmConsent).not.toHaveBeenCalled();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it('rejects before recall-question dispatch when consent is withdrawn', async () => {
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+    mockFindFirst.mockResolvedValue({
+      id: SESSION_ID,
+      profileId: PROFILE_ID,
+      subjectId: 'subject-001',
+      topicId: 'topic-001',
+      sessionType: 'homework',
+      status: 'active',
+    });
+    mockTopicFindFirst.mockResolvedValue({
+      id: 'topic-001',
+      title: 'Algebra',
+      description: 'Basic algebra',
+    });
+
+    const db = createMockDb();
+    await expect(
+      generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+        deps: { assertLlmConsent },
+      }),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
     expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
@@ -193,7 +244,9 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     expect(result.questions).toHaveLength(2);
   });
@@ -222,7 +275,9 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     expect(result.questions).toHaveLength(2);
     expect(result.questions[0]).toBe('What is a variable?');
@@ -253,7 +308,9 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     expect(result.topicId).toBe('topic-001');
     expect(result.topicTitle).toBe('Quadratic Equations');
@@ -284,7 +341,9 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     const messages = mockRouteAndCall.mock.calls[0][0];
     const systemMessage = messages.find(
@@ -318,7 +377,9 @@ describe('generateRecallBridge', () => {
     });
 
     const db = createMockDb();
-    await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     // Second argument to routeAndCall is the rung; third is options
     expect(mockRouteAndCall).toHaveBeenCalledWith(

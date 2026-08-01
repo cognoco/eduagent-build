@@ -20,6 +20,7 @@ import {
   setProxyMode,
 } from './api-client';
 import { formatApiError } from './format-api-error';
+import { clearNavigationTransitionProvenance } from './navigation-transition-provenance';
 
 export type { Profile };
 
@@ -267,6 +268,16 @@ export function ProfileProvider({
   const [isExplicitProxyMode, setIsExplicitProxyMode] = useState(false);
   const [isRestoringProxyMode, setIsRestoringProxyMode] = useState(true);
 
+  // Navigation ancestry is account/profile-scoped even though its short-lived
+  // proof is kept in a module singleton. Never let that proof survive the
+  // provider boundary.
+  useEffect(
+    () => () => {
+      clearNavigationTransitionProvenance();
+    },
+    [],
+  );
+
   // On mount: restore saved profile ID from SecureStore
   useEffect(() => {
     const restore = async () => {
@@ -326,6 +337,7 @@ export function ProfileProvider({
       const owner =
         profiles.find((p) => p.isOwner) ??
         (profiles[0] as (typeof profiles)[number]);
+      clearNavigationTransitionProvenance();
       setActiveProfileId(owner.id);
       void SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, owner.id).catch(() => {
         /* non-fatal — in-memory activeProfileId is already set above */
@@ -389,6 +401,7 @@ export function ProfileProvider({
           error: formatApiError(err),
         };
       }
+      clearNavigationTransitionProvenance();
       let persistenceFailed = false;
       try {
         await SecureStore.setItemAsync(ACTIVE_PROFILE_KEY, profileId);

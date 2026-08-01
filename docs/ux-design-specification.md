@@ -391,6 +391,8 @@ Components use semantic class names throughout (`bg-background`, `text-primary`,
 
 > **Implementation note (2026-05-23):** The per-persona named exports above (`teenTheme`, `adultTheme`, `parentTheme`) were not carried forward. The shipped implementation uses `tokens: Record<'light' | 'dark', ThemeTokens>` in `apps/mobile/src/lib/design-tokens.ts` — a two-scheme (light/dark) token map with five accent presets (teal/electric/hotpink/emerald/amber). NativeWind CSS variable injection via `vars()` is applied in `(app)/_layout.tsx`. The semantic class contract described here (e.g., `bg-background`, `text-primary`) is correctly implemented.
 
+> **Correction (2026-07-30) to the note above:** the two-scheme light/dark token map is accurate; **"with five accent presets" overstates what ships.** Those presets are residual machinery from an accent-selection capability that was deliberately removed rather than shipped: no current surface offers the choice, so on a fresh installation the fixed teal-and-lavender palette is what renders. The machinery is not fully inert, though — the theme layer still reads a per-profile stored selection from device storage, so an installation upgraded from a build that offered the picker may still have one applied. Treat it as legacy awaiting cleanup rather than a feature: nothing may be built against it, and removing it requires clearing the persisted keys rather than deleting the code alone. Rationale drafted at [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md) (`Status: Proposed`).
+
 ### Semantic Design Token Set
 
 _Every persona theme MUST define every token. No gaps, no fallbacks. This is the contract._
@@ -525,6 +527,12 @@ This triangle is both positioning and a feature evaluation framework. For every 
 
 ## Visual Design Foundation
 
+> **DRIFT NOTICE — this section does not describe what the product ships.** The shipped implementation applies a single fixed palette (teal primary, lavender secondary) to every user, varying only between light and dark colour schemes: see `apps/mobile/src/lib/design-tokens.ts`. There are no per-persona moods and no persona-specific expression of a hue family. The persona attribute this system depended on was removed from the data model and shared components are deliberately persona-unaware, so this direction has no input to run on.
+>
+> **Do not build from this section** — not because a newer document outranks it, but because the code it describes does not exist. Retained in full as history: it records a direction genuinely considered and not taken.
+>
+> The durable record of *why* is drafted at [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md), which is **`Status: Proposed` and awaiting human Architecture sign-off**. Until that sign-off it is not canon and does not supersede this section as a matter of governance — this notice records observed drift against shipped code, which stands on its own. When the ADR is accepted, the supersession becomes formal.
+
 ### Visual Design Philosophy
 
 **Structure is the brand. Color is the mood.** Typography, spacing, component shapes, logo placement, and animation style are consistent across all three personas. Color palette and information density are what shift. A parent glancing at their child's screen should instantly recognize it as the same product, just tuned differently.
@@ -599,6 +607,8 @@ The grid stays consistent. What changes per persona is internal padding and whit
 - **Motion**: Respect reduced-motion preferences. Animations should enhance, not distract.
 
 ## Design Direction Decision
+
+> **DRIFT NOTICE — this section summarises the per-persona direction, not the shipped one.** Every row below that varies a value by persona (overall approach, the three per-persona moods, persona-specific accent saturation/tone, per-persona density) describes behaviour the product does not implement: it ships one fixed teal-and-lavender palette for all users, varying only by light/dark scheme. The rows that are persona-invariant — Inter typography on a consistent scale, and shared component shapes and structure — still hold. Retained as history. The drafted rationale is [`MMT-ADR-0051`](adr/MMT-ADR-0051-one-fixed-brand-palette-varying-only-by-colour-scheme.md), `Status: Proposed`, not yet canon.
 
 ### Chosen Direction
 
@@ -1133,7 +1143,8 @@ A mentor notice is a quiet, learner-only acknowledgement that the Mentor recorde
 
 | State | Primary action | Secondary behavior |
 |---|---|---|
-| Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses | `Not now` defers until the next learning day, measured from local 04:00 in the learner's IANA time zone |
+| Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses; if the learner is still unclear at the cap, that attempt simply ends and the notice may be offered again later | `Not now` defers until the next learning day, measured from local 04:00 in the learner's IANA time zone; an invalid or unavailable zone uses the same 04:00 boundary and civil date in UTC |
+| Re-check evaluation unresolved at the cap | End the current offer as `not_yet` with encouraging copy | Only an unresolved evaluation at the third response ends the offer this way — for example judging that is unavailable or malformed; never a valid continue |
 | Independent server judge commits `locked_in` | Show concise acknowledgement from the committed server transition | The tutor's prose never self-certifies understanding; do not inflate into a diagnosis or expose it to a proxy viewer |
 | Independent server judge commits `not_yet` | End the current offer with encouraging copy | Do not claim mastery; a later notice requires new evidence |
 | Learner explicitly asks to stop | Dismiss terminally | Do not resurface the record |

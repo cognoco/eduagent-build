@@ -5,9 +5,23 @@ import {
   usePreventRemove,
   type NavigationAction,
 } from '@react-navigation/native';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  MENTOR_RETURN_TO,
+  SUBJECT_HUB_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../lib/navigation';
+import { consumeHubToSessionTransition } from '../../../lib/navigation-transition-provenance';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
@@ -446,13 +460,78 @@ function SessionScreenInner() {
     setMentorReturnReady(false);
     setPendingMentorReturn(true);
   }, []);
+  const subjectHubTransitionProofCandidate =
+    returnTo === SUBJECT_HUB_RETURN_TO ? returnId : undefined;
+  const subjectsTransitionId =
+    returnTo === SUBJECTS_RETURN_TO
+      ? subjectId
+      : returnTo === SUBJECT_HUB_RETURN_TO &&
+          typeof subjectId === 'string' &&
+          typeof rawReturnId === 'string' &&
+          subjectId === returnId
+        ? subjectId
+        : undefined;
+  const subjectsTransitionProofCandidate =
+    returnTo === SUBJECTS_RETURN_TO
+      ? subjectsTransitionId
+      : subjectHubTransitionProofCandidate;
+  const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
+    string | undefined
+  >();
+  useEffect(() => {
+    const hasTransitionProof = subjectsTransitionProofCandidate
+      ? consumeHubToSessionTransition(subjectsTransitionProofCandidate)
+      : false;
+    // Promote the one-shot transition proof into this mounted route's state.
+    // A same-screen transcript retry keeps that exact predecessor without
+    // making the token reusable by a later, unrelated navigation.
+    if (
+      subjectsTransitionId &&
+      subjectsTransitionProofCandidate === subjectsTransitionId &&
+      hasTransitionProof
+    ) {
+      setSubjectsPredecessorId(subjectsTransitionId);
+      return;
+    }
+    setSubjectsPredecessorId((current) =>
+      current === subjectsTransitionId ? current : undefined,
+    );
+  }, [subjectsTransitionId, subjectsTransitionProofCandidate]);
+  const hasSubjectsPredecessor =
+    !!subjectsTransitionId && subjectsPredecessorId === subjectsTransitionId;
+  const [subjectsReturnReady, setSubjectsReturnReady] = useState(false);
+  const shouldGuardSubjectsRemoval =
+    hasSubjectsPredecessor && Platform.OS !== 'web' && !subjectsReturnReady;
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android' || !shouldGuardSubjectsRemoval) {
+        return undefined;
+      }
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          // Android's device Back reaches BackHandler before this Expo Router
+          // stack emits a prevent-remove action. Consume it here, then let the
+          // existing guarded replacement restore the proven owning route.
+          setSubjectsReturnReady(true);
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, [shouldGuardSubjectsRemoval]),
+  );
   usePreventRemove(
-    returnTo === MENTOR_RETURN_TO &&
-      !mentorReturnReady &&
+    ((returnTo === MENTOR_RETURN_TO && !mentorReturnReady) ||
+      shouldGuardSubjectsRemoval) &&
       deferredRemovalAction === null,
     ({ data: { action } }) => {
       if (action.type !== 'GO_BACK' && action.type !== 'POP') {
         setDeferredRemovalAction(action);
+        return;
+      }
+      if (shouldGuardSubjectsRemoval) {
+        setSubjectsReturnReady(true);
         return;
       }
       startMentorReturn();
@@ -463,6 +542,11 @@ function SessionScreenInner() {
     navigation.dispatch(deferredRemovalAction);
     setDeferredRemovalAction(null);
   }, [deferredRemovalAction, navigation]);
+  useEffect(() => {
+    if (!subjectsReturnReady) return;
+    router.replace(homeBackHref as Href);
+    setSubjectsReturnReady(false);
+  }, [homeBackHref, router, subjectsReturnReady]);
   useEffect(() => {
     if (!pendingMentorReturn) return;
 
@@ -527,6 +611,8 @@ function SessionScreenInner() {
         startMentorReturn();
         return;
       }
+      // A named destination without consumed runtime provenance is only a
+      // deterministic replacement fallback, never permission to pop history.
       router.replace(homeBackHref as Href);
       return;
     }
@@ -793,16 +879,22 @@ function SessionScreenInner() {
     isV2MentorEntry && effectiveMode === 'freeform' && rawInput?.trim().length
       ? rawInput
       : undefined;
-  const mentorOpenerAlreadyPersisted = !!(
-    mentorOpenerText &&
-    liveTranscript?.exchanges.some(
-      (exchange, index, exchanges) =>
-        exchange.role === 'user' &&
-        exchange.content === mentorOpenerText &&
-        exchanges[index + 1]?.role === 'assistant' &&
-        !exchanges[index + 1]?.isSystemPrompt,
-    )
-  );
+  const mentorOpenerPersistedPairCount = mentorOpenerText
+    ? (liveTranscript?.exchanges.filter(
+        (exchange, index, exchanges) =>
+          exchange.role === 'user' &&
+          exchange.content === mentorOpenerText &&
+          exchanges[index + 1]?.role === 'assistant' &&
+          !exchanges[index + 1]?.isSystemPrompt,
+      ).length ?? 0)
+    : 0;
+  const mentorOpenerPersistedLearnerTurnCount = mentorOpenerText
+    ? (liveTranscript?.exchanges.filter(
+        (exchange) =>
+          exchange.role === 'user' && exchange.content === mentorOpenerText,
+      ).length ?? 0)
+    : 0;
+  const mentorOpenerAlreadyPersisted = mentorOpenerPersistedPairCount > 0;
 
   // Auto-resume the latest active/paused session when the user re-enters a
   // learning topic (e.g. tapping "Continue learning" on the topic screen,
@@ -2025,6 +2117,20 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            {isE2EBuild &&
+            mentorOpenerPersistedPairCount === 1 &&
+            mentorOpenerPersistedLearnerTurnCount === 1 ? (
+              <View
+                testID="mentor-opener-persisted-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            {isE2EBuild && mentorOpenerPersistedLearnerTurnCount > 1 ? (
+              <View
+                testID="mentor-opener-persisted-more-than-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
             {exactManualHomeworkSessionAssociated ? (
               <View
                 testID="homework-session-associated-once"
@@ -2071,8 +2177,7 @@ function SessionScreenInner() {
               profileId={activeProfile?.id}
             />
             <SessionFooter
-              router={router}
-              homeHref={homeBackHref}
+              onHomeBack={handleHomeBack}
               sessionExpired={sessionExpired}
               notePromptOffered={notePromptOffered}
               showNoteInput={showNoteInput}

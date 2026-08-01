@@ -55,12 +55,15 @@ function normalizeExpression(value: unknown): string {
 }
 
 describe('API co-located integration routing', () => {
-  it('maps the root API integration script to the co-located API integration target', () => {
+  it('maps the root API integration script through the guarded launcher', () => {
     const pkg = readJson<PackageJson>('package.json');
     const command = pkg.scripts?.['test:api:integration'] ?? '';
 
-    expect(command).toContain('api:integration-api');
+    expect(command).toBe('node scripts/run-api-integration.mjs');
     expect(command).not.toContain('apps/api/jest.config.cjs');
+    expect(pkg.scripts?.['test:api:integration:ci']).toBe(
+      'node scripts/run-api-integration.mjs --nx',
+    );
   });
 
   it('keeps the cross-package target and exposes an unambiguous API co-located target', () => {
@@ -70,10 +73,35 @@ describe('API co-located integration routing', () => {
     expect(targets['test:integration']?.options?.command).toContain(
       'tests/integration/jest.config.cjs',
     );
-    expect(targets['integration-api']?.options?.command).toContain(
-      'apps/api/jest.integration.config.cjs',
+    expect(targets['integration-api']?.options?.command).toBe(
+      'node scripts/run-api-integration.mjs --jest',
     );
     expect(targets['test-integration']).toBeUndefined();
+  });
+
+  it('documents targeted API integration through the pnpm lifecycle', () => {
+    const runbook = readFileSync(
+      join(repoRoot, 'docs/runbooks/local-db-testing.md'),
+      'utf8',
+    );
+
+    expect(runbook).toContain(
+      'pnpm run test:api:integration --jest apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage',
+    );
+    expect(runbook).not.toContain(
+      'node scripts/run-api-integration.mjs --jest apps/api/src/services/auth-scoping.integration.test.ts',
+    );
+  });
+
+  it('documents the canonical CI lifecycle command', () => {
+    const instructions = readFileSync(join(repoRoot, 'AGENTS.md'), 'utf8');
+
+    expect(instructions).toContain(
+      'the API co-located suite is `pnpm run test:api:integration:ci`',
+    );
+    expect(instructions).not.toContain(
+      'the API co-located suite is `pnpm exec nx run api:integration-api`',
+    );
   });
 
   it('runs cross-package and API co-located integration suites serially under the same CI router condition', () => {
@@ -90,7 +118,7 @@ describe('API co-located integration routing', () => {
     const coLocatedStep = steps[coLocatedIndex]!;
 
     expect(crossPackageStep.run).toBe('pnpm exec nx run api:test:integration');
-    expect(coLocatedStep.run).toBe('pnpm exec nx run api:integration-api');
+    expect(coLocatedStep.run).toBe('pnpm run test:api:integration:ci');
     expect(normalizeExpression(coLocatedStep.if)).toBe(
       normalizeExpression(crossPackageStep.if),
     );
@@ -105,7 +133,7 @@ describe('API co-located integration routing', () => {
       'API co-located integration tests (flag-ON, apps/api/src)',
     );
 
-    expect(steps[index]?.run).toBe('pnpm exec nx run api:integration-api');
+    expect(steps[index]?.run).toBe('pnpm run test:api:integration:ci');
   });
 
   it('wires the API co-located Jest config into the quarantine registry', () => {

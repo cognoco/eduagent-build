@@ -30,6 +30,9 @@ import {
   persistNarrowTopics,
   deleteTopicIfSafe,
   deleteBook,
+  ensureCurriculum,
+  getLatestCurriculum,
+  getLatestCurricula,
 } from './curriculum';
 import type {
   CurriculumInput,
@@ -40,10 +43,16 @@ import type {
   BookTopicGenerationResult,
   BookWithTopics,
 } from '@eduagent/schemas';
-import { asc } from 'drizzle-orm';
-import { subjects as subjectTable, type Database } from '@eduagent/database';
+import { asc, desc } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import {
+  curricula,
+  subjects as subjectTable,
+  type Database,
+} from '@eduagent/database';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { ConsentWithdrawnError } from './session';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const PROFILE_ID = 'test-profile-id';
@@ -226,10 +235,68 @@ function mockTopicRow(
   };
 }
 
+type LatestCurriculumJoinRow = {
+  curricula: ReturnType<typeof mockCurriculumRow>;
+  subjects: ReturnType<typeof mockSubjectRow>;
+};
+
+function createLatestCurriculaQuery(rows: LatestCurriculumJoinRow[]) {
+  let whereQuery = { sql: '', params: [] as unknown[] };
+  const orderBy = jest.fn().mockImplementation(async () => {
+    const values = new Set(
+      whereQuery.params.map((value) => String(value).toLowerCase()),
+    );
+    return rows
+      .filter(
+        (row) =>
+          values.has(row.curricula.subjectId.toLowerCase()) &&
+          values.has(row.subjects.profileId.toLowerCase()),
+      )
+      .sort((a, b) => b.curricula.version - a.curricula.version);
+  });
+  const where = jest.fn().mockImplementation((predicate: unknown) => {
+    whereQuery = new PgDialect().sqlToQuery(
+      (
+        predicate as {
+          getSQL: () => Parameters<PgDialect['sqlToQuery']>[0];
+        }
+      ).getSQL(),
+    );
+    return { orderBy };
+  });
+  const innerJoin = jest.fn().mockImplementation((table: unknown) => {
+    if (table !== subjectTable) {
+      throw new Error('Latest-curriculum fixture expected a subjects join');
+    }
+    return { where };
+  });
+  const from = jest.fn().mockImplementation((table: unknown) => {
+    if (table !== curricula) {
+      throw new Error('Latest-curriculum fixture expected curricula as root');
+    }
+    return { innerJoin };
+  });
+
+  return {
+    from,
+    innerJoin,
+    where,
+    orderBy,
+    getWhereQuery: () => whereQuery,
+  };
+}
+
 function mockLatestSessionSelect(
   rows: Array<{ metadata: unknown; rawInput: string | null }> = [],
+  latestCurriculumRows: LatestCurriculumJoinRow[] = [],
 ) {
+  const latestCurriculumQuery =
+    createLatestCurriculaQuery(latestCurriculumRows);
   return jest.fn((selection?: Record<string, unknown>) => {
+    if (selection === undefined) {
+      return { from: latestCurriculumQuery.from };
+    }
+
     const resultRows =
       selection && 'metadata' in selection && 'rawInput' in selection
         ? rows
@@ -274,6 +341,15 @@ function createMockDb({
   bookFindFirst = { id: BOOK_ID } as { id: string } | undefined,
   latestSessions = [] as Array<{ metadata: unknown; rawInput: string | null }>,
 } = {}): Database {
+  const latestCurriculumRows =
+    subjectFindFirst && curriculumFindFirst
+      ? [
+          {
+            curricula: curriculumFindFirst,
+            subjects: subjectFindFirst,
+          },
+        ]
+      : [];
   const db = {
     query: {
       subjects: {
@@ -315,7 +391,7 @@ function createMockDb({
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
     }),
-    select: mockLatestSessionSelect(latestSessions),
+    select: mockLatestSessionSelect(latestSessions, latestCurriculumRows),
     // Raw SQL execution used by batch CASE UPDATE [CR-2B.1]
     execute: jest.fn().mockResolvedValue(undefined),
     // transaction() executes the callback with the same mock as tx context
@@ -327,6 +403,212 @@ function createMockDb({
   } as unknown as Database;
   return db;
 }
+
+function createLatestCurriculaFixture(rows: LatestCurriculumJoinRow[]) {
+  const query = createLatestCurriculaQuery(rows);
+  const select = jest.fn().mockReturnValue({ from: query.from });
+
+  return {
+    db: { select } as unknown as Database,
+    select,
+    ...query,
+  };
+}
+
+function createDynamicLatestCurriculumSelect(
+  curriculumLoader: () => Promise<
+    ReturnType<typeof mockCurriculumRow> | undefined
+  >,
+  subjectLoader: () => Promise<ReturnType<typeof mockSubjectRow> | undefined>,
+) {
+  const orderBy = jest.fn().mockImplementation(async () => {
+    const [curriculum, subject] = await Promise.all([
+      curriculumLoader(),
+      subjectLoader(),
+    ]);
+    return curriculum && subject
+      ? [{ curricula: curriculum, subjects: subject }]
+      : [];
+  });
+  return {
+    from: jest.fn().mockReturnValue({
+      innerJoin: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({ orderBy }),
+      }),
+    }),
+  };
+}
+
+describe('latest curriculum accessors', () => {
+  it('returns the highest-version curriculum for an owned subject', async () => {
+    const older = mockCurriculumRow({ id: 'curriculum-v1', version: 1 });
+    const latest = mockCurriculumRow({ id: 'curriculum-v2', version: 2 });
+    const fixture = createLatestCurriculaFixture([
+      { curricula: older, subjects: mockSubjectRow() },
+      { curricula: latest, subjects: mockSubjectRow() },
+    ]);
+
+    const result = await getLatestCurriculum(
+      fixture.db,
+      PROFILE_ID,
+      SUBJECT_ID,
+    );
+
+    expect(result).toMatchObject({
+      id: 'curriculum-v2',
+      subjectId: SUBJECT_ID,
+      version: 2,
+    });
+    expect(fixture.select).toHaveBeenCalledWith();
+    expect(fixture.from).toHaveBeenCalledWith(curricula);
+    expect(fixture.innerJoin).toHaveBeenCalledWith(
+      subjectTable,
+      expect.anything(),
+    );
+    const whereQuery = fixture.getWhereQuery();
+    const whereValues = whereQuery.params.map((value) =>
+      String(value).toLowerCase(),
+    );
+    expect(whereValues).toEqual(
+      expect.arrayContaining([PROFILE_ID, SUBJECT_ID]),
+    );
+    expect(whereQuery.sql).toContain('"curricula"."subject_id"');
+    expect(whereQuery.sql).toContain('"subjects"."profile_id"');
+    expect(fixture.orderBy).toHaveBeenCalledWith(desc(curricula.version));
+  });
+
+  it('does not return a foreign-profile curriculum from the single-subject accessor', async () => {
+    const foreignSubjectId = 'foreign-subject';
+    const foreignProfileId = 'foreign-profile';
+    const fixture = createLatestCurriculaFixture([
+      {
+        curricula: mockCurriculumRow({
+          id: 'foreign-curriculum',
+          subjectId: foreignSubjectId,
+          version: 99,
+        }),
+        subjects: mockSubjectRow({
+          id: foreignSubjectId,
+          profileId: foreignProfileId,
+        }),
+      },
+    ]);
+
+    const result = await getLatestCurriculum(
+      fixture.db,
+      PROFILE_ID,
+      foreignSubjectId,
+    );
+
+    expect(result).toBeUndefined();
+    const whereValues = fixture
+      .getWhereQuery()
+      .params.map((value) => String(value).toLowerCase());
+    expect(whereValues).toEqual(
+      expect.arrayContaining([PROFILE_ID, foreignSubjectId]),
+    );
+    expect(whereValues).not.toContain(foreignProfileId);
+  });
+
+  it('excludes foreign-profile rows and selects each owned latest version in a bounded multi-subject lookup', async () => {
+    const secondSubjectId = 'subject-2';
+    const foreignSubjectId = 'foreign-subject';
+    const fixture = createLatestCurriculaFixture([
+      {
+        curricula: mockCurriculumRow({
+          id: 'subject-1-v1',
+          subjectId: SUBJECT_ID,
+          version: 1,
+        }),
+        subjects: mockSubjectRow(),
+      },
+      {
+        curricula: mockCurriculumRow({
+          id: 'subject-1-v2',
+          subjectId: SUBJECT_ID,
+          version: 2,
+        }),
+        subjects: mockSubjectRow(),
+      },
+      {
+        curricula: mockCurriculumRow({
+          id: 'subject-2-v3',
+          subjectId: secondSubjectId,
+          version: 3,
+        }),
+        subjects: mockSubjectRow({ id: secondSubjectId }),
+      },
+      {
+        curricula: mockCurriculumRow({
+          id: 'foreign-v100',
+          subjectId: foreignSubjectId,
+          version: 100,
+        }),
+        subjects: mockSubjectRow({
+          id: foreignSubjectId,
+          profileId: 'foreign-profile',
+        }),
+      },
+    ]);
+
+    const result = await getLatestCurricula(fixture.db, PROFILE_ID, [
+      SUBJECT_ID,
+      secondSubjectId,
+      foreignSubjectId,
+    ]);
+
+    expect([...result.entries()]).toEqual([
+      [
+        secondSubjectId,
+        expect.objectContaining({ id: 'subject-2-v3', version: 3 }),
+      ],
+      [SUBJECT_ID, expect.objectContaining({ id: 'subject-1-v2', version: 2 })],
+    ]);
+    expect(result.has(foreignSubjectId)).toBe(false);
+    const whereValues = fixture
+      .getWhereQuery()
+      .params.map((value) => String(value).toLowerCase());
+    expect(whereValues).toEqual(
+      expect.arrayContaining([
+        PROFILE_ID,
+        SUBJECT_ID,
+        secondSubjectId,
+        foreignSubjectId,
+      ]),
+    );
+  });
+
+  it('returns an empty map without querying for an empty subject list', async () => {
+    const fixture = createLatestCurriculaFixture([]);
+
+    const result = await getLatestCurricula(fixture.db, PROFILE_ID, []);
+
+    expect(result).toEqual(new Map());
+    expect(fixture.select).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty map without querying for an empty profile list', async () => {
+    const fixture = createLatestCurriculaFixture([]);
+
+    const result = await getLatestCurricula(fixture.db, [], [SUBJECT_ID]);
+
+    expect(result).toEqual(new Map());
+    expect(fixture.select).not.toHaveBeenCalled();
+  });
+
+  it('rejects more than 100 unique subjects without querying', async () => {
+    const fixture = createLatestCurriculaFixture([]);
+    const subjectIds = Array.from(
+      { length: 101 },
+      (_, index) => `subject-${index}`,
+    );
+
+    await expect(
+      getLatestCurricula(fixture.db, PROFILE_ID, subjectIds),
+    ).rejects.toThrow('Latest curriculum lookup accepts at most 100 subjects');
+    expect(fixture.select).not.toHaveBeenCalled();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // generateCurriculum tests (existing — LLM-based)
@@ -797,7 +1079,10 @@ describe('challengeCurriculum', () => {
           }),
         }),
       }),
-      select: mockLatestSessionSelect(),
+      select: mockLatestSessionSelect(
+        [],
+        [{ curricula: newCurriculum, subjects: mockSubjectRow() }],
+      ),
       transaction: jest
         .fn()
         .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
@@ -1365,6 +1650,11 @@ describe('persistBookTopics', () => {
         onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       };
     });
+    const insertSelect = jest.fn().mockReturnValue({
+      onConflictDoNothing: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([]),
+      }),
+    });
 
     const db = {
       query: {
@@ -1392,14 +1682,23 @@ describe('persistBookTopics', () => {
       }),
       insert: jest.fn().mockReturnValue({
         values: insertValues,
+        select: insertSelect,
       }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-          innerJoin: jest.fn().mockReturnValue({
+      select: jest.fn((selection?: Record<string, unknown>) => {
+        if (selection === undefined) {
+          return createDynamicLatestCurriculumSelect(
+            curriculaFindFirst,
+            subjectsFindFirst,
+          );
+        }
+        return {
+          from: jest.fn().mockReturnValue({
             where: jest.fn().mockResolvedValue([]),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
           }),
-        }),
+        };
       }),
       transaction: jest
         .fn()
@@ -1417,6 +1716,18 @@ describe('persistBookTopics', () => {
     await expect(
       persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, []),
     ).rejects.toThrow('Subject not found');
+  });
+
+  it('does not create a curriculum when the subject is missing', async () => {
+    const db = createPersistMockDb({
+      subjectExists: false,
+      curriculumExists: false,
+    });
+
+    await expect(ensureCurriculum(db, PROFILE_ID, SUBJECT_ID)).rejects.toThrow(
+      'Subject not found',
+    );
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundError when book does not exist', async () => {
@@ -1661,7 +1972,7 @@ describe('persistBookTopics', () => {
       const db = createPersistMockDb({ curriculumExists: false });
       // Override curricula.findFirst to return null first, then a row
       (db.query.curricula.findFirst as jest.Mock)
-        .mockResolvedValueOnce(undefined) // getLatestCurriculumRow first call
+        .mockResolvedValueOnce(undefined) // getLatestCurriculum first call
         .mockResolvedValueOnce(mockCurriculumRow()) // re-read after onConflictDoNothing
         .mockResolvedValue(mockCurriculumRow()); // subsequent calls from getBookWithTopics
 
@@ -1932,25 +2243,33 @@ describe('getBooks (BUG-884)', () => {
           findMany: jest.fn().mockResolvedValue([]),
         },
       },
-      select: jest.fn((selection?: Record<string, unknown>) => ({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockImplementation((arg: unknown) => {
-            capturedWhereCalls.push(arg);
-            return Promise.resolve(selectRowsFor(selection));
-          }),
-          innerJoin: jest.fn().mockReturnValue({
+      select: jest.fn((selection?: Record<string, unknown>) => {
+        if (selection === undefined) {
+          return createDynamicLatestCurriculumSelect(
+            async () => opts.curriculumFindFirst,
+            async () => opts.subject,
+          );
+        }
+        return {
+          from: jest.fn().mockReturnValue({
             where: jest.fn().mockImplementation((arg: unknown) => {
               capturedWhereCalls.push(arg);
               return Promise.resolve(selectRowsFor(selection));
             }),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockImplementation((arg: unknown) => {
+                capturedWhereCalls.push(arg);
+                return Promise.resolve(selectRowsFor(selection));
+              }),
+            }),
+            // computeBookStatusesBatch also issues db.select chains. Stub a
+            // generic resolution so the call doesn't throw.
+            leftJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
           }),
-          // computeBookStatusesBatch also issues db.select chains. Stub a
-          // generic resolution so the call doesn't throw.
-          leftJoin: jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([]),
-          }),
-        }),
-      })),
+        };
+      }),
     } as unknown as Database;
     return { db, capturedWhereCalls };
   }
@@ -2579,6 +2898,9 @@ describe('repairIncompleteBookGenerationClaim', () => {
         {
           generateBookTopics,
           captureException: jest.fn(),
+          assertLlmConsent: jest
+            .fn()
+            .mockRejectedValue(new ConsentWithdrawnError()),
         },
       );
 
@@ -2620,6 +2942,7 @@ describe('repairIncompleteBookGenerationClaim', () => {
         .mockResolvedValue([
           { claimedAt: new Date('2026-01-01T00:00:00.000Z') },
         ]);
+      const curriculum = mockCurriculumRow({ id: 'curriculum-1' });
       return {
         update: jest.fn(() => ({
           set: jest.fn(() => ({
@@ -2631,12 +2954,18 @@ describe('repairIncompleteBookGenerationClaim', () => {
             findFirst: jest.fn().mockResolvedValue({ birthDate: '1990-01-01' }),
           },
           curricula: {
-            findFirst: jest.fn().mockResolvedValue({ id: 'curriculum-1' }),
+            findFirst: jest.fn().mockResolvedValue(curriculum),
           },
           curriculumTopics: {
             findFirst: jest.fn().mockResolvedValue(undefined),
           },
         },
+        select: jest.fn().mockImplementation(() =>
+          createDynamicLatestCurriculumSelect(
+            async () => curriculum,
+            async () => mockSubjectRow(),
+          ),
+        ),
       } as unknown as Database;
     }
 
@@ -2655,6 +2984,7 @@ describe('repairIncompleteBookGenerationClaim', () => {
             {
               generateBookTopics: genSpy,
               captureException: jest.fn(),
+              assertLlmConsent: jest.fn().mockResolvedValue(undefined),
             },
           ),
         ).rejects.toBeDefined();
@@ -3080,12 +3410,14 @@ describe('expandExistingBookTopics', () => {
       { ...mockTopicRow({ id: 't4', title: 'New Topic 4', sortOrder: 4 }) },
       { ...mockTopicRow({ id: 't5', title: 'New Topic 5', sortOrder: 5 }) },
     ];
+    const subjectRow = mockSubjectRow();
+    const curriculumRow = mockCurriculumRow();
 
     const db = {
       query: {
-        subjects: { findFirst: jest.fn().mockResolvedValue(mockSubjectRow()) },
+        subjects: { findFirst: jest.fn().mockResolvedValue(subjectRow) },
         curricula: {
-          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+          findFirst: jest.fn().mockResolvedValue(curriculumRow),
         },
         curriculumBooks: {
           findFirst: jest
@@ -3116,13 +3448,21 @@ describe('expandExistingBookTopics', () => {
           onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         }),
       }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-          innerJoin: jest.fn().mockReturnValue({
+      select: jest.fn((selection?: Record<string, unknown>) => {
+        if (selection === undefined) {
+          return createDynamicLatestCurriculumSelect(
+            async () => curriculumRow,
+            async () => subjectRow,
+          );
+        }
+        return {
+          from: jest.fn().mockReturnValue({
             where: jest.fn().mockResolvedValue([]),
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            }),
           }),
-        }),
+        };
       }),
       transaction: jest
         .fn()
@@ -3224,7 +3564,12 @@ describe('expandExistingBookTopics', () => {
       BOOK_ID,
       existingBook(),
       'I already know about pyramids',
-      { learnerAge: 12, generateBookTopics, captureException },
+      {
+        learnerAge: 12,
+        generateBookTopics,
+        captureException,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+      },
     );
 
     // Generator called with book title, description, learner age, and a
@@ -3265,7 +3610,12 @@ describe('expandExistingBookTopics', () => {
       BOOK_ID,
       existingBook(),
       undefined,
-      { learnerAge: 12, generateBookTopics, captureException },
+      {
+        learnerAge: 12,
+        generateBookTopics,
+        captureException,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+      },
     );
 
     expect(generateBookTopics).toHaveBeenCalledTimes(1);
@@ -3302,7 +3652,12 @@ describe('expandExistingBookTopics', () => {
       BOOK_ID,
       bare,
       undefined,
-      { learnerAge: 14, generateBookTopics, captureException },
+      {
+        learnerAge: 14,
+        generateBookTopics,
+        captureException,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+      },
     );
 
     expect(generateBookTopics).toHaveBeenCalledTimes(1);
@@ -3366,6 +3721,8 @@ describe('generateBookTopicsWithFallback', () => {
     };
 
     const result = await generateBookTopicsWithFallback(
+      {} as Database,
+      PROFILE_ID,
       'Ancient Egypt',
       'Explore pyramids',
       12,
@@ -3375,6 +3732,7 @@ describe('generateBookTopicsWithFallback', () => {
         captureException,
         buildFallbackBookTopics,
         sentryContext,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
       },
     );
 
@@ -3406,6 +3764,8 @@ describe('generateBookTopicsWithFallback', () => {
     };
 
     const result = await generateBookTopicsWithFallback(
+      {} as Database,
+      PROFILE_ID,
       'Ancient Egypt',
       'Explore pyramids',
       14,
@@ -3415,6 +3775,7 @@ describe('generateBookTopicsWithFallback', () => {
         captureException,
         buildFallbackBookTopics,
         sentryContext,
+        assertLlmConsent: jest.fn().mockResolvedValue(undefined),
       },
     );
 
@@ -3428,6 +3789,39 @@ describe('generateBookTopicsWithFallback', () => {
       'Explore pyramids',
     );
     expect(result).toEqual(fallbackOutput());
+  });
+
+  it('fails closed before generation and deterministic fallback when consent is withdrawn', async () => {
+    const db = {} as Database;
+    const generateBookTopics = jest.fn().mockResolvedValue(llmOutput());
+    const captureException = jest.fn();
+    const buildFallbackBookTopics = jest.fn(() => fallbackOutput());
+    const assertLlmConsent = jest
+      .fn()
+      .mockRejectedValue(new ConsentWithdrawnError());
+
+    await expect(
+      generateBookTopicsWithFallback(
+        db,
+        PROFILE_ID,
+        'Ancient Egypt',
+        'Explore pyramids',
+        12,
+        undefined,
+        {
+          generateBookTopics,
+          captureException,
+          buildFallbackBookTopics,
+          sentryContext: { profileId: PROFILE_ID },
+          assertLlmConsent,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConsentWithdrawnError);
+
+    expect(assertLlmConsent).toHaveBeenCalledWith(db, PROFILE_ID);
+    expect(generateBookTopics).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(buildFallbackBookTopics).not.toHaveBeenCalled();
   });
 });
 
@@ -3527,7 +3921,10 @@ describe('persistNarrowTopics orphan strip', () => {
   ];
 
   it('does not persist a narrow topic that restates the subject name', async () => {
-    const db = createMockDb({ curriculumFindFirst: mockCurriculumRow() });
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+    });
 
     await persistNarrowTopics(
       db,
@@ -3546,7 +3943,10 @@ describe('persistNarrowTopics orphan strip', () => {
   });
 
   it('persists every topic when none restates the subject name', async () => {
-    const db = createMockDb({ curriculumFindFirst: mockCurriculumRow() });
+    const db = createMockDb({
+      subjectFindFirst: mockSubjectRow(),
+      curriculumFindFirst: mockCurriculumRow(),
+    });
 
     await persistNarrowTopics(
       db,

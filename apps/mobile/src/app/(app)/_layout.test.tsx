@@ -9,6 +9,7 @@ import { Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import i18n from 'i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/expo';
 import {
@@ -27,6 +28,12 @@ import {
   fetchCallsMatching,
 } from '../../test-utils/mock-api-routes';
 import { tokens } from '../../lib/design-tokens';
+import {
+  FAMILY_INTENT_ONBOARDING_KEY,
+  FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+  __resetFamilyIntentOnboardingForTests,
+  startFamilyIntentOnboarding,
+} from '../../lib/family-intent-onboarding-state';
 
 const mockFetch = createRoutedMockFetch();
 
@@ -38,6 +45,7 @@ jest.mock(
 
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
+const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
@@ -114,7 +122,7 @@ jest.mock('expo-router', () => ({
   usePathname: () => mockUsePathname(),
   useGlobalSearchParams: () => mockUseGlobalSearchParams(),
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     replace: mockReplace,
     back: mockBack,
     canGoBack: mockCanGoBack,
@@ -366,7 +374,21 @@ describe('AppLayout', () => {
     });
   }
 
-  beforeEach(() => {
+  function expectFamilyIntentNavigatorBlocked() {
+    screen.getByTestId('tabs', { includeHiddenElements: true });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+    const shell = screen.getByTestId('app-navigator-shell', {
+      includeHiddenElements: true,
+    });
+    expect(shell.props.pointerEvents).toBe('none');
+    expect(shell.props.accessibilityElementsHidden).toBe(true);
+    expect(shell.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(shell.props.style).toEqual(
+      expect.objectContaining({ display: 'none', opacity: 0 }),
+    );
+  }
+
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
     testQueryClient = new QueryClient({
@@ -374,6 +396,7 @@ describe('AppLayout', () => {
     });
     clearPendingAuthRedirect();
     mockReplace.mockReset();
+    mockPush.mockReset();
     mockBack.mockReset();
     mockCanGoBack.mockReset();
     mockCanGoBack.mockReturnValue(false);
@@ -397,6 +420,8 @@ describe('AppLayout', () => {
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    __resetFamilyIntentOnboardingForTests();
+    await AsyncStorage.removeItem(FAMILY_INTENT_ONBOARDING_RECOVERY_KEY);
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -513,6 +538,354 @@ describe('AppLayout', () => {
           },
         ),
     );
+  });
+
+  it('[WI-2532] restores the pending family-intent learner choice after app relaunch', async () => {
+    jest
+      .spyOn(require('../../lib/preview-onboarding-state'), 'getPreviewState')
+      .mockResolvedValueOnce(null);
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(
+          key === FAMILY_INTENT_ONBOARDING_KEY
+            ? JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'login-choice',
+              })
+            : null,
+        ),
+    );
+
+    renderLayout();
+
+    await waitFor(
+      () => {
+        screen.getByTestId('family-intent-onboarding-gate');
+        screen.getByTestId('family-intent-login-yes');
+      },
+      { timeout: 10_000 },
+    );
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] restores the post-create recovery journal after the primary marker write failed', async () => {
+    await AsyncStorage.setItem(
+      FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
+      JSON.stringify({
+        version: 1,
+        profileId: 'p1',
+        step: 'learner-target',
+      }),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-target-me');
+      screen.getByTestId('family-intent-target-someone-else');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] reveals a retry-published family-intent marker in an already-active shell', async () => {
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('tabs');
+    });
+    expect(screen.queryByTestId('family-intent-onboarding-gate')).toBeNull();
+
+    await act(async () => {
+      await startFamilyIntentOnboarding('p1');
+    });
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-target-me');
+      screen.getByTestId('family-intent-target-someone-else');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
+  it('[WI-2532] preserves the requested tab navigator while an ordinary profile restore probe is pending', async () => {
+    mockUsePathname.mockReturnValue('/subjects');
+    let resolvePrimaryRead!: (value: null) => void;
+    const pendingPrimaryRead = new Promise<null>((resolve) => {
+      resolvePrimaryRead = resolve;
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? pendingPrimaryRead
+          : Promise.resolve(null),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-state-loading');
+    });
+    expectFamilyIntentNavigatorBlocked();
+
+    await act(async () => {
+      resolvePrimaryRead(null);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('family-intent-state-loading')).toBeNull();
+    });
+    screen.getByTestId('tabs');
+    screen.getByTestId('active-root-scene');
+    expect(screen.getByTestId('app-navigator-shell').props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
+  });
+
+  it('[WI-2532/WI-1556] resolves durable family intent before showing the first-Mentor language gate', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { PREVIEW_ONBOARDING_ENABLED: boolean };
+    };
+    const originalPreviewFlag = flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED;
+    flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = false;
+    const profileState = mockUseProfile();
+    const unconfirmedProfile = {
+      ...profileState.activeProfile,
+      isCurrentUser: true,
+      conversationLanguageConfirmed: false,
+    };
+    mockUseProfile.mockReturnValue({
+      ...profileState,
+      profiles: [
+        unconfirmedProfile,
+        ...profileState.profiles.filter(
+          (profile: { id: string }) => profile.id !== unconfirmedProfile.id,
+        ),
+      ],
+      activeProfile: unconfirmedProfile,
+    });
+
+    let resolvePrimaryRead!: (value: string) => void;
+    const pendingPrimaryRead = new Promise<string>((resolve) => {
+      resolvePrimaryRead = resolve;
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? pendingPrimaryRead
+          : Promise.resolve(null),
+    );
+
+    try {
+      renderLayout();
+
+      await waitFor(() => {
+        screen.getByTestId('family-intent-state-loading');
+      });
+      expect(screen.queryByTestId('first-mentor-language-gate')).toBeNull();
+      expectFamilyIntentNavigatorBlocked();
+
+      await act(async () => {
+        resolvePrimaryRead(
+          JSON.stringify({
+            version: 1,
+            profileId: 'p1',
+            step: 'learner-target',
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        screen.getByTestId('family-intent-onboarding-gate');
+      });
+      expect(screen.queryByTestId('first-mentor-language-gate')).toBeNull();
+    } finally {
+      flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = originalPreviewFlag;
+    }
+  });
+
+  it('[WI-2532] mounts the tab navigator before replaying a durable invitation destination', async () => {
+    mockPush.mockImplementationOnce(() => {
+      screen.getByTestId('tabs');
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(
+          key === FAMILY_INTENT_ONBOARDING_KEY
+            ? JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'opening-invitation',
+              })
+            : null,
+        ),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/link/initiate',
+        params: { target: 'existingTeen' },
+      });
+    });
+    screen.getByTestId('tabs');
+  });
+
+  it('[WI-2532/WI-1556] replays a durable invitation before gating an unconfirmed first-Mentor language', async () => {
+    const profileState = mockUseProfile();
+    const unconfirmedProfile = {
+      ...profileState.activeProfile,
+      isCurrentUser: true,
+      conversationLanguageConfirmed: false,
+    };
+    mockUseProfile.mockReturnValue({
+      ...profileState,
+      profiles: [
+        unconfirmedProfile,
+        ...profileState.profiles.filter(
+          (profile: { id: string }) => profile.id !== unconfirmedProfile.id,
+        ),
+      ],
+      activeProfile: unconfirmedProfile,
+    });
+    let invitationSawMountedTabs = false;
+    mockPush.mockImplementationOnce(() => {
+      invitationSawMountedTabs =
+        screen.queryByTestId('tabs', { includeHiddenElements: true }) !== null;
+    });
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        Promise.resolve(
+          key === FAMILY_INTENT_ONBOARDING_KEY
+            ? JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'opening-invitation',
+              })
+            : null,
+        ),
+    );
+
+    const view = renderLayout();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/link/initiate',
+        params: { target: 'existingTeen' },
+      });
+    });
+    expect(invitationSawMountedTabs).toBe(true);
+
+    mockUsePathname.mockReturnValue('/link/initiate');
+    view.rerender(<AppLayout />);
+
+    expect(screen.queryByTestId('first-mentor-language-gate')).toBeNull();
+    screen.getByTestId('tabs');
+  });
+
+  it('[WI-2532] fails closed and offers retry when the family-intent state read rejects', async () => {
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(null),
+    );
+
+    renderLayout();
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-restore-error');
+    });
+    expectFamilyIntentNavigatorBlocked();
+  });
+
+  it('[WI-2532] fails closed when the family-intent state read times out', async () => {
+    jest.useFakeTimers();
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) =>
+        key === FAMILY_INTENT_ONBOARDING_KEY
+          ? new Promise(() => undefined)
+          : Promise.resolve(null),
+    );
+
+    renderLayout();
+    await act(async () => {
+      jest.advanceTimersByTime(2_500);
+    });
+
+    screen.getByTestId('family-intent-restore-error');
+    expectFamilyIntentNavigatorBlocked();
+  });
+
+  it('[WI-2532] preserves the requested route when a failed restore retries to no pending intent', async () => {
+    mockUsePathname.mockReturnValue('/subjects');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    let familyReads = 0;
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) => {
+        if (key !== FAMILY_INTENT_ONBOARDING_KEY) return Promise.resolve(null);
+        familyReads += 1;
+        return familyReads === 1
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(null);
+      },
+    );
+
+    renderLayout();
+    await waitFor(() => {
+      screen.getByTestId('family-intent-restore-error');
+    });
+    expectFamilyIntentNavigatorBlocked();
+
+    fireEvent.press(screen.getByTestId('family-intent-restore-retry'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('family-intent-restore-error')).toBeNull();
+    });
+    screen.getByTestId('tabs');
+    screen.getByTestId('active-root-scene');
+    expect(screen.getByTestId('app-navigator-shell').props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
+  });
+
+  it('[WI-2532] retries a failed family-intent restore without exposing tabs first', async () => {
+    const SecureStoreMock = require('../../lib/secure-storage');
+    let familyReads = 0;
+    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) => {
+        if (key !== FAMILY_INTENT_ONBOARDING_KEY) return Promise.resolve(null);
+        familyReads += 1;
+        return familyReads === 1
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(
+              JSON.stringify({
+                version: 1,
+                profileId: 'p1',
+                step: 'login-choice',
+              }),
+            );
+      },
+    );
+
+    renderLayout();
+    await waitFor(() => {
+      screen.getByTestId('family-intent-restore-error');
+    });
+    expectFamilyIntentNavigatorBlocked();
+    fireEvent.press(screen.getByTestId('family-intent-restore-retry'));
+
+    await waitFor(() => {
+      screen.getByTestId('family-intent-login-yes');
+    });
+    expect(screen.queryByTestId('tabs')).toBeNull();
   });
 
   afterEach(() => {
@@ -2046,6 +2419,8 @@ describe('AppLayout no-profile gate — preview branch', () => {
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    __resetFamilyIntentOnboardingForTests();
+    await AsyncStorage.removeItem(FAMILY_INTENT_ONBOARDING_RECOVERY_KEY);
     // Also clear the in-memory preview state between tests.
     await clearPreviewState();
     setupDefaultRoutes();
@@ -2112,6 +2487,27 @@ describe('AppLayout no-profile gate — preview branch', () => {
     }
   });
 
+  it('carries the gated deep-link route into first-profile setup', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { PREVIEW_ONBOARDING_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED;
+    flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = false;
+    mockUsePathname.mockReturnValue('/quiz');
+
+    try {
+      renderAppLayoutWithNoProfile();
+      fireEvent.press(await screen.findByTestId('create-profile-cta'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/create-profile',
+        params: { returnTo: '/(app)/quiz' },
+      });
+    } finally {
+      flags.FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED = original;
+    }
+  });
+
   it('renders loading state during preview-state async probe', async () => {
     // Spy getPreviewState to return a pending promise. Assert loading testID
     // is rendered; assert neither gate nor wizard is in the tree.
@@ -2145,6 +2541,16 @@ describe('AppLayout no-profile gate — preview branch', () => {
 
     expect(screen.getByTestId('preview-state-loading')).toBeTruthy();
 
+    await act(async () => {
+      // Let the independent family-intent SecureStore probe resolve before
+      // advancing the clock for the deliberately hung preview probe.
+      // The preview loading gate hides the navigator, so there is no
+      // family-intent completion testID to wait on here. Drain the primary
+      // read, recovery fallback, and state-update microtasks explicitly.
+      for (let flush = 0; flush < 5; flush += 1) {
+        await Promise.resolve();
+      }
+    });
     act(() => {
       jest.advanceTimersByTime(2500);
     });

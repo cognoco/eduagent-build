@@ -1,0 +1,125 @@
+Running on E2E_Device_2
+ > Flow more-tab-navigation
+Run ../_setup/seed-and-sign-in.yaml...
+[engine] WARNING: Unable to load the TruffleAttach library.
+As a result, the optimized Truffle runtime is unavailable, and Truffle cannot provide native access to languages and tools.
+To customize the behavior of this warning, use the 'polyglotimpl.AttachLibraryFailureAction' system property.
+Allowed values are:
+  - ignore:    Do not print this warning.
+  - warn:      Print this warning (default value).
+  - diagnose:  Print this warning along with the exception cause.
+  - throw:     Throw an exception instead of printing this warning.
+
+  Run nav-welcome-to-sign-in.yaml...
+    Assert that id: welcome-chooser is visible... COMPLETED
+    Tap on id: welcome-chooser-learner... COMPLETED
+    Assert that id: welcome-card-1 is visible... COMPLETED
+    Tap on id: welcome-next-button... COMPLETED
+    Assert that id: welcome-card-2 is visible... COMPLETED
+    Wait for animation to end... COMPLETED
+    Tap on id: welcome-next-button... COMPLETED
+    Assert that id: welcome-card-3 is visible... COMPLETED
+    Assert that id: welcome-start-button is visible... COMPLETED
+    Tap on id: welcome-start-button... COMPLETED
+    Assert that id: pre-auth-bridge is visible... COMPLETED
+    Tap on id: pre-auth-bridge-secondary... COMPLETED
+    Assert that id: sign-in-button is visible... COMPLETED
+  Run nav-welcome-to-sign-in.yaml... COMPLETED
+  Assert that id: sign-in-button is visible... COMPLETED
+  Take screenshot signin-01-screen-loaded... COMPLETED
+  Tap on id: sign-in-email... COMPLETED
+  Input text ${EMAIL}... COMPLETED
+  Take screenshot signin-02-email-keyboard-open... COMPLETED
+  Scrolling DOWN until id: sign-in-password is visible with speed 60, visibility percentage 50%, timeout 10000 ms, with centering disabled... COMPLETED
+  Tap on id: sign-in-password... COMPLETED
+  Input text ${PASSWORD}... COMPLETED
+  Take screenshot signin-03-password-keyboard-open... COMPLETED
+  Scrolling DOWN until id: sign-in-button is visible with speed 60, visibility percentage 50%, timeout 10000 ms, with centering disabled... COMPLETED
+  Tap on id: sign-in-button... COMPLETED
+  Assert that (Optional) id: learner-screen is visible... COMPLETED
+  Assert that (Optional) id: dashboard-scroll is visible... WARNED
+  Assert that (Optional) id: parent-home-screen is visible... WARNED
+  Run dismiss-post-approval.yaml when "You're approved!" is visible...
+  Run dismiss-post-approval.yaml when "You're approved!" is visible... SKIPPED
+  Tap on (Optional) "Skip for now"... WARNED
+  Assert that id: profile-load-error is not visible... COMPLETED
+  Run return-to-home-safe.yaml when id: learner-screen is not visible...
+  Run return-to-home-safe.yaml when id: learner-screen is not visible... SKIPPED
+  Assert that (Optional) id: learner-screen is visible... COMPLETED
+  Assert that (Optional) id: parent-home-screen is visible... WARNED
+  Assert that (Optional) id: mentor-screen is visible... WARNED
+  Assert that (Optional) id: support-hub-mentor-tab is visible... WARNED
+  Take screenshot signin-04-home-reached... COMPLETED
+  Run dismiss-notifications.yaml when "send you notifications" is visible...
+  Run dismiss-notifications.yaml when "send you notifications" is visible... SKIPPED
+Run ../_setup/seed-and-sign-in.yaml... COMPLETED
+Assert that id: learner-screen is visible... COMPLETED
+Tap on "More"... COMPLETED
+Assert that id: more-row-learning-preferences is visible... COMPLETED
+Assert that id: more-row-mentor-memory is visible... COMPLETED
+Assert that id: more-row-mentor-language is visible... COMPLETED
+Scrolling DOWN until id: more-row-notifications is visible with speed 50, visibility percentage 40%, timeout 15000 ms, with centering disabled... COMPLETED
+Assert that id: more-row-account is visible... COMPLETED
+Scrolling DOWN until id: sign-out-button is visible with speed 50, visibility percentage 40%, timeout 15000 ms, with centering disabled... COMPLETED
+Assert that id: more-row-privacy is visible... COMPLETED
+Assert that id: more-row-help is visible... COMPLETED
+Assert that id: sign-out-button is visible... COMPLETED
+Take screenshot more-tab-loaded... COMPLETED
+Scrolling UP until id: more-row-notifications is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Tap on id: more-row-notifications... COMPLETED
+Assert that id: more-notifications-scroll is visible... COMPLETED
+Assert that id: push-notifications-toggle is visible... COMPLETED
+Assert that id: weekly-digest-toggle is visible... COMPLETED
+Press back... COMPLETED
+Assert that id: more-row-notifications is visible... COMPLETED
+Scrolling UP until id: more-row-account is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Tap on id: more-row-account... COMPLETED
+Assert that id: more-account-scroll is visible... COMPLETED
+Assert that id: more-row-profile is visible... COMPLETED
+Scrolling DOWN until id: more-row-subscription is visible with speed 50, visibility percentage 100%, timeout 15000 ms, with centering enabled... COMPLETED
+Assert that id: more-row-subscription is visible... COMPLETED
+Press back... COMPLETED
+Assert that id: more-row-account is visible... COMPLETED
+Scrolling DOWN until id: more-row-privacy is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Tap on id: more-row-privacy... COMPLETED
+Assert that id: more-privacy-scroll is visible... COMPLETED
+Assert that "Privacy Policy" is visible... COMPLETED
+Assert that "Terms of Service" is visible... COMPLETED
+Assert that id: more-row-export is visible... COMPLETED
+Assert that id: more-row-delete-account is visible... COMPLETED
+Tap on "Privacy Policy"... COMPLETED
+Assert that "Privacy Policy" is visible... COMPLETED
+Take screenshot nav-privacy-policy... COMPLETED
+Press back... COMPLETED
+Assert that id: more-privacy-scroll is visible... COMPLETED
+Tap on "Terms of Service"... COMPLETED
+Assert that "Terms of Service" is visible... COMPLETED
+Take screenshot nav-terms-of-service... COMPLETED
+Press back... COMPLETED
+Assert that id: more-privacy-scroll is visible... COMPLETED
+Tap on id: more-row-export... COMPLETED
+Tap on (Optional) "OK"... WARNED
+
+
+ Warning: Element not found: Text matching regex: OK
+Take screenshot nav-export-data... COMPLETED
+Press Back key... COMPLETED
+Assert that id: more-privacy-scroll is visible... COMPLETED
+Scrolling DOWN until id: more-row-delete-account is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Tap on id: more-row-delete-account... COMPLETED
+Assert that id: delete-account-confirm is visible... COMPLETED
+Assert that id: delete-account-cancel is visible... COMPLETED
+Take screenshot nav-delete-account... COMPLETED
+Tap on id: delete-account-cancel... COMPLETED
+Assert that id: more-privacy-scroll is visible... COMPLETED
+Press back... COMPLETED
+Scrolling DOWN until id: more-row-help is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Tap on id: more-row-help... COMPLETED
+Assert that id: more-help-scroll is visible... COMPLETED
+Assert that id: more-row-help-support is visible... COMPLETED
+Assert that id: more-row-report-problem is visible... COMPLETED
+Press back... COMPLETED
+Scrolling DOWN until id: sign-out-button is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled... COMPLETED
+Tap on id: sign-out-button... COMPLETED
+Assert that id: sign-in-button is visible... COMPLETED
+Take screenshot nav-signed-out... COMPLETED

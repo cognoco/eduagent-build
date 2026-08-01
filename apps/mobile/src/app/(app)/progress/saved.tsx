@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { Bookmark } from '@eduagent/schemas';
 import {
@@ -16,6 +16,7 @@ import {
   TimeoutLoader,
 } from '../../../components/common';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -249,10 +250,18 @@ export default function SavedBookmarksScreen() {
               </Text>
               <Pressable
                 // [LEARN-24] CTA copy says "Go to Library" — use a direct replace
-                // so the user always lands on Library regardless of navigation history.
-                // goBackOrReplace would pick router.back() when canGoBack() is true,
-                // returning the user to Progress instead of Library.
-                onPress={() => router.replace('/(app)/library')}
+                // so the user always lands on the browse destination regardless of
+                // navigation history. goBackOrReplace would pick router.back() when
+                // canGoBack() is true, returning the user to Progress instead.
+                // [WI-2467] Destination is V2-shell aware: MODE_NAV_V2_ENABLED
+                // routes to /(app)/subjects instead of /(app)/library.
+                onPress={() =>
+                  router.replace(
+                    (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                      ? '/(app)/subjects'
+                      : '/(app)/library') as Href,
+                  )
+                }
                 className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t('progress.saved.goToLibrary')}

@@ -21,7 +21,17 @@ import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import { useProgressInventory } from '../../../../hooks/use-progress';
-import { pushLearningResumeTarget } from '../../../../lib/navigation';
+import {
+  goBackOrReplace,
+  pushLearningResumeTarget,
+  replaceV2LearningResumeTarget,
+  SUBJECT_HUB_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../../lib/navigation';
+import {
+  consumeSubjectsToHubTransition,
+  markHubToTopicTransition,
+} from '../../../../lib/navigation-transition-provenance';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { formatApiError } from '../../../../lib/format-api-error';
@@ -35,7 +45,13 @@ export default function SubjectHubRoute(): React.ReactElement {
   const router = useRouter();
   const params = useLocalSearchParams<{ subjectId?: string | string[] }>();
   const subjectId = firstParam(params.subjectId);
-  const hub = useSubjectHub(subjectId);
+  const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
+    string | undefined
+  >();
+  const isV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const hub = useSubjectHub(subjectId, {
+    preferDueReviewOverNextTopic: isV2,
+  });
   const retryCurriculum = useRetryCurriculum(subjectId);
   // Topic-scoped note authoring for the focused topic's detail sheet (felt-knowing
   // loop Flow 1). bookId is undefined because the hub spans multiple books; the
@@ -66,8 +82,9 @@ export default function SubjectHubRoute(): React.ReactElement {
   const navigationContract = useNavigationContract();
   const canManage = !navigationContract.isParentProxy;
   const [manageOpen, setManageOpen] = useState(false);
-  // includeInactive so a deep-linked paused/archived subject still resolves its
-  // status; defaults to 'active' (the common hub-entry path) until loaded.
+  // Every Navigation Shape renders the Manage control, so each shape needs
+  // the real status. Including inactive subjects also keeps paused/archived
+  // deep links fail-closed until that status has settled.
   const subjectsQuery = useSubjects({
     includeInactive: true,
     enabled: canManage && !!subjectId,
@@ -80,6 +97,7 @@ export default function SubjectHubRoute(): React.ReactElement {
   // the sheet on the 'active' fallback would show the wrong action set for a
   // deep-linked paused/archived subject (pause+archive instead of resume/restore).
   const manageReady = canManage && !!subjectsQuery.data;
+  const showHubHeader = isV2 || manageReady;
   const updateSubject = useUpdateSubject();
   const inventoryEnabled =
     FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
@@ -93,6 +111,18 @@ export default function SubjectHubRoute(): React.ReactElement {
   const progressInventory = useProgressInventory({
     enabled: inventoryEnabled,
   });
+
+  useEffect(() => {
+    if (subjectId && consumeSubjectsToHubTransition(subjectId)) {
+      setSubjectsPredecessorId(subjectId);
+      return;
+    }
+    setSubjectsPredecessorId((current) =>
+      current === subjectId ? current : undefined,
+    );
+  }, [subjectId]);
+  const hasSubjectsPredecessor =
+    !!subjectId && subjectsPredecessorId === subjectId;
 
   const handleChangeStatus = useCallback(
     (status: Subject['status']) => {
@@ -119,15 +149,16 @@ export default function SubjectHubRoute(): React.ReactElement {
     // The Subjects tab moves to /(app)/subjects under the V2 shell; fall back to
     // the legacy Library tab only when V2 nav is off, so a back-stack-exhausted
     // user lands on the tab they actually came from.
-    const fallback = (
-      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects' : '/(app)/library'
-    ) as Href;
-    // Subject-hub entries are cross-stack pushes from tab surfaces. On native,
-    // canGoBack() can still be true for a one-deep synthesized stack, and
-    // router.back() then falls through to the Tabs first route (Home). This
-    // exit is intentionally contextual, so replace to the owning tab directly.
+    const fallback = (isV2 ? '/(app)/subjects' : '/(app)/library') as Href;
+    // Only an in-memory proof consumed from the actual Subjects → Hub
+    // transition may authorize a pop. URL params and ambient history are not
+    // ancestry evidence; deep links and refreshes use the stable fallback.
+    if (isV2 && hasSubjectsPredecessor) {
+      goBackOrReplace(router, fallback);
+      return;
+    }
     router.replace(fallback);
-  }, [router]);
+  }, [hasSubjectsPredecessor, isV2, router]);
 
   const goPickBook = useCallback(() => {
     router.push({
@@ -146,16 +177,20 @@ export default function SubjectHubRoute(): React.ReactElement {
 
   const openTopic = useCallback(
     (topicId: string, bookId?: string | null) => {
+      if (isV2 && subjectId) {
+        markHubToTopicTransition(subjectId, topicId);
+      }
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: {
           subjectId,
           topicId,
           ...(bookId ? { bookId } : {}),
+          ...(isV2 ? { returnTo: SUBJECT_HUB_RETURN_TO } : {}),
         },
       } as Href);
     },
-    [router, subjectId],
+    [isV2, router, subjectId],
   );
 
   const handleStudyTopic = useCallback(
@@ -166,30 +201,43 @@ export default function SubjectHubRoute(): React.ReactElement {
   );
 
   const handleReviewTopic = useCallback(
-    (topicId: string) => {
-      router.push({
-        pathname: '/(app)/topic/[topicId]',
-        params: { subjectId, topicId },
-      } as Href);
+    (topicId: string, bookId?: string | null) => {
+      openTopic(topicId, isV2 ? bookId : undefined);
     },
-    [router, subjectId],
+    [isV2, openTopic],
   );
 
   const handleNextUp = useCallback(
     (nextUp: HubNextUp) => {
       if (!nextUp.topicId) return;
       if (nextUp.kind === 'resume' && hub.data?.nextUp.resumeTarget) {
-        pushLearningResumeTarget(router, hub.data.nextUp.resumeTarget);
+        if (isV2) {
+          replaceV2LearningResumeTarget(
+            router,
+            hub.data.nextUp.resumeTarget,
+            SUBJECTS_RETURN_TO,
+            { preserveSubjectsHistory: hasSubjectsPredecessor },
+          );
+        } else {
+          pushLearningResumeTarget(router, hub.data.nextUp.resumeTarget);
+        }
         return;
       }
       if (nextUp.kind === 'review-due') {
-        handleReviewTopic(nextUp.topicId);
+        handleReviewTopic(nextUp.topicId, nextUp.bookId);
         return;
       }
 
       openTopic(nextUp.topicId, nextUp.bookId);
     },
-    [handleReviewTopic, hub.data?.nextUp.resumeTarget, openTopic, router],
+    [
+      handleReviewTopic,
+      hasSubjectsPredecessor,
+      hub.data?.nextUp.resumeTarget,
+      isV2,
+      openTopic,
+      router,
+    ],
   );
 
   // HIGH-3: surface a platform alert when the retry mutation fails so the
@@ -241,7 +289,35 @@ export default function SubjectHubRoute(): React.ReactElement {
   // hub data is non-null (the `!subjectId` guard above is the only null case),
   // so an empty subject still surfaces a recoverable empty state below rather
   // than handing blank data to SubjectHub.
-  const hubData = hub.data;
+  const hubData = hub.data
+    ? {
+        ...hub.data,
+        canStudy:
+          hub.data.canStudy && canManage && subject?.status === 'active',
+      }
+    : hub.data;
+  const inactiveEmptyState =
+    hubData &&
+    subject &&
+    subject.status !== 'active' &&
+    hub.emptyKind !== 'none'
+      ? {
+          title:
+            hub.emptyKind === 'preparing'
+              ? t('subjectHub.preparing.titleNamed', {
+                  subject: hubData.subjectName,
+                })
+              : hub.emptyKind === 'stuck'
+                ? t('subjectHub.stuck.title')
+                : t('subjectHub.pickBook.title'),
+          message:
+            hub.emptyKind === 'preparing'
+              ? t('subjectHub.preparing.message')
+              : hub.emptyKind === 'stuck'
+                ? t('subjectHub.stuck.message')
+                : t('subjectHub.pickBook.message'),
+        }
+      : undefined;
   const vocabulary = inventoryEnabled
     ? progressInventory.data?.subjects.find(
         (subject) =>
@@ -270,7 +346,40 @@ export default function SubjectHubRoute(): React.ReactElement {
         testID: 'subject-hub-back',
       }}
     >
-      {hubData && hub.emptyKind === 'preparing' ? (
+      {inactiveEmptyState && hubData ? (
+        <View className="flex-1">
+          <ErrorFallback
+            variant="centered"
+            testID="subject-hub-inactive-empty"
+            title={inactiveEmptyState.title}
+            message={inactiveEmptyState.message}
+            primaryAction={
+              canManage
+                ? {
+                    label: t('subjectHub.manage.open'),
+                    onPress: () => setManageOpen(true),
+                    testID: 'subject-hub-inactive-manage',
+                  }
+                : undefined
+            }
+            secondaryAction={{
+              label: t('common.goBack'),
+              onPress: goBack,
+              testID: 'subject-hub-inactive-back',
+            }}
+          />
+          {canManage ? (
+            <SubjectHubManageSheet
+              visible={manageOpen}
+              subjectName={hubData.subjectName}
+              status={subjectStatus}
+              isSaving={updateSubject.isPending}
+              onClose={() => setManageOpen(false)}
+              onChangeStatus={handleChangeStatus}
+            />
+          ) : null}
+        </View>
+      ) : hubData && hub.emptyKind === 'preparing' ? (
         <SubjectHubPreparing
           subjectName={hubData.subjectName}
           onRetry={() => {
@@ -317,19 +426,40 @@ export default function SubjectHubRoute(): React.ReactElement {
         />
       ) : hubData ? (
         <View className="flex-1" testID="subject-hub-screen">
-          {manageReady ? (
-            <View className="flex-row justify-end px-5 pt-3">
-              <Pressable
-                testID="subject-hub-manage"
-                accessibilityRole="button"
-                accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
-                onPress={() => setManageOpen(true)}
-                className="min-h-[40px] justify-center rounded-button px-3"
-              >
-                <Text className="text-body-sm font-semibold text-primary">
-                  {t('subjectHub.manage.open')}
-                </Text>
-              </Pressable>
+          {showHubHeader ? (
+            <View
+              className="flex-row items-center px-5 pt-3"
+              style={{
+                justifyContent: isV2 ? 'space-between' : 'flex-end',
+              }}
+              testID="subject-hub-header"
+            >
+              {isV2 ? (
+                <Pressable
+                  testID="subject-hub-back"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.goBackAction')}
+                  onPress={goBack}
+                  className="min-h-[40px] justify-center rounded-button px-3"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {t('common.goBack')}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {manageReady ? (
+                <Pressable
+                  testID="subject-hub-manage"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
+                  onPress={() => setManageOpen(true)}
+                  className="min-h-[40px] justify-center rounded-button px-3"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {t('subjectHub.manage.open')}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
           <SubjectHub

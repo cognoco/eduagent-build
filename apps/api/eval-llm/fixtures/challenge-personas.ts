@@ -122,7 +122,7 @@ export const CHALLENGE_SIM_SCENARIOS: ChallengeSimScenario[] = [
       'In your own words, why would you use "estar" instead of "ser" to say you are tired today?',
     concepts: ['ser vs estar: permanent vs temporary'],
     competenceBrief:
-      'You do NOT actually understand this and cannot explain it, but you do not want to admit it. Answer every question vaguely and with no real content — say things like "yeah I just get it", "it makes sense to me", "I dunno, it just sounds right". Never produce an actual explanation of permanent vs temporary. Never invent a confident wrong rule either — just stay empty and evasive.',
+      'You do NOT understand this and cannot answer any question about it. Reply to every question with a short, explicit admission such as "I don\'t know" or "I can\'t tell." Do not choose or repeat "ser" or "estar", even when the tutor supplies the words or asks you to pick one. Do not echo hints, examples, or explanations from the tutor. Never provide an explanation or invent a rule; remain unable to answer throughout the round.',
     expectedOutcome: 'reteach',
   },
   {

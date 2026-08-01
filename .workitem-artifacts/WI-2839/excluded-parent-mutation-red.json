@@ -1,0 +1,197 @@
+{
+  "numFailedTestSuites": 1,
+  "numFailedTests": 1,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 0,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 8,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 9,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1785108392986,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "weekly progress push integration",
+            "[WI-1997] push delivery controls the email fallback"
+          ],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration [WI-1997] push delivery controls the email fallback restores a delivered-but-unlogged push result across durable replay and suppresses email",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108394424,
+          "status": "pending",
+          "title": "restores a delivered-but-unlogged push result across durable replay and suppresses email"
+        },
+        {
+          "ancestorTitles": [
+            "weekly progress push integration",
+            "[WI-1997] push delivery controls the email fallback"
+          ],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration [WI-1997] push delivery controls the email fallback sends fallback email when push genuinely fails",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108394424,
+          "status": "pending",
+          "title": "sends fallback email when push genuinely fails"
+        },
+        {
+          "ancestorTitles": [
+            "weekly progress push integration",
+            "[WI-1997] push delivery controls the email fallback"
+          ],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration [WI-1997] push delivery controls the email fallback does not re-send a successful fallback email on retry",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108394424,
+          "status": "pending",
+          "title": "does not re-send a successful fallback email on retry"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": 1258,
+          "failing": false,
+          "failureDetails": [
+            {
+              "matcherResult": {
+                "message": "expect(jest.fn()).not.toHaveBeenCalledWith(...expected)\n\nExpected: not Any<String>, ArrayContaining [ObjectContaining {\"data\": ObjectContaining {\"parentId\": \"019fa0c0-72cc-79b4-906a-2c1ba47cbaea\"}}]\nReceived:     0, [\"fan-out-weekly-progress-0\", [{\"data\": {\"parentId\": \"019fa0c0-71f6-7097-92c3-ef0cab018e19\", \"reportWeekStart\": \"2026-07-20\"}, \"name\": \"app/weekly-progress-push.generate\"}, {\"data\": {\"parentId\": \"019fa0c0-72cc-79b4-906a-2c1ba47cbaea\", \"reportWeekStart\": \"2026-07-20\"}, \"name\": \"app/weekly-progress-push.generate\"}]]\n\nNumber of calls: 1",
+                "pass": true
+              }
+            }
+          ],
+          "failureMessages": [
+            "Error: expect(jest.fn()).not.toHaveBeenCalledWith(...expected)\n\nExpected: not Any<String>, ArrayContaining [ObjectContaining {\"data\": ObjectContaining {\"parentId\": \"019fa0c0-72cc-79b4-906a-2c1ba47cbaea\"}}]\nReceived:     0, [\"fan-out-weekly-progress-0\", [{\"data\": {\"parentId\": \"019fa0c0-71f6-7097-92c3-ef0cab018e19\", \"reportWeekStart\": \"2026-07-20\"}, \"name\": \"app/weekly-progress-push.generate\"}, {\"data\": {\"parentId\": \"019fa0c0-72cc-79b4-906a-2c1ba47cbaea\", \"reportWeekStart\": \"2026-07-20\"}, \"name\": \"app/weekly-progress-push.generate\"}]]\n\nNumber of calls: 1\n    at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2839/apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts:726:32)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)"
+          ],
+          "fullName": "weekly progress push integration uses the memoized evaluation instant when the wall clock is one hour later",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "startAt": 1785108394424,
+          "status": "failed",
+          "title": "uses the memoized evaluation instant when the wall clock is one hour later"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration persists a weekly report and sends a real delta summary from stored snapshots",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108395705,
+          "status": "pending",
+          "title": "persists a weekly report and sends a real delta summary from stored snapshots"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration returns skipped when the parent has no linked children",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108395705,
+          "status": "pending",
+          "title": "returns skipped when the parent has no linked children"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration [BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108395705,
+          "status": "pending",
+          "title": "[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration [BUG-699-FOLLOWUP] logs email-only weekly sends so the 24h dedup gate can see them",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108395705,
+          "status": "pending",
+          "title": "[BUG-699-FOLLOWUP] logs email-only weekly sends so the 24h dedup gate can see them"
+        },
+        {
+          "ancestorTitles": ["weekly progress push integration"],
+          "duration": null,
+          "failing": false,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "weekly progress push integration skips children with no snapshots but still pushes for children that have activity",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "startAt": 1785108395705,
+          "status": "pending",
+          "title": "skips children with no snapshots but still pushes for children that have activity"
+        }
+      ],
+      "endTime": 1785108395836,
+      "message": "  ● weekly progress push integration › uses the memoized evaluation instant when the wall clock is one hour later\n\n    expect(jest.fn()).not.toHaveBeenCalledWith(...expected)\n\n    Expected: not Any<String>, ArrayContaining [ObjectContaining {\"data\": ObjectContaining {\"parentId\": \"019fa0c0-72cc-79b4-906a-2c1ba47cbaea\"}}]\n    Received:     0, [\"fan-out-weekly-progress-0\", [{\"data\": {\"parentId\": \"019fa0c0-71f6-7097-92c3-ef0cab018e19\", \"reportWeekStart\": \"2026-07-20\"}, \"name\": \"app/weekly-progress-push.generate\"}, {\"data\": {\"parentId\": \"019fa0c0-72cc-79b4-906a-2c1ba47cbaea\", \"reportWeekStart\": \"2026-07-20\"}, \"name\": \"app/weekly-progress-push.generate\"}]]\n\n    Number of calls: 1\n\n      724 |       ]),\n      725 |     );\n    > 726 |     expect(step.sendEvent).not.toHaveBeenCalledWith(\n          |                                ^\n      727 |       expect.any(String),\n      728 |       expect.arrayContaining([\n      729 |         expect.objectContaining({\n\n      at Object.<anonymous> (apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts:726:32)\n",
+      "name": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2839/apps/api/src/inngest/functions/weekly-progress-push.integration.test.ts",
+      "startTime": 1785108393191,
+      "status": "failed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}

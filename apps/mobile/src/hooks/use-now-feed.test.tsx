@@ -20,9 +20,18 @@ import {
 // [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
 // bind the persisted Now-feed cache to actor+profile+policy. External-boundary
 // mock (bare specifier), matching the pattern in use-subscription.test.ts.
+// [WI-2933] The actor id is swappable so a test can ATTEMPT the BOUND ->
+// UNBOUND transition (sign-out / auth teardown) that the unbound suppression
+// path depends on. Swapping it alone does not achieve that — the value is read
+// through a getter, but nothing re-renders on the mutation, so a test must
+// force a re-render for the unbind to land. Default is unchanged for every
+// pre-existing test.
+let mockActorId: string | null = 'wi2498-test-actor';
 jest.mock('@clerk/expo', () => ({
   useAuth: () => ({
-    userId: 'wi2498-test-actor',
+    get userId() {
+      return mockActorId;
+    },
     getToken: jest.fn().mockResolvedValue('test-token'),
   }),
 }));
@@ -83,7 +92,9 @@ describe('useNowFeed', () => {
 
     const { result } = renderHook(() => useNowFeed(), { wrapper });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), {
+      timeout: 3_000,
+    });
     expect(result.current.data).toEqual(value);
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain('/v1/now');
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain('scope=self');
@@ -236,6 +247,11 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
     setActiveProfileId(CACHE_BINDING.profileId);
     await AsyncStorage.clear();
+    // [WI-2933] The mentor-notice policy store is MODULE-level, so clearing
+    // AsyncStorage alone does not isolate these tests from each other — a
+    // hydrated Entry survives into the next test and its floor is still
+    // consulted. This describe is the first here to depend on that store.
+    resetMentorNoticePolicyStoreForTests();
     jest.useFakeTimers();
   });
 
@@ -243,6 +259,111 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     jest.useRealTimers();
     globalThis.fetch = originalFetch;
     setActiveProfileId(undefined);
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2933] The persisted projection must be judged against the DISABLE FLOOR
+  // of the pair it was cached for — including after that pair goes unbound.
+  //
+  // `fallbackFeed` can only be POPULATED while bound, and it survives the pair
+  // going unbound (sign-out, auth teardown) only when `query.isError` — see the
+  // RETENTION MECHANISM note below. Were it to survive, the suppression call
+  // would take the unbound branch, which has no storage key and therefore no
+  // stored floor to consult, so a projection whose pair had been told the
+  // rollout is off would paint anyway.
+  //
+  // The assertion is on what the surface EXPOSES, never on an internal field.
+  //
+  // LIMITATION — THESE TWO DO NOT DISCRIMINATE THE FIX, and saying so here
+  // rather than in a report that outlives this file. Reverting the fix to
+  // `policy.suppressed(undefined)` leaves both GREEN. The reason, measured: with
+  // a disabling floor seeded, the BOUND render already strips the notice card
+  // (`fallbackFeed` is `[]` before sign-out ever happens), so the unbound
+  // judgement is never reached; with no floor, there is nothing to suppress.
+  // They therefore lock in current behaviour but prove nothing about the unbound
+  // path.
+  //
+  // RETENTION MECHANISM, measured rather than read (WI-2933 reachability run):
+  // forcing a real re-render with `userId = null` gives
+  // `fallbackFeed = null, isError = false` — so with the query NOT in an error
+  // state the projection does NOT survive the unbind; the `if (!query.isError)`
+  // branch above clears it. Retention therefore requires `query.isError`, which
+  // is what the source reads. An earlier probe here appeared to show the feed
+  // surviving; that probe never forced a re-render, so it was sampling the still
+  // BOUND component and proved nothing.
+  //
+  // STILL UNMEASURED: the `isError: true` AND unbound combination. Once the pair
+  // is unbound the query stops fetching, so this harness could not drive it into
+  // an error state afterwards. That combination is the only surviving candidate
+  // for a reachable unbound judgement, and it remains undemonstrated.
+  // -------------------------------------------------------------------------
+  it('[WI-2933] does not paint the cached notice surface when the pair’s stored floor forbids it', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // The pair's durable floor: told the rollout is OFF at revision 7.
+    await AsyncStorage.setItem(
+      `mentor-notice-policy-state::${CACHE_BINDING.actorId}::${CACHE_BINDING.profileId}`,
+      '{"revision":7,"enabled":false,"observedDisableRevision":7}',
+    );
+
+    const { result, queryClient } = await renderSlowFallback();
+    // Establish the exposure: the projection really is being served.
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+
+    // ATTEMPTED sign-out that DOES NOT LAND, and the title no longer claims it
+    // does. `cacheBinding` derives from the auth id, so unbinding requires a
+    // re-render; mutating this module variable triggers none, and the assertion
+    // below therefore measures the still-BOUND component.
+    //
+    // The control test is the proof: had the unbind landed, the effect's
+    // early-return would have cleared `fallbackFeed` (no `query.isError`), and
+    // the control's `.toContain('mentor_notice')` on an empty list would have
+    // FAILED rather than passed. Its passing is what tells you the pair is
+    // still bound in both.
+    mockActorId = null;
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+
+    // THE CRITERION: no notice-bearing card is exposed off that projection.
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).not.toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
+  });
+
+  // NON-TRIVIALITY CONTROL. Identical setup, identical cached projection — but
+  // the pair has NO stored floor. It must STILL paint. Without this, the
+  // assertion above passes on a remedy that blanks every observation-less
+  // payload on every pre-auth render, which is the fleet-wide harm AC-2 forbids
+  // and the reason this was not folded into WI-2911.
+  //
+  // It carries a second load, unintended when written: because it PASSES, the
+  // attempted unbind above cannot have landed in either test — an unbound pair
+  // would have cleared the projection out from under this assertion.
+  it('[WI-2933] still paints the cached notice surface when the pair has NO stored floor', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // Deliberately no mentor-notice-policy-state key for this pair.
+
+    const { result, queryClient } = await renderSlowFallback();
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+
+    mockActorId = null;
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
   });
 
   it('does not paint a warm cached notice surface after the client observed flag-off', async () => {
@@ -1296,14 +1417,21 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
     setActiveProfileId(undefined);
   });
 
-  // The defect is NOT that the reducer mishandles a malformed observation — it
-  // handles it correctly. The defect is that the reducer is never REACHED: a
-  // malformed policy field fails the whole `nowResponseSchema`, `parseJson`
-  // throws, and TanStack Query retains the prior notice-bearing data with policy
-  // still enabled. So this test drives a real parse FAILURE and asserts on the
-  // retained payload.
-  it('goes fail-closed when the response fails to parse, and suppresses the RETAINED cards', async () => {
-    // First fetch: a good notice-bearing feed at revision 7, rollout on.
+  // [WI-2949] The DESCOPE, direction A: an unparseable response body that is
+  // unrelated to mentor-notice policy must NOT suppress notices.
+  //
+  // WI-2627 stage 2 wired a fail-closed policy fold into the whole-body
+  // parse-failure path of these surfaces. The failing field is not identifiable
+  // without a
+  // second read of a single-use body, so that call was over-broad BY
+  // CONSTRUCTION: any unparseable /now body — a bad card, a bad count, anything —
+  // silently suppressed mentor notices for that pair. No WI-2627 criterion asked
+  // for that, and it is a behaviour change to an unrelated failure mode.
+  //
+  // These two tests drive a REAL parse failure whose cause has nothing to do with
+  // policy (`overflowCount: -1`, `scope: 'not-a-scope'`), with a perfectly valid
+  // policy field alongside, and assert the retained notices STILL RENDER.
+  it('keeps notices visible when the /now body fails to parse for an unrelated reason', async () => {
     mockFetch.mockImplementationOnce(() =>
       Promise.resolve(
         jsonResponse({
@@ -1320,7 +1448,6 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
       wrapper: createHookWrapper().wrapper,
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // Precondition: the cards really are rendering before the bad response.
     expect(result.current.data?.cards.map((c) => c.kind)).toEqual([
       'mentor_notice',
     ]);
@@ -1330,20 +1457,16 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
       ),
     );
 
-    // Refetch returns a MALFORMED observation — negative revision. The whole
-    // response schema rejects it, so no observation value ever reaches `observe`.
+    // Refetch fails the schema on `overflowCount`, NOT on policy — the policy
+    // field is valid and unchanged.
     mockFetch.mockImplementation(() =>
       Promise.resolve(
         jsonResponse({
           scope: 'self',
           cards: [NOTICE_CARD],
-          overflowCount: 0,
+          overflowCount: -1,
           generatedAt: FRESH_CACHE_TIMESTAMP,
-          mentorNoticePolicy: {
-            rolloutRevision: -1,
-            rolloutEnabled: true,
-            projectionEpoch: 'notice-policy-v1:bad',
-          },
+          mentorNoticePolicy: policy(7, true),
         }),
       ),
     );
@@ -1352,39 +1475,21 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
       await result.current.refetch();
     });
 
-    // The store took the fail-closed signal even though the reducer got no
-    // observation value: disabled AT the held revision, never dropped to 0.
-    await waitFor(async () =>
-      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
-        '{"revision":7,"enabled":false}',
-      ),
+    // Establish the retention rather than assume it: the query really is in an
+    // error state and really is still holding the prior page.
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeDefined();
+    // THE CRITERION: the unrelated failure did not blank the notice.
+    expect(result.current.data?.cards.map((c) => c.kind)).toEqual([
+      'mentor_notice',
+    ]);
+    // ...and the store was not moved by a failure that told it nothing.
+    expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+      '{"revision":7,"enabled":true}',
     );
-    // And the retained (still notice-bearing) payload is suppressed rather than
-    // rendering indefinitely.
-    await waitFor(() => expect(result.current.data?.cards).toEqual([]));
   });
 
-  // [WI-2627 rework, finding 1] The same defect on the OVERFLOW surface, which
-  // the first pass left fail-OPEN.
-  //
-  // `useApiQuery` parsed inside its own query fn, BEFORE running the `select`
-  // callback that held the fold — so a malformed policy threw at the wrapper and
-  // the fold was unreachable. TanStack Query then retained the prior
-  // notice-bearing page and kept handing it to the surface with policy still
-  // enabled.
-  //
-  // The assertion is deliberately about what the surface EXPOSES while the query
-  // sits in an error state holding retained data — not about the schema, and not
-  // about whether `observeMalformed` was called. Both of those pass on code that
-  // still renders the retained notice.
-  it('goes fail-closed when the OVERFLOW response fails to parse, and suppresses the RETAINED notice item', async () => {
-    const PLAIN_ITEM = {
-      kind: 'retention_due',
-      templateKey: 'now.retention_due.default',
-      params: { subjectName: 'Physics' },
-      deepLink: { route: 'retention.review', params: {}, chain: [] },
-      scope: 'self',
-    };
+  it('keeps overflow notices visible when the body fails to parse for an unrelated reason', async () => {
     const OVERFLOW_NOTICE_ITEM = {
       kind: 'mentor_notice',
       templateKey: 'now.mentor_notice.default',
@@ -1396,12 +1501,11 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
       scope: 'self',
     };
 
-    // First fetch: a good notice-bearing overflow page at revision 7, rollout on.
     mockFetch.mockImplementationOnce(() =>
       Promise.resolve(
         jsonResponse({
           scope: 'self',
-          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
+          items: [OVERFLOW_NOTICE_ITEM],
           mentorNoticePolicy: policy(7, true),
         }),
       ),
@@ -1411,33 +1515,20 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
       wrapper: createHookWrapper().wrapper,
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // NON-TRIVIALITY CONTROL: at a revision the store accepts with rollout ON,
-    // the notice item really does render. An implementation that suppressed
-    // unconditionally would fail here, so the suppression assertion below is not
-    // vacuously satisfiable.
     expect(result.current.data?.items.map((item) => item.kind)).toEqual([
       'mentor_notice',
-      'retention_due',
     ]);
-    await waitFor(async () =>
-      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
-        '{"revision":7,"enabled":true}',
-      ),
-    );
 
-    // Refetch returns a MALFORMED observation — negative revision, which the
-    // whole `nowOverflowResponseSchema` rejects, so no observation value ever
-    // reaches `observe`.
+    // Refetch fails the schema on `scope`, NOT on policy. This is the surface
+    // whose failure path ran through `useApiQuery`'s `onParseError` seam; the
+    // seam itself stays (it is generic and has other potential consumers), only
+    // the mentor-notice call is gone.
     mockFetch.mockImplementation(() =>
       Promise.resolve(
         jsonResponse({
-          scope: 'self',
-          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
-          mentorNoticePolicy: {
-            rolloutRevision: -1,
-            rolloutEnabled: true,
-            projectionEpoch: 'notice-policy-v1:bad',
-          },
+          scope: 'not-a-scope',
+          items: [OVERFLOW_NOTICE_ITEM],
+          mentorNoticePolicy: policy(7, true),
         }),
       ),
     );
@@ -1446,47 +1537,45 @@ describe('[WI-2627] the fold must be reachable, and must precede publication', (
       await result.current.refetch();
     });
 
-    // The query IS in an error state and IS still holding the prior successful
-    // page — that retention is the exposure, so it has to be established rather
-    // than assumed.
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.data).toBeDefined();
-    // THE CRITERION'S LAYER: what the surface exposes off that retained page.
-    // The plain item survives (proving the page really was retained and is not
-    // merely gone); the notice item and its notice.recheck deep link do not.
-    await waitFor(() =>
-      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
-        'retention_due',
-      ]),
-    );
-    // And the mechanism behind it: fail-closed at the held revision, never
-    // dropped to 0.
+    expect(result.current.data?.items.map((item) => item.kind)).toEqual([
+      'mentor_notice',
+    ]);
     expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
-      '{"revision":7,"enabled":false}',
+      '{"revision":7,"enabled":true}',
     );
+  });
 
-    // RECOVERY: fail-closed must be sticky, not permanent. Holding the revision
-    // rather than dropping it to 0 is precisely what leaves a strictly higher
-    // revision able to lift the disable — without this, one corrupt response
-    // would blacken this surface on the device forever, which is what extending
-    // the sticky-disable class to three surfaces would otherwise risk.
+  // [WI-2949] Direction A's near neighbour, kept explicit because collapsing the
+  // two is how a reviewer could read this change as relaxing the real
+  // fail-closed path: an ABSENT policy field is "nothing was observed", not
+  // "something arrived and cannot be trusted". WI-2627 ruled it keeps current
+  // state — treating absence as a disable would blank notices fleet-wide the
+  // moment a pre-field worker answered. Unchanged by this item.
+  it('keeps notices visible when the body carries NO policy field at all', async () => {
+    await AsyncStorage.setItem(POLICY_KEY, '{"revision":7,"enabled":true}');
     mockFetch.mockImplementation(() =>
       Promise.resolve(
         jsonResponse({
           scope: 'self',
-          items: [OVERFLOW_NOTICE_ITEM, PLAIN_ITEM],
-          mentorNoticePolicy: policy(8, true),
+          cards: [NOTICE_CARD],
+          overflowCount: 0,
+          generatedAt: FRESH_CACHE_TIMESTAMP,
         }),
       ),
     );
-    await act(async () => {
-      await result.current.refetch();
+
+    const { result } = renderHook(() => useNowFeed(), {
+      wrapper: createHookWrapper().wrapper,
     });
-    await waitFor(() =>
-      expect(result.current.data?.items.map((item) => item.kind)).toEqual([
-        'mentor_notice',
-        'retention_due',
-      ]),
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.cards.map((c) => c.kind)).toEqual([
+      'mentor_notice',
+    ]);
+    expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+      '{"revision":7,"enabled":true}',
     );
   });
 

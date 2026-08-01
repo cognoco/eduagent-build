@@ -1,4 +1,11 @@
-import { expect, test, type Request } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import {
+  NOW_REFRESH_OBSERVATION_WINDOW_MS,
+  assertRequestAttempted,
+  captureNowRefreshPayload,
+  observeCapturedNowRefresh,
+  observeNowRefreshRequestAttempt,
+} from '../../helpers/now-refresh-observation';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
@@ -85,58 +92,88 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   });
   await expect(completedReplyBelowExactMessage).not.toHaveText(/^\s*$/);
 
-  // Hold the self-scoped Now response caused by Back. The Session route must
-  // remain active until this exact response is allowed through; the tab
-  // navigator keeps Mentor mounted underneath the pushed Session route.
-  let capturePostBackNowRequest = false;
-  let releasePostBackNowResponse!: () => void;
-  let observePostBackNowRequest!: (request: Request) => void;
-  const postBackNowRequest = new Promise<Request>((resolve) => {
-    observePostBackNowRequest = resolve;
-  });
-  const allowPostBackNowResponse = new Promise<void>((resolve) => {
-    releasePostBackNowResponse = resolve;
-  });
-  await page.route('**/v1/now?*', async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (
-      request.method() !== 'GET' ||
-      url.searchParams.get('scope') !== 'self' ||
-      !capturePostBackNowRequest
-    ) {
-      await route.continue();
-      return;
-    }
+  // [WI-2833] Observe (never hold) the self-scoped Now response caused by
+  // Back. WI-2818 bounds the Session→Mentor refresh gate to 2s in production
+  // (apps/mobile/src/app/(app)/session/index.tsx MENTOR_RETURN_REFRESH_WAIT_MS):
+  // it waits for the exact refresh, but gives up and completes the Back
+  // navigation regardless once that bound elapses. Pausing the real network
+  // response and releasing it only after unrelated post-Back assertions (the
+  // previous pattern) can lose that race under parallel load — production may
+  // already have reached Mentor before a test-side release ever runs. Arm a
+  // plain, production-compatible observation BEFORE the click instead, and
+  // let the response flow through exactly as production sees it.
+  //
+  // [WI-2833 rework] Observing only the RESPONSE is not enough: if production
+  // regresses and never sends the post-Back request at all, the response
+  // promise below simply times out the same way a legitimate abort or
+  // non-settlement does, and this spec would still pass. Arm an independent
+  // REQUEST observation too, so "no matching request fired" is always a
+  // distinct, asserted failure -- never silently absorbed into the response's
+  // rejected/unsettled classification.
+  const postBackNowMatchesUrl = (url: URL) =>
+    url.pathname.endsWith('/v1/now') &&
+    url.searchParams.get('scope') === 'self';
 
-    capturePostBackNowRequest = false;
-    observePostBackNowRequest(request);
-    await allowPostBackNowResponse;
-    await route.continue();
-  });
+  const postBackNowArmedAtMs = Date.now();
+  const postBackNowRequestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === 'GET' &&
+      postBackNowMatchesUrl(new URL(request.url())),
+    { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
+  );
+  // [WI-2961] Start reading the body the instant Playwright observes the
+  // exact response. Keeping only the Response handle until after Back can
+  // outlive Chromium's Network body, making a healthy response unreadable.
+  const postBackNowCapturePromise = captureNowRefreshPayload(
+    page.waitForResponse(
+      (response) => {
+        const request = response.request();
+        return (
+          request.method() === 'GET' &&
+          postBackNowMatchesUrl(new URL(response.url()))
+        );
+      },
+      { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
+    ),
+    async (response) =>
+      (await response.json()) as {
+        generatedAt?: unknown;
+      },
+  );
 
-  await pressableClick(page.getByTestId('chat-shell-back'), {
-    beforeDispatch: () => {
-      capturePostBackNowRequest = true;
-      return () => {
-        capturePostBackNowRequest = false;
-      };
-    },
-  });
-  const heldPostBackNowRequest = await postBackNowRequest;
+  await pressableClick(page.getByTestId('chat-shell-back'));
+  const postBackNowActionAtMs = Date.now();
   await expect(page).toHaveURL(/\/session(?:\?|$)/);
   await expect(page.getByTestId('session-screen')).toBeVisible();
-  const postBackNowResponsePromise = page.waitForResponse(
-    (response) => response.request() === heldPostBackNowRequest,
+
+  const postBackNowRequestOutcome = await observeNowRefreshRequestAttempt(
+    postBackNowRequestPromise,
+    { armedAtMs: postBackNowArmedAtMs, actionAtMs: postBackNowActionAtMs },
   );
-  releasePostBackNowResponse();
-  const postBackNowResponse = await postBackNowResponsePromise;
-  expect(postBackNowResponse.ok()).toBe(true);
-  const postBackNowFeed = (await postBackNowResponse.json()) as {
-    generatedAt?: unknown;
-  };
-  expect(typeof postBackNowFeed.generatedAt).toBe('string');
-  expect(postBackNowFeed.generatedAt).not.toBe(initialNowFeed.generatedAt);
+  // Required in EVERY accepted variant below (settled, aborted/rejected, or
+  // bounded-unsettled) -- a variant where no matching request ever fired must
+  // fail the spec, not be accepted as a legitimate WI-2818 outcome.
+  assertRequestAttempted(postBackNowRequestOutcome);
+
+  const postBackNowOutcome = await observeCapturedNowRefresh(
+    postBackNowCapturePromise,
+    { armedAtMs: postBackNowArmedAtMs, actionAtMs: postBackNowActionAtMs },
+  );
+  if (postBackNowOutcome.kind === 'settled') {
+    // Evidence is strongest when the exact refresh settles inside the
+    // observation window: prove it succeeded and was actually fresh.
+    const { response: postBackNowResponse, payload: postBackNowFeed } =
+      postBackNowOutcome.response;
+    expect(postBackNowResponse.ok()).toBe(true);
+    expect(typeof postBackNowFeed.generatedAt).toBe('string');
+    expect(postBackNowFeed.generatedAt).not.toBe(initialNowFeed.generatedAt);
+  }
+  // A rejected or unsettled exact refresh is a legitimate WI-2818 production
+  // outcome (network hiccup, or Session already gave up waiting past the
+  // 2-second bound) — Mentor is still reached either way, proven below. The
+  // request-attempt assertion above already ruled out "no request fired" as
+  // the cause of a rejected/unsettled response.
+
   await expect(page).toHaveURL(/\/mentor(?:\?|$)/);
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
     timeout: 30_000,

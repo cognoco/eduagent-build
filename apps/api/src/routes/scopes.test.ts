@@ -21,12 +21,14 @@ jest.mock(
 const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
 const EDGE_ID = '00000000-0000-4000-8000-000000000201';
+const CALLER_PERSON_ID = '00000000-0000-4000-8000-000000000301';
 
-function makeApp() {
+function makeApp(callerPersonId: string = PROFILE_ID) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('db' as never, { marker: 'db' } as unknown as Database);
     c.set('profileId' as never, PROFILE_ID);
+    c.set('callerPersonId' as never, callerPersonId);
     await next();
   });
   app.route('/v1', scopesRoutes);
@@ -114,10 +116,22 @@ describe('scopes routes', () => {
   it('GET /scopes/:personId/subjects returns 403 for unlinked people', async () => {
     jest
       .mocked(readSupporteeStructuralSubjects)
-      .mockRejectedValue(new ForbiddenError('No edge'));
+      .mockImplementation(async (_db, supporterPersonId) => {
+        if (supporterPersonId === CALLER_PERSON_ID) {
+          throw new ForbiddenError('No edge');
+        }
+        return { personId: CHILD_ID, edgeId: EDGE_ID, subjects: [] };
+      });
 
-    const res = await makeApp().request(`/v1/scopes/${CHILD_ID}/subjects`);
+    const res = await makeApp(CALLER_PERSON_ID).request(
+      `/v1/scopes/${CHILD_ID}/subjects`,
+    );
 
     expect(res.status).toBe(403);
+    expect(readSupporteeStructuralSubjects).toHaveBeenCalledWith(
+      expect.anything(),
+      CALLER_PERSON_ID,
+      CHILD_ID,
+    );
   });
 });

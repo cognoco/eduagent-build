@@ -29,7 +29,10 @@ import {
   stripNoticeOverflowItems,
   writeCachedNowFeed,
 } from '../lib/now-feed-cache';
-import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
+import {
+  mentorNoticePolicySuppressesPayloadFor,
+  useMentorNoticePolicy,
+} from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
@@ -198,26 +201,7 @@ export function useNowFeed(): NowFeedQueryResult {
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        let data: NowResponse;
-        try {
-          data = await parseJson(okRes, nowResponseSchema, 'GET /now');
-        } catch (err) {
-          // [WI-2627] A malformed `mentorNoticePolicy` fails the WHOLE response
-          // schema, so `parseJson` throws and the fold below never runs. Left
-          // there, the reducer is never REACHED: TanStack Query retains the
-          // prior notice-bearing `data` after a failed background refetch,
-          // policy stays enabled, and those cards keep rendering indefinitely —
-          // "missing/malformed never exposes data" defeated by a route that
-          // never gets to the reducer.
-          //
-          // Deliberately over-broad: this fires on ANY unparseable /now body,
-          // not only a bad policy field, because we cannot tell which field
-          // failed without a second read of a single-use body. That is the
-          // correct side to err on — a response we cannot parse is one whose
-          // policy we cannot confirm, and notices are the private feature.
-          policy.observeMalformed();
-          throw err;
-        }
+        const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
         // [WI-2627] This response is also the ORDERED observation. Fold it
         // before the cache write below, so a response that carries a rollback
         // is not persisted with its own notice cards intact.
@@ -337,12 +321,62 @@ export function useNowFeed(): NowFeedQueryResult {
       : query.data;
   }, [query.data, policy]);
 
+  // [WI-2933] Judge the persisted projection against the floor of the pair it
+  // was CACHED FOR, not against whatever pair happens to be bound at render.
+  //
+  // `fallbackFeed` can only ever be populated while BOUND — the effect above
+  // returns early without a `cacheBinding`. Whether it SURVIVES the pair going
+  // unbound (sign-out, auth teardown, profile cleared) is CONDITIONAL, and that
+  // condition is the whole reachability question: the same early-return branch
+  // clears it unless `query.isError`, so retention past an unbind requires the
+  // query to be in an error state. Measured (WI-2933 reachability run): forcing
+  // a real re-render with a null user gives `fallbackFeed = null,
+  // isError = false` — with no error the projection does not survive.
+  //
+  // What the unbound branch would do if reached: `policy.suppressed(undefined)`
+  // takes the unbound branch, which has no storage key, therefore no Entry,
+  // therefore no stored disable floor — a projection for a pair whose durable
+  // floor forbids notices would be judged with nothing to judge it against.
+  // NO SUCH EXPOSURE HAS BEEN DEMONSTRATED. The `isError: true` AND unbound
+  // combination is unmeasured: once the pair is unbound the query stops
+  // fetching, so the harness could not drive it into an error state afterwards.
+  //
+  // That combination also got HARDER to reach while this branch was open:
+  // #2752 (WI-2949) removed the mentor-notice call from `useApiQuery`'s
+  // `onParseError` seam — the one route that produced `isError` and a stored
+  // disable floor in the same event. No production caller passes that option
+  // now.
+  //
+  // Remembering the populating pair is what would make the floor reachable if
+  // that combination ever occurs — hardening, not a fix for a demonstrated
+  // exposure. It is
+  // also the ONLY defensible answer to "what is the safe default when the pair
+  // is unknowable": for this payload the pair is not unknowable — the payload
+  // exists *because* a pair was bound. A device that has NEVER been bound has no
+  // cached projection to paint and no floor to consult, so it keeps today's
+  // permissive default and nothing is blanked fleet-wide (AC-2).
+  // Stores the already-memoised `cacheBinding` rather than a fresh
+  // `{actorId, profileId}` literal — matching `cacheBindingRef` above. A new
+  // literal here would change identity on every bound render, and this ref
+  // feeds `noticeSafeFallback`'s dep array, so the memo would re-run every
+  // render for a value that only changes when the binding does.
+  const fallbackPairRef = useRef<typeof cacheBinding>(null);
+  if (cacheBinding) {
+    fallbackPairRef.current = cacheBinding;
+  }
+  const fallbackPair = fallbackPairRef.current;
+
   const noticeSafeFallback = useMemo(() => {
     if (!fallbackFeed) return fallbackFeed;
-    return policy.suppressed(undefined)
-      ? stripNoticeCards(fallbackFeed)
-      : fallbackFeed;
-  }, [fallbackFeed, policy]);
+    const suppressed = fallbackPair
+      ? mentorNoticePolicySuppressesPayloadFor(
+          fallbackPair.actorId,
+          fallbackPair.profileId,
+          undefined,
+        )
+      : policy.suppressed(undefined);
+    return suppressed ? stripNoticeCards(fallbackFeed) : fallbackFeed;
+  }, [fallbackFeed, policy, fallbackPair]);
 
   // The cast is the `UseQueryResult` discriminated union, not a type escape:
   // overriding `data` on a spread widens it to `NowResponse | undefined`, which
@@ -440,17 +474,6 @@ export function useNowOverflow(
         { query: { scope: 'self' } },
         { init: { signal } },
       ),
-    // [WI-2627 rework] `select` runs AFTER the wrapper's parse, so a malformed
-    // `mentorNoticePolicy` fails the whole schema and the fold below is never
-    // reached — and TanStack Query then RETAINS the prior notice-bearing page
-    // and keeps rendering it with policy still enabled. `onParseError` is the
-    // wrapper's seam for exactly that: it fires before the error propagates, so
-    // the store goes fail-closed and the suppression memo below re-evaluates
-    // and strips the data the query kept.
-    //
-    // Deliberately over-broad, as in `useNowFeed`: a body we cannot parse is one
-    // whose policy we cannot confirm, and notices are the private feature.
-    onParseError: () => policy.observeMalformed(),
     // [WI-2627] The fold happens HERE, not in an effect. `useApiQuery` runs
     // `select` inside the query fn, i.e. BEFORE the query publishes — which is
     // the only place a fold can sit without the surface painting a frame first.

@@ -3,11 +3,11 @@
  *
  * Seeds two isolated profiles. For each test, inserts candidate + neighbour
  * fact rows with real embeddings. Runs runDedupForProfile with a real DB and
- * scoped repo. Mocks only the LLM boundary (routeAndCall) via registerProvider.
+ * scoped repo. Mocks only the LLM boundary via the caller dependency.
  * Asserts DB state after each action.
  *
  * Per AGENTS.md: "No internal mocks in integration tests."
- * LLM boundary: registerProvider (real routeAndCall dispatch, mock chat fn).
+ * LLM boundary: caller dependency (real runDedupLlm parsing, mock route result).
  */
 
 import { and, eq, isNull } from 'drizzle-orm';
@@ -39,12 +39,20 @@ const EMBEDDING_B = axis(0); // identical → cosine distance 0 (best case)
 
 // A far vector so we can control which neighbour is within threshold
 
+type SuccessfulDedupLlmResult = Extract<DedupLlmResult, { ok: true }>;
+
 function llmDecision(
-  decision: DedupLlmResult & { ok: true },
-): jest.MockedFunction<
-  NonNullable<Parameters<typeof runDedupForProfile>[0]['llm']>
-> {
-  return jest.fn().mockResolvedValue(decision);
+  decision: SuccessfulDedupLlmResult,
+): NonNullable<Parameters<typeof runDedupForProfile>[0]['llmDeps']> {
+  return {
+    caller: jest.fn().mockResolvedValue({
+      response: JSON.stringify(decision.decision),
+      model: decision.modelVersion,
+      provider: decision.provider,
+      latencyMs: 1,
+      stopReason: 'stop',
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -92,13 +100,14 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: {
           action: 'merge',
           merged_text: 'likes fractions and fraction work',
         },
         modelVersion: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -170,10 +179,11 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'supersede' },
         modelVersion: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -232,10 +242,11 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'keep_both' },
         modelVersion: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -293,10 +304,11 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
+        provider: 'anthropic',
       }),
     });
 
@@ -371,10 +383,11 @@ describe('memory_facts dedup — action branches (real DB)', () => {
       candidateIds: [cId],
       threshold: 0.5,
       cap: 5,
-      llm: llmDecision({
+      llmDeps: llmDecision({
         ok: true,
         decision: { action: 'discard_new' },
         modelVersion: 'test',
+        provider: 'anthropic',
       }),
     });
 

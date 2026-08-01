@@ -23,6 +23,7 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },
   moduleFileExtensions: ['ts', 'js'],
+  // Source-selection authority for Jest and `pnpm typecheck:integration`.
   testMatch: ['**/tests/integration/**/*.integration.test.ts'],
   // The `**/tests/integration/**` glob also matches every copy of this suite
   // inside `.worktrees/<branch>/` checkouts. Without the guards below, a repo

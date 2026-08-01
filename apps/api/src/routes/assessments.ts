@@ -107,12 +107,6 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
 
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // Gated unconditionally — the app_help/forceReview branches inside
-      // submitAssessmentAnswer are DB-only, but this endpoint's primary
-      // purpose (evaluateAssessmentAnswer) dispatches the LLM.
-      await assertLlmConsent(db, profileId);
-
       // [WI-2432] Safety-adjacent age gate (mirrors exchanges.ts's
       // ageBracket derivation) — the router consumes this to enforce the
       // under-18 Gemini/Vertex vendor exclusion (MMT-ADR-0016 §1.5) on the

@@ -2609,14 +2609,52 @@ describe('SubscriptionScreen', () => {
       expect(mockPush).toHaveBeenCalledWith('/(app)/progress');
     });
 
-    it('"Browse Library" button navigates to /(app)/library', async () => {
-      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+    it('"Browse Library" button navigates to /(app)/library when V2 nav is off [WI-2467]', async () => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = false;
 
-      await waitFor(() => {
-        screen.getByTestId('browse-library-button');
-      });
-      fireEvent.press(screen.getByTestId('browse-library-button'));
-      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('browse-library-button');
+        });
+        fireEvent.press(screen.getByTestId('browse-library-button'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    });
+
+    it('"Browse Library" button navigates to /(app)/subjects when V2 nav is on [WI-2467]', async () => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('browse-library-button');
+        });
+        fireEvent.press(screen.getByTestId('browse-library-button'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
     });
 
     it.each([

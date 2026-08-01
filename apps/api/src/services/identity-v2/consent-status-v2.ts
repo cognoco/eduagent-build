@@ -44,7 +44,7 @@ import {
 // barrel here would cycle. session-crud.ts has no dependency back on this
 // module. Precedented elsewhere (dashboard.ts, recaps.ts reach into
 // session-crud.ts directly).
-import { ConsentWithdrawnError } from '../session/session-crud';
+import { ConsentWithdrawnError } from './consent-errors';
 import type {
   ConsentPurpose,
   ConsentStatus,

@@ -432,13 +432,13 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by POST generate-topics) runs
-// isLlmExchangeConsentAllowed, which reads db.query.membership /
+// assertLlmConsent (called by the real generateBookTopicsWithFallback helper
+// downstream of POST generate-topics) runs isLlmExchangeConsentAllowed, which
+// reads db.query.membership /
 // consentGrant — real queries with no controllable behavior on this file's
 // mock DB. Defaults to allowed (resolves undefined = no throw); the
-// consent-withdrawal test suite below overrides with
-// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
-// refusal path. Mirrors the subjects.test.ts pattern.
+// consent-withdrawal test suite below overrides it to exercise the
+// service-boundary refusal path.
 // gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
 // consentGrant reads with no real implementation available in this file's
 // mock-DB environment (same class as verifyPersonOwnershipV2 above).
@@ -1466,12 +1466,38 @@ describe('book routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5)
+  // [WI-2543] Consent gate lives at the service LLM-dispatch boundary.
   // -------------------------------------------------------------------------
-  describe('[WI-2396] generate-topics consent-withdrawal gate', () => {
+  describe('[WI-2543] generate-topics granular consent gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls generateBookTopics when consent is withdrawn', async () => {
+    it('returns an already-generated cached book after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce(
+        mockBookWithTopics as BookWithTopics,
+      );
+
+      try {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({}),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(mockClaimBookForGeneration).toHaveBeenCalled();
+      } finally {
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
+    });
+
+    it('refuses with 403 CONSENT_WITHDRAWN at generation and never dispatches the LLM', async () => {
       assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
       mockClaimBookForGeneration.mockResolvedValueOnce({
         id: BOOK_ID,
@@ -1496,7 +1522,7 @@ describe('book routes', () => {
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
       expect(generateBookTopics).not.toHaveBeenCalled();
-      expect(mockClaimBookForGeneration).not.toHaveBeenCalled();
+      expect(mockClaimBookForGeneration).toHaveBeenCalled();
     });
 
     it('proceeds (LLM dispatched) when consent is active', async () => {

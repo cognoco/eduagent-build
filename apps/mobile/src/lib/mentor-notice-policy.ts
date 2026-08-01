@@ -8,7 +8,10 @@ import {
 } from '@eduagent/schemas';
 
 import { Sentry } from './sentry';
-import { MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX as KEY_PREFIX } from './secure-store-keys';
+import {
+  MENTOR_NOTICE_POLICY_DISABLE_FLOOR_KEY_SUFFIX as FLOOR_SUFFIX,
+  MENTOR_NOTICE_POLICY_STATE_KEY_PREFIX as KEY_PREFIX,
+} from './secure-store-keys';
 
 // ---------------------------------------------------------------------------
 // [WI-2627] Client-side monotonic mentor-notice rollout state
@@ -199,6 +202,82 @@ export function reduceMentorNoticePolicy(
 }
 
 /**
+ * [WI-2627 rework 5] Reduce the DISABLE FLOOR key SET to one signal.
+ *
+ * The floor is the MAXIMUM revision across the marker keys. Two properties, and
+ * the single-slot sidecar this replaced had only the first:
+ *
+ *   suppress-only — the signal always carries `enabled: false`, so folding it
+ *     through `reduceMentorNoticePolicy` can only adopt a disable, keep a
+ *     disable, or be ignored as older. There is no floor value that re-enables.
+ *
+ *   NON-LOWERABLE — a maximum over a set that only ever gains members cannot
+ *     decrease. This is the property that matters, and it is why the floor is a
+ *     set of keys rather than one slot: the device must record a disable while it
+ *     cannot READ, and a blind write to a single slot can overwrite a higher
+ *     revision it never saw. Adding a member cannot.
+ *
+ * UNPARSEABLE MARKERS, and this is where the first pass was outright wrong. It
+ * folded 'malformed' — disable at the HELD revision — which is unconditional and
+ * re-applied on EVERY hydration, so a genuine re-enable was adopted in-session,
+ * written durably, and then re-disabled at that same revision on the next launch.
+ * Forever: raising the deploy revision did not help, because the marker re-fired
+ * at whatever revision was then held. A corrupt STATE RECORD self-heals (the next
+ * write overwrites it); a corrupt MARKER cannot, because markers are deliberately
+ * never pruned. "Never remove" bought non-lowerability and sold self-healing, and
+ * that turned a transient fault into a permanent one — the exact
+ * "permanently disabled with no recovery path" this module claims to avoid.
+ *
+ * So an unparseable marker contributes a suppress-only floor at revision
+ * `floor ?? 0` — never 'malformed'. That is the honest reading: its true revision
+ * is UNKNOWABLE, and asserting one would fabricate a revision the server never
+ * issued, pointed at blocking re-enables, which is precisely the prohibited move
+ * that caused this. At revision 0 it is `older` than any real state, so a genuine
+ * revision clears it and recovery survives a restart; it still withholds the
+ * never-told benefit, because an object signal counts as an observation just as
+ * 'malformed' did, so a cached projection cannot paint on a fresh install.
+ *
+ * RESIDUAL, stated: if a corrupt marker's true revision was high, that disable is
+ * lost. Unavoidable — we cannot read it — and the alternative is bricking. Nothing
+ * in this codebase writes a corrupt marker; it takes storage corruption or a
+ * foreign writer under the prefix.
+ *
+ * No prefix match at all is 'absent' and contributes nothing (the common case).
+ */
+function disableFloorSignal(
+  allKeys: readonly string[],
+  prefix: string,
+): MentorNoticePolicySignal {
+  let floor: number | null = null;
+  let sawUnparseable = false;
+  for (const key of allKeys) {
+    if (!key.startsWith(prefix)) continue;
+    const suffix = key.slice(prefix.length);
+    // Strict: `Number` would accept '', ' 3', '3.5', '0x8', 'Infinity'. A
+    // fabricated or unbounded revision is exactly what must never reach the fold.
+    if (!/^\d+$/.test(suffix)) {
+      sawUnparseable = true;
+      continue;
+    }
+    const revision = Number(suffix);
+    if (!Number.isSafeInteger(revision)) {
+      sawUnparseable = true;
+      continue;
+    }
+    if (floor === null || revision > floor) floor = revision;
+  }
+  // Both halves at once, and either alone re-opens the other defect:
+  //   - the good markers' floor is `max` over the PARSEABLE ones, so a corrupt
+  //     sibling cannot lower it (that was its own fail-open: bailing on the first
+  //     bad suffix discarded markers already found, dropping a rev-8 floor to 0
+  //     and letting a stale rev-5 enable through as 'newer');
+  //   - an unparseable marker with no good marker behind it contributes revision
+  //     0 — inert against any real revision, so it cannot brick the device.
+  const revision = floor ?? (sawUnparseable ? 0 : null);
+  return revision === null ? 'absent' : { revision, enabled: false };
+}
+
+/**
  * What this device knows, as the payload test below needs it.
  *
  * `observed` is the distinction the bootstrap alone cannot express, and getting
@@ -216,6 +295,33 @@ export type MentorNoticePolicyKnowledge = {
   /** Has any real signal — wire or stored — ever been folded in? */
   observed: boolean;
   hydrated: boolean;
+  /**
+   * [WI-2911] Has a storage read for this pair SUCCEEDED this session?
+   *
+   * `hydrated` says a read attempt has COMPLETED; this says one has completed
+   * successfully, and the two diverge exactly when storage is unreadable. A
+   * failed read folds 'malformed', which disables AT THE HELD REVISION — and at
+   * initial hydration the held revision is the bootstrap 0, so the very next
+   * observation above 0 is `newer`, adopted wholesale, and `state.enabled` goes
+   * true again while the disable floor on disk stays unread. Every surface that
+   * carries no observation of its own then repaints off that state: the exact
+   * in-session fail-open WI-2627 closed durably (the write is withheld while
+   * blind, and a restart re-reads the append-only floor markers) and left open
+   * for the life of the session.
+   *
+   * MONOTONIC, and deliberately: it is set on the first successful read and
+   * never cleared. A device whose hydration succeeded and whose FOREGROUND
+   * re-read later throws was still enabled from a trusted source, and
+   * re-suppressing it would strand a device that legitimately holds a
+   * server-issued enable.
+   *
+   * Consumed only by the no-observation branch of `noticesSuppressedForPayload`.
+   * A payload carrying its OWN observation is judged on that observation — the
+   * server's predicate V has already stripped notice data if the rollout is off,
+   * so a live reply is the one thing a blind device may still trust, and it is
+   * what keeps a blind device from going dark for the whole session.
+   */
+  trusted: boolean;
 };
 
 /**
@@ -243,6 +349,10 @@ export function signalIsObservation(signal: MentorNoticePolicySignal): boolean {
  *   - not hydrated: nothing may render off a projection before the stored
  *     observation is back (the cold-offline-launch case WI-2504 established);
  *   - the payload's own observation is malformed;
+ *   - [WI-2911] the payload carries NO observation and no read has SUCCEEDED
+ *     this session — the state such a payload would be judged against was
+ *     assembled blind, so it cannot stand in for the disable floor it could not
+ *     read;
  *   - the payload carries NO observation and this device HAS been told the
  *     rollout is off — the cached-resurrection case this store exists for;
  *   - the payload carries an observation, and policy is off at the revision we
@@ -267,6 +377,22 @@ export function noticesSuppressedForPayload(
   const signal = observationSignal(observation);
   if (signal === 'malformed') return true;
   if (signal === 'absent') {
+    // [WI-2911] THE IN-SESSION FLOOR. A payload with no observation is judged
+    // purely on stored policy state — so while no read has succeeded there is
+    // nothing legitimate to judge it on. Both readings of the bootstrap fail
+    // here: `observed` is true (the failed read folded 'malformed'), so this
+    // would suppress correctly for exactly as long as `state.enabled` stays
+    // false — and one stale observation above revision 0 flips it, because 0 is
+    // what a failed read leaves us holding. That is the resurrection, and it
+    // does not need a malicious payload: any pre-rollback reply in flight or in
+    // cache carries it.
+    //
+    // This is NOT gated on "an observation has arrived". A response from a
+    // worker predating the field carries none, and gating on presence would
+    // blank notices on every such response fleet-wide. It is gated on the read,
+    // so it fires only on a device whose storage is unreadable — a population
+    // that is already fail-closed by every other path in this module.
+    if (!knowledge.trusted) return true;
     return knowledge.observed ? !knowledge.state.enabled : false;
   }
   if (!knowledge.state.enabled) return true;
@@ -280,6 +406,31 @@ export function noticesSuppressedForPayload(
 function storageKey(actorId: string, profileId: string): string {
   return `${KEY_PREFIX}::${actorId}::${profileId}`;
 }
+
+/**
+ * [WI-2627] The disable-floor marker namespace for a state key, and the marker
+ * key for one revision within it. Derived from the state key rather than rebuilt
+ * from (actor, profile) so there stays exactly ONE key-construction site, and so
+ * the floor is unconditionally actor-scoped the way the state key is.
+ *
+ * The trailing separator matters: it makes the prefix scan exact, so a marker can
+ * never be confused with the state key itself or with a longer sibling namespace.
+ */
+function disableFloorPrefix(stateKey: string): string {
+  return `${stateKey}::${FLOOR_SUFFIX}::`;
+}
+
+function disableFloorKeyFor(stateKey: string, revision: number): string {
+  return `${disableFloorPrefix(stateKey)}${revision}`;
+}
+
+/**
+ * Placeholder value for a floor marker. The REVISION lives in the key and the
+ * key's presence is the whole fact, so this is never read — deliberately, because
+ * a value that had to agree with its key would be a second source of truth for
+ * the same fact, and the two could disagree.
+ */
+const DISABLE_FLOOR_MARKER = '1';
 
 export type MentorNoticePolicySnapshot = MentorNoticePolicyKnowledge;
 
@@ -333,26 +484,63 @@ type Entry = {
    */
   readUntrusted: boolean;
   /**
-   * [WI-2627 rework 3] A well-formed OBSERVATION carrying `enabled: false` has
-   * been folded into this entry — i.e. the server actually told this device the
-   * rollout is off.
+   * [WI-2627 rework 3] The highest revision at which a well-formed OBSERVATION
+   * carrying `enabled: false` has been folded into this entry — i.e. the highest
+   * revision at which the server actually told this device the rollout is off.
+   * `null` when it never has.
    *
    * Needed because "the store is currently disabled" is NOT the same as "we hold
    * a disable worth persisting blind". A failed read folds `'malformed'`, which
    * disables at the held revision — so after a blind read the state reads
    * disabled even when the only thing the server ever said was ENABLED. Gating
    * the blind write on `state.enabled` alone therefore wrote a disable
-   * manufactured by our own read failure, lowering the durable floor for
-   * nothing. This flag distinguishes a genuine kill-switch, which is worth the
-   * floor cost, from our own fail-closed reaction to blindness, which is not.
+   * manufactured by our own read failure. This field distinguishes a genuine
+   * kill-switch from our own fail-closed reaction to blindness.
+   *
+   * [rework 4] It carries the REVISION, not just a flag, because it is now what
+   * the blind write persists. Every value it can ever hold is a revision the
+   * SERVER issued alongside `rolloutEnabled: false` — it is the maximum over
+   * genuinely-observed disables, never a sentinel, never a synthesized bound,
+   * never `revision + 1`. That is what keeps the floor honest: it can assert
+   * only disables that actually happened.
    */
-  observedDisable: boolean;
+  observedDisableRevision: number | null;
 };
 
 const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
   observed: false,
   hydrated: false,
+  // [WI-2933, correcting a WI-2911 rationale] `true` is the right VALUE, and the
+  // reason given for it was wrong. `trusted` asserts "no read of this pair's
+  // stored record has failed"; an unbound pair has no key, so no read was ever
+  // attempted and none can have failed. That stands on its own.
+  //
+  // The struck justification claimed this matched `hydrated`/`observed` "which
+  // the hook already reports as true when unbound". It does not: the literal two
+  // lines above sets BOTH to `false`. The "true when unbound" belongs to the
+  // hook's RETURN (`bound ? snapshot.hydrated : true`), a different object built
+  // from this one — so the old comment justified a field of this literal by
+  // citing values this literal does not hold.
+  //
+  // Rationale corrected rather than value changed — and the FIRST correction
+  // was wrong the same way. It claimed flipping this to `false` would make
+  // `noticesSuppressedForPayload` suppress unconditionally. That consequence
+  // belongs to a DIFFERENT literal: the one built inline in
+  // `mentorNoticePolicySuppressesPayloadFor`'s unbound branch, which pairs
+  // `trusted: true` with `hydrated: true` and so does reach the `!trusted`
+  // check. Read that literal for the fleet-wide-blanking argument; it is the
+  // one that carries it.
+  //
+  // THIS field is read on no live path, on four counts: the only reference is
+  // `getSnapshot`'s `if (!key) return UNBOUND_SNAPSHOT`; the unbound branch
+  // above builds its own literal instead of using this one;
+  // `noticesSuppressedForPayload` returns at `!hydrated` before `trusted` is
+  // read, and this literal sets `hydrated: false`; and the hook's return masks
+  // it (`trusted: bound ? snapshot.trusted : true`). Flipping it changes
+  // nothing observable. `true` is the honest label for "no read was attempted",
+  // which is why it stays.
+  trusted: true,
 };
 
 /**
@@ -373,6 +561,7 @@ function getEntry(key: string): Entry {
         state: MENTOR_NOTICE_POLICY_BOOTSTRAP,
         observed: false,
         hydrated: false,
+        trusted: false,
       },
       listeners: new Set(),
       hydrating: false,
@@ -380,7 +569,7 @@ function getEntry(key: string): Entry {
       flushQueued: false,
       durable: null,
       readUntrusted: false,
-      observedDisable: false,
+      observedDisableRevision: null,
     };
     entries.set(key, entry);
   }
@@ -392,16 +581,18 @@ function commit(
   state: MentorNoticePolicyState,
   observed: boolean,
   hydrated: boolean,
+  trusted: boolean,
 ): void {
   const previous = entry.snapshot;
   if (
     previous.state === state &&
     previous.observed === observed &&
-    previous.hydrated === hydrated
+    previous.hydrated === hydrated &&
+    previous.trusted === trusted
   ) {
     return;
   }
-  entry.snapshot = { state, observed, hydrated };
+  entry.snapshot = { state, observed, hydrated, trusted };
   for (const listener of entry.listeners) listener();
 }
 
@@ -457,7 +648,9 @@ function enqueue(entry: Entry, work: () => Promise<void>): void {
  * It is NOT the whole story when the READ itself failed, because then a
  * higher-revision disable may be on disk unseen. `flush` handles that case
  * before reaching here: it retries the read, and if still blind it withholds an
- * ENABLED candidate outright while letting a DISABLED one through unguarded.
+ * ENABLED candidate outright and diverts a genuine DISABLE to the suppress-only
+ * disable-floor key set, so this function is never asked to write the state
+ * record blind.
  */
 function durableCandidate(entry: Entry): MentorNoticePolicyState {
   const current = entry.snapshot.state;
@@ -486,15 +679,28 @@ function durableCandidate(entry: Entry): MentorNoticePolicyState {
  *     keep painting.
  *
  * Retrying with backoff is the defensible shape: it recovers the common
- * transient failure (the case this device most likely to hit) without
- * inventing a second fallible write path. Under sustained failure (disk
- * genuinely full for the retry window) the write still never lands and the
- * durable record lags — but it lags at an OLDER revision that no later flush
- * can be tricked into re-adopting, and in-session behaviour is fail-closed
- * throughout.
+ * transient failure (the case this device most likely to hit). Under sustained
+ * failure (disk genuinely full for the retry window) the write still never
+ * lands and the durable record lags — but it lags at an OLDER revision that no
+ * later flush can be tricked into re-adopting, and in-session behaviour is
+ * fail-closed throughout.
+ *
+ * [rework 4] This function also owns the ONE case where a write goes to the
+ * disable-floor key set instead of the state record. The earlier objection to a
+ * second key — "a second fallible write path" — does not hold for a key that can
+ * only ever SUPPRESS: a failed marker write leaves the device exactly where it
+ * already was, where a failed STATE-record write is what destroys the floor. See
+ * "THE DISABLE FLOOR" inline.
  */
 async function flush(key: string, entry: Entry): Promise<void> {
   entry.flushQueued = false;
+
+  /**
+   * Non-null when this flush must add a SUPPRESS-ONLY disable-floor marker
+   * instead of the state record, because a genuine disable has to be persisted
+   * while the state record cannot be read. See "THE DISABLE FLOOR" below.
+   */
+  let blindFloor: number | null = null;
 
   // [WI-2627 rework 3] A failed READ leaves the disk contents UNKNOWN, and a
   // higher-revision disable may be sitting there unseen. Retry the read on the
@@ -516,13 +722,14 @@ async function flush(key: string, entry: Entry): Promise<void> {
       if (backoff !== undefined) await delay(backoff);
     }
 
-    // Still blind, with nothing established to guard against. The choice is
-    // between two bad writes, and the DIRECTION of the candidate decides which
-    // one we take — the previous pass withheld unconditionally and that was
-    // wrong, because it swallowed the kill-switch itself.
+    // Still blind, with nothing established to guard against.
     if (entry.readUntrusted && entry.durable === null) {
-      if (entry.snapshot.state.enabled || !entry.observedDisable) {
-        // Nothing worth persisting blind → WITHHOLD. Two shapes land here:
+      if (
+        entry.snapshot.state.enabled ||
+        entry.observedDisableRevision === null
+      ) {
+        // Nothing worth persisting at all → WITHHOLD, both keys. Two shapes
+        // land here:
         //
         //   an ENABLED candidate — the original breach. At cold start in-memory
         //     is the bootstrap, so any enabled observation above revision 0 is
@@ -543,37 +750,117 @@ async function flush(key: string, entry: Entry): Promise<void> {
         });
         return;
       }
-      // DISABLED candidate → WRITE IT ANYWAY. A disable is the emergency
-      // kill-switch, and withholding it is strictly worse than any record it
-      // can overwrite:
-      //   - if the unknown disk held an ENABLED record, withholding leaves that
-      //     record and the next launch shows notices — the kill-switch silently
-      //     swallowed;
-      //   - if the disk held NOTHING (fresh install, first read throws),
-      //     withholding leaves it absent, and an absent record hydrates as
-      //     NEVER-TOLD, which `noticesSuppressedForPayload` treats as "not
-      //     suppressed" and lets a cached projection paint. That is precisely
-      //     the hazard `removeItem` was rejected for above, reintroduced.
-      // Writing the disable cannot do either. Its one real cost is the FLOOR:
-      // if the unknown disk held a disable at a HIGHER revision, we lower the
-      // bar a later enabled observation must clear. That leaves the device
-      // disabled either way — it only widens the window in which a stale
-      // enabled reply could re-enable — so it is the lesser harm by a wide
-      // margin. Tagged distinctly so the trade is observable in production
-      // rather than only asserted here.
-      Sentry.captureMessage('mentor_notice_policy: blind disable write', {
+      // ── THE DISABLE FLOOR ────────────────────────────────────────────────
+      //
+      // A GENUINE disable, blind, with nothing established to guard against.
+      // Both obvious moves are wrong, and this is where the previous two passes
+      // each took one of them:
+      //
+      //   withhold entirely — swallows the emergency kill-switch. If the unseen
+      //     disk held an ENABLED record the next launch shows notices; if it
+      //     held NOTHING, the record stays absent and an absent record hydrates
+      //     as NEVER-TOLD, which `noticesSuppressedForPayload` treats as "not
+      //     suppressed" and lets a cached projection paint.
+      //
+      //   write the STATE record anyway — persists the disable, but if the
+      //     unseen disk held a disable at a HIGHER revision it overwrites it and
+      //     LOWERS the floor a later enabled observation must clear. A stale
+      //     intermediate enabled reply then clears the lowered bar and the
+      //     restart shows notices. That is the resurrection path this Work Item
+      //     exists to eliminate, so "it leaves the device disabled for now" does
+      //     not buy it.
+      //
+      // So write NEITHER the state record nor a fabricated revision: ADD a
+      // marker to the suppress-only disable-floor key set, and leave the state
+      // record untouched. Hydration folds the floor additively on top of the
+      // state record (`readAndFold`); the effective bar is the higher of them.
+      //
+      // [rework 5] IT MUST BE A SET, NOT A SLOT, and this is the correction that
+      // matters most. A single sidecar slot holding "the highest disable" is
+      // still a slot we cannot READ while blind, so a blind rev-3 write
+      // overwrites an unseen rev-8 marker and lowers the floor exactly as the
+      // state record did. That is reachable in two blind cold starts — the shape
+      // sustained disk pressure actually takes, since it spans restarts — and on
+      // a fresh install the floor is the ONLY carrier, so lowering it lowers the
+      // bar absolutely. "A different key cannot destroy the state record" was
+      // true and answered the wrong question: what must survive is the FLOOR, not
+      // the record.
+      //
+      // Why this cannot re-enable anything, which is the whole argument:
+      //   - a marker has no `enabled` field to carry. `disableFloorSignal` always
+      //     yields `enabled: false`, so folding the floor can only adopt a
+      //     disable, keep a disable, or be ignored as older.
+      //   - NON-LOWERABLE by construction: the floor is the MAXIMUM over the set,
+      //     a blind write only ever ADDS a member, and a maximum over a growing
+      //     set cannot decrease. No read is required for that to hold, which is
+      //     the point — reads are unavailable by hypothesis here.
+      //   - every marker WRITTEN here carries a revision the SERVER issued with
+      //     `rolloutEnabled: false` (`entry.observedDisableRevision`) — no
+      //     sentinel, no synthesized maximum. A genuine deploy above the highest
+      //     marker clears it.
+      //
+      // A fabricated revision pointed at BLOCKING re-enables strands a device
+      // permanently disabled with no recovery path. This write path cannot do
+      // that. But the READ path once did, and the correction is load-bearing: an
+      // unparseable marker used to fold 'malformed' (disable at the HELD
+      // revision, re-applied every hydration) and no revision could clear it,
+      // because markers are never pruned. `disableFloorSignal` now treats an
+      // unknowable revision as 0 rather than asserting one. Do not "harden" that
+      // back — asserting a revision you cannot read is the bricking move.
+      //
+      // NOT pruned, deliberately. A marker below the state record's revision is
+      // redundant, but pruning is a write, and a prune that misfires is where
+      // bricking gets reintroduced. Note also that a marker AT the state record's
+      // revision is NOT redundant — same-revision disabled-wins is what it
+      // enforces. Growth is one key per distinct revision at which this device
+      // observed a disable *while blind*, which is bounded by emergency rollbacks
+      // during storage failure: realistically none, at ~60 bytes each.
+      //
+      // Residual, stated rather than papered over: if the marker write itself
+      // never lands (sustained disk pressure through the retry ladder) a device
+      // whose disk held a LOWER enabled record keeps that record, and the
+      // kill-switch is lost on restart. Same failure class as any other exhausted
+      // write here; in-session behaviour stays fail-closed throughout. Tagged
+      // distinctly so the path is observable in production.
+      Sentry.captureMessage('mentor_notice_policy: blind disable floor write', {
         level: 'warning',
-        tags: { feature: 'mentor_notice_policy', op: 'write_blind_disable' },
+        tags: {
+          feature: 'mentor_notice_policy',
+          op: 'write_blind_disable_floor',
+        },
       });
+      blindFloor = entry.observedDisableRevision;
     }
   }
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= PERSIST_RETRY_DELAYS_MS.length; attempt++) {
-    const candidate = durableCandidate(entry);
+    // read-latest on BOTH branches: recomputed every attempt, so a retry that
+    // lands late carries today's state (see `durableCandidate`) or today's
+    // highest genuine disable, never the one that was current when the
+    // observation arrived.
+    const floor =
+      blindFloor === null
+        ? null
+        : (entry.observedDisableRevision ?? blindFloor);
+    let writeKey = key;
+    let payload: string;
+    let candidate: MentorNoticePolicyState | null = null;
+    if (floor === null) {
+      candidate = durableCandidate(entry);
+      payload = JSON.stringify(candidate);
+    } else {
+      // ADDING a marker, never replacing one: the revision is in the KEY, so
+      // this cannot overwrite a marker for any other revision.
+      writeKey = disableFloorKeyFor(key, floor);
+      payload = DISABLE_FLOOR_MARKER;
+    }
     try {
-      await AsyncStorage.setItem(key, JSON.stringify(candidate));
-      entry.durable = candidate;
+      await AsyncStorage.setItem(writeKey, payload);
+      // Only a STATE-record write establishes what is durably there; a floor
+      // marker says nothing about the state record, so the guard stays
+      // unestablished.
+      if (candidate !== null) entry.durable = candidate;
       return;
     } catch (err) {
       lastError = err;
@@ -610,13 +897,52 @@ function schedulePersist(key: string, entry: Entry): void {
  * what makes the re-read safe (see `useMentorNoticePolicy`).
  *
  * A storage THROW is 'malformed', not 'absent': "storage failure remains
- * fail-closed" per the acceptance criteria. It disables at the held revision,
- * so it can never re-enable and never resurrects a lower revision.
+ * fail-closed" per the acceptance criteria. It disables at the held revision and
+ * never resurrects a lower revision.
+ *
+ * [WI-2911] That is not sufficient ON ITS OWN, and this is where the in-session
+ * hole was. At HYDRATION the held revision is the bootstrap 0, so 'malformed'
+ * disables at 0 — and any subsequent observation above 0 is `newer` and adopted
+ * wholesale, `enabled` included. WI-2627 closed the DURABLE half (the write is
+ * withheld while blind, and a restart re-reads the append-only floor markers);
+ * what remained was the rest of the session, in which a cached or in-flight
+ * pre-rollback projection could repaint. So this function also records WHETHER
+ * THE READ SUCCEEDED, and `noticesSuppressedForPayload` refuses to judge an
+ * observation-less payload on state assembled blind. The floor markers are
+ * untouched — this is a read-side verdict, not a new durable fact.
  */
 async function readAndFold(key: string, entry: Entry): Promise<void> {
   let signal: MentorNoticePolicySignal;
+  /**
+   * [WI-2911] Whether THIS attempt got a clean look at the disk. Folded into the
+   * snapshot's monotonic `trusted` at commit, never used to clear it: a session
+   * that has already read successfully keeps that standing.
+   */
+  let readSucceeded = false;
+  // [WI-2627 rework 4] The suppress-only disable floor, folded ADDITIVELY on top
+  // of the state record below. 'absent' — no markers, the common case —
+  // contributes nothing. Always `enabled: false` (see `disableFloorSignal`), so
+  // fold ORDER against the state record is immaterial: at a higher revision it
+  // adopts, at the same revision disabled wins either way, at a lower revision it
+  // is ignored either way.
+  let floor: MentorNoticePolicySignal = 'absent';
   try {
+    // Sequential, state record FIRST, both inside this one `try`. Not
+    // `multiGet`/`Promise.all`: a failing read must short-circuit so ONE
+    // `readAndFold` costs one failed read, which is what keeps the retry
+    // ladder's read count meaningful. And if EITHER read throws the disk is
+    // unknown, so both facts are discarded together rather than half-trusted.
     signal = storedSignal(await AsyncStorage.getItem(key));
+    // `getAllKeys` rather than one known key, because the floor is a SET whose
+    // members are not enumerable in advance — their revisions are whatever the
+    // server issued. It runs on hydration AND on every foreground re-read: one
+    // extra index read against a store this app already scans wholesale on
+    // sign-out (`sign-out-cleanup.ts`), bought in exchange for a floor no blind
+    // write can lower.
+    floor = disableFloorSignal(
+      await AsyncStorage.getAllKeys(),
+      disableFloorPrefix(key),
+    );
     // [WI-2627 rework] Seed the write guard from what is actually on disk. Only
     // a PARSEABLE record tells us a durable revision; 'absent' means there is
     // genuinely nothing to regress, and 'malformed' means its revision is
@@ -626,11 +952,17 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // and the write path is unblocked.
     entry.durable = typeof signal === 'object' ? signal : null;
     entry.readUntrusted = false;
+    // [WI-2911] BOTH reads landed (they share this `try`, and the state record is
+    // read first), so whatever the disk holds — a record, nothing, or something
+    // unparseable — we have seen it. That is what `trusted` asserts: not that the
+    // contents were good, but that we were able to look.
+    readSucceeded = true;
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: 'mentor_notice_policy', op: 'read' },
     });
     signal = 'malformed';
+    floor = 'absent';
     // [WI-2627 rework 2] We could not LOOK. Do NOT null `durable`: a record
     // established by an earlier successful read or write is still the best guard
     // we have, and discarding it would hand the write path a blank cheque. And
@@ -638,14 +970,29 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // what `readUntrusted` records, and what makes `flush` withhold.
     entry.readUntrusted = true;
   }
+  // ONE commit for both records. Committing the state record first would leave a
+  // window in which a `suppressed()` call reads an enabled state that the floor
+  // is about to disable — the exact fail-open shape this module is about.
   commit(
     entry,
-    reduceMentorNoticePolicy(entry.snapshot.state, signal),
+    reduceMentorNoticePolicy(
+      reduceMentorNoticePolicy(entry.snapshot.state, signal),
+      floor,
+    ),
     // A stored record that EXISTS (even unparseably) means this device was told
     // something and persisted it; only its genuine absence leaves the device
-    // never-told.
-    entry.snapshot.observed || signalIsObservation(signal),
+    // never-told. A disable-floor marker counts for the same reason, and MUST:
+    // a blind disable on a fresh install lands there and nowhere else, and
+    // without this the relaunch would hydrate as never-told and let a cached
+    // projection paint.
+    entry.snapshot.observed ||
+      signalIsObservation(signal) ||
+      signalIsObservation(floor),
     true,
+    // [WI-2911] Monotonic: OR against what the session already holds, so a
+    // foreground re-read that throws cannot revoke a standing established by an
+    // earlier successful read.
+    entry.snapshot.trusted || readSucceeded,
   );
 }
 
@@ -688,11 +1035,27 @@ export function foldMentorNoticePolicyFor(
   // `flush` needs to tell a server kill-switch from the fail-closed state its
   // own failed read manufactures. Only a well-formed observation counts;
   // 'malformed' does not.
+  //
+  // [rework 4] Keep the highest such revision, because `flush` now PERSISTS it
+  // to the disable-floor key set. Every value this can hold is therefore some
+  // `signal.revision` the server actually sent with `rolloutEnabled: false` —
+  // the max of a set of real observations is a member of that set, so nothing
+  // fabricated ever reaches disk.
   if (typeof signal === 'object' && !signal.enabled) {
-    entry.observedDisable = true;
+    entry.observedDisableRevision = Math.max(
+      entry.observedDisableRevision ?? 0,
+      signal.revision,
+    );
   }
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
-  commit(entry, next, true, entry.snapshot.hydrated);
+  // [WI-2911] An observation is NOT an authorizing signal for `trusted`, and this
+  // is the load-bearing negative. Every fold site here fires only after a
+  // successful parse, so "a response arrived" and "an observation arrived" are
+  // the same event — letting a response confer `trusted` would hand the standing
+  // straight to the stale enabled reply this closes, which is the whole
+  // continuation. A blind device's recovery path is the LIVE payload, judged on
+  // its own observation below, not a re-blessed cache.
+  commit(entry, next, true, entry.snapshot.hydrated, entry.snapshot.trusted);
   // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
   // store holds when it actually reaches the disk, not this observation's
   // snapshot — otherwise a retried older ENABLED write can land after a newer
@@ -720,6 +1083,8 @@ export function mentorNoticePolicySuppressesPayloadFor(
         state: reduceMentorNoticePolicy(MENTOR_NOTICE_POLICY_BOOTSTRAP, signal),
         observed: signalIsObservation(signal),
         hydrated: true,
+        // [WI-2911] No pair, no key, no read — nothing was assembled blind.
+        trusted: true,
       },
       observation,
     );
@@ -751,14 +1116,10 @@ export function useMentorNoticePolicy(
   /** Whether any real signal has ever been folded in for this pair. */
   observed: boolean;
   hydrated: boolean;
+  /** [WI-2911] Whether a storage read has SUCCEEDED for this pair this session. */
+  trusted: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
-  /**
-   * Record a fail-closed `malformed` signal when the observation could not be
-   * reached at all — e.g. the whole response failed schema validation, so no
-   * observation value exists to pass to `observe`.
-   */
-  observeMalformed: () => void;
   /** Whether THIS payload's notice content must be suppressed. */
   suppressed: (
     observation: MentorNoticePolicyObservation | undefined,
@@ -818,10 +1179,6 @@ export function useMentorNoticePolicy(
     [actorId, profileId],
   );
 
-  const observeMalformed = useCallback(() => {
-    foldMentorNoticePolicyFor(actorId, profileId, 'malformed');
-  }, [actorId, profileId]);
-
   // Reads the LIVE store rather than this render's snapshot. In render the two
   // agree (both come from the same entry, and `useSyncExternalStore` re-renders
   // on every commit). The difference matters in an imperative callback that has
@@ -839,17 +1196,17 @@ export function useMentorNoticePolicy(
       state: snapshot.state,
       observed: bound ? snapshot.observed : true,
       hydrated: bound ? snapshot.hydrated : true,
+      trusted: bound ? snapshot.trusted : true,
       observe,
-      observeMalformed,
       suppressed,
     }),
     [
       snapshot.state,
       snapshot.observed,
       snapshot.hydrated,
+      snapshot.trusted,
       bound,
       observe,
-      observeMalformed,
       suppressed,
     ],
   );

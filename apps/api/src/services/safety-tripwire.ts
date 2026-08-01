@@ -234,9 +234,10 @@ export function tripwireResponse(
       );
     case 'sexual_content_minor':
       return (
-        "I can't help with that. If someone has asked you for something like this, " +
-        'please tell a parent, guardian, or trusted adult — it is not your fault. ' +
-        "Let's get back to what you're learning."
+        "I can't create or describe sexual content involving a child. I can help " +
+        'with age-appropriate questions about bodies, boundaries, consent, or ' +
+        'staying safe. If someone has asked you for sexual content or images, ' +
+        'please tell a trusted adult — it is not your fault.'
       );
     case 'abuse_disclosure':
       return (

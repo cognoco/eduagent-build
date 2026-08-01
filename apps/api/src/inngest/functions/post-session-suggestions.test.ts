@@ -207,6 +207,43 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
     expect(mockDb.insert).toHaveBeenCalled();
   });
 
+  it('[WI-2737] fences every stored text field in the system prompt', async () => {
+    mockDb.query.curriculumBooks.findFirst.mockResolvedValue({
+      id: 'book-1',
+      subjectId: 'subj-1',
+      title: 'Contact book@example.com',
+      description: 'i live at 12 oakwood street',
+    });
+    mockDb.query.curriculumTopics.findMany.mockResolvedValue([
+      { title: 'Call +1 415 555 2671' },
+    ]);
+    mockRouteAndCall.mockResolvedValue({
+      response: '{"suggestions": ["Light Reactions", "Dark Reactions"]}',
+    });
+
+    await runHandler({
+      ...validEventData,
+      topicTitle: 'Email topic@example.com',
+    });
+
+    const messages = mockRouteAndCall.mock.calls[0]?.[0] as Array<{
+      role: string;
+      content: string;
+    }>;
+    expect(messages[0]?.content).toContain(
+      '<book_title>Contact book@example.com</book_title>',
+    );
+    expect(messages[0]?.content).toContain(
+      '<book_description>i live at 12 oakwood street</book_description>',
+    );
+    expect(messages[0]?.content).toContain(
+      '<topic_list>Call +1 415 555 2671</topic_list>',
+    );
+    expect(messages[0]?.content).toContain(
+      '<completed_topic>Email topic@example.com</completed_topic>',
+    );
+  });
+
   it('strips markdown ```json fences before parsing', async () => {
     mockRouteAndCall.mockResolvedValue({
       response: '```json\n{"suggestions": ["A", "B"]}\n```',

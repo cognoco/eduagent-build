@@ -8,12 +8,16 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parse } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
 const deployYaml = readFileSync(
   join(repoRoot, '.github/workflows/deploy.yml'),
   'utf8',
 );
+const deployWorkflow = parse(deployYaml) as {
+  jobs: Record<string, { if?: string; needs?: string | string[] }>;
+};
 
 const ROUTE_PROBES = [
   {
@@ -33,6 +37,18 @@ type SmokeRoute = RouteProbe['route'];
 test('does not use nonexistent or bare auth-short-circuited paths as mounted-route smoke probes', () => {
   expect(deployYaml).not.toContain('/v1/auth/me');
   expect(deployYaml).not.toContain('${STAGING_API_URL}/v1/sessions"');
+});
+
+test('api-smoke-test overrides skipped-ancestor handling while requiring a successful staging deploy', () => {
+  expect(deployWorkflow.jobs['api-smoke-test']).toMatchObject({
+    needs: 'api-deploy',
+    if: [
+      'always() &&',
+      "needs.api-deploy.result == 'success' &&",
+      "(github.event_name == 'push' || inputs.api_environment == 'staging')",
+      '',
+    ].join('\n'),
+  });
 });
 
 function extractRunScriptForRoute(route: SmokeRoute): string {

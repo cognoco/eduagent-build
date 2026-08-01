@@ -11,7 +11,9 @@
  * When `doppler run` injects secrets, it also sets `DOPPLER_CONFIG` in the
  * child process env. This script checks that value:
  *
- *   DOPPLER_CONFIG = "dev"           →  push is allowed (Doppler dev config)
+ *   DOPPLER_CONFIG = "dev"           →  push is allowed (shared dev contract)
+ *   DOPPLER_CONFIG = "dev_integration" → allowed only through WI-2939's
+ *                                         revision-pinned disposable bootstrap
  *   DOPPLER_CONFIG = "stg" or "prd" →  push is BLOCKED with a clear error
  *   DOPPLER_CONFIG = anything else  →  push is BLOCKED (unknown config = err on safe side)
  *   DOPPLER_CONFIG absent           →  push is BLOCKED unless DB_PUSH_LOCAL_DEV=1
@@ -68,14 +70,19 @@
  * See `docs/incidents/2026-04-stg-push-incident.md`.
  *
  * Exit codes:
- *   0 — DOPPLER_CONFIG="dev"; or DOPPLER_CONFIG absent AND DB_PUSH_LOCAL_DEV=1
- *       AND DATABASE_URL is set AND its host is localhost/127.0.0.1
+ *   0 — DOPPLER_CONFIG="dev"; the verified WI-2939 dev_integration path; or
+ *       DOPPLER_CONFIG absent AND DB_PUSH_LOCAL_DEV=1 AND DATABASE_URL is set
+ *       AND its host is localhost/127.0.0.1
  *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1;
  *       or absent with DB_PUSH_LOCAL_DEV=1 but DATABASE_URL is absent from the
  *       process env (fail-closed) or resolves to a non-local host
  */
 
-import { extractHost, hostMatchesEnvironment } from './verify-db-target-lib.mjs';
+import {
+  extractHost,
+  hostMatchesEnvironment,
+} from './verify-db-target-lib.mjs';
+import { validateDisposableApiIntegrationTarget } from './verify-disposable-integration-target-lib.mjs';
 
 const dopplerConfig = process.env.DOPPLER_CONFIG;
 
@@ -93,7 +100,10 @@ function redactUrl(url) {
 }
 
 function blocked(reason) {
-  const displayUrl = redactUrl(process.env.DATABASE_URL);
+  const displayUrl =
+    dopplerConfig === 'dev_integration'
+      ? '(redacted disposable integration target)'
+      : redactUrl(process.env.DATABASE_URL);
   console.error(
     '\n' +
       '✗  drizzle-kit push is blocked against non-dev databases.\n' +
@@ -101,9 +111,15 @@ function blocked(reason) {
       '   AGENTS.md (Schema And Deploy Safety): "Never run drizzle-kit push\n' +
       '   against staging or production."\n' +
       '\n' +
-      '   Reason: ' + reason + '\n' +
-      '   Doppler config: ' + dopplerConfig + '\n' +
-      '   DATABASE_URL resolved to: ' + displayUrl + '\n' +
+      '   Reason: ' +
+      reason +
+      '\n' +
+      '   Doppler config: ' +
+      dopplerConfig +
+      '\n' +
+      '   DATABASE_URL resolved to: ' +
+      displayUrl +
+      '\n' +
       '\n' +
       '   To push against the dev database:\n' +
       '     pnpm db:push:dev            (from the repo root)\n' +
@@ -161,25 +177,60 @@ if (dopplerConfig === undefined || dopplerConfig === '') {
       Boolean(host?.startsWith('127.0.0.1:'));
 
     if (!isLocalHost) {
-      const neonCheck = hostMatchesEnvironment({ host: host ?? '', wrongEnvSubstring: 'neon.tech' });
+      const neonCheck = hostMatchesEnvironment({
+        host: host ?? '',
+        wrongEnvSubstring: 'neon.tech',
+      });
       blocked(
         'DB_PUSH_LOCAL_DEV=1 is set, but DATABASE_URL resolves to host "' +
           (host ?? '(unparseable)') +
           '", not localhost/127.0.0.1.' +
-          (neonCheck.status === 'mismatch' ? ' ' + neonCheck.reason + '.' : '') +
+          (neonCheck.status === 'mismatch'
+            ? ' ' + neonCheck.reason + '.'
+            : '') +
           ' DATABASE_URL is already set in the process environment and does not\n' +
           '   point at a local database. Point DATABASE_URL at your local Postgres instance.',
       );
     }
   }
 
-  console.log('✓ drizzle-kit push: no Doppler config — DB_PUSH_LOCAL_DEV=1 override accepted');
+  console.log(
+    '✓ drizzle-kit push: no Doppler config — DB_PUSH_LOCAL_DEV=1 override accepted',
+  );
+  process.exit(0);
+}
+
+if (dopplerConfig === 'dev_integration') {
+  if (process.env.INTEGRATION_SCHEMA_BOOTSTRAP !== 'WI-2939') {
+    blocked(
+      'dev_integration is permitted only through the revision-pinned WI-2939\n' +
+        '   bootstrap command; direct or ambient pushes remain blocked.',
+    );
+  }
+  try {
+    validateDisposableApiIntegrationTarget(process.env);
+  } catch (error) {
+    blocked(
+      error instanceof Error
+        ? error.message
+        : 'the disposable integration target could not be verified',
+    );
+  }
+  console.log(
+    '✓ drizzle-kit push: guarded disposable dev_integration target confirmed',
+  );
   process.exit(0);
 }
 
 if (dopplerConfig !== 'dev') {
-  blocked('Doppler config is "' + dopplerConfig + '" — only "dev" is allowed for push');
+  blocked(
+    'Doppler config is "' +
+      dopplerConfig +
+      '" — only "dev" is allowed for push',
+  );
 }
 
-console.log('✓ drizzle-kit push: dev Doppler config confirmed (DOPPLER_CONFIG=dev)');
+console.log(
+  '✓ drizzle-kit push: dev Doppler config confirmed (DOPPLER_CONFIG=dev)',
+);
 process.exit(0);

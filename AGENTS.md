@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~88 screens, 494 test suites, ~5644 tests
-- API: 53 route groups, 329 test suites, ~8380 tests, 78 Inngest functions
-- Cross-package integration tests: 70 suites in `tests/integration/`, ~290 cases
+- Mobile: ~88 screens, 515 test suites, ~6,055 tests
+- API: 53 route groups, 329 test suites, ~8,818 tests, 78 Inngest functions
+- Cross-package integration tests: 71 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-07-21. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-07-29. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## How to Work
 
@@ -162,6 +162,22 @@ concern and may override the commands named here. Standard:
 Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`). The global primitive ships in the `zdx-core` plugin from the `cognoco/zdx-marketplace` plugin registry — if `/zdx-core:commit` is unavailable, install/enable that plugin; never fall back to ad-hoc git. Never hand-roll a commit flow, use the runtime's built-in commit protocol, or stage broadly without first checking scope. The skill lets hooks run and never bypasses them autonomously; the `--no-verify` doctrine lives in Required Validation below.
 
 Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
+
+**Docs-only exception (operator-ruled 2026-07-29):** a change touching ONLY documentation artifacts (`docs/**` markdown/HTML/PDF evidence, repo meta-docs — no code, config, CI, schema, or test files) still lands via **branch + PR**, but does NOT need an isolated worktree (no `setup-worktree.sh`, no `pnpm install`/`env:sync`). Build the commit against `origin/main` with git plumbing from the shared checkout and push it to a branch — never commit on `main` directly, never switch the shared checkout's branch:
+
+```bash
+base=$(git rev-parse origin/main)
+export GIT_INDEX_FILE=$(mktemp -u)
+git read-tree "$base"
+blob=$(git hash-object -w <local-file>)                      # repeat per file
+git update-index --add --cacheinfo 100644 "$blob" <repo-path> # (or --force-remove to delete)
+tree=$(git write-tree); unset GIT_INDEX_FILE
+commit=$(git commit-tree "$tree" -p "$base" -m "docs(scope): summary")
+git push origin "$commit":refs/heads/<branch>
+gh pr create --head <branch> ...
+```
+
+Local hooks don't run on a plumbing commit; the PR's CI is the gate (docs change-class routes light checks). Any change that mixes in non-doc files still goes worktree→PR.
 
 ## Pull Requests
 
@@ -356,6 +372,7 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 - **The global unscoped `@tanstack/query-core` pin in root `package.json` `pnpm.overrides` is load-bearing**, not hygiene debt — it dedupes query-core to one version across `@clerk/shared` (declares `5.87.4`) and the `@tanstack/*` consumers (react-query, query-async-storage-persister, query-persist-client-core). Scoping it to the react-query edge (`@tanstack/react-query>@tanstack/query-core`) regresses to 3 separate query-core versions in the tree (verified WI-1043). Keep it global, and bump its version **in lockstep** whenever `@tanstack/react-query` is bumped.
 - **Account-level Inngest events omit `profileId`** — `app/account.reclaim_attempt` and similar events that fire at account-creation time (before any profile exists) legitimately carry no `profileId`. This is a sanctioned deviation from the "payloads always include `profileId`" rule for events scoped to the accounts table by `clerkUserId` or `accountId`. The `@inngest-admin: event-profile` annotation documents the scoping mechanism in place. Do not attempt to add a dummy `profileId: null` to satisfy the rule textually — it would be misleading.
 - **`teachingPreferenceSchema.analogyDomain` (request) keeps `.nullable().optional()`** — a documented carve-out (WI-1160, operator-ruled) from the "never `.nullable().optional()`; request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). This **request** field is genuinely tri-state: a value = set, `null` = explicitly clear, absent = leave unchanged. `null`-as-clear is established, tested product behavior (`apps/api/src/routes/retention.test.ts` → "accepts null analogyDomain to clear preference"), so both `.nullable()` and `.optional()` are required; the canon's "pick one" wrongly assumes null and absent are interchangeable here. The ban is docs-only (no automated checker), so no escape annotation is needed. The **response** fields (`teachingPreferenceResponseDataSchema.analogyDomain` / `nativeLanguage`) DO conform to `.nullable()` — the carve-out is request-side only.
+- **`profileSchemaShape.conversationLanguageConfirmed` / `.isCurrentUser` (response) keep `.optional()`** — a documented carve-out (WI-1556) from the "request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). Both are **hints derived by the API**, not stored columns, and only *some* response shapers populate them: `listProfilesV2` emits both and `getOwnerProfileV2` emits `conversationLanguageConfirmed`, while `updateProfileV2` (`apps/api/src/services/identity-v2/profile-v2.ts`, backing `PATCH /profiles/:id`), `updateProfileAppContext` (`apps/api/src/services/profile.ts`, backing `PATCH /profiles/:id/app-context`) and `getProfileV2` (`apps/api/src/services/identity-v2/profile-v2.ts`, backing `GET /profiles/:id`) emit **neither**. Mobile parses the two PATCH responses through `profileResponseSchema` (`apps/mobile/src/hooks/use-profiles.ts:70` and `:108`), so the keys are genuinely absent on **current, live traffic** — a standing shaper asymmetry, not only a rollout window; a mixed-version API rollout produces the same absent-key shape. `.nullable()` does not help: it requires the key to be **present** with a `null` value and throws when it is absent, so it would break those parses today. `.nullable().optional()` is banned outright by the same canon, which leaves `.optional()` as the only single Zod primitive that fits. **Why `.optional()` rather than the `.default(false)` used by neighbouring booleans (`hasPremiumLlm`, `hasFamilyLinks`):** `undefined` is a meaningful third state — "this response did not report the hint" — and the consumer relies on it. `shouldRequireFirstMentorLanguageConfirmation` (`apps/mobile/src/lib/first-mentor-language.ts`) gates on strict `conversationLanguageConfirmed === false`, so an absent hint **fails open** and a response from a shaper that omits the field can never raise the blocking first-Mentor gate. `.default(false)` would coerce that absence into a definitive "not confirmed" and gate a learner off a response that simply never carried the field. The ban is docs-only (no automated checker), so no escape annotation is needed. **Does not generalize:** it is scoped to these two derived hint fields on `profileSchemaShape`. Response fields backed by a real column still use `.nullable()`, and a new response field must not copy this pattern unless it is likewise shaper-optional **and** its consumer fails open on absence.
 - **`signals.topic_opened_pending_content`'s hard cap lives client-side, not server-side** — a documented deviation (WI-2107) from the "every envelope signal needs a server-side hard cap" rule. This signal has no server-side loop to cap (unlike `MAX_INTERVIEW_EXCHANGES`, which bounds an in-request loop): each auto-continuation is a discrete client-initiated request, so the termination guarantee is enforced in `apps/mobile/src/components/session/use-session-streaming.ts`'s `autoContinuationFiredRef` (capped at one auto-fired follow-up per learner turn) instead. The rule's intent — bound the flow so it terminates even if the LLM never stops emitting the signal — is preserved; only the enforcement layer differs because the control-flow shape differs.
 
 ## Schema And Deploy Safety
@@ -374,7 +391,7 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 Local hooks are fast feedback; **CI is the authoritative gate that protects `main`**. **pre-commit** runs cheap staged-only guards (`lint-staged`, the eval-snapshot / i18n / GC1 guards, skills-sync, a secret/large-file scan) — **not** whole-tree `tsc`/tests. **pre-push** is the local type/test gate (`tsc --build` + surgical `--findRelatedTests` jest on the push delta, plus Tier-1 eval + i18n). **CI routes the slow suites by change class** — `scripts/check-change-class.sh` is the single routing source (see `docs/change-classes.md`). Verify locally while iterating, and focus on what hooks do not cover:
 
 - **Run what CI runs.** When diagnosing a CI failure or addressing review findings, run the affected projects' typecheck + lint + tests locally — the full set CI would run, not just the file named in the error — and batch fixes into one validated push. A failure that first surfaces in CI costs a ~30-minute push-fix-push round trip (Insights analysis 2026-03-27 measured 3–4 such cycles in single sessions).
-- Integration tests are **routed by the CI change-class router** and run whenever the diff could affect them (api / db-schema / shared-schemas / lockfile classes). The cross-package suite is `pnpm exec nx run api:test:integration` (`tests/integration/`); the API co-located suite is `pnpm exec nx run api:integration-api` (`apps/api/src/**/*.integration.test.ts`, local wrapper `pnpm test:api:integration`). Running them locally before a commit is **advisory** — useful fast feedback for `apps/api/` or `tests/integration/` changes, but local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
+- Integration tests are **routed by the CI change-class router** and run whenever the diff could affect them (api / db-schema / shared-schemas / lockfile classes). The cross-package suite is `pnpm exec nx run api:test:integration` (`tests/integration/`); the API co-located suite is `pnpm run test:api:integration:ci` (`apps/api/src/**/*.integration.test.ts`, local wrapper `pnpm test:api:integration`). Running them locally before a commit is **advisory** — useful fast feedback for `apps/api/` or `tests/integration/` changes, but local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
 - **`--no-verify`, two levels.** *Doctrine:* default is to let hooks run; a **narrow, deliberate** bypass of a local hook is acceptable **because CI backstops it** (a genuinely broken local harness via `SKIP_PRE_PUSH`, or a local-only hook defect after reporting the failure) and is not a violation — but needing to bypass the same check repeatedly means the check is **mis-placed: fix the gate, don't normalise the bypass**. Verified zero-drift prompt changes use the eval harness receipt path, not a bypass. One platform-scoped accommodation stands: `nx affected` is broken on Windows by an upstream `@nx/expo` bug, so the documented `--no-verify` escape for large staged sets remains for human Windows devs until the upstream fix lands (MMT-ADR-0019; watch-item WI-542). *Skill behavior is stricter than doctrine:* the automated commit agent never bypasses hooks autonomously — on a hook failure it stops and reports.
 - Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshot evidence is still failing.
 - No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
@@ -450,6 +467,28 @@ Before declaring a PR ready to merge:
 3. Always read the Claude Code Review comment and triage its findings — the check colour does not surface them. The verdict (APPROVED / CHANGES_REQUESTED / BLOCKED + MUST_FIX/SHOULD_FIX/CONSIDER tables) is a TOP-LEVEL PR comment, returned ONLY by `gh api repos/{owner}/{repo}/issues/<number>/comments` (newest = latest head) — NOT `pulls/<number>/comments`, which is diff-anchored inline comments (Codex/CodeRabbit). Also read `gh api repos/{owner}/{repo}/pulls/<number>/reviews`. Fix MUST_FIX / SHOULD_FIX before merge.
 4. Never dismiss advisory findings just because the check is green — advisory means triage it yourself, not ignore it.
 
+### Claude reviewer-unavailable recovery
+
+The `Claude Code Review` workflow runs for every pull request, including documentation-only changes. It makes three reviewer attempts capped at 20 minutes each and initializes `claude-review-verdict.json` before the first attempt. If quota exhaustion, timeout, or another reviewer failure prevents a fresh trusted verdict, the workflow uploads that artifact with `status = REVIEWER_UNAVAILABLE` and `merge_eligible = false`, then fails. This is a machine-readable non-merge result, not an approval or an exception.
+
+After reviewer capacity returns, download the artifact if diagnosis is needed, then execute its `recovery_command` (the command reruns the failed workflow job against the same PR head):
+
+```bash
+gh run download <run-id> --name claude-review-verdict --dir /tmp/claude-review-<run-id>
+jq . /tmp/claude-review-<run-id>/claude-review-verdict.json
+gh run rerun <run-id> --failed --repo cognoco/eduagent-build
+```
+
+PRs that modify `.github/workflows/claude-code-review.yml` are a special self-reference case: `anthropics/claude-code-action` rejects the automatic run while the PR's workflow differs from the default branch. Once reviewer quota is available, a trusted repository member must invoke the unchanged interactive workflow with an exact-head request:
+
+```bash
+pr=<pr-number>
+head="$(gh pr view "$pr" --json headRefOid --jq .headRefOid)"
+gh pr comment "$pr" --body "@claude Perform the final exact-head review for ${head}. Review the full diff against the trusted repository instructions. Post the canonical Claude Code Review verdict, including the exact metadata line '- Reviewed head SHA: ${head}'; do not modify the branch."
+```
+
+Neither recovery route weakens the armed gate. Do not merge until a fresh `claude[bot]` exact clean verdict exists for the current head.
+
 A required check stuck on "Waiting for status to be reported" (never red, never green) is usually **workflow-trigger drift, not failing code** — the check is required in branch protection but its workflow only runs on `push`/`workflow_dispatch`, not `pull_request`. Fix the trigger (a small PR-only job that reports the required check name; guard deploy/build jobs with `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` so PRs can't deploy), not the code. For a Playwright web-smoke failure, read `error-context.md` + the `0-trace.network` log before touching selectors: `net::ERR_FAILED`/CORS in the trace means fix the staging/API target, not the assertion.
 
 When rebasing PRs:
@@ -512,4 +551,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-06-12
+Last updated: 2026-07-29

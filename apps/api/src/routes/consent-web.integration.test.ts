@@ -954,7 +954,11 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('Consent withdrawn');
-    expect(html).toContain('signing in');
+    expect(html).toContain('The account is paused');
+    expect(html).toContain('internal deletion grace period');
+    expect(html).toContain('permanently deleted after 7 days');
+    expect(html).toContain('not an undo window');
+    expect(html).not.toMatch(/sign(?:ing)? in/i);
     // [WI-2348 / OPQ-114] bearer possession no longer restores — the page
     // must not offer a self-service restore form/action anymore.
     expect(html).not.toContain('Undo — restore consent');
