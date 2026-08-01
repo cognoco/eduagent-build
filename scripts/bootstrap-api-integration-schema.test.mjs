@@ -380,11 +380,13 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
     'expected committed migration-only RLS SQL',
   );
   for (const table of new Set(migrationOnlyRlsTables)) {
+    const replay = plan.postPushStatements.find((statement) =>
+      statement.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`),
+    );
+    assert.ok(replay, `expected post-push RLS enablement for ${table}`);
     assert.ok(
-      plan.postPushStatements.some((statement) =>
-        statement.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`),
-      ),
-      `expected post-push RLS enablement for ${table}`,
+      replay.includes(`to_regclass('${table}') IS NOT NULL`),
+      `expected relation-existence guard for RLS replay on ${table}`,
     );
   }
   for (const policyName of [
@@ -393,12 +395,32 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
     'activation_events_profile_isolation',
   ]) {
     assert.ok(
-      plan.postPushStatements.some((statement) =>
-        statement.includes(`CREATE POLICY "${policyName}"`),
+      plan.postPushStatements.some(
+        (statement) =>
+          statement.includes(`CREATE POLICY "${policyName}"`) &&
+          /to_regclass\('[^']+'\) IS NOT NULL/.test(statement),
       ),
       `expected post-push policy replay for ${policyName}`,
     );
   }
+  const familyPolicyCreateIndex = plan.postPushStatements.findIndex(
+    (statement) =>
+      statement.includes(
+        'CREATE POLICY "family_preferences_profile_isolation"',
+      ),
+  );
+  const familyPolicyAlterIndex = plan.postPushStatements.findIndex(
+    (statement) =>
+      statement.includes('ALTER POLICY "family_preferences_profile_isolation"'),
+  );
+  assert.ok(
+    familyPolicyAlterIndex > familyPolicyCreateIndex,
+    'expected final ALTER POLICY replay after the historical CREATE POLICY',
+  );
+  assert.match(
+    plan.postPushStatements[familyPolicyAlterIndex],
+    /to_regclass\('[^']+'\) IS NOT NULL[\s\S]*app\.current_profile_id/,
+  );
   assert.ok(
     plan.postPushStatements.every(
       (statement) => !/\bCREATE\s+(?:TABLE|TYPE)\b/i.test(statement),
