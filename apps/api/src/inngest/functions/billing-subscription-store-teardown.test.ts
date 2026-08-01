@@ -4,6 +4,30 @@ import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { inngest } from '../client';
 import { billingSubscriptionStoreTeardown } from './billing-subscription-store-teardown';
 
+const mockDb = { query: {} };
+const mockPersistTerminalDeletionFailure = jest.fn();
+const mockDeleteTerminalDeletionFailure = jest.fn();
+
+jest.mock(
+  '../helpers' /* gc1-allow: inject the outbox database without a live Neon connection */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return { ...actual, getStepDatabase: () => mockDb };
+  },
+);
+
+jest.mock(
+  '../../services/terminal-deletion-failure-outbox' /* gc1-allow: terminal failure outbox writes must be asserted without a live database */,
+  () => ({
+    persistTerminalDeletionFailure: (...args: unknown[]) =>
+      mockPersistTerminalDeletionFailure(...args),
+    deleteTerminalDeletionFailure: (...args: unknown[]) =>
+      mockDeleteTerminalDeletionFailure(...args),
+  }),
+);
+
 const handler = (billingSubscriptionStoreTeardown as any).fn as (args: {
   event: { data: unknown };
   runId?: string;
@@ -19,7 +43,9 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
+    jest.spyOn(safeNonCore, 'safeSendConfirmed').mockResolvedValue(true);
+    mockPersistTerminalDeletionFailure.mockResolvedValue(undefined);
+    mockDeleteTerminalDeletionFailure.mockResolvedValue(undefined);
   });
 
   it('[WI-885] declares account-scoped idempotency and concurrency', () => {
@@ -86,8 +112,8 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
   it('[BREAK WI-2346] safeSends a PII-minimized subscription teardown dead-letter event', async () => {
     jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
     const safeSendSpy = jest
-      .spyOn(safeNonCore, 'safeSend')
-      .mockResolvedValue(undefined);
+      .spyOn(safeNonCore, 'safeSendConfirmed')
+      .mockResolvedValue(true);
     const inngestSendSpy = jest
       .spyOn(inngest, 'send')
       .mockResolvedValue({ ids: [] });
@@ -127,6 +153,7 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
 
     await expect(sendThunk()).resolves.not.toThrow();
     expect(inngestSendSpy).toHaveBeenCalledWith({
+      id: 'deletion-terminal-failure:billing-subscription-store-teardown:run-store-teardown',
       name: 'app/billing.subscription_store_teardown.failed',
       data: {
         accountId: 'org-terminal',
@@ -141,6 +168,42 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
     expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
       'alice@example.test',
     );
+    expect(mockPersistTerminalDeletionFailure).toHaveBeenCalledWith(mockDb, {
+      signalId:
+        'deletion-terminal-failure:billing-subscription-store-teardown:run-store-teardown',
+      eventName: 'app/billing.subscription_store_teardown.failed',
+      accountId: 'org-terminal',
+      runId: 'run-store-teardown',
+      errorName: 'Error',
+      occurredAt: expect.any(Date),
+    });
+    expect(mockDeleteTerminalDeletionFailure).toHaveBeenCalledWith(
+      mockDb,
+      'deletion-terminal-failure:billing-subscription-store-teardown:run-store-teardown',
+    );
+  });
+
+  it('[WI-2994] retains the durable signal when transport is unconfirmed', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    jest.spyOn(safeNonCore, 'safeSendConfirmed').mockResolvedValue(false);
+    const onFailure = (billingSubscriptionStoreTeardown as any).opts
+      .onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'org-timeout' } },
+          run_id: 'run-timeout',
+        },
+      },
+      error: new Error('send timed out'),
+    });
+
+    expect(mockPersistTerminalDeletionFailure).toHaveBeenCalledTimes(1);
+    expect(mockDeleteTerminalDeletionFailure).not.toHaveBeenCalled();
   });
 
   it('[WI-885] orchestrates teardown for a valid payload (all-null providers → not_applicable, no provider calls)', async () => {

@@ -40,6 +40,20 @@ export async function safeSend(
   context?: Record<string, unknown>,
   options?: SafeSendOptions,
 ): Promise<void> {
+  await safeSendConfirmed(send, surface, context, options);
+}
+
+/**
+ * The confirmation-returning form used by durable outboxes. `true` means the
+ * transport settled successfully inside the wait window and the caller may
+ * acknowledge its row; rejection or timeout returns `false`.
+ */
+export async function safeSendConfirmed(
+  send: () => Promise<unknown>,
+  surface: string,
+  context?: Record<string, unknown>,
+  options?: SafeSendOptions,
+): Promise<boolean> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   let timedOut = false;
@@ -89,7 +103,9 @@ export async function safeSend(
         timeoutMs,
         ...context,
       });
+      return false;
     }
+    return true;
   } catch (err) {
     captureException(err, {
       extra: { surface, kind: 'non-core-send', ...context },
@@ -99,6 +115,7 @@ export async function safeSend(
       error: err instanceof Error ? err.message : String(err),
       ...context,
     });
+    return false;
   } finally {
     if (timeoutHandle) clearTimeout(timeoutHandle);
   }

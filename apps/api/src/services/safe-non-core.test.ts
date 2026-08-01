@@ -1,4 +1,4 @@
-import { safeSend } from './safe-non-core';
+import { safeSend, safeSendConfirmed } from './safe-non-core';
 
 const mockCaptureException = jest.fn();
 jest.mock('./sentry', () => {
@@ -85,10 +85,12 @@ describe('safeSend', () => {
           }),
       );
 
-      const result = safeSend(send, 'unit.test.hang', { profileId: 'prof-1' });
+      const result = safeSendConfirmed(send, 'unit.test.hang', {
+        profileId: 'prof-1',
+      });
 
       await jest.advanceTimersByTimeAsync(2001);
-      await expect(result).resolves.toBeUndefined();
+      await expect(result).resolves.toBe(false);
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
       const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
@@ -115,7 +117,7 @@ describe('safeSend', () => {
           }),
       );
 
-      const result = safeSend(
+      const result = safeSendConfirmed(
         send,
         'unit.test.custom',
         { profileId: 'prof-2' },
@@ -123,7 +125,7 @@ describe('safeSend', () => {
       );
 
       await jest.advanceTimersByTimeAsync(51);
-      await expect(result).resolves.toBeUndefined();
+      await expect(result).resolves.toBe(false);
 
       const [, capturedCtx] = mockCaptureException.mock.calls[0];
       expect(capturedCtx.extra).toMatchObject({
@@ -141,10 +143,12 @@ describe('safeSend', () => {
           }),
       );
 
-      const result = safeSend(send, 'unit.test.late', { profileId: 'prof-3' });
+      const result = safeSendConfirmed(send, 'unit.test.late', {
+        profileId: 'prof-3',
+      });
 
       await jest.advanceTimersByTimeAsync(2001);
-      await expect(result).resolves.toBeUndefined();
+      await expect(result).resolves.toBe(false);
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
 
       const boom = new Error('inngest finally rejected');
@@ -162,6 +166,31 @@ describe('safeSend', () => {
       });
     });
 
+    it('[WI-2994] tolerates a late resolution after timeout without a second failure signal', async () => {
+      let resolveSend!: () => void;
+      const send = jest.fn().mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSend = resolve;
+          }),
+      );
+
+      const result = safeSendConfirmed(send, 'unit.test.late-resolution', {
+        runId: 'run-late-resolution',
+      });
+
+      await jest.advanceTimersByTimeAsync(2001);
+      await expect(result).resolves.toBe(false);
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+
+      resolveSend();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockLoggerError).toHaveBeenCalledTimes(1);
+    });
+
     it('still works on the happy path when send() resolves before the timeout', async () => {
       const send = jest.fn().mockResolvedValue('ok');
       await safeSend(send, 'unit.test.fast');
@@ -174,7 +203,9 @@ describe('safeSend', () => {
       const boom = new Error('immediate fail');
       const send = jest.fn().mockRejectedValue(boom);
 
-      await safeSend(send, 'unit.test.inband.with.timer');
+      await expect(
+        safeSendConfirmed(send, 'unit.test.inband.with.timer'),
+      ).resolves.toBe(false);
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
       const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
@@ -183,6 +214,14 @@ describe('safeSend', () => {
         kind: 'non-core-send',
         surface: 'unit.test.inband.with.timer',
       });
+    });
+
+    it('[WI-2994] reports a confirmed send so a durable outbox row can be acknowledged', async () => {
+      const send = jest.fn().mockResolvedValue('ok');
+
+      await expect(
+        safeSendConfirmed(send, 'unit.test.confirmed-send'),
+      ).resolves.toBe(true);
     });
   });
 });

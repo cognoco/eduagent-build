@@ -8,13 +8,18 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import {
+  getStepDatabase,
   getStepRevenueCatRestApiKey,
   getStepStripeSecretKey,
 } from '../helpers';
 import { teardownSubscriptionStoresForErasure } from '../../services/billing/store-teardown';
 import { createLogger } from '../../services/logger';
-import { safeSend } from '../../services/safe-non-core';
+import { safeSendConfirmed } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
+import {
+  deleteTerminalDeletionFailure,
+  persistTerminalDeletionFailure,
+} from '../../services/terminal-deletion-failure-outbox';
 
 const logger = createLogger();
 
@@ -61,16 +66,28 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
         errorName,
       });
 
+      const signalId = `deletion-terminal-failure:billing-subscription-store-teardown:${runId ?? accountId ?? 'unknown'}`;
+      const occurredAt = new Date();
       const failureEvent: BillingSubscriptionStoreTeardownFailedEvent =
         billingSubscriptionStoreTeardownFailedEventSchema.parse({
           accountId,
           runId,
           errorName,
-          timestamp: new Date().toISOString(),
+          timestamp: occurredAt.toISOString(),
         });
-      await safeSend(
+      const db = getStepDatabase();
+      await persistTerminalDeletionFailure(db, {
+        signalId,
+        eventName: 'app/billing.subscription_store_teardown.failed',
+        accountId,
+        runId,
+        errorName,
+        occurredAt,
+      });
+      const confirmed = await safeSendConfirmed(
         () =>
           inngest.send({
+            id: signalId,
             // orphan-allow: observability-only dead-letter signal consumed by
             // launch-health alerting and the Inngest dashboard.
             name: 'app/billing.subscription_store_teardown.failed',
@@ -79,6 +96,9 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
         'billing-subscription-store-teardown.terminal_failure',
         { accountId, runId },
       );
+      if (confirmed) {
+        await deleteTerminalDeletionFailure(db, signalId);
+      }
 
       return { status: 'terminal_failure' as const, accountId };
     },

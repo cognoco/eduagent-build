@@ -21,6 +21,9 @@ const mockExecuteDeletionV2 = jest.fn();
 const mockGetOrganizationOwnerClerkUserIdV2 = jest.fn();
 const mockGetOrganizationOwnerEmailV2 = jest.fn();
 const mockGetSubscriptionStoreTeardownTargetsV2 = jest.fn();
+const mockPersistTerminalDeletionFailure = jest.fn();
+const mockDeleteTerminalDeletionFailure = jest.fn();
+const mockDb = { query: {} };
 
 jest.mock(
   '../helpers' /* gc1-allow: getStepDatabase/getStepClerkSecretKey wrap Inngest step-level binding acquisition; must be intercepted to inject test doubles without a real Neon connection or CF env */,
@@ -76,9 +79,17 @@ jest.mock(
   },
 );
 
-describe('scheduledDeletion', () => {
-  const mockDb = { query: {} };
+jest.mock(
+  '../../services/terminal-deletion-failure-outbox' /* gc1-allow: terminal failure outbox writes must be asserted without a live database */,
+  () => ({
+    persistTerminalDeletionFailure: (...args: unknown[]) =>
+      mockPersistTerminalDeletionFailure(...args),
+    deleteTerminalDeletionFailure: (...args: unknown[]) =>
+      mockDeleteTerminalDeletionFailure(...args),
+  }),
+);
 
+describe('scheduledDeletion', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // [WI-867] v2-only: flag collapsed; absent-identityVersion events route to v2.
@@ -97,6 +108,8 @@ describe('scheduledDeletion', () => {
     mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_v2-1');
     mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
     mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+    mockPersistTerminalDeletionFailure.mockResolvedValue(undefined);
+    mockDeleteTerminalDeletionFailure.mockResolvedValue(undefined);
   });
 
   it('should be defined as an Inngest function with the expected id', () => {
@@ -598,7 +611,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
+    jest.spyOn(safeNonCore, 'safeSendConfirmed').mockResolvedValue(true);
   });
 
   it('[BREAK] declares an onFailure handler', () => {
@@ -647,8 +660,8 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
   it('[BREAK WI-2346] safeSends a PII-minimized account deletion teardown dead-letter event', async () => {
     jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
     const safeSendSpy = jest
-      .spyOn(safeNonCore, 'safeSend')
-      .mockResolvedValue(undefined);
+      .spyOn(safeNonCore, 'safeSendConfirmed')
+      .mockResolvedValue(true);
     const inngestSendSpy = jest
       .spyOn(inngest, 'send')
       .mockResolvedValue({ ids: [] });
@@ -685,6 +698,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
 
     await expect(sendThunk()).resolves.not.toThrow();
     expect(inngestSendSpy).toHaveBeenCalledWith({
+      id: 'deletion-terminal-failure:scheduled-account-deletion:run-xyz',
       name: 'app/account.deletion_teardown.failed',
       data: {
         accountId: 'acc-terminal',
@@ -699,6 +713,41 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
       'alice@example.test',
     );
+    expect(mockPersistTerminalDeletionFailure).toHaveBeenCalledWith(mockDb, {
+      signalId: 'deletion-terminal-failure:scheduled-account-deletion:run-xyz',
+      eventName: 'app/account.deletion_teardown.failed',
+      accountId: 'acc-terminal',
+      runId: 'run-xyz',
+      errorName: 'Error',
+      occurredAt: expect.any(Date),
+    });
+    expect(mockDeleteTerminalDeletionFailure).toHaveBeenCalledWith(
+      mockDb,
+      'deletion-terminal-failure:scheduled-account-deletion:run-xyz',
+    );
+  });
+
+  it('[WI-2994] retains the durable signal when immediate transport rejection is unconfirmed', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    jest.spyOn(safeNonCore, 'safeSendConfirmed').mockResolvedValue(false);
+
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'acc-reject' } },
+          run_id: 'run-reject',
+        },
+      },
+      error: new Error('transport rejected'),
+    });
+
+    expect(mockPersistTerminalDeletionFailure).toHaveBeenCalledTimes(1);
+    expect(mockDeleteTerminalDeletionFailure).not.toHaveBeenCalled();
   });
 
   it('tolerates a missing original event payload (accountId null)', async () => {

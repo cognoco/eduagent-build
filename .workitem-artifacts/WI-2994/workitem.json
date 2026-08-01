@@ -1,0 +1,18 @@
+{
+  "pageId": "3af8bce9-1f7c-81b7-b5fd-c0858a74036c",
+  "id": "WI-2994",
+  "name": "Make terminal deletion dead-letter dispatch durable across transport failure",
+  "description": "Root cause: terminal Clerk and subscription-store deletion teardown failures emit their last-resort Inngest signal through safeSend, whose immediate rejection or timeout returns without a repository-owned durable record or retry; a timed-out underlying send is not cancelled and may settle later, so current compliance evidence overstates ownership and recoverability.",
+  "acceptanceCriteria": "1. A terminal app/account.deletion_teardown.failed or app/billing.subscription_store_teardown.failed signal survives immediate transport rejection and timeout through a repository-owned durable record and retry/recovery path. The mechanism is duplicate-safe when a timed-out underlying send resolves or rejects later.\n2. Focused regression tests cover four variants: immediate rejection, timeout followed by late resolution, timeout followed by late rejection, and recovery/replay without duplicate remediation. Tests fail with the durability mechanism reverted and pass with it present, and no learner, account, provider, or credential data is added to the payload or durable record.\n3. docs/compliance/evidence/2026-07-26-retention-schedule-draft.md and docs/runbooks/launch-health-alerts.md cite current source locations, distinguish timeout from cancellation, and identify the actual owner; they do not claim WI-1916 owns dispatch durability because WI-1916 covers only downstream chat/pager routing.\n4. Preserve existing account deletion, Clerk erasure, subscription-store teardown, manual provider-remediation, and privacy-minimized payload behavior. A committed migration is permitted only if the repository's existing durable substrate cannot satisfy AC1; it must run through the deploy migrator and must never be applied through db:push, Studio, manual DDL, or an agent staging mutation. No provider-console or unrelated alert-routing change is authorized.",
+  "riskImpact": "A terminal external-erasure failure can lose its final operator-visible signal during an Inngest transport outage, undermining GDPR deletion remediation evidence; a timed-out send can also settle later, so a naive retry can duplicate remediation.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

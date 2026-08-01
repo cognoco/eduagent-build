@@ -34,3 +34,4 @@ export * from './activation-events';
 export * from './safety-digest';
 export * from './speaking-practice';
 export * from './mentor-notices';
+export * from './terminal-deletion-failure-outbox';

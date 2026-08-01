@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Both terminal handlers persist the PII-minimized signal before transport, acknowledge only confirmed sends, and have immediate plus scheduled retry/recovery paths keyed by one deterministic id.",
+      "pointer": "apps/api/src/inngest/functions/account-deletion.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Migration 0164 defines the first-party durable outbox with constrained event/error names and no identity foreign key because deletion may already be complete.",
+      "pointer": "docs/compliance/evidence/2026-07-26-retention-schedule-draft.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Focused tests cover immediate rejection, timeout then late resolution, timeout then late rejection, and duplicate-safe recovery/replay; production revert fails and exact restore passes with matching SHA-256 hashes.",
+      "pointer": "apps/api/src/services/safe-non-core.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Retention evidence cites current first-party outbox, timeout-not-cancellation, replay/sweep ownership, and WI-1916's downstream-only scope.",
+      "pointer": "docs/compliance/evidence/2026-07-26-retention-schedule-draft.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The launch-health runbook documents persistence-before-send, confirmation-only acknowledgement, five-retry immediate replay, five-minute recovery, and deterministic dedupe.",
+      "pointer": "docs/runbooks/launch-health-alerts.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Existing deletion, Clerk erasure, subscription-store teardown, manual remediation, and privacy-minimized payload behavior remain covered by the focused handler tests; no environment or provider mutation occurred.",
+      "pointer": "apps/api/src/inngest/functions/account-deletion.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "pnpm exec jest apps/api/src/services/safe-non-core.test.ts apps/api/src/services/terminal-deletion-failure-outbox.test.ts apps/api/src/inngest/functions/account-deletion.test.ts apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts apps/api/src/inngest/functions/inngest-function-failed-observe.test.ts apps/api/src/inngest/functions/terminal-deletion-failure-recovery.test.ts --runInBand"
+}

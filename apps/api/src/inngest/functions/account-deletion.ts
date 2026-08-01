@@ -16,8 +16,12 @@ import {
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
-import { safeSend } from '../../services/safe-non-core';
+import { safeSendConfirmed } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
+import {
+  deleteTerminalDeletionFailure,
+  persistTerminalDeletionFailure,
+} from '../../services/terminal-deletion-failure-outbox';
 
 const logger = createLogger();
 
@@ -82,16 +86,28 @@ export const scheduledDeletion = inngest.createFunction(
         },
       );
 
+      const signalId = `deletion-terminal-failure:scheduled-account-deletion:${runId ?? accountId ?? 'unknown'}`;
+      const occurredAt = new Date();
       const failureEvent: AccountDeletionTeardownFailedEvent =
         accountDeletionTeardownFailedEventSchema.parse({
           accountId,
           runId,
           errorName,
-          timestamp: new Date().toISOString(),
+          timestamp: occurredAt.toISOString(),
         });
-      await safeSend(
+      const db = getStepDatabase();
+      await persistTerminalDeletionFailure(db, {
+        signalId,
+        eventName: 'app/account.deletion_teardown.failed',
+        accountId,
+        runId,
+        errorName,
+        occurredAt,
+      });
+      const confirmed = await safeSendConfirmed(
         () =>
           inngest.send({
+            id: signalId,
             // orphan-allow: observability-only dead-letter signal consumed by
             // launch-health alerting and the Inngest dashboard.
             name: 'app/account.deletion_teardown.failed',
@@ -100,6 +116,9 @@ export const scheduledDeletion = inngest.createFunction(
         'account-deletion.terminal_failure',
         { accountId, runId },
       );
+      if (confirmed) {
+        await deleteTerminalDeletionFailure(db, signalId);
+      }
 
       return { status: 'terminal_failure', accountId };
     },

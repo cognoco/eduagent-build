@@ -77,6 +77,7 @@ import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum
 import { subjectRetryCurriculum } from './functions/subject-retry-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
 import { inngestFunctionFailedObserve } from './functions/inngest-function-failed-observe';
+import { terminalDeletionFailureRecovery } from './functions/terminal-deletion-failure-recovery';
 import {
   learnerRecapRegenerate,
   sessionSummaryCreate,
@@ -194,6 +195,7 @@ export {
   subjectRetryCurriculum,
   notificationSuppressedObserve,
   inngestFunctionFailedObserve,
+  terminalDeletionFailureRecovery,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
@@ -297,6 +299,7 @@ export const functions = [
   subjectRetryCurriculum,
   notificationSuppressedObserve,
   inngestFunctionFailedObserve,
+  terminalDeletionFailureRecovery,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,

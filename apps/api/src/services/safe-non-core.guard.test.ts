@@ -2,8 +2,9 @@
  * Ratchet test for `inngest.send(...)` call sites.
  *
  * Every dispatch site must be one of:
- *   1. Wrapped in `safeSend(() => inngest.send({...}), 'surface', ...)`
- *      (preferred — failures captured in Sentry, never throw).
+ *   1. Wrapped in `safeSend(() => inngest.send({...}), 'surface', ...)` or
+ *      `safeSendConfirmed(...)` (preferred — failures captured in Sentry,
+ *      never throw).
  *   2. Annotated with a `// core-send: <reason>` comment on the line
  *      immediately above the call (intentional CORE dispatch — must throw
  *      on failure, e.g. user-initiated retries, billing alerts).
@@ -75,7 +76,7 @@ function walkDir(dir: string, out: string[]): void {
 
 /**
  * Walk up the AST from `node` looking for a syntactic ancestor that is the
- * arrow/function body of a `safeSend(...)` CallExpression argument.
+ * arrow/function body of a safe-send CallExpression argument.
  */
 function isInsideSafeSendLambda(node: ts.Node): boolean {
   let cur: ts.Node | undefined = node.parent;
@@ -86,7 +87,7 @@ function isInsideSafeSendLambda(node: ts.Node): boolean {
         parent &&
         ts.isCallExpression(parent) &&
         ts.isIdentifier(parent.expression) &&
-        parent.expression.text === 'safeSend'
+        ['safeSend', 'safeSendConfirmed'].includes(parent.expression.text)
       ) {
         return true;
       }
@@ -327,6 +328,43 @@ describe('safe-non-core ratchet', () => {
     `;
     const sf = ts.createSourceFile(
       'ok.ts',
+      ok,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    let bareCount = 0;
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === 'inngest' &&
+        node.expression.name.text === 'send' &&
+        classifySite(sf, node) === 'bare'
+      ) {
+        bareCount += 1;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    expect(bareCount).toBe(0);
+  });
+
+  it('self-check: ignores inngest.send inside safeSendConfirmed lambda', () => {
+    const ok = `
+      import { inngest } from './client';
+      import { safeSendConfirmed } from './safe-non-core';
+      export async function durableOutbox() {
+        return safeSendConfirmed(
+          () => inngest.send({ name: 'app/ok', data: {} }),
+          'ok',
+          {},
+        );
+      }
+    `;
+    const sf = ts.createSourceFile(
+      'ok-confirmed.ts',
       ok,
       ts.ScriptTarget.Latest,
       true,

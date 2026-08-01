@@ -283,6 +283,20 @@ null when the failed event did not provide them. Creating or changing the
 production-console rule remains operator-owned as stated at the top of this
 runbook.
 
+For account deletion and subscription-store teardown, each terminal handler
+first idempotently writes the PII-minimized signal to the first-party
+`terminal_deletion_failure_outbox`, then makes the direct
+`safeSendConfirmed` attempt. A two-second timeout returns an unconfirmed result;
+it stops waiting but does not cancel the underlying send. Rejection or timeout
+therefore leaves the row for recovery. The repository-owned
+`inngest-function-failed-observe` performs an immediate replay with five
+retries, and `terminal-deletion-failure-recovery` scans stranded rows every five
+minutes. Both use named `step.sendEvent` calls and acknowledge the row only
+after confirmed dispatch. Direct and replayed sends share the row's
+deterministic signal id, so a late direct settlement and recovery cannot create
+duplicate remediation work. WI-2994 owns this dispatch durability; WI-1916 owns
+only downstream chat/pager delivery and production-console routing.
+
 Sentry filters:
 
 ```text
@@ -313,6 +327,9 @@ surface:transcript-purge signal:function-failed
 - `apps/api/src/inngest/functions/consent-revocation.test.ts`
 - `apps/api/src/inngest/functions/account-deletion.test.ts`
 - `apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts`
+- `apps/api/src/inngest/functions/inngest-function-failed-observe.test.ts`
+- `apps/api/src/inngest/functions/terminal-deletion-failure-recovery.test.ts`
+- `apps/api/src/services/safe-non-core.test.ts`
 - `apps/api/src/inngest/functions/billing-alias-merge.test.ts`
 
 ## 6. Stranded filing
