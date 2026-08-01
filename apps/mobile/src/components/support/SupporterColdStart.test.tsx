@@ -43,6 +43,7 @@ jest.mock(/* gc1-allow: Clerk useAuth() external boundary; component test exerci
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
+const CONTRACT_ID = '550e8400-e29b-41d4-a716-446655440301';
 
 // Renders the CURRENT activeProfile id so tests can assert the real effect
 // of a switchProfile call, not merely that it was invoked.
@@ -315,6 +316,43 @@ describe('SupporterColdStart', () => {
       screen.getByTestId(`supporter-cold-start-kickstart-${PERSON_ID}`),
     );
     expect(onKickstart).toHaveBeenCalledWith(data.cards[0]);
+  });
+
+  it('renders a minimal pending-consent card that resumes the canonical contract', async () => {
+    const data: SupporterColdStartData = {
+      variant: 'per-child',
+      cards: [
+        {
+          pendingLinkId: CONTRACT_ID,
+          displayName: 'Jakub',
+          state: 'consent-pending',
+          anchor: 'approve',
+        },
+      ],
+      selfLearningDoorway: true,
+    };
+    mockFetch.setRoute('/scopes/coldstart', data);
+
+    render(<SupporterColdStart />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId(`supporter-cold-start-pending-${CONTRACT_ID}`);
+    });
+    screen.getByText('Jakub');
+    screen.getByText(
+      'Both people accept the same agreement before anything is shared.',
+    );
+    fireEvent.press(
+      screen.getByTestId(`supporter-cold-start-approve-${CONTRACT_ID}`),
+    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/link/[contractId]',
+      params: {
+        contractId: CONTRACT_ID,
+        supporteeName: 'Jakub',
+        audience: 'supporter',
+      },
+    });
   });
 
   it('renders the stale-idle nudge copy for the given staleIdleStep', async () => {

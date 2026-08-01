@@ -441,10 +441,18 @@ describe('family-join routes (integration)', () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       familyOrgId: parent.organizationId,
       alreadyMember: false,
       storeCancelNudge: null,
+      visibilityContract: {
+        supporterPersonId: parent.personId,
+        supporteePersonId: teen.personId,
+        relation: 'parent',
+        status: 'pending',
+        supporterAcceptedAt: null,
+        supporteeAcceptedAt: null,
+      },
     });
 
     await expect(
