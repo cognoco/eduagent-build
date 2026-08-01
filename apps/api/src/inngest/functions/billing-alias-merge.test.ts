@@ -130,6 +130,11 @@ describe('billingAliasMerge worker [BUG-783]', () => {
       .mockResolvedValue({ ids: [] });
     const opts = (billingAliasMerge as any).opts;
 
+    const maliciousError = new Error(
+      'RevenueCat response contained private context',
+    );
+    maliciousError.name = `payer alice@example.test ${'x'.repeat(160)}`;
+
     await opts.onFailure({
       event: {
         data: {
@@ -137,7 +142,7 @@ describe('billingAliasMerge worker [BUG-783]', () => {
           run_id: 'run-alias-terminal',
         },
       },
-      error: new Error('RevenueCat response contained private context'),
+      error: maliciousError,
     });
 
     expect(safeSendSpy).toHaveBeenCalledTimes(1);
@@ -163,6 +168,9 @@ describe('billingAliasMerge worker [BUG-783]', () => {
     });
     expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
       'private context',
+    );
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'alice@example.test',
     );
   });
 });

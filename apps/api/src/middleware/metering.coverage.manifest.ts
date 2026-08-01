@@ -131,6 +131,166 @@ export interface GranularLlmConsentBoundary {
   serviceBoundaries: readonly GranularLlmConsentServiceBoundary[];
 }
 
+export interface RouteOwnedLlmConsentBoundary {
+  id: string;
+  routeFile: string;
+  routeStartToken: string;
+  routeEndToken: string;
+  classification:
+    | 'route-owned'
+    | 'route-discriminant'
+    | 'independent-mixed-residue';
+  rationale: string;
+}
+
+/**
+ * Exhaustive inventory of consent assertions that remain in request-time
+ * route code. Inclusion is not semantic approval: each entry must state
+ * whether the route owns the boundary, gates a fail-closed discriminant, or
+ * is independently deliverable mixed-route residue. The companion guard
+ * discovers every production assertion and requires exactly one classified
+ * segment, so a new route-entry gate cannot arrive silently. Service-owned
+ * mixed routes belong in GRANULAR_LLM_CONSENT_BOUNDARIES instead.
+ */
+export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBoundary[] =
+  [
+    {
+      id: 'dictation.prepare-homework',
+      routeFile: 'apps/api/src/routes/dictation.ts',
+      routeStartToken: "'/dictation/prepare-homework'",
+      routeEndToken: ".post('/dictation/generate'",
+      classification: 'route-owned',
+      rationale:
+        'Validated requests delegate to the LLM-backed homework parser.',
+    },
+    {
+      id: 'dictation.generate',
+      routeFile: 'apps/api/src/routes/dictation.ts',
+      routeStartToken: ".post('/dictation/generate'",
+      routeEndToken: "'/dictation/review'",
+      classification: 'route-owned',
+      rationale:
+        'The route assembles context before its dictation-generation dispatch.',
+    },
+    {
+      id: 'dictation.review',
+      routeFile: 'apps/api/src/routes/dictation.ts',
+      routeStartToken: "'/dictation/review'",
+      routeEndToken: '',
+      classification: 'independent-mixed-residue',
+      rationale:
+        'Rate-limit and payload-size branches still follow the route gate.',
+    },
+    {
+      id: 'curriculum.topic-preview',
+      routeFile: 'apps/api/src/routes/curriculum.ts',
+      routeStartToken: "'/subjects/:subjectId/curriculum/topics'",
+      routeEndToken: "'/subjects/:subjectId/curriculum/challenge'",
+      classification: 'route-discriminant',
+      rationale:
+        "mode='create' bypasses the gate; all other and future modes fail closed.",
+    },
+    {
+      id: 'curriculum.challenge',
+      routeFile: 'apps/api/src/routes/curriculum.ts',
+      routeStartToken: "'/subjects/:subjectId/curriculum/challenge'",
+      routeEndToken: "'/subjects/:subjectId/curriculum/adapt'",
+      classification: 'route-owned',
+      rationale:
+        'The accepted challenge request delegates to curriculum generation.',
+    },
+    {
+      id: 'curriculum.topic-explanation',
+      routeFile: 'apps/api/src/routes/curriculum.ts',
+      routeStartToken:
+        ".get('/subjects/:subjectId/curriculum/topics/:topicId/explain'",
+      routeEndToken: '',
+      classification: 'route-owned',
+      rationale:
+        'The accepted explanation request delegates to the LLM-backed explainer.',
+    },
+    {
+      id: 'homework.ocr',
+      routeFile: 'apps/api/src/routes/homework.ts',
+      routeStartToken: ".post('/ocr'",
+      routeEndToken: '',
+      classification: 'independent-mixed-residue',
+      rationale:
+        'Content-length, multipart, MIME, and file-size returns still follow the route gate.',
+    },
+    {
+      id: 'quiz.round-generation',
+      routeFile: 'apps/api/src/routes/quiz.ts',
+      routeStartToken: 'async function generateRoundFromInput(',
+      routeEndToken: 'export const quizRoutes',
+      classification: 'route-discriminant',
+      rationale:
+        "activityType='capitals' bypasses the gate; unknown future values fail closed.",
+    },
+    {
+      id: 'subjects.resolve',
+      routeFile: 'apps/api/src/routes/subjects.ts',
+      routeStartToken: "'/subjects/resolve'",
+      routeEndToken: "'/subjects/classify'",
+      classification: 'route-owned',
+      rationale:
+        'The validated resolver request directly invokes its LLM-backed service.',
+    },
+    {
+      id: 'subjects.classify',
+      routeFile: 'apps/api/src/routes/subjects.ts',
+      routeStartToken: "'/subjects/classify'",
+      routeEndToken: ".get('/subjects'",
+      classification: 'route-owned',
+      rationale:
+        'The validated classifier request directly invokes its LLM-backed service.',
+    },
+    {
+      id: 'retention.recall-test',
+      routeFile: 'apps/api/src/routes/retention.ts',
+      routeStartToken: "'/retention/recall-test'",
+      routeEndToken: "'/retention/relearn'",
+      classification: 'independent-mixed-residue',
+      rationale:
+        "The 'dont_remember' discriminant bypasses the gate, but standard cooldown and lost-claim returns still follow it.",
+    },
+    {
+      id: 'assessments.quick-check',
+      routeFile: 'apps/api/src/routes/assessments.ts',
+      routeStartToken: "'/sessions/:sessionId/quick-check'",
+      routeEndToken: '',
+      classification: 'independent-mixed-residue',
+      rationale:
+        'The deterministic missing-session response still follows the route gate.',
+    },
+    {
+      id: 'filing.request',
+      routeFile: 'apps/api/src/routes/filing.ts',
+      routeStartToken: ".post('/filing',",
+      routeEndToken: '',
+      classification: 'route-owned',
+      rationale: 'The request-time filing path owns its direct LLM dispatch.',
+    },
+    {
+      id: 'learner-profile.tell-self',
+      routeFile: 'apps/api/src/routes/learner-profile.ts',
+      routeStartToken: "'/learner-profile/tell'",
+      routeEndToken: "'/learner-profile/:profileId/tell'",
+      classification: 'route-owned',
+      rationale:
+        'The learner parser dispatches for every validated tell request.',
+    },
+    {
+      id: 'learner-profile.tell-charge',
+      routeFile: 'apps/api/src/routes/learner-profile.ts',
+      routeStartToken: "'/learner-profile/:profileId/tell'",
+      routeEndToken: "'/learner-profile/unsuppress'",
+      classification: 'route-owned',
+      rationale:
+        'The charge parser dispatches for every validated tell request.',
+    },
+  ];
+
 /**
  * Mixed deterministic/LLM HTTP routes whose consent gate must remain inside
  * the service at the last branch before LLM dispatch. The companion guard
@@ -239,6 +399,59 @@ export const GRANULAR_LLM_CONSENT_BOUNDARIES: readonly GranularLlmConsentBoundar
           llmDispatchToken: 'generateCategorizedBookSuggestions(',
           llmCallSiteFile:
             'apps/api/src/services/book-suggestion-generation.ts',
+        },
+      ],
+    },
+    {
+      id: 'sessions.summary.submit',
+      routeFile: 'apps/api/src/routes/sessions.ts',
+      routeStartToken: '// Submit learner summary ("Your Words")',
+      routeEndToken: '// Start an interleaved retrieval session',
+      routeServiceCallTokens: ['submitSummary('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/session/session-summary.ts',
+          serviceStartToken: 'export async function submitSummary(',
+          serviceEndToken: 'const SUMMARY_FEEDBACK_RETRY_COOLDOWN_MS',
+          consentGateToken: 'deps.assertLlmConsent(',
+          llmDispatchToken: 'deps.evaluateSummary(',
+          llmCallSiteFile: 'apps/api/src/services/summaries.ts',
+        },
+      ],
+    },
+    {
+      id: 'sessions.summary.retry-feedback',
+      routeFile: 'apps/api/src/routes/sessions.ts',
+      routeStartToken:
+        '// Retry AI feedback for an already-saved learner summary.',
+      routeEndToken: '// Submit learner summary ("Your Words")',
+      routeServiceCallTokens: ['retrySummaryFeedback('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/session/session-summary.ts',
+          serviceStartToken: 'export async function retrySummaryFeedback(',
+          serviceEndToken: '',
+          consentGateToken: 'deps.assertLlmConsent(',
+          llmDispatchToken: 'deps.evaluateSummary(',
+          llmCallSiteFile: 'apps/api/src/services/summaries.ts',
+        },
+      ],
+    },
+    {
+      id: 'sessions.recall-bridge',
+      routeFile: 'apps/api/src/routes/sessions.ts',
+      routeStartToken:
+        '// Generate recall bridge questions after homework success',
+      routeEndToken: 'function qualityRatingFromSummaryStatus(',
+      routeServiceCallTokens: ['generateRecallBridge('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/recall-bridge.ts',
+          serviceStartToken: 'export async function generateRecallBridge(',
+          serviceEndToken: 'function buildRecallBridgePrompt(',
+          consentGateToken: 'deps.assertLlmConsent(',
+          llmDispatchToken: 'deps.routeAndCall(',
+          llmCallSiteFile: 'apps/api/src/services/recall-bridge.ts',
         },
       ],
     },

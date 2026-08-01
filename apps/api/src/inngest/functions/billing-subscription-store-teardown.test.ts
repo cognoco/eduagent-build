@@ -97,6 +97,11 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
       error: unknown;
     }) => Promise<unknown>;
 
+    const maliciousError = new Error(
+      'RevenueCat response contained private context',
+    );
+    maliciousError.name = `payer alice@example.test ${'x'.repeat(160)}`;
+
     await onFailure({
       event: {
         data: {
@@ -104,7 +109,7 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
           run_id: 'run-store-teardown',
         },
       },
-      error: new Error('RevenueCat response contained private context'),
+      error: maliciousError,
     });
 
     expect(safeSendSpy).toHaveBeenCalledTimes(1);
@@ -132,6 +137,9 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
     });
     expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
       'private context',
+    );
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'alice@example.test',
     );
   });
 

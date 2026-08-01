@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 import {
   createRoutedMockFetch,
+  fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../../../../test-utils/mock-api-routes';
 import {
@@ -206,7 +207,20 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     const { cleanup } = renderSessionDetail();
 
-    await waitFor(() => screen.getByText('Practiced light reactions'));
+    await waitFor(
+      () => {
+        const sessionCalls = fetchCallsMatching(
+          mockFetch,
+          '/dashboard/children/child-profile-001/sessions/session-001',
+        );
+        expect(sessionCalls).toHaveLength(1);
+        expect(new URL(sessionCalls[0]!.url, 'http://localhost').pathname).toBe(
+          '/dashboard/children/child-profile-001/sessions/session-001',
+        );
+        expect(screen.getByText('Practiced light reactions')).toBeTruthy();
+      },
+      { timeout: 5_000 },
+    );
     screen.getByTestId('session-metadata');
 
     cleanup();
