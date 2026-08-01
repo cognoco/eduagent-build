@@ -13,6 +13,13 @@ provides reliable event delivery from functions, and that stable step state is
 memoized across replay. Therefore the repository's existing durable substrate
 satisfies AC1 and the item does not authorize a new database migration.
 
+The SDK's `Inngest.CreateFunction` declaration contextually types `onFailure`
+as a `Handler` extended with `FailureEventArgs`, while `InngestStepTools`
+declares `sendEvent` against `SendEventPayload<GetEvents<TClient>>`. Both
+handlers therefore rely on contextual inference; a handwritten facade with an
+`unknown` payload would discard the SDK's event contract rather than strengthen
+it.
+
 Primary sources:
 
 - `node_modules/inngest/components/InngestFunction.d.ts`
@@ -31,6 +38,8 @@ Primary sources:
 - ESLint passed for the four production/test files, apart from the repository's
   known uncached Nx project-graph warning.
 - Prettier and `git diff --check` passed after formatting.
+- The API TypeScript project passed with the inferred `onFailure` handler and
+  `step.sendEvent` types.
 
 The two event data objects retain exactly the existing fields: `accountId`,
 `runId`, bounded `errorName`, and `timestamp`. The deterministic event ID is

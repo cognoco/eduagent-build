@@ -24,17 +24,7 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
     retries: 5,
     idempotency: 'event.data.accountId',
     concurrency: { key: 'event.data.accountId', limit: 1 },
-    onFailure: async ({
-      event,
-      error,
-      step,
-    }: {
-      event: { data: { event?: { data?: unknown }; run_id?: string } };
-      error: unknown;
-      step: {
-        sendEvent: (name: string, payload: unknown) => Promise<unknown>;
-      };
-    }) => {
+    onFailure: async ({ event, error, step }) => {
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;

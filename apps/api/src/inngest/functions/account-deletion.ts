@@ -42,17 +42,7 @@ export const scheduledDeletion = inngest.createFunction(
     // ops can query "how many erasures terminally failed?" and recover the
     // half-completed deletion manually. Mirrors the terminal-failure handlers on
     // auto-file-session.ts and topic-probe-extract.ts.
-    onFailure: async ({
-      event,
-      error,
-      step,
-    }: {
-      event: { data: { event?: { data?: unknown }; run_id?: string } };
-      error: unknown;
-      step: {
-        sendEvent: (name: string, payload: unknown) => Promise<unknown>;
-      };
-    }) => {
+    onFailure: async ({ event, error, step }) => {
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
