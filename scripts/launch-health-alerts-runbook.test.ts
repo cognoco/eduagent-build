@@ -38,6 +38,8 @@ describe('launch-health durable terminal-failure surface', () => {
       '`app/billing.subscription_store_teardown.failed`',
     );
     expect(section).toContain('`app/billing.alias_merge.failed`');
-    expect(section).toMatch(/opaque account\/event and\s+Inngest run IDs/);
+    expect(section).toMatch(
+      /two consent events carry their opaque profile or\s+person identifiers, `runId`, a bounded `errorClass`/,
+    );
   });
 });
