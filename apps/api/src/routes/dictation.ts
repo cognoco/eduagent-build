@@ -13,6 +13,7 @@ import {
   dictationHistorySchema,
   DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
+  computeAgeBracketFromDate,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -130,6 +131,14 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         conversationLanguage: parseConversationLanguage(
           profileMeta?.conversationLanguage,
         ),
+        ageBracket:
+          profileMeta == null
+            ? undefined
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
       });
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     },
@@ -160,6 +169,11 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     // i18n Phase 1 — forward the learner's UI locale into the dictation LLM.
     const result = await generateDictation({
       ...ctx,
+      ageBracket: computeAgeBracketFromDate(
+        profileMeta.birthYear,
+        profileMeta.birthMonth ?? undefined,
+        profileMeta.birthDay ?? undefined,
+      ),
       conversationLanguage: parseConversationLanguage(
         profileMeta?.conversationLanguage,
       ),
@@ -238,9 +252,6 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       const db = c.get('db');
       const input = c.req.valid('json');
 
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      await assertLlmConsent(db, profileId);
-
       // [CR-4] Per-profile rate limit: 10 requests per minute.
       // Placed after validation so invalid input gets 400, not a DB hit.
       // Placed before the LLM call so the expensive operation is gated.
@@ -285,6 +296,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
           `Dictation review payload too large: ${promptCharCount} prompt chars exceeds limit of ${DICTATION_REVIEW_MAX_PROMPT_CHARS}.`,
         );
       }
+
+      // [WI-2396/WI-2987] Consent-withdrawal gate after deterministic request
+      // exits and before every path that can reach the LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
 
       // Derive ageYears from profileMeta birthYear (same pattern as generate route).
       const profileMeta = c.get('profileMeta');
@@ -331,6 +346,14 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         imageMimeType: input.imageMimeType,
         language: input.language,
         ageYears,
+        ageBracket:
+          profileMeta.birthYear == null
+            ? undefined
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
         recentStruggles,
         // i18n Phase 1 — feedback prose follows the learner's UI locale.
         conversationLanguage: parseConversationLanguage(

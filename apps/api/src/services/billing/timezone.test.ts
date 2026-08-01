@@ -59,5 +59,28 @@ describe('billing/timezone', () => {
       const start = getStartOfTodayInTimeZone(now, 'Europe/Berlin');
       expect(start.toISOString()).toBe('2026-07-14T22:00:00.000Z');
     });
+
+    it.each([
+      {
+        name: 'skipped midnight uses the first instant after the gap',
+        now: '2026-09-06T12:00:00.000Z',
+        timeZone: 'America/Santiago',
+        // Chile advances from 23:59:59 on Sep 5 to 01:00:00 on Sep 6 at
+        // 04:00Z, so 00:00 does not exist and the day starts at 04:00Z.
+        expected: '2026-09-06T04:00:00.000Z',
+      },
+      {
+        name: 'folded midnight uses the earlier matching instant',
+        now: '2026-11-01T12:00:00.000Z',
+        timeZone: 'America/Havana',
+        // Cuba repeats 00:00 when DST ends: it occurs at both 04:00Z and
+        // 05:00Z. The civil-time convention selects the earlier 04:00Z.
+        expected: '2026-11-01T04:00:00.000Z',
+      },
+    ])('$name', ({ now, timeZone, expected }) => {
+      expect(
+        getStartOfTodayInTimeZone(new Date(now), timeZone).toISOString(),
+      ).toBe(expected);
+    });
   });
 });

@@ -239,8 +239,13 @@ export function isIdempotencyReplay(response: Response): boolean {
   return response.headers.get('Idempotency-Replay') === 'true';
 }
 
-export function useApiClient(): ApiClient {
+type ApiClientOptions = {
+  profileContext?: 'active' | 'omit';
+};
+
+export function useApiClient(options: ApiClientOptions = {}): ApiClient {
   const { getToken } = useAuth();
+  const omitProfileContext = options.profileContext === 'omit';
 
   // Refs avoid recreating the client when auth state changes.
   // The custom fetch reads current values from refs on each request.
@@ -257,8 +262,10 @@ export function useApiClient(): ApiClient {
       // the module vars and when we attach headers, we'd send mismatched
       // X-Profile-Id / X-Proxy-Mode for the wrong profile. Snapshotting here
       // ties both values to the same moment in time.
-      const snapshotProfileId = _activeProfileId;
-      const snapshotProxyMode = _proxyMode;
+      const snapshotProfileId = omitProfileContext
+        ? undefined
+        : _activeProfileId;
+      const snapshotProxyMode = omitProfileContext ? false : _proxyMode;
       const signal = requestSignal(input, init);
 
       // Token of the most recent attempt. The 401 handling below branches on
@@ -487,5 +494,5 @@ export function useApiClient(): ApiClient {
     };
 
     return hc<AppType>(`${getApiUrl()}/v1`, { fetch: customFetch });
-  }, []);
+  }, [omitProfileContext]);
 }

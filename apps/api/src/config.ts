@@ -62,6 +62,16 @@ const envSchema = z.object({
   // compliance failure — so we fail prod boot loudly instead.
   CONSENT_WITHDRAWAL_TOKEN_SECRET: z.string().min(32).optional(),
 
+  // [WI-2533] Dedicated HMAC secret for short-lived, server-minted guardian
+  // authority assertions produced after adult identity, age and parental-
+  // responsibility VPC verification. Kept separate from withdrawal tokens so
+  // either credential can rotate without widening the other's authority.
+  GUARDIAN_AUTHORITY_TOKEN_SECRET: z.string().min(32).optional(),
+  // Server-to-server VPC verifier. The mobile app carries only a single-use
+  // provider handle; the API redeems it with this private credential.
+  GUARDIAN_AUTHORITY_VERIFIER_URL: z.string().url().optional(),
+  GUARDIAN_AUTHORITY_VERIFIER_KEY: z.string().min(1).optional(),
+
   // Sentry — error tracking
   SENTRY_DSN: z.string().url().optional(),
 
@@ -639,6 +649,9 @@ const PRODUCTION_REQUIRED_BASE_KEYS: readonly (keyof Env)[] = [
   // withdrawal link is always signable/verifiable; a missing secret is a silent
   // compliance failure, so fail prod boot loudly instead.
   'CONSENT_WITHDRAWAL_TOKEN_SECRET',
+  'GUARDIAN_AUTHORITY_TOKEN_SECRET',
+  'GUARDIAN_AUTHORITY_VERIFIER_URL',
+  'GUARDIAN_AUTHORITY_VERIFIER_KEY',
 ] as const;
 
 /**

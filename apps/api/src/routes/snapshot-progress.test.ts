@@ -94,7 +94,7 @@ describe('[WI-774] snapshot-progress flag-on rate-limit threading', () => {
         resolvedVia: 'explicit-header',
       });
       // The account middleware seeds callerPersonId on the v2 path.
-      c.set('callerPersonId' as never, 'person-test-id');
+      c.set('callerPersonId' as never, PROFILE_ID);
       await next();
     });
     app.route('/', snapshotProgressRoutes);
@@ -116,7 +116,7 @@ describe('[WI-774] snapshot-progress flag-on rate-limit threading', () => {
       'test-account-id',
       'progress_refresh',
       { hours: 1, maxCount: 10 },
-      { callerPersonId: 'person-test-id' },
+      { callerPersonId: PROFILE_ID },
     );
   });
 });

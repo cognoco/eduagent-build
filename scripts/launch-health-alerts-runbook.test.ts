@@ -24,3 +24,26 @@ describe('launch-health Sentry ingestion-capacity invariant', () => {
     expect(section).toContain('without copying credentials or payment details');
   });
 });
+
+describe('launch-health durable terminal-failure surface', () => {
+  it('groups terminal dead letters while documenting their distinct privacy shapes', () => {
+    const section = runbook.match(
+      /## 5\. Deletion and retention[\s\S]*?(?=\n## |$)/,
+    )?.[0];
+
+    expect(section).toBeDefined();
+    expect(section).toContain('`app/consent.revocation.failed`');
+    expect(section).toContain('`app/account.deletion_teardown.failed`');
+    expect(section).toContain(
+      '`app/billing.subscription_store_teardown.failed`',
+    );
+    expect(section).toContain('`app/billing.alias_merge.failed`');
+    expect(section).toContain('`app/consent.email-revocation.failed`');
+    expect(section).toMatch(
+      /two consent events carry their opaque profile or\s+person identifiers, `runId`, a bounded `errorClass`/,
+    );
+    expect(section).toMatch(
+      /Account deletion and subscription-store teardown carry\s+`accountId`, `runId`, `errorName`, and `timestamp`; alias merge carries\s+`eventId`, `runId`, `errorName`, and `timestamp`/,
+    );
+  });
+});

@@ -2,7 +2,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -12,6 +12,14 @@ const PACKAGE_JSON = join(REPO_ROOT, 'package.json');
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const LOCAL_DATABASE_MARKER = /(^|[_-])(test|tests|integration)([_-]|$)/i;
 const PROTECTED_LABEL = /(^|[._-])(stg|staging|prd|prod|production)([._-]|$)/i;
+const LOOPBACK_ONLY_REPAIR_SUITE =
+  'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts';
+const LOOPBACK_ONLY_REPAIR_PATH = resolve(
+  REPO_ROOT,
+  LOOPBACK_ONLY_REPAIR_SUITE,
+);
+const LOCAL_JEST_CONFIG = 'apps/api/jest.integration.config.cjs';
+const REMOTE_JEST_CONFIG = 'apps/api/jest.integration.remote.config.cjs';
 
 function refuse(reason) {
   throw new Error(`API integration launch refused before Jest: ${reason}`);
@@ -38,24 +46,44 @@ function pinnedPnpmVersion() {
   return match[1];
 }
 
+function packageManagerLaunch() {
+  const pnpmCli = process.env.npm_execpath?.trim();
+  if (!pnpmCli) {
+    refuse(
+      'npm_execpath is required; run the canonical pnpm test:api:integration command.',
+    );
+  }
+  return /\.(?:c?js)$/i.test(pnpmCli)
+    ? {
+        binary: process.execPath,
+        args: [pnpmCli],
+      }
+    : {
+        binary: pnpmCli,
+        args: [],
+      };
+}
+
 function assertPinnedPnpm() {
   const expected = pinnedPnpmVersion();
-  const result = spawnSync('corepack', ['pnpm', '--version'], {
+  const launch = packageManagerLaunch();
+  const result = spawnSync(launch.binary, [...launch.args, '--version'], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
   });
   if (result.error || result.status !== 0) {
     refuse(
-      `Corepack could not resolve the repository-pinned pnpm ${expected}. ` +
-        'Install/enable Corepack and retry the canonical command.',
+      `npm_execpath could not resolve the repository-pinned pnpm ${expected}. ` +
+        'Retry the canonical pnpm command.',
     );
   }
   const actual = result.stdout.trim();
   if (actual !== expected) {
     refuse(
-      `package.json requires pnpm ${expected}, but Corepack resolved ${actual}.`,
+      `package.json requires pnpm ${expected}, but npm_execpath resolved ${actual}.`,
     );
   }
+  return launch;
 }
 
 function requiredEnv(name) {
@@ -113,9 +141,9 @@ function assertDatabaseContract() {
       `Doppler project "${dopplerProject}" is refused; expected "mentomate".`,
     );
   }
-  if (dopplerConfig && dopplerConfig !== 'integration') {
+  if (dopplerConfig && dopplerConfig !== 'dev_integration') {
     refuse(
-      `Doppler config "${dopplerConfig}" is refused; expected "integration".`,
+      `Doppler config "${dopplerConfig}" is refused; expected "dev_integration".`,
     );
   }
   if (dopplerEnvironment && dopplerEnvironment !== 'dev') {
@@ -130,13 +158,13 @@ function assertDatabaseContract() {
         `local database metadata "${databaseName}" is not explicitly test/integration-scoped.`,
       );
     }
-    return;
+    return { isLocal: true };
   }
 
   requiredEnv('DOPPLER_PROJECT');
   requiredEnv('DOPPLER_ENVIRONMENT');
-  if (dopplerConfig !== 'integration') {
-    refuse('DOPPLER_CONFIG=integration is required for a remote database.');
+  if (dopplerConfig !== 'dev_integration') {
+    refuse('DOPPLER_CONFIG=dev_integration is required for a remote database.');
   }
 
   const expectedHost = requiredEnv('INTEGRATION_DATABASE_HOST').toLowerCase();
@@ -172,20 +200,32 @@ function assertDatabaseContract() {
       );
     }
   }
+  return { isLocal: false };
 }
 
 function main() {
   const [mode, ...forwardedArgs] = process.argv.slice(2);
 
   if (mode === '--jest') {
-    assertDatabaseContract();
-    assertPinnedPnpm();
-    return run('corepack', [
-      'pnpm',
+    const { isLocal } = assertDatabaseContract();
+    if (
+      !isLocal &&
+      forwardedArgs.some(
+        (arg) =>
+          resolve(REPO_ROOT, arg.replaceAll('\\', '/')) ===
+          LOOPBACK_ONLY_REPAIR_PATH,
+      )
+    ) {
+      refuse('the curriculum dedup repair suite is loopback-only.');
+    }
+    const launch = assertPinnedPnpm();
+    const jestConfig = isLocal ? LOCAL_JEST_CONFIG : REMOTE_JEST_CONFIG;
+    return run(launch.binary, [
+      ...launch.args,
       'exec',
       'jest',
       '--config',
-      'apps/api/jest.integration.config.cjs',
+      jestConfig,
       '--forceExit',
       ...forwardedArgs,
     ]);
@@ -197,9 +237,9 @@ function main() {
     }
     // Defense in depth: --jest repeats both checks after Nx re-invokes this script.
     assertDatabaseContract();
-    assertPinnedPnpm();
-    return run('corepack', [
-      'pnpm',
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
       'exec',
       'nx',
       'run',
@@ -218,7 +258,7 @@ function main() {
     '--project',
     'mentomate',
     '--config',
-    'integration',
+    'dev_integration',
     '--',
     process.execPath,
     SCRIPT,

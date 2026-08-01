@@ -1,0 +1,18 @@
+{
+  "pageId": "3af8bce9-1f7c-81db-953f-d0390983c450",
+  "id": "WI-2995",
+  "name": "Validate quick-check session IDs before database lookup",
+  "description": "Root cause: the quick-check route validates its JSON body but reads the UUID-backed sessionId path parameter without a parameter validator, so malformed IDs can reach the scoped PostgreSQL lookup and raise an invalid-UUID error. One behavioral variant exists: a malformed path ID; valid missing, scoped-hidden, withdrawn-consent, and active-consent IDs must remain unchanged.",
+  "acceptanceCriteria": "Root cause: POST /assessments/sessions/:sessionId/quick-check validates its JSON body but not the UUID-backed sessionId path parameter before the scoped database lookup. Variant searched and bounded: malformed path ID is the single defective variant; valid missing, scoped-hidden, withdrawn-consent existing, and active-consent behavior are preservation variants. Done when: (1) sessionId is validated as a UUID before handler execution; (2) malformed IDs return the standard request-validation 400 before repository lookup, consent enforcement, topic-context lookup, or LLM dispatch; (3) focused regression coverage proves malformed-ID behavior and preserves all valid-ID variants; (4) no database schema, ownership policy, response schema, LLM routing, prompt, or metering behavior changes. Regression evidence must include red-green-revert proof at completion. Affected surfaces: apps/api/src/routes/assessments.ts and apps/api/src/routes/assessments.test.ts.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

@@ -142,11 +142,9 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (POST /topup) runs isLlmExchangeConsentAllowed,
-// which reads db.query.membership — the mini-app below (used for the
-// consent-gate tests) injects a bare `{}` db, same limitation class as the
-// mock above. Defaults to allowed; the withdrawn-consent test overrides with
-// mockRejectedValueOnce(new ConsentWithdrawnError()).
+// The top-up service owns assertLlmConsent, but this route harness stubs that
+// service and injects a bare `{}` db. Keep a controllable consent mock as a
+// tripwire proving the mixed route itself does not invoke the gate.
 // gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
 // consentGrant reads with no real implementation available in this file's
 // stub-db environment (same class as verifyPersonOwnershipV2 above).
@@ -195,7 +193,13 @@ const AUTH_HEADERS = makeAuthHeaders();
 // in this file (billing-v2 / metering-v2 continuity mocks are absent here,
 // unlike dictation.test.ts / filing.test.ts), so routing through it 500s.
 // Mirrors this file's own makeProxyApp() pattern below, but isOwner: true.
-function makeWriteApp() {
+function makeWriteApp(
+  profileMetaOverrides: {
+    birthYear?: number;
+    birthMonth?: number | null;
+    birthDay?: number | null;
+  } = {},
+) {
   const writeApp = new Hono();
   writeApp.use('*', async (c, next) => {
     c.set('db' as never, {});
@@ -204,8 +208,12 @@ function makeWriteApp() {
     c.set('account' as never, { id: 'test-account-id' });
     c.set('callerPersonId' as never, 'test-profile-id');
     c.set('profileMeta' as never, {
+      birthYear: 2000,
+      birthMonth: null,
+      birthDay: null,
       isOwner: true,
       resolvedVia: 'explicit-header',
+      ...profileMetaOverrides,
     });
     await next();
   });
@@ -349,22 +357,56 @@ describe('book-suggestions routes', () => {
       expect(res.status).toBe(400);
     });
 
-    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
-    it('returns 200 and dispatches the top-up service when consent is active', async () => {
+    // [WI-2543] Mixed-route consent gate lives inside the top-up service.
+    it('returns 200 and delegates deterministic service branches after consent withdrawal', async () => {
       (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockClear();
-
-      const res = await makeWriteApp().request(
-        '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/topup',
-        { method: 'POST' },
+      (assertLlmConsent as jest.Mock).mockRejectedValue(
+        new ConsentWithdrawnError(),
       );
 
-      expect(res.status).toBe(200);
-      expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalled();
+      try {
+        const res = await makeWriteApp().request(
+          '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/topup',
+          { method: 'POST' },
+        );
+
+        expect(res.status).toBe(200);
+        expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalled();
+        expect(assertLlmConsent).not.toHaveBeenCalled();
+      } finally {
+        (assertLlmConsent as jest.Mock).mockResolvedValue(undefined);
+      }
     });
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls getUnpickedBookSuggestionsWithTopup when consent is withdrawn', async () => {
+    it('uses the exact birth date for the safety age bracket before the 18th birthday', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00Z'));
       (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockClear();
-      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+
+      try {
+        const res = await makeWriteApp({
+          birthYear: 2008,
+          birthMonth: 12,
+          birthDay: 31,
+        }).request(
+          '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/topup',
+          { method: 'POST' },
+        );
+
+        expect(res.status).toBe(200);
+        expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalledWith(
+          expect.anything(),
+          'test-profile-id',
+          'a0000000-0000-4000-a000-000000000201',
+          expect.objectContaining({ ageBracket: 'adolescent' }),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
+      (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockClear();
+      (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockRejectedValueOnce(
         new ConsentWithdrawnError(),
       );
 
@@ -376,7 +418,8 @@ describe('book-suggestions routes', () => {
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(getUnpickedBookSuggestionsWithTopup).not.toHaveBeenCalled();
+      expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalled();
+      expect(assertLlmConsent).not.toHaveBeenCalled();
     });
   });
 });

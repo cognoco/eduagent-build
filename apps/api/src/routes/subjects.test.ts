@@ -87,12 +87,12 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by POST /subjects, /subjects/resolve,
+// assertLlmConsent (called at route entry by /subjects/resolve and
 // /subjects/classify) runs isLlmExchangeConsentAllowed, which reads
 // db.query.membership — the stub `db` ({}) in this file has no `.query`
 // property. Defaults to allowed (resolves undefined = no throw); individual
-// tests override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
-// exercise the refusal path.
+// tests override it to exercise those refusal paths. The mixed POST /subjects
+// tests also use the mock as a tripwire proving delegation to the service.
 // gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
 // consentGrant reads with no real implementation available in this file's
 // stub-db environment (same class as verifyPersonOwnershipV2 above).
@@ -669,12 +669,14 @@ describe('POST /v1/subjects/classify', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5)
+// [WI-2543] Mixed-route consent gate lives inside createSubjectWithStructure.
 // ---------------------------------------------------------------------------
 
-describe('[WI-2396] subjects consent-withdrawal gate', () => {
-  it('POST /subjects refuses with 403 CONSENT_WITHDRAWN and never calls createSubjectWithStructure when consent is withdrawn', async () => {
-    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+describe('[WI-2543] subjects granular consent gate', () => {
+  it('POST /subjects maps a service-boundary consent refusal to 403', async () => {
+    createSubjectWithStructureMock.mockRejectedValueOnce(
+      new ConsentWithdrawnError(),
+    );
 
     const res = await makeApp().request('/v1/subjects', {
       method: 'POST',
@@ -685,27 +687,30 @@ describe('[WI-2396] subjects consent-withdrawal gate', () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
-    expect(createSubjectWithStructureMock).not.toHaveBeenCalled();
+    expect(createSubjectWithStructureMock).toHaveBeenCalled();
+    expect(assertLlmConsentMock).not.toHaveBeenCalled();
   });
 
-  it('POST /subjects proceeds (LLM dispatched) when consent is active', async () => {
+  it('POST /subjects delegates deterministic branches after consent withdrawal', async () => {
+    assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
     createSubjectWithStructureMock.mockResolvedValue({
       subject: makeSubjectRecord(),
       structureType: 'narrow',
     });
 
-    const res = await makeApp().request('/v1/subjects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Chemistry' }),
-    });
+    try {
+      const res = await makeApp().request('/v1/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Chemistry' }),
+      });
 
-    expect(res.status).toBe(201);
-    expect(assertLlmConsentMock).toHaveBeenCalledWith(
-      expect.anything(),
-      PROFILE_ID,
-    );
-    expect(createSubjectWithStructureMock).toHaveBeenCalled();
+      expect(res.status).toBe(201);
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
+      expect(createSubjectWithStructureMock).toHaveBeenCalled();
+    } finally {
+      assertLlmConsentMock.mockResolvedValue(undefined);
+    }
   });
 
   it('POST /subjects/resolve refuses with 403 CONSENT_WITHDRAWN and never calls resolveSubjectName when consent is withdrawn', async () => {

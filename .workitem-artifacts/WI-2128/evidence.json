@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The root-cause trace follows the synthetic learner and owner through login-bound caller identity, organization membership, profile selection, shell restoration, and cache state, and identifies owner fallback at the headerless profile-scope boundary as the first Person substitution.",
+      "pointer": ".workitem-artifacts/WI-2128/root-cause-trace-and-plan.md"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The central authority resolver permits self operation and active-guardian operation of an uncredentialed charge while categorically denying credentialed charges, unrelated people, and non-members.",
+      "pointer": "apps/api/src/services/identity-v2/ownership-v2.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The request boundary resolves omitted headers from the authenticated caller Person, filters explicit selection through caller-bound operation authority, and emits privacy-safe mismatch categories.",
+      "pointer": "apps/api/src/middleware/profile-scope.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The real-database security regression uses separate owner and learner Clerk subjects to prove self-binding, owner preservation, fail-closed profile selection and writes, preserved family/support/billing relationships, and fresh-factor non-elevation.",
+      "pointer": "tests/integration/wi2128-family-join-identity.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The supporter fixture proves that a Supportership-only edge remains available through the supporter cold-start read surface but does not add the supportee to the caller's operate-as profile list.",
+      "pointer": "apps/api/src/services/test-seed-v2-supporter.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Mobile profile restoration revalidates caller-authorized profiles through a request-local profileContext:'omit' client without clearing shared context, then repairs an invalid saved selection or stale proxy state after the authoritative response while withholding stale authority during refresh failures.",
+      "pointer": "apps/mobile/src/lib/profile.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The durable verification record contains the named production-only revert failure, exact restore success, real-database suite, touched-suite coverage, type/lint/change-class gates, and independently captured baseline residues.",
+      "pointer": ".workitem-artifacts/WI-2128/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-30",
+  "redGreenPointer": "tests/integration/wi2128-family-join-identity.integration.test.ts"
+}

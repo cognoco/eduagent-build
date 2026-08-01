@@ -6,10 +6,17 @@ import {
 } from './use-session-streaming';
 import { QuotaExceededError } from '../../lib/api-client';
 import { UpstreamError } from '../../lib/api-errors';
+import { queryKeys } from '../../lib/query-keys';
 import { Sentry } from '../../lib/sentry';
 import * as sessionRecoveryModule from '../../lib/session-recovery';
 
 const mockCaptureException = jest.spyOn(Sentry, 'captureException');
+const mockInvalidateQueries = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+}));
 
 // Mock session recovery
 const mockWriteRecoveryMarker = jest
@@ -470,6 +477,81 @@ describe('useSessionStreaming', () => {
           }),
         ]),
       );
+    });
+
+    it('[WI-2231] invalidates only the completed session transcript for the active profile', async () => {
+      const opts = makeOpts();
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('What is algebra?');
+      });
+
+      expect(mockInvalidateQueries).toHaveBeenCalledTimes(1);
+      const { predicate } = mockInvalidateQueries.mock.calls[0][0] as {
+        predicate: (query: { queryKey: readonly unknown[] }) => boolean;
+      };
+
+      expect(
+        predicate({
+          queryKey: queryKeys.sessions.transcript(
+            'study',
+            'new-session-1',
+            'profile-1',
+          ),
+        }),
+      ).toBe(true);
+      expect(
+        predicate({
+          queryKey: queryKeys.sessions.transcript(
+            'family',
+            'new-session-1',
+            'profile-1',
+          ),
+        }),
+      ).toBe(true);
+      expect(
+        predicate({
+          queryKey: queryKeys.sessions.transcript(
+            'study',
+            'new-session-1',
+            'other-profile',
+          ),
+        }),
+      ).toBe(false);
+      expect(
+        predicate({
+          queryKey: queryKeys.sessions.transcript(
+            'study',
+            'other-session',
+            'profile-1',
+          ),
+        }),
+      ).toBe(false);
+      expect(
+        predicate({
+          queryKey: queryKeys.sessions.detail(
+            'study',
+            'new-session-1',
+            'profile-1',
+          ),
+        }),
+      ).toBe(false);
+    });
+
+    it('[WI-2231] does not invalidate the transcript when streaming fails', async () => {
+      const opts = makeOpts({
+        streamMessage: jest
+          .fn()
+          .mockRejectedValue(new TypeError('Failed to fetch')),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('What is algebra?');
+      });
+
+      expect(mockInvalidateQueries).not.toHaveBeenCalled();
     });
 
     it('stores challenge round affordances from the typed done payload', async () => {

@@ -350,15 +350,14 @@ describe('progress routes', () => {
       expect(mockGetSubjectProgress).not.toHaveBeenCalled();
     });
 
-    it('returns 400 when profile cannot be resolved (no X-Profile-Id and no owner)', async () => {
-      // findOwnerProfile returns null by default, so without X-Profile-Id
-      // profileId stays undefined → requireProfileId throws 400
+    it('[WI-2128] returns 403 when the authenticated caller Person cannot be resolved', async () => {
+      mockGetPersonScope.mockResolvedValueOnce(null);
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/progress`,
         { headers: makeAuthHeaders() },
         TEST_ENV,
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(mockGetSubjectProgress).not.toHaveBeenCalled();
     });
   });

@@ -99,12 +99,12 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by POST /assessments/:id/answer and
-// POST /sessions/:id/quick-check) runs isLlmExchangeConsentAllowed, which
+// assertLlmConsent (called at route entry by POST /sessions/:id/quick-check)
+// runs isLlmExchangeConsentAllowed, which
 // reads db.query.membership — makeStubDb() below has no `.query` property.
 // Defaults to allowed (resolves undefined = no throw); individual tests
-// override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
-// exercise the refusal path.
+// override it to exercise that refusal path. The mixed assessment-answer tests
+// also use the mock as a tripwire proving the route delegates to its service.
 // gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
 // consentGrant reads with no real implementation available in this file's
 // stub-db environment (same class as verifyPersonOwnershipV2 above).
@@ -299,6 +299,7 @@ const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  assertLlmConsentMock.mockReset().mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -533,32 +534,37 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     expect(res.status).toBe(409);
   });
 
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
-  describe('[WI-2396] consent-withdrawal gate', () => {
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls submitAssessmentAnswer when consent is withdrawn', async () => {
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+  // [WI-2543] Mixed-route consent gate lives inside submitAssessmentAnswer.
+  describe('[WI-2543] granular consent gate', () => {
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
+      submitAssessmentAnswerMock.mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
 
       const res = await makeApp().request(path, validAnswerBody());
 
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
-      expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
+      expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
+    it('delegates a deterministic app-help result after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
       submitAssessmentAnswerMock.mockResolvedValue(
-        makeSubmitAnswerResult({ status: 'in_progress' }),
+        makeSubmitAnswerResult({ kind: 'app_help', status: 'in_progress' }),
       );
 
-      const res = await makeApp().request(path, validAnswerBody());
+      try {
+        const res = await makeApp().request(path, validAnswerBody());
 
-      expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-      );
-      expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+      } finally {
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
     });
   });
 
@@ -837,7 +843,20 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
     };
   }
 
-  it('returns 200 with feedback when session exists', async () => {
+  it('returns 400 for a malformed session ID before database, consent, context, or LLM work', async () => {
+    const res = await makeApp().request(
+      '/v1/sessions/not-a-uuid/quick-check',
+      validQuickCheckBody(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(getSessionMock).not.toHaveBeenCalled();
+    expect(assertLlmConsentMock).not.toHaveBeenCalled();
+    expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
+    expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 with feedback and dispatches once for a topic-scoped session', async () => {
     getSessionMock.mockResolvedValue(makeSessionRecord());
     loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
     evaluateQuickCheckAnswerMock.mockResolvedValue({
@@ -855,16 +874,33 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ feedback: 'Good work!', isCorrect: true });
+    expect(assertLlmConsentMock).toHaveBeenCalledTimes(1);
+    expect(loadAssessmentTopicContextMock).toHaveBeenCalledWith(
+      expect.anything(),
+      TOPIC_ID,
+      PROFILE_ID,
+    );
+    expect(evaluateQuickCheckAnswerMock).toHaveBeenCalledTimes(1);
+    expect(evaluateQuickCheckAnswerMock).toHaveBeenCalledWith(
+      expect.objectContaining(makeTopicContext()),
+      'The answer is 42',
+      expect.any(Object),
+    );
   });
 
-  it('returns 404 when the session does not exist', async () => {
+  it('returns 404 without consent or LLM dispatch when the session does not exist and consent is withdrawn', async () => {
     getSessionMock.mockResolvedValue(null);
+    assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
 
     const res = await makeApp().request(path, validQuickCheckBody());
 
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.NOT_FOUND });
+    expect(getSessionMock).toHaveBeenCalledTimes(1);
+    expect(assertLlmConsentMock).not.toHaveBeenCalled();
+    expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
+    expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the answer field is missing', async () => {
@@ -876,11 +912,14 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
 
     expect(res.status).toBe(400);
     expect(getSessionMock).not.toHaveBeenCalled();
+    expect(assertLlmConsentMock).not.toHaveBeenCalled();
+    expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when a different profile tries to access the session', async () => {
+  it('returns 404 without consent or LLM dispatch when scoped access hides another profile session and consent is withdrawn', async () => {
     // getSession uses scoped access — returns null for wrong profile
     getSessionMock.mockResolvedValue(null);
+    assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
 
     const res = await makeApp({ profileId: 'other-profile-id' }).request(
       path,
@@ -893,25 +932,46 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
       'other-profile-id',
       SESSION_ID,
     );
+    expect(assertLlmConsentMock).not.toHaveBeenCalled();
+    expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
+    expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
   });
 
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
-  describe('[WI-2396] consent-withdrawal gate', () => {
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls evaluateQuickCheckAnswer when consent is withdrawn', async () => {
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+  // [WI-2990] Consent follows the ownership-hiding session read and precedes
+  // either topic-scoped or general quick-check LLM dispatch.
+  describe('[WI-2990] ordered consent-withdrawal gate', () => {
+    it('returns 403 for an existing topic-scoped session before context lookup or LLM dispatch', async () => {
+      getSessionMock.mockResolvedValue(makeSessionRecord());
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
 
       const res = await makeApp().request(path, validQuickCheckBody());
 
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
-      expect(getSessionMock).not.toHaveBeenCalled();
+      expect(getSessionMock).toHaveBeenCalledTimes(1);
+      expect(assertLlmConsentMock).toHaveBeenCalledTimes(1);
+      expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
       expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
-      getSessionMock.mockResolvedValue(makeSessionRecord());
-      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
+    it('returns 403 for an existing topicless session before general LLM dispatch', async () => {
+      getSessionMock.mockResolvedValue(makeSessionRecord({ topicId: null }));
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+
+      const res = await makeApp().request(path, validQuickCheckBody());
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(getSessionMock).toHaveBeenCalledTimes(1);
+      expect(assertLlmConsentMock).toHaveBeenCalledTimes(1);
+      expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
+      expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
+    });
+
+    it('dispatches exactly once with general context for an active-consent topicless session', async () => {
+      getSessionMock.mockResolvedValue(makeSessionRecord({ topicId: null }));
       evaluateQuickCheckAnswerMock.mockResolvedValue({
         feedback: 'Good work!',
         passed: true,
@@ -929,7 +989,19 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
         expect.anything(),
         PROFILE_ID,
       );
-      expect(evaluateQuickCheckAnswerMock).toHaveBeenCalled();
+      expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
+      expect(evaluateQuickCheckAnswerMock).toHaveBeenCalledTimes(1);
+      expect(evaluateQuickCheckAnswerMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topicTitle: 'General',
+          topicDescription: '',
+          subjectName: undefined,
+          pedagogyMode: undefined,
+          languageCode: null,
+        }),
+        'The answer is 42',
+        expect.any(Object),
+      );
     });
   });
 });
@@ -969,11 +1041,13 @@ function makeAssessmentRecord(
   };
 }
 
-function makeSessionRecord() {
+function makeSessionRecord(
+  overrides: Partial<{ topicId: string | null }> = {},
+) {
   return {
     id: SESSION_ID,
     subjectId: SUBJECT_ID,
-    topicId: TOPIC_ID,
+    topicId: overrides.topicId === undefined ? TOPIC_ID : overrides.topicId,
     topicTitle: null,
     subjectName: null,
     bookId: null,

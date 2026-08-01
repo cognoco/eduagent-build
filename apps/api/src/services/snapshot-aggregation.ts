@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm';
 import {
   assessments,
-  curricula,
   curriculumTopics,
   learningSessions,
   milestones,
@@ -33,6 +32,7 @@ import {
   progressMetricsSchema,
 } from '@eduagent/schemas';
 import { queueCelebration } from './celebrations';
+import { getLatestCurricula } from './curriculum';
 import { getCurrentLanguageProgress } from './language-curriculum';
 import { getCurrentlyWorkingOn } from './learner-profile';
 import { getPersonBirthYear } from './identity-v2/helpers';
@@ -254,9 +254,7 @@ async function loadProgressStateOnce(
     repo.vocabularyRetentionCards.findMany(),
   ]);
 
-  const curriculaPromise = db.query.curricula.findMany({
-    where: inArray(curricula.subjectId, subjectIds),
-  });
+  const curriculaPromise = getLatestCurricula(db, profileId, subjectIds);
   const [
     [
       sessionRows,
@@ -266,15 +264,13 @@ async function loadProgressStateOnce(
       vocabularyRows,
       vocabularyCardRows,
     ],
-    allCurricula,
+    latestCurricula,
   ] = await Promise.all([profileScopedReadsPromise, curriculaPromise]);
 
-  const latestCurriculumBySubject = new Map<string, string>();
-  for (const curriculum of allCurricula.sort((a, b) => b.version - a.version)) {
-    if (!latestCurriculumBySubject.has(curriculum.subjectId)) {
-      latestCurriculumBySubject.set(curriculum.subjectId, curriculum.id);
-    }
-  }
+  const allCurricula = [...latestCurricula.values()];
+  const latestCurriculumBySubject = new Map(
+    allCurricula.map((curriculum) => [curriculum.subjectId, curriculum.id]),
+  );
 
   // Only fetch topics for the latest curriculum per subject — old versions
   // are dead weight (challengeCurriculum now deletes them, but stale rows

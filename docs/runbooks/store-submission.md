@@ -10,25 +10,39 @@ Before that ruling, agents may refresh the branch and run static, unit, export, 
 
 The committed Android profile targets **Play internal** testing. The iOS profile relies on EAS-managed App Store Connect credentials and targets TestFlight through the normal EAS submit path. No Apple identifier or private key belongs in `eas.json`.
 
-## Credential Preparation
+## Credential Preflight
 
-The approved secret provider must inject `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`; the value must be the complete Google service-account JSON object. With the value stored in Doppler production, materialize the ignored file without printing the secret:
+Android submission uses the EAS-managed Google Play service account assigned to
+the app for `com.mentomate.app` under **OPQ-37**. Keep
+`serviceAccountKeyPath` out of `eas.json`: setting it forces EAS to read local
+material and prevents managed-key resolution.
+
+Before submission, run the metadata-only preflight. It checks assignment without
+printing or creating credential material, and fails closed when the key is absent
+or unassigned:
 
 ```powershell
-doppler run -c prd -- pnpm mobile:submit:prepare
-git check-ignore apps/mobile/.eas-submit/google-play-service-account.json
+doppler run -c prd -- pnpm mobile:submit:preflight
 ```
 
-The materializer validates the credential shape, writes mode `0600`, and exits without writing when the value is missing or malformed. POSIX systems enforce that mode. Windows does not enforce POSIX read permissions, so the helper emits a warning; restrict the file to the current operator and inspect the resulting ACL before submission:
+Stop on a preflight failure. Do not paste, materialize, rotate, or otherwise handle
+the Google service-account JSON locally.
+
+The retired materializer may have left a stale local credential on an existing
+worktree. The preflight fails closed before its Expo request when it finds that
+path. Delete only the stale local credential file, then verify it is absent
+before rerunning the preflight:
 
 ```powershell
 $credentialPath = 'apps/mobile/.eas-submit/google-play-service-account.json'
-$principal = "$env:USERDOMAIN\$env:USERNAME"
-icacls $credentialPath /inheritance:r /grant:r "${principal}:(R,W)"
-icacls $credentialPath
+Remove-Item -LiteralPath $credentialPath -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $credentialPath) {
+  throw "Stale Google Play credential still exists at $credentialPath"
+}
 ```
 
-Stop if any unapproved principal retains access. Never paste the JSON into a shell argument, `eas.json`, an environment file, a CI log, or a pull request.
+Do not print, copy, or stage its contents. The legacy directory remains ignored
+only to prevent accidental staging while that cleanup happens.
 
 ## Preflight
 
@@ -36,14 +50,14 @@ Run from the repository root unless the command starts with `cd apps/mobile`:
 
 ```powershell
 pnpm check:mode-nav-flag-combo
-pnpm exec jest --config scripts/jest.config.cjs scripts/prepare-eas-submit-credentials.test.ts --runInBand --no-coverage
+pnpm exec jest --config scripts/jest.config.cjs scripts/eas-managed-submit-profile-contract.test.ts scripts/verify-eas-managed-submit-credential.test.ts --runInBand --no-coverage
 git status --short
 cd apps/mobile
 eas build:list --platform android --limit 3
 eas build:list --platform ios --limit 3
 ```
 
-The production profile must classify as Config T: V0 off, V1 on, V2 on. Stop if the worktree is dirty, OPQ-155 is not approved, a production build already covers the intended commit, or the credential path is absent/ignored incorrectly. The production Doppler flag triple must also be aligned to Config T before running `pnpm env:sync`; otherwise that sync will restore V0 and invalidate the candidate.
+The production profile must classify as Config T: V0 off, V1 on, V2 on. Stop if the worktree is dirty, OPQ-155 is not approved, a production build already covers the intended commit, or the managed-credential preflight fails. The production Doppler flag triple must also be aligned to Config T before running `pnpm env:sync`; otherwise that sync will restore V0 and invalidate the candidate.
 
 ## Build
 
@@ -86,6 +100,6 @@ Confirm processing in App Store Connect and add only approved internal TestFligh
 ## Failure And Rollback
 
 - Do not retry a failed build or submission until the failure is diagnosed.
-- If credential validation fails, replace the approved secret upstream and rematerialize; never edit the generated file.
+- If managed-credential preflight fails, stop before upload and have the authorized EAS administrator restore the app assignment; do not create a local credential file.
 - If Config T fails candidate verification, stop submission and rebuild from the approved fallback or reverted production flag commit. Build-time flags cannot be repaired by changing a runtime database value.
-- Remove the local credential after submission evidence is recorded. Keep only build/submission IDs, timestamps, commit, profile, track, and status.
+- Keep only build/submission IDs, timestamps, commit, profile, track, and status; never retain credential material.

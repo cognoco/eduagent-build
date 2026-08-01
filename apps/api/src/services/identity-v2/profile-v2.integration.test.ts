@@ -488,6 +488,8 @@ const RUN = !!process.env.DATABASE_URL;
     expect(scope!.profileId).toBe(owner);
     expect(scope!.meta).toMatchObject({
       birthYear: 1990,
+      birthMonth: 2,
+      birthDay: 14,
       location: 'EU',
       isOwner: true,
       hasPremiumLlm: false,

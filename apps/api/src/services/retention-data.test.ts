@@ -8,6 +8,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 });
 const mockCaptureException = jest.fn();
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+const mockAssertLlmConsent = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
@@ -54,6 +55,14 @@ jest.mock(
 );
 
 jest.mock(
+  './identity-v2/consent-status-v2' /* gc1-allow: service unit test — consent decision is the controlled boundary under test */,
+  () => ({
+    ...jest.requireActual('./identity-v2/consent-status-v2'),
+    assertLlmConsent: (...args: unknown[]) => mockAssertLlmConsent(...args),
+  }),
+);
+
+jest.mock(
   '../inngest/client' /* gc1-allow: Inngest is an external event-dispatch boundary */,
   () => ({
     inngest: {
@@ -72,6 +81,7 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import { UpstreamLlmError } from '../errors';
+import { ConsentWithdrawnError } from './identity-v2/consent-errors';
 import {
   processRecallResult,
   getRetentionStatus,
@@ -206,16 +216,34 @@ function createMockDb(options?: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
     },
-    select: jest.fn().mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        innerJoin: jest.fn().mockReturnValue({
+    select: jest.fn((selection?: Record<string, unknown>) => {
+      if (selection === undefined) {
+        return {
+          from: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                orderBy: jest.fn().mockResolvedValue([
+                  {
+                    curricula: { id: curriculumId, subjectId, version: 1 },
+                    subjects: { id: subjectId, profileId },
+                  },
+                ]),
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        from: jest.fn().mockReturnValue({
           innerJoin: jest.fn().mockReturnValue({
             innerJoin: jest.fn().mockReturnValue({
-              where: jest.fn().mockReturnValue(ownedTopicWhereResult),
+              innerJoin: jest.fn().mockReturnValue({
+                where: jest.fn().mockReturnValue(ownedTopicWhereResult),
+              }),
             }),
           }),
         }),
-      }),
+      };
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -345,6 +373,7 @@ function makeSelectChain<T>(rows: T[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAssertLlmConsent.mockReset().mockResolvedValue(undefined);
   setupScopedRepo();
   (checkNeedsDeepeningCapacity as jest.Mock).mockReturnValue({
     atCapacity: false,
@@ -428,27 +457,32 @@ describe('getSubjectRetention', () => {
         title: 'Mixed Parent Topic',
       },
     ]);
-    db.select = jest.fn(() => ({
-      from: jest.fn(() => ({
-        innerJoin: jest.fn(() => ({
-          innerJoin: jest.fn(() => ({
-            innerJoin: jest.fn(() => ({
-              where: jest.fn().mockResolvedValue([
-                {
-                  topicId: 'owned-topic',
-                  topicTitle: 'Owned Topic',
-                  topicDescription: null,
-                  bookId: 'book-owned',
-                  bookTitle: 'Book',
-                  curriculumId,
-                  subjectId,
-                },
-              ]),
+    const baseSelect = db.select;
+    db.select = jest.fn((selection?: Record<string, unknown>) =>
+      selection === undefined
+        ? (baseSelect as jest.Mock)(selection)
+        : ({
+            from: jest.fn(() => ({
+              innerJoin: jest.fn(() => ({
+                innerJoin: jest.fn(() => ({
+                  innerJoin: jest.fn(() => ({
+                    where: jest.fn().mockResolvedValue([
+                      {
+                        topicId: 'owned-topic',
+                        topicTitle: 'Owned Topic',
+                        topicDescription: null,
+                        bookId: 'book-owned',
+                        bookTitle: 'Book',
+                        curriculumId,
+                        subjectId,
+                      },
+                    ]),
+                  })),
+                })),
+              })),
             })),
-          })),
-        })),
-      })),
-    })) as never;
+          } as never),
+    ) as never;
 
     const result = await getSubjectRetention(db, profileId, subjectId);
 
@@ -487,27 +521,32 @@ describe('getAllSubjectsRetention', () => {
         title: 'Mixed Parent Topic',
       },
     ]);
-    db.select = jest.fn(() => ({
-      from: jest.fn(() => ({
-        innerJoin: jest.fn(() => ({
-          innerJoin: jest.fn(() => ({
-            innerJoin: jest.fn(() => ({
-              where: jest.fn().mockResolvedValue([
-                {
-                  topicId: 'owned-topic',
-                  topicTitle: 'Owned Topic',
-                  topicDescription: null,
-                  bookId: 'book-owned',
-                  bookTitle: 'Book',
-                  curriculumId,
-                  subjectId,
-                },
-              ]),
+    const baseSelect = db.select;
+    db.select = jest.fn((selection?: Record<string, unknown>) =>
+      selection === undefined
+        ? (baseSelect as jest.Mock)(selection)
+        : ({
+            from: jest.fn(() => ({
+              innerJoin: jest.fn(() => ({
+                innerJoin: jest.fn(() => ({
+                  innerJoin: jest.fn(() => ({
+                    where: jest.fn().mockResolvedValue([
+                      {
+                        topicId: 'owned-topic',
+                        topicTitle: 'Owned Topic',
+                        topicDescription: null,
+                        bookId: 'book-owned',
+                        bookTitle: 'Book',
+                        curriculumId,
+                        subjectId,
+                      },
+                    ]),
+                  })),
+                })),
+              })),
             })),
-          })),
-        })),
-      })),
-    })) as never;
+          } as never),
+    ) as never;
 
     const result = await getAllSubjectsRetention(db, profileId);
 
@@ -577,12 +616,13 @@ describe('processRecallTest', () => {
   // SM-2-orchestration tests are exercising. Register a parseable JSON grader so
   // every standard-mode test proceeds past the grade gate; the SM-2 outcome is
   // still controlled per-test by the mocked processRecallResult.
-  function registerJsonGrader(body: string): void {
+  function registerJsonGrader(body: string) {
+    const chat = jest.fn(async (): Promise<ChatResult> => {
+      return { content: body, stopReason: 'stop' };
+    });
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: body, stopReason: 'stop' };
-      },
+      chat,
       chatStream(): ChatStreamResult {
         return makeChatStreamResult(
           (async function* () {
@@ -593,6 +633,7 @@ describe('processRecallTest', () => {
       },
     };
     registerProvider(provider);
+    return chat;
   }
 
   beforeEach(() => {
@@ -950,6 +991,9 @@ describe('processRecallTest', () => {
   });
 
   it('treats "I don\'t remember" as quality 0 and returns a hint', async () => {
+    const graderChat = registerJsonGrader(
+      '{"quality": 4, "verdict": "solid", "rationale": "must not run", "misconception": null}',
+    );
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -978,6 +1022,8 @@ describe('processRecallTest', () => {
     });
 
     expect(processRecallResult).toHaveBeenCalledWith(expect.any(Object), 0);
+    expect(mockAssertLlmConsent).not.toHaveBeenCalled();
+    expect(graderChat).not.toHaveBeenCalled();
     expect(result.failureCount).toBe(1);
     expect(result.hint).toContain("That's okay");
   });
@@ -1744,6 +1790,193 @@ describe('processRecallTest', () => {
     expect(typeof result.cooldownEndsAt).toBe('string');
     expect(result.passed).toBe(false);
     expect(result.xpChange).toBe('none');
+  });
+
+  describe('[WI-2989] consent boundary after deterministic cooldown exits', () => {
+    it('returns an active cooldown without checking consent, claiming, or dispatching the grader', async () => {
+      const graderChat = registerJsonGrader(
+        '{"quality": 4, "verdict": "solid", "rationale": "must not run", "misconception": null}',
+      );
+      mockAssertLlmConsent.mockRejectedValue(new ConsentWithdrawnError());
+      (canRetestTopic as jest.Mock).mockReturnValueOnce(false);
+      const card = mockRetentionCardRow();
+      setupScopedRepo({ retentionCardFindFirst: card });
+      const db = createMockDb();
+
+      const result = await processRecallTest(db, profileId, {
+        topicId,
+        answer: 'A detailed answer that should remain inside cooldown.',
+      });
+
+      expect(result.cooldownActive).toBe(true);
+      expect(mockAssertLlmConsent).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+      expect(graderChat).not.toHaveBeenCalled();
+    });
+
+    it('returns the lost-claim cooldown without checking consent or dispatching the grader', async () => {
+      const graderChat = registerJsonGrader(
+        '{"quality": 4, "verdict": "solid", "rationale": "must not run", "misconception": null}',
+      );
+      mockAssertLlmConsent.mockRejectedValue(new ConsentWithdrawnError());
+      const card = mockRetentionCardRow();
+      setupScopedRepo({ retentionCardFindFirst: card });
+      const db = createMockDb();
+      (db.update as jest.Mock).mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation(() => {
+            const pending = Promise.resolve(undefined);
+            (pending as unknown as Record<string, unknown>).returning = jest
+              .fn()
+              .mockResolvedValue([]);
+            return pending;
+          }),
+        }),
+      });
+
+      const result = await processRecallTest(db, profileId, {
+        topicId,
+        answer: 'A detailed answer from the request that loses the claim.',
+      });
+
+      expect(result.cooldownActive).toBe(true);
+      expect(mockAssertLlmConsent).not.toHaveBeenCalled();
+      expect(db.update).toHaveBeenCalledTimes(1);
+      expect(graderChat).not.toHaveBeenCalled();
+    });
+
+    it('restores an acquired claim and preserves consent denial before grader dispatch', async () => {
+      const graderChat = registerJsonGrader(
+        '{"quality": 4, "verdict": "solid", "rationale": "must not run", "misconception": null}',
+      );
+      const consentError = new ConsentWithdrawnError();
+      mockAssertLlmConsent.mockRejectedValueOnce(consentError);
+      const card = mockRetentionCardRow();
+      setupScopedRepo({ retentionCardFindFirst: card });
+      const db = createMockDb();
+
+      await expect(
+        processRecallTest(db, profileId, {
+          topicId,
+          answer: 'A detailed answer after an acquired cooldown claim.',
+        }),
+      ).rejects.toBe(consentError);
+
+      expect(mockAssertLlmConsent).toHaveBeenCalledWith(db, profileId);
+      expect(db.update).toHaveBeenCalledTimes(2);
+      expect(graderChat).not.toHaveBeenCalled();
+    });
+
+    it('captures restoration failure without replacing the consent-denied error', async () => {
+      const graderChat = registerJsonGrader(
+        '{"quality": 4, "verdict": "solid", "rationale": "must not run", "misconception": null}',
+      );
+      const consentError = new ConsentWithdrawnError();
+      const restoreError = new Error('transient restore failure');
+      mockAssertLlmConsent.mockRejectedValueOnce(consentError);
+      const card = mockRetentionCardRow();
+      setupScopedRepo({ retentionCardFindFirst: card });
+      const db = createMockDb();
+      let updateCallIndex = 0;
+      (db.update as jest.Mock).mockImplementation(() => {
+        const thisCallIndex = ++updateCallIndex;
+        return {
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockImplementation(() => {
+              const pending = Promise.resolve(undefined);
+              (pending as unknown as Record<string, unknown>).returning =
+                thisCallIndex === 2
+                  ? jest.fn().mockRejectedValue(restoreError)
+                  : jest.fn().mockResolvedValue([{ id: 'card-1' }]);
+              return pending;
+            }),
+          }),
+        };
+      });
+
+      await expect(
+        processRecallTest(db, profileId, {
+          topicId,
+          answer: 'A detailed answer before a failed claim restoration.',
+        }),
+      ).rejects.toBe(consentError);
+
+      expect(db.update).toHaveBeenCalledTimes(2);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        restoreError,
+        expect.objectContaining({
+          tags: { area: 'recall', op: 'cooldown_restore' },
+        }),
+      );
+      expect(graderChat).not.toHaveBeenCalled();
+    });
+
+    it('captures a rejected optimistic restoration without replacing the consent-denied error', async () => {
+      const graderChat = registerJsonGrader(
+        '{"quality": 4, "verdict": "solid", "rationale": "must not run", "misconception": null}',
+      );
+      const consentError = new ConsentWithdrawnError();
+      mockAssertLlmConsent.mockRejectedValueOnce(consentError);
+      const card = mockRetentionCardRow();
+      setupScopedRepo({ retentionCardFindFirst: card });
+      const db = createMockDb();
+      let updateCallIndex = 0;
+      (db.update as jest.Mock).mockImplementation(() => {
+        const thisCallIndex = ++updateCallIndex;
+        return {
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockImplementation(() => {
+              const pending = Promise.resolve(undefined);
+              (pending as unknown as Record<string, unknown>).returning = jest
+                .fn()
+                .mockResolvedValue(
+                  thisCallIndex === 2 ? [] : [{ id: 'card-1' }],
+                );
+              return pending;
+            }),
+          }),
+        };
+      });
+
+      await expect(
+        processRecallTest(db, profileId, {
+          topicId,
+          answer: 'A detailed answer before a stale claim restoration.',
+        }),
+      ).rejects.toBe(consentError);
+
+      expect(db.update).toHaveBeenCalledTimes(2);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Cooldown claim changed before consent-denial restoration',
+        }),
+        expect.objectContaining({
+          tags: { area: 'recall', op: 'cooldown_restore' },
+        }),
+      );
+      expect(graderChat).not.toHaveBeenCalled();
+    });
+
+    it('checks active consent immediately before exactly one grader dispatch', async () => {
+      const graderChat = registerJsonGrader(
+        '{"quality": 4, "verdict": "solid", "rationale": "allowed", "misconception": null}',
+      );
+      const card = mockRetentionCardRow();
+      setupScopedRepo({ retentionCardFindFirst: card });
+      const db = createMockDb();
+
+      await processRecallTest(db, profileId, {
+        topicId,
+        answer: 'A detailed answer with active LLM consent.',
+      });
+
+      expect(mockAssertLlmConsent).toHaveBeenCalledTimes(1);
+      expect(mockAssertLlmConsent).toHaveBeenCalledWith(db, profileId);
+      expect(graderChat).toHaveBeenCalledTimes(1);
+      expect(mockAssertLlmConsent.mock.invocationCallOrder[0]).toBeLessThan(
+        graderChat.mock.invocationCallOrder[0]!,
+      );
+    });
   });
 
   it('D-02: atomic guard allows update when lastReviewedAt is null (first review)', async () => {

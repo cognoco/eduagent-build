@@ -1,0 +1,52 @@
+{
+  "schema": "wi-2948.preload-classification.v1",
+  "observedAtUtc": "2026-08-01T11:05:43Z",
+  "gitHead": "37af17536437db19f9535b7bf55f06a82b5f4732",
+  "originMainAtProof": "a4b4698432c6d7f6c984a4550425b50d7e457539",
+  "target": "staging",
+  "proofInvocation": {
+    "authorized": true,
+    "invocationCount": 1,
+    "configuredWorkers": 1,
+    "configuredRetries": 0,
+    "credentialBoundary": "Doppler mentomate/stg; only TEST_SEED_SECRET and CLERK_PUBLISHABLE_KEY injected; CLERK_SECRET_KEY explicitly absent"
+  },
+  "outcome": {
+    "proofClass": "global-setup-failure",
+    "playwrightExit": 1,
+    "wrapperExit": 3,
+    "reporterOutputValid": true,
+    "topLevelErrorCount": 1,
+    "setupScenarioCount": 0,
+    "setupPassedCount": 0,
+    "setupFailedCount": 0,
+    "setupSkippedCount": 0,
+    "setupOtherCount": 0,
+    "setupAttemptCount": 0,
+    "setupRetryCount": 0,
+    "globalTeardownFailureLineCount": 0
+  },
+  "phaseCounts": {
+    "reporterReady": 1,
+    "webServerCommandStarted": 1,
+    "globalSetupStarted": 1,
+    "globalSetupCompleted": 0,
+    "globalSetupFailed": 1,
+    "discoveryCompleted": 0,
+    "setupTestBegin": 0,
+    "setupBodyEntered": 0
+  },
+  "claims": {
+    "setupReached": false,
+    "seededSignInValidated": false,
+    "globalTeardownValidated": false,
+    "endToEndSuccess": false
+  },
+  "privacy": {
+    "durableClassificationMode": "0600",
+    "rawConsolePublished": false,
+    "rawErrorsPublished": false,
+    "rawTemporaryDataDeleted": true,
+    "rawTemporaryDirectoryCountAfterExit": 0
+  }
+}

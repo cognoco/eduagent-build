@@ -1,0 +1,56 @@
+{
+  "schema": "wi-2948.ramtop-seeded-signin-receipt.v1",
+  "startedUtc": "2026-08-01T11:09:40Z",
+  "finishedUtc": "2026-08-01T11:11:07Z",
+  "machine": "ramtop",
+  "os": "Darwin",
+  "nodeVersion": "v22.16.0",
+  "gitHead": "719b2b5254a88111ada253fc1b5fb2e60bc15551",
+  "candidateBlobs": {
+    "workflow": "f860d65dd05e23b080a2682ef9edacd1f185a130",
+    "contractTest": "2fd13081fbd6847b55e9efe5773e55f5ff79389e"
+  },
+  "runId": "wi2948-ramtop-20260801T110940Z",
+  "target": "https://api-stg.mentomate.com",
+  "credentialBoundary": "Doppler stg live read; only TEST_SEED_SECRET, CLERK_PUBLISHABLE_KEY, and the aligned CLERK_SECRET_KEY injected; ambient CLERK_TESTING_TOKEN explicitly unset",
+  "commandShape": "CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com EXPO_PUBLIC_ENABLE_MODE_NAV=true EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true PLAYWRIGHT_RUN_ID=<recorded-run-id> PLAYWRIGHT_PRELOAD_PHASE_FILE=<mode-0600-temporary-file> PLAYWRIGHT_JSON_OUTPUT_FILE=<mode-0700-temporary-directory> env -u CLERK_SECRET_KEY -u CLERK_TESTING_TOKEN -u DOPPLER_TOKEN mise exec node@22 -- doppler run --project mentomate --config stg --no-cache --no-fallback --only-secrets=\"TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY\" -- zsh -f -c 'require aligned staging CLERK_SECRET_KEY present and ambient CLERK_TESTING_TOKEN absent; export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=\"$CLERK_PUBLISHABLE_KEY\"; export PLAYWRIGHT_TEST_SEED_SECRET=\"$TEST_SEED_SECRET\"; pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=setup --workers=1 --retries=0'",
+  "configuredRetries": 0,
+  "configuredWorkers": 1,
+  "globalTeardownReset": "passed",
+  "sourceResultSha256": "11525fe0f62fa8c0ca45008bb016f3a158545f25e884587afa5c720bc519710d",
+  "artifactPointer": "docs/evidence/WI-2948/ramtop-node22-seeded-signin-receipt.json",
+  "scenarios": [
+    {
+      "title": "seed onboarding-complete and capture solo-learner storage state",
+      "seedScenario": "onboarding-complete",
+      "storageState": "solo-learner",
+      "outcome": "passed",
+      "attempts": 1,
+      "retryIndexes": [0],
+      "durationMs": 16366
+    },
+    {
+      "title": "seed parent-multi-child and capture owner-with-children storage state",
+      "seedScenario": "parent-multi-child",
+      "storageState": "owner-with-children",
+      "outcome": "passed",
+      "attempts": 1,
+      "retryIndexes": [0],
+      "durationMs": 12504
+    },
+    {
+      "title": "seed v2-account-non-owner-child and capture non-owner-child storage state",
+      "seedScenario": "v2-account-non-owner-child",
+      "storageState": "non-owner-child",
+      "outcome": "passed",
+      "attempts": 1,
+      "retryIndexes": [0],
+      "durationMs": 10881
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 0,
+    "retriesObserved": 0
+  }
+}

@@ -1,7 +1,7 @@
 // @inngest-admin: cross-profile
-import { and, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, count, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { sessionSummaries } from '@eduagent/database';
+import { learningSessions, sessionSummaries } from '@eduagent/database';
 import { inngest } from '../client';
 import {
   getStepDatabase,
@@ -17,7 +17,20 @@ const transcriptPurgeEventDataSchema = z.object({
 });
 
 const PURGE_LIMIT = 100;
+const PURGE_QUERY_LIMIT = PURGE_LIMIT + 1;
 const DELAYED_LIMIT = 50;
+const UTC_DAY_MS = 86_400_000;
+
+export function computeRotatingDelayedOffset(
+  totalCount: number,
+  nowMs: number,
+): number {
+  if (totalCount <= 0) {
+    return 0;
+  }
+  const utcDay = Math.floor(nowMs / UTC_DAY_MS);
+  return (utcDay * DELAYED_LIMIT) % totalCount;
+}
 
 export const transcriptPurgeCron = inngest.createFunction(
   {
@@ -41,23 +54,27 @@ export const transcriptPurgeCron = inngest.createFunction(
       cutoff.setUTCDate(cutoff.getUTCDate() - 30);
 
       const db = getStepDatabase();
-      return db
-        .select({
-          sessionSummaryId: sessionSummaries.id,
-          sessionId: sessionSummaries.sessionId,
-          profileId: sessionSummaries.profileId,
-        })
-        .from(sessionSummaries)
-        .where(
-          and(
-            isNull(sessionSummaries.purgedAt),
-            isNotNull(sessionSummaries.llmSummary),
-            isNotNull(sessionSummaries.learnerRecap),
-            isNotNull(sessionSummaries.summaryGeneratedAt),
-            lte(sessionSummaries.summaryGeneratedAt, cutoff),
-          ),
-        )
-        .limit(PURGE_LIMIT);
+      return (
+        db
+          .select({
+            sessionSummaryId: sessionSummaries.id,
+            sessionId: sessionSummaries.sessionId,
+            profileId: sessionSummaries.profileId,
+          })
+          .from(sessionSummaries)
+          .where(
+            and(
+              isNull(sessionSummaries.purgedAt),
+              isNotNull(sessionSummaries.llmSummary),
+              isNotNull(sessionSummaries.learnerRecap),
+              isNotNull(sessionSummaries.summaryGeneratedAt),
+              lte(sessionSummaries.summaryGeneratedAt, cutoff),
+            ),
+          )
+          // Read one row beyond daily dispatch capacity. Without that sentinel,
+          // a full 100-row result is indistinguishable from a growing backlog.
+          .limit(PURGE_QUERY_LIMIT)
+      );
     });
 
     const delayed = await step.run(
@@ -89,8 +106,121 @@ export const transcriptPurgeCron = inngest.createFunction(
       },
     );
 
+    const nullTimestampDelayed = await step.run(
+      'find-null-timestamp-delayed-candidates',
+      async () => {
+        const delayedCutoff = new Date();
+        delayedCutoff.setUTCDate(delayedCutoff.getUTCDate() - 37);
+
+        const db = getStepDatabase();
+        const joinPredicate = and(
+          eq(learningSessions.id, sessionSummaries.sessionId),
+          eq(learningSessions.profileId, sessionSummaries.profileId),
+        );
+        const delayedPredicate = and(
+          isNull(sessionSummaries.purgedAt),
+          isNull(sessionSummaries.summaryGeneratedAt),
+          isNotNull(learningSessions.endedAt),
+          lte(learningSessions.endedAt, delayedCutoff),
+        );
+
+        const [{ totalCount: rawTotalCount = 0 } = {}] = await db
+          .select({ totalCount: count() })
+          .from(sessionSummaries)
+          .innerJoin(learningSessions, joinPredicate)
+          .where(delayedPredicate);
+        const totalCount = Number(rawTotalCount);
+
+        if (totalCount === 0) {
+          return { candidates: [], totalCount: 0 };
+        }
+
+        // Rotate a bounded page through the complete stale-null set. A fixed
+        // oldest-first LIMIT lets permanently unrepairable rows monopolize the
+        // queue forever; advancing by one page per UTC day gives every stable
+        // row a durable remediation attempt without an unbounded fan-out.
+        const pageSize = Math.min(DELAYED_LIMIT, totalCount);
+        const pageOffset = computeRotatingDelayedOffset(totalCount, Date.now());
+        const selectPage = (limit: number, offset: number) =>
+          db
+            .select({
+              sessionSummaryId: sessionSummaries.id,
+              sessionId: sessionSummaries.sessionId,
+              profileId: sessionSummaries.profileId,
+              summaryGeneratedAt: sessionSummaries.summaryGeneratedAt,
+              subjectId: learningSessions.subjectId,
+              topicId: sessionSummaries.topicId,
+            })
+            .from(sessionSummaries)
+            .innerJoin(learningSessions, joinPredicate)
+            .where(delayedPredicate)
+            .orderBy(asc(sessionSummaries.id))
+            .limit(limit)
+            .offset(offset);
+
+        const firstPage = await selectPage(pageSize, pageOffset);
+        // Rows can leave the predicate between COUNT and SELECT. If that
+        // shrinks the set below one page, the wrapped page may overlap the
+        // first page; duplicate regeneration events are safe because
+        // sessionSummaryRegenerate is idempotent on event.data.sessionId.
+        const wrapCount = pageSize - firstPage.length;
+        const wrappedPage = wrapCount > 0 ? await selectPage(wrapCount, 0) : [];
+
+        return {
+          candidates: [...firstPage, ...wrappedPage],
+          totalCount,
+        };
+      },
+    );
+
+    const nullTimestampCandidates = nullTimestampDelayed.candidates;
+    const nullSummaryGeneratedAtCount = nullTimestampDelayed.totalCount;
+    const delayedCount = delayed.length + nullSummaryGeneratedAtCount;
+    const delayedSample = [...delayed, ...nullTimestampCandidates];
+
+    const purgeCandidates = candidates.slice(0, PURGE_LIMIT);
+    const backlog = candidates.length > PURGE_LIMIT;
+    const minimumEligibleCount = candidates.length;
+    const minimumDeferredCount = Math.max(
+      0,
+      minimumEligibleCount - PURGE_LIMIT,
+    );
+
+    if (candidates.length === 0 && delayedCount === 0) {
+      return {
+        status: 'completed',
+        queued: 0,
+        delayed: 0,
+        backlog: false,
+        minimumEligibleCount: 0,
+        nullSummaryGeneratedAtCount: 0,
+      };
+    }
+
+    // Keep every recovery/escalation event stable across Inngest replays.
+    const timestamp = await step.run('snapshot-fanout-timestamp', () =>
+      new Date().toISOString(),
+    );
+
+    if (nullTimestampCandidates.length > 0) {
+      await step.sendEvent(
+        'fan-out-remediate-null-summary-timestamps',
+        nullTimestampCandidates.map((candidate) => ({
+          name: 'app/session.summary.regenerate' as const,
+          data: {
+            sessionSummaryId: candidate.sessionSummaryId,
+            sessionId: candidate.sessionId,
+            profileId: candidate.profileId,
+            subjectId: candidate.subjectId,
+            topicId: candidate.topicId,
+            timestamp,
+          },
+        })),
+      );
+    }
+
     if (candidates.length === 0) {
-      if (delayed.length > 0) {
+      if (delayedCount > 0) {
         // [BUG-993] captureException surfaces delayed purge count to Sentry so
         // ops can query how many sessions are stuck past day-37 without a
         // complete summary. The Inngest dashboard alert targets the event count;
@@ -98,14 +228,15 @@ export const transcriptPurgeCron = inngest.createFunction(
         await step.run('capture-delayed-purge-without-candidates', async () => {
           captureException(
             new Error(
-              `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
+              `transcript-purge-cron: ${delayedCount} session(s) past day-37 with incomplete retention prerequisites`,
             ),
             {
               tags: { surface: 'transcript-purge', signal: 'delayed' },
               extra: {
                 surface: 'transcript-purge-delayed',
-                delayedCount: delayed.length,
-                sessionIds: delayed.map((c) => c.sessionId),
+                delayedCount,
+                sessionIds: delayedSample.map((c) => c.sessionId),
+                nullSummaryGeneratedAtCount,
               },
             },
           );
@@ -113,40 +244,76 @@ export const transcriptPurgeCron = inngest.createFunction(
         await step.sendEvent('notify-purge-delayed', {
           name: 'app/session.purge.delayed',
           data: {
-            delayedCount: delayed.length,
-            sessionIds: delayed.map((candidate) => candidate.sessionId),
-            missingPreconditionCount: delayed.length,
-            timestamp: new Date().toISOString(),
+            delayedCount,
+            sessionIds: delayedSample.map((candidate) => candidate.sessionId),
+            missingPreconditionCount: delayedCount,
+            nullSummaryGeneratedAtCount,
+            timestamp,
           },
         });
       }
 
-      return { status: 'completed', queued: 0, delayed: delayed.length };
+      return {
+        status: 'completed',
+        queued: 0,
+        delayed: delayedCount,
+        backlog: false,
+        minimumEligibleCount: 0,
+        nullSummaryGeneratedAtCount,
+      };
     }
 
-    const timestamp = new Date().toISOString();
+    if (backlog) {
+      await step.run('capture-purge-backlog', async () => {
+        captureException(
+          new Error(
+            `transcript-purge-cron: at least ${minimumEligibleCount} eligible session(s) exceed daily capacity ${PURGE_LIMIT}`,
+          ),
+          {
+            tags: { surface: 'transcript-purge', signal: 'backlog' },
+            extra: {
+              surface: 'transcript-purge-backlog',
+              dailyCapacity: PURGE_LIMIT,
+              minimumEligibleCount,
+              minimumDeferredCount,
+            },
+          },
+        );
+      });
+      await step.sendEvent('notify-purge-backlog', {
+        name: 'app/session.purge.backlog',
+        data: {
+          dailyCapacity: PURGE_LIMIT,
+          minimumEligibleCount,
+          minimumDeferredCount,
+          timestamp,
+        },
+      });
+    }
+
     await step.sendEvent(
       'fan-out-transcript-purge',
-      candidates.map((candidate) => ({
+      purgeCandidates.map((candidate) => ({
         name: 'app/session.transcript.purge' as const,
         data: { ...candidate, timestamp },
       })),
     );
 
-    if (delayed.length > 0) {
+    if (delayedCount > 0) {
       // [BUG-993] Same captureException pattern as the candidates.length === 0
       // branch above: surfaces delayed count to Sentry alongside the Inngest event.
       await step.run('capture-delayed-purge-with-candidates', async () => {
         captureException(
           new Error(
-            `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
+            `transcript-purge-cron: ${delayedCount} session(s) past day-37 with incomplete retention prerequisites`,
           ),
           {
             tags: { surface: 'transcript-purge', signal: 'delayed' },
             extra: {
               surface: 'transcript-purge-delayed',
-              delayedCount: delayed.length,
-              sessionIds: delayed.map((c) => c.sessionId),
+              delayedCount,
+              sessionIds: delayedSample.map((c) => c.sessionId),
+              nullSummaryGeneratedAtCount,
             },
           },
         );
@@ -154,9 +321,10 @@ export const transcriptPurgeCron = inngest.createFunction(
       await step.sendEvent('notify-purge-delayed', {
         name: 'app/session.purge.delayed',
         data: {
-          delayedCount: delayed.length,
-          sessionIds: delayed.map((candidate) => candidate.sessionId),
-          missingPreconditionCount: delayed.length,
+          delayedCount,
+          sessionIds: delayedSample.map((candidate) => candidate.sessionId),
+          missingPreconditionCount: delayedCount,
+          nullSummaryGeneratedAtCount,
           timestamp,
         },
       });
@@ -164,8 +332,11 @@ export const transcriptPurgeCron = inngest.createFunction(
 
     return {
       status: 'completed',
-      queued: candidates.length,
-      delayed: delayed.length,
+      queued: purgeCandidates.length,
+      delayed: delayedCount,
+      backlog,
+      minimumEligibleCount,
+      nullSummaryGeneratedAtCount,
     };
   },
 );

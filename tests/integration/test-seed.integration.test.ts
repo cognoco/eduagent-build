@@ -28,9 +28,9 @@ const DEV_ENV = buildIntegrationEnv({ ENVIRONMENT: 'development' });
 const PROD_ENV = buildIntegrationEnv({ ENVIRONMENT: 'production' });
 
 const LEARNING_EMAIL = 'integration-seed-learning@integration.test';
-const RESET_A_EMAIL = 'integration-seed-reset-a@integration.test';
-const RESET_B_EMAIL = 'integration-seed-reset-b@integration.test';
 const RESET_PREFIX = 'integ-playwright-reset-scope-';
+const RESET_A_EMAIL = `${RESET_PREFIX}a@integration.test`;
+const RESET_B_EMAIL = `${RESET_PREFIX}b@integration.test`;
 const RESET_PREFIX_EMAIL = `${RESET_PREFIX}target@test.invalid`;
 const RESET_OTHER_EMAIL = 'integration-seed-reset-other@integration.test';
 const MANUAL_EMAIL = 'integration-seed-manual@integration.test';
@@ -219,7 +219,7 @@ describe('Integration: test-seed routes', () => {
     expect(body.scenarios).toEqual(VALID_SCENARIOS);
   });
 
-  it('resets seeded accounts while leaving non-seed accounts alone', async () => {
+  it('resets prefix-scoped seeded accounts while leaving non-seed accounts alone', async () => {
     await app.request(
       '/v1/__test/seed',
       {
@@ -247,7 +247,7 @@ describe('Integration: test-seed routes', () => {
     await seedManualNonSeedAccount();
 
     const resetRes = await app.request(
-      '/v1/__test/reset',
+      `/v1/__test/reset?prefix=${encodeURIComponent(RESET_PREFIX)}`,
       {
         method: 'POST',
       },

@@ -206,6 +206,8 @@ function LearnerMentorScreen(): React.ReactElement {
   const homeworkSubject = subjectsIndex.subjects.find(
     (subject) => subject.status === 'active',
   );
+  const hostedManualHomeworkUnavailable =
+    process.env.EXPO_PUBLIC_E2E === 'true' && subjectsIndex.isLoading;
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
   const [cardArcStates, setCardArcStates] = useState<
     Record<string, NowCardArcState>
@@ -407,6 +409,11 @@ function LearnerMentorScreen(): React.ReactElement {
     }));
   };
 
+  const handleOpenHomework = (): void => {
+    if (hostedManualHomeworkUnavailable) return;
+    pushMentorHomework(router, homeworkSubject);
+  };
+
   const handleLightPractice = (route: LightPracticeRoute): void => {
     if (route === 'dictation') {
       router.push('/(app)/dictation' as Href);
@@ -533,7 +540,11 @@ function LearnerMentorScreen(): React.ReactElement {
             <Pressable
               testID="mentor-homework-prompt"
               accessibilityRole="button"
-              onPress={() => pushMentorHomework(router, homeworkSubject)}
+              accessibilityState={{
+                disabled: hostedManualHomeworkUnavailable,
+              }}
+              disabled={hostedManualHomeworkUnavailable}
+              onPress={handleOpenHomework}
               className="rounded-card border border-border bg-surface px-4 py-3"
             >
               <Text className="text-body-sm text-text-secondary">
@@ -564,10 +575,11 @@ function LearnerMentorScreen(): React.ReactElement {
               the keyboard no longer covers it while typing. */}
           <MentorInputBar
             unavailable={nowFeed.isError && !feed}
+            homeworkUnavailable={hostedManualHomeworkUnavailable}
             showColdStartPrompts={showColdStartPrompts}
             onSubmitText={handleSubmitText}
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
-            onOpenHomework={() => pushMentorHomework(router, homeworkSubject)}
+            onOpenHomework={handleOpenHomework}
             voiceLocale={getVoiceLocaleForLanguage(
               activeProfile?.conversationLanguage,
             )}

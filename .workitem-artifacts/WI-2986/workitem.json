@@ -1,0 +1,18 @@
+{
+  "pageId": "3af8bce9-1f7c-8112-8ced-e2f0a3b184d4",
+  "id": "WI-2986",
+  "name": "Make guardian verifier redemption durable and recoverable",
+  "description": "Guardian-attachment initiation redeems a single-use verifier handle and signs its authority token only in memory, so response loss can strand the ceremony and repeated or concurrent requests lack a durable local single-use boundary.",
+  "acceptanceCriteria": "Root cause: initiateGuardianAuthorityVerification calls the external verifier and signs a token without any durable consumed-handle or issued-authority record. Behavioral variants: (1) ordinary success, (2) local commit then response loss followed by exact retry, (3) concurrent duplicate redemption, (4) same handle with a mutated adult/learner/org/policy tuple, (5) provider success followed by local persistence failure. Done when successful redemption durably and atomically records a non-secret handle identity, consumed state, and bound authority identity before responding; an exact retry recovers the original still-valid authority; concurrent and mutated retries fail closed; persistence failure returns no authority; attachment validates the durable redemption; raw verifier evidence, bearer tokens, and signing secrets are not retained. A named red-green regression test must fail without the fix and pass with it, with API/integration coverage for all five variants including two-connection contention. Scope is the guardian-attachment redemption boundary and its minimum schema/API/mobile recovery contract; no verifier-vendor selection or unrelated consent-flow redesign. Dependency: WI-2533 consumes this prerequisite; WI-2037 supplies the governing ADR/spec contract. Verification: targeted schema, API service/route, integration, migration, typecheck, and lint suites are strict green.",
+  "riskImpact": "P1 authorization-integrity risk: non-durable redemption can make a legally required ceremony unrecoverable after response loss and cannot locally enforce single-use or mutated/concurrent replay semantics. A faulty fix could mint duplicate authority or retain sensitive verifier material.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

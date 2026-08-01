@@ -30,12 +30,11 @@ things clearly:
    acceptance of DPAs, SCCs, TIAs, ZDR/no-training evidence, subprocessor
    review, and DPO/counsel sign-off.
 
-One controller-owned engineering follow-up was found during this review:
-Mistral is documented as the EU secondary/vision route, but the current adapter
-uses `https://api.mistral.ai/v1/chat/completions`, not the EU endpoint
-identified in the procurement research (`https://api.eu.mistral.ai`). This is
-not a vendor signature problem; it should be fixed or explicitly ruled before
-Mistral is used as an EU-residency control.
+One controller-owned engineering follow-up was found during this review and
+resolved by WI-2740: Mistral is documented as the EU secondary/vision route,
+and the adapter now uses
+`https://api.eu.mistral.ai/v1/chat/completions`. This aligns the runtime with
+the EU endpoint identified in the procurement research.
 
 ## Reconciliation inputs
 
@@ -69,7 +68,7 @@ external dependency.
 | Discovered recipient | Runtime/evidence source | Ledger disposition |
 |---|---|---|
 | Cerebras Systems Inc. | V2 primary text path; `createCerebrasProvider`; model register active row | Live row L1 |
-| Mistral AI | V2 free vision/secondary path; `createMistralProvider`; model register active row | Live row L2; endpoint engineering follow-up |
+| Mistral AI | V2 free vision/secondary path; `createMistralProvider`; model register active row | Live row L2; runtime uses `https://api.eu.mistral.ai/v1/chat/completions` |
 | OpenAI | V2 paid vision/secondary/deep reasoning; `createOpenAIProvider`; signed DPA evidence | Live row L3 |
 | Anthropic | Judge and rung 4-5 fallback; `createAnthropicProvider`; model register active row | Live row L4 |
 | Voyage AI | `VOYAGE_API_URL` embedding endpoint | Live row L5 |
@@ -98,7 +97,7 @@ router's vision capability, not a separate OCR vendor.
 | ID | Service / contracting entity | Role | Data and purpose | Runtime evidence | Region / transfer position | Internal artifact status | What remains outside code |
 |---|---|---|---|---|---|---|---|
 | L1 | Cerebras Systems Inc. - Cerebras Inference API | Processor | Tutoring prompts, selected session history, learning context, generated outputs, async learning jobs; no direct MentoMate IDs intentionally sent by adapter | `router.ts` default V2 text path uses `gpt-oss-120b`; `cerebras.ts` posts to `https://api.cerebras.ai/v1/chat/completions`; model register says universal primary, including async jobs | US transfer. Current country/residence primary substitution is not built; EEA traffic uses this primary path unless product gating avoids launch traffic | Controller assessment complete; proposed DPA prepared; Trust Center evidence reviewed under NDA; DPA not yet binding | Cerebras must provide binding DPA/order form, SCC coverage, TIA evidence/acceptance, retention/log and subprocessor confirmations; DPO/counsel and management must approve |
-| L2 | Mistral AI - La Plateforme API | Processor | Free-tier secondary text and free vision/OCR when V2 matrix routes `capability='vision'`; image content and extracted homework text may be included | `router.ts` V2 vision branch routes free to `mistral-small-2603`; `mistral.ts` posts to `https://api.mistral.ai/v1/chat/completions`; OCR uses `routeAndCall` through the same router | Register describes EU secondary/vision, but adapter currently uses global API host. Research says EU guarantee requires `api.eu.mistral.ai` | Public DPA PDF and ZDR-enabled screenshot retained; research memo complete | Engineering follow-up to use/rule EU endpoint; counsel/DPO to accept stock DPA, special-category mismatch, SCC/onward-transfer position, and ZDR sufficiency |
+| L2 | Mistral AI - La Plateforme API | Processor | Free-tier secondary text and free vision/OCR when V2 matrix routes `capability='vision'`; image content and extracted homework text may be included | `router.ts` V2 vision branch routes free to `mistral-small-2603`; `mistral.ts` posts to `https://api.eu.mistral.ai/v1/chat/completions`; OCR uses `routeAndCall` through the same router | Runtime and register consistently use the documented EU secondary/vision endpoint | Public DPA PDF and ZDR-enabled screenshot retained; research memo complete | Counsel/DPO to accept stock DPA, special-category mismatch, SCC/onward-transfer position, and ZDR sufficiency |
 | L3 | OpenAI, L.L.C. / applicable OpenAI contracting entity | Processor | Paid secondary text/vision, GPT-5 mini fallback, and GPT-5.4 deep reasoning for non-Family paid tiers/add-on | `router.ts` V2 matrix routes paid vision to `gpt-5-mini`, premium rung 4-5 to OpenAI advanced model; `openai.ts` direct provider | Register records EU-residency deployment and ZDR for minors | Organisation-specific signed OpenAI DPA naming ZWIZZLY AS is retained in provider evidence | Confirm current ZDR/minor settings and region configuration in account evidence; DPO/counsel TIA/sign-off |
 | L4 | Anthropic, PBC | Processor | Judge/grader and rung 4-5 fallback; may receive learner answers or model output under review. Vendor independence is required when the judged tutor output came from another provider; the router now threads the actual producer vendor so an Anthropic-produced tutor reply is not incorrectly treated as independent | `router.ts` `ANTHROPIC_SONNET_MODEL`, `resolveGraderConfig`, fallback logic, and effective-provider propagation; `anthropic.ts` direct provider | Region not established in current internal evidence | No current provider evidence file found in `docs/compliance/evidence/providers/` during this review | Obtain DPA, no-training/retention evidence, transfer safeguards, subprocessor evidence, and DPO/counsel TIA/sign-off |
 | L5 | Voyage AI Innovations, Inc. - Voyage hosted embeddings API | Processor | Text used to create semantic embeddings for memory recall; vectors stored in Neon | `embeddings.ts` posts to `https://api.voyageai.com/v1/embeddings` with `voyage-3.5` | US/unknown hosted region; no EU region selector found in public research | Public DPA PDF retained; research memo complete | Add payment method and opt-out/ZDR evidence; confirm organisation/account identity; DPO/counsel TIA and acceptance of hosted-region uncertainty |
@@ -128,7 +127,7 @@ engineering.
 | Row | Product tier / account | Serving or processing region | Known subprocessors | Retention / deletion facts in internal evidence | Contract or transfer artifact location / status |
 |---|---|---|---|---|---|
 | L1 Cerebras | Inference API; production key present; exact commercial tier unknown | US endpoint | Trust Center materials reviewed under NDA; publishable list not retained in git | Proposed requirement is ZDR/no training; binding vendor commitment remains open | Controller assessment and proposed DPA under `docs/compliance/assessments/providers/`; executable agreement, SCCs and TIA remain with OPQ-110 |
-| L2 Mistral | Scale/API organisation evidence; production key present | Runtime uses global host; EU claim requires the documented EU endpoint | Current list referenced through vendor trust materials; exact approved snapshot remains for OPQ-110 | Public evidence says 30-day default for applicable APIs; retained screenshot records ZDR enabled for ZWIZZLY AS; coverage exceptions remain documented in research | Public DPA and non-secret ZDR evidence indexed in `docs/compliance/evidence/providers/`; counsel acceptance and onward-transfer review open |
+| L2 Mistral | Scale/API organisation evidence; production key present | Runtime uses `https://api.eu.mistral.ai/v1/chat/completions`, aligned with the documented EU endpoint | Current list referenced through vendor trust materials; exact approved snapshot remains for OPQ-110 | Public evidence says 30-day default for applicable APIs; retained screenshot records ZDR enabled for ZWIZZLY AS; coverage exceptions remain documented in research | Public DPA and non-secret ZDR evidence indexed in `docs/compliance/evidence/providers/`; counsel acceptance and onward-transfer review open |
 | L3 OpenAI | Organisation-specific API account; production key present; exact commercial tier unknown | Register claims EU-residency deployment; live account setting requires external confirmation | Unknown from current non-confidential internal evidence | ZDR for minors is required by the register; current account-level confirmation remains open | Organisation-specific DPA is indexed under `docs/compliance/evidence/providers/`; region/ZDR evidence and TIA acceptance remain with OPQ-110 |
 | L4 Anthropic | Direct API; production key present; exact commercial tier unknown | Unknown | Unknown | No-training, provider retention and deletion facts are not established in current internal evidence | No provider artifact is indexed; DPA, transfer mechanism and TIA are open in OPQ-110 |
 | L5 Voyage | Hosted embeddings API; production key present; organisation opt-out requires a paid plan | US / hosted region unknown | Public DPA identifies AWS and Google | Current stateless embeddings path; zero-day retention begins only after organisation opt-out, which remains pending; Files API has a separate 30-day rule but is not used | Public DPA and dated research are indexed; opt-out evidence, organisation identity and TIA acceptance remain with OPQ-110 |
@@ -160,9 +159,10 @@ engineering.
   than an undisclosed OCR processor.
 - **Embedding path:** `apps/api/src/services/embeddings.ts` directly calls the
   Voyage hosted embeddings endpoint recorded in L5.
-- **Engineering gap:** WI-2740 - Align Mistral runtime endpoint with EU-region
-  processor claim - is Ready/Active and two-way cross-linked to WI-1192. It
-  owns the endpoint correction or withdrawal of the EU-residency claim.
+- **Engineering resolution:** WI-2740 - Align Mistral runtime endpoint with
+  EU-region processor claim - routes the Mistral adapter through
+  `https://api.eu.mistral.ai/v1/chat/completions` and protects the endpoint
+  with a provider regression test.
 
 ## Dormant, eval-only, or excluded rows
 
@@ -198,7 +198,7 @@ For each live processor row, OPQ-110 should hold or obtain:
 
 | Finding | Why it matters | Proposed handling |
 |---|---|---|
-| Mistral adapter uses the global endpoint while compliance research says EU processing requires the EU endpoint | The model register treats Mistral as the EU secondary/vision route, but region-aware routing is not implemented. | WI-2740 must either implement the EU route and use `api.eu.mistral.ai`, require that endpoint for all currently covered Mistral traffic, or amend the register and transfer package to withdraw the EU-region claim. |
+| Mistral adapter previously used the global endpoint while compliance research requires the EU endpoint | The model register treats Mistral as the EU secondary/vision route. | Resolved by WI-2740: all Mistral adapter traffic uses `https://api.eu.mistral.ai/v1/chat/completions`, guarded by a provider regression test. |
 
 ## Current launch posture from this ledger
 
@@ -211,6 +211,7 @@ blocker is that several external facts still need execution or acceptance:
 - Voyage opt-out/ZDR and hosted-region acceptance remain open.
 - Infrastructure vendors still need DPA/TIA evidence gathered or linked.
 
-Those external/legal items belong to OPQ-110. The separate Mistral endpoint
-engineering gap belongs to WI-2740. WI-1192 is satisfied when this ledger, the
-provider evidence index, and the OPQ-110 handoff record are review-ready.
+Those external/legal items belong to OPQ-110. The Mistral runtime now uses
+`https://api.eu.mistral.ai/v1/chat/completions`; WI-1192 is satisfied when
+this ledger, the provider evidence index, and the OPQ-110 handoff record are
+review-ready.

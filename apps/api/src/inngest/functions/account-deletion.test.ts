@@ -1,5 +1,7 @@
 import { scheduledDeletion } from './account-deletion';
+import { inngest } from '../client';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import * as safeNonCore from '../../services/safe-non-core';
 import * as sentry from '../../services/sentry';
 
 const mockGetStepDatabase = jest.fn();
@@ -464,6 +466,121 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-2390] Postgres PITR can restore rows deleted by this workflow, including
+// the in-DB deletion_audit row. Completion therefore needs an out-of-band proof
+// after the DB and Clerk legs have both succeeded. The structured log and
+// Sentry message are independent of the application database and carry only
+// opaque IDs plus non-PII outcomes.
+// ---------------------------------------------------------------------------
+describe('[WI-2390] restore-independent completion audit proof', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
+    mockOrganizationExistsV2.mockResolvedValue(true);
+    mockIsDeletionCancelledV2.mockResolvedValue(false);
+    mockExecuteDeletionV2.mockResolvedValue('deleted');
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_user_abc');
+    mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
+    mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('[BREAK] records completed DB + Clerk erasure outside Postgres with the Inngest run id', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    const consoleSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const { step, runNames } = createInngestStepRunner();
+
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-audit-proof' } },
+      runId: 'run-audit-proof',
+      step,
+    });
+
+    expect(result).toEqual({
+      status: 'deleted',
+      accountId: 'acc-audit-proof',
+    });
+    expect(runNames()).toContain('record-deletion-completion');
+    expect(captureSpy).toHaveBeenCalledWith(
+      'account.deletion.completed',
+      expect.objectContaining({
+        level: 'info',
+        tags: {
+          surface: 'account.deletion.completed',
+          databaseDeletion: 'deleted',
+          clerkErasure: 'deleted',
+          subscriptionStoreTeardown: 'not_applicable',
+        },
+        extra: {
+          accountId: 'acc-audit-proof',
+          runId: 'run-audit-proof',
+        },
+      }),
+    );
+
+    const completionLog = consoleSpy.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .find((entry) => entry.message === 'account_deletion.completed');
+    expect(completionLog).toEqual(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({
+          event: 'account_deletion.completed',
+          accountId: 'acc-audit-proof',
+          runId: 'run-audit-proof',
+          databaseDeletion: 'deleted',
+          clerkErasure: 'deleted',
+          subscriptionStoreTeardown: 'not_applicable',
+        }),
+      }),
+    );
+  });
+
+  it('does not emit a completion proof when deletion is cancelled during grace', async () => {
+    mockIsDeletionCancelledV2.mockResolvedValue(true);
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    const consoleSpy = jest
+      .spyOn(console, 'log')
+      .mockImplementation(() => undefined);
+    const { step, runNames } = createInngestStepRunner();
+
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-cancelled' } },
+      runId: 'run-cancelled',
+      step,
+    });
+
+    expect(result).toEqual({ status: 'cancelled' });
+    expect(runNames()).not.toContain('record-deletion-completion');
+    expect(captureSpy).not.toHaveBeenCalledWith(
+      'account.deletion.completed',
+      expect.anything(),
+    );
+    expect(
+      consoleSpy.mock.calls.some(([line]) =>
+        String(line).includes('account_deletion.completed'),
+      ),
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [INNGEST-DELETION-ONFAILURE][BREAK] GDPR Art 17 erasure-completeness guard.
 //
 // When all `retries` of scheduledDeletion are exhausted (e.g. a sustained
@@ -481,6 +598,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[BREAK] declares an onFailure handler', () => {
@@ -523,6 +641,63 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
           runId: 'run-xyz',
         }),
       }),
+    );
+  });
+
+  it('[BREAK WI-2346] safeSends a PII-minimized account deletion teardown dead-letter event', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const safeSendSpy = jest
+      .spyOn(safeNonCore, 'safeSend')
+      .mockResolvedValue(undefined);
+    const inngestSendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] });
+
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<unknown>;
+    const maliciousError = new Error(
+      'Clerk response contained private context',
+    );
+    maliciousError.name = `payer alice@example.test ${'x'.repeat(160)}`;
+
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { accountId: 'acc-terminal' } },
+          run_id: 'run-xyz',
+        },
+      },
+      error: maliciousError,
+    });
+
+    expect(safeSendSpy).toHaveBeenCalledTimes(1);
+    const call = safeSendSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) return;
+    const [sendThunk, surface, context] = call;
+    expect(surface).toBe('account-deletion.terminal_failure');
+    expect(context).toEqual({
+      accountId: 'acc-terminal',
+      runId: 'run-xyz',
+    });
+
+    await expect(sendThunk()).resolves.not.toThrow();
+    expect(inngestSendSpy).toHaveBeenCalledWith({
+      name: 'app/account.deletion_teardown.failed',
+      data: {
+        accountId: 'acc-terminal',
+        runId: 'run-xyz',
+        errorName: 'Error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'private context',
+    );
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'alice@example.test',
     );
   });
 

@@ -28,6 +28,8 @@ import {
   type Database,
 } from '@eduagent/database';
 
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../test-utils/conversation-language-confirmation';
+
 /** The ids a v2 identity seed produces, mirroring the legacy seed's returns. */
 export interface SeededIdentityV2 {
   /** organization.id — the legacy accountId analogue. */
@@ -72,7 +74,7 @@ export async function seedOwnerIdentityV2(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
-    conversationLanguageConfirmedAt: new Date(),
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
     ...(opts.conversationLanguage !== undefined
       ? { conversationLanguage: opts.conversationLanguage }
       : {}),
@@ -112,15 +114,20 @@ export async function seedChildIdentityV2(
     birthYear: number;
     personId?: string;
     residenceJurisdiction?: string;
+    conversationLanguageConfirmed?: boolean;
   },
 ): Promise<{ personId: string }> {
   const personId = opts.personId ?? generateUUIDv7();
+  const conversationLanguageConfirmed =
+    opts.conversationLanguageConfirmed ?? true;
   await db.insert(person).values({
     id: personId,
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
-    conversationLanguageConfirmedAt: null,
+    conversationLanguageConfirmedAt: conversationLanguageConfirmed
+      ? CONFIRMED_CONVERSATION_LANGUAGE_AT
+      : null,
     // login_id stays null — managed child, no credential.
   });
   await db.insert(membership).values({

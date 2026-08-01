@@ -1,0 +1,7 @@
+**What was done:** Moved quick-check consent enforcement behind the scoped missing-session return while retaining it before both topic-scoped and general-context LLM dispatch.
+
+**What changed:** Missing and wrong-profile-hidden sessions now retain the existing not-found response even after consent withdrawal. Existing topic and topicless sessions still reject withdrawn consent before context lookup or dispatch. Active-consent paths preserve their current context, response, ownership-hiding, dispatch-count, and route-owned metering behavior. The structural manifest and guard now encode the final lookup, consent, and dispatch order.
+
+**Verification:** The focused route and structural command completed successfully at the current base. Preserved evidence contains baseline RED, candidate GREEN, production-only REVERT RED with the five expected failures, and exact RESTORE GREEN with matching hashes. Routed validation completed TypeScript, the full API unit lane, the no-Gemini runtime ratchet, and the test-only-export guard successfully.
+
+**Caveats / Follow-ups:** The sanctioned fast route skipped only the existing slow API integration lane. Seven pre-existing relative internal-module mocks remain in the assessment route test; converting that legacy harness is outside this scoped ordering repair. No schema, migration, session policy, scoped ownership, response schema, prompt, model, provider routing, metering implementation, environment, or deployment was changed.

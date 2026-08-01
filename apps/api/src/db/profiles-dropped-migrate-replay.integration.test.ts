@@ -46,6 +46,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { resolveScratchDatabaseUrl } from './scratch-database-url';
 import { closePoolAndDropScratchDatabase } from './scratch-database-teardown';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -73,16 +74,6 @@ interface JournalEntry {
   when: number;
   tag: string;
   breakpoints: boolean;
-}
-
-function requireDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
-    );
-  }
-  return url;
 }
 
 function loadJournalEntries(): JournalEntry[] {
@@ -161,7 +152,10 @@ async function expectUndefinedTableError(
 }
 
 describe('migration-tail replay on a profiles-dropped database [WI-1167]', () => {
-  const baseUrl = requireDatabaseUrl();
+  const baseUrl = resolveScratchDatabaseUrl({
+    directUrl: process.env.DIRECT_URL,
+    databaseUrl: process.env.DATABASE_URL,
+  });
   const scratchRunId = randomBytes(4).toString('hex');
   const databaseName = `wi1167_replay_${scratchRunId}`;
   const scratchApplicationName = `wi1167-replay-${scratchRunId}`;

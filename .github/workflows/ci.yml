@@ -58,6 +58,9 @@ jobs:
           apps/mobile/scripts/run-wi2176-orion-evidence.test.ts
           --runInBand --no-coverage
 
+      - name: Run WI-2522 doppler-run Windows contract
+        run: pnpm test:doppler-run
+
   main:
     needs: wi2176-windows-orion-contract
     if: ${{ always() }}
@@ -132,7 +135,6 @@ jobs:
               - 'packages/schemas/**'
               - 'packages/retention/**'
               - 'pnpm-lock.yaml'
-
       # Setup pnpm (version read from packageManager field in package.json)
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         if: steps.scope.outputs.docs_only != 'true'
@@ -175,6 +177,13 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         working-directory: packages/database
         run: pnpm exec drizzle-kit migrate
+
+      # WI-2643: explicit local-only setup for non-owner RLS assertions.
+      # The command refuses every non-loopback target; repository tests never
+      # create or grant external/shared roles implicitly.
+      - name: Provision local RLS isolation test role
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm db:setup:rls-test-role:local
 
       # Clean stale build artifacts — composite mode (tsconfig.base.json) uses dist/*.d.ts
       # to verify source-output consistency. Nx remote cache can restore stale dist/ and
@@ -367,7 +376,7 @@ jobs:
       # them directly through ts-jest via scripts/jest.config.cjs.
       - name: scripts/* tests
         if: steps.scope.outputs.docs_only != 'true'
-        run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
+        run: pnpm run test:scripts
 
       # Same rationale as scripts/* tests above (WI-2120): tools/scripts/ EAS
       # build hooks live outside any Nx project too.
@@ -417,7 +426,10 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.database_script_guards == 'true')
         run: |
           node --test packages/database/scripts/check-db-push-target.test.mjs
+          node --test packages/database/scripts/check-development-schema.test.mjs
           node --test packages/database/scripts/check-identity-fk-drift.test.mjs
+          node --test packages/database/scripts/reconcile-development-schema.test.mjs
+          node --test packages/database/scripts/setup-rls-isolation-test-role.test.mjs
 
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
@@ -464,6 +476,12 @@ jobs:
           pnpm exec nx run-many -t lint test typecheck
           pnpm exec nx run-many -t build --exclude=@eduagent/mobile
 
+      - name: Integration TypeScript checker
+        if: >-
+          github.event_name == 'push' ||
+          steps.scope.outputs.docs_only != 'true'
+        run: pnpm typecheck:integration
+
       # Run API integration tests against real PostgreSQL.
       # PRs: routed by the change-class router (WI-452) — runs whenever the
       # matrix maps any touched class to integration tests (db-schema,
@@ -484,7 +502,7 @@ jobs:
         if: >-
           (github.event_name == 'push' && steps.changes.outputs.api == 'true') ||
           (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
-        run: pnpm exec nx run api:integration-api
+        run: pnpm run test:api:integration:ci
 
       # API UNIT tests for a cross-package read nx affected cannot see (WI-886).
       # apps/api/src/services/app-help-map.test.ts reads
@@ -608,6 +626,9 @@ jobs:
         working-directory: packages/database
         run: pnpm exec drizzle-kit migrate
 
+      - name: Provision local RLS isolation test role
+        run: pnpm db:setup:rls-test-role:local
+
       # Run the full integration suite with the flag on.
       # Reds here are expected (D1-D4/FG1/:709 defects) and are the diagnostic
       # signal this lane exists to surface. They do NOT fail the `main` job.
@@ -625,7 +646,7 @@ jobs:
       # colon step above is expected-red; allowed-red with the rest of this job.
       - name: API co-located integration tests (flag-ON, apps/api/src)
         if: always()
-        run: pnpm exec nx run api:integration-api
+        run: pnpm run test:api:integration:ci
 
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)

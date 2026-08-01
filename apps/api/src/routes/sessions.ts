@@ -20,6 +20,7 @@ import {
   RateLimitedError,
   recallBridgeResultSchema,
   retrySummaryFeedbackResultSchema,
+  computeAgeBracketFromDate,
   sessionAutoFileRequestedEventSchema,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
@@ -32,7 +33,6 @@ import type { Account } from '../services/account';
 import { idempotencyPreflight } from '../middleware/idempotency';
 import { type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assertCanReadProfile } from '../services/family-access';
 import { withProfile } from '../route-utils/route-context';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
@@ -227,12 +227,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // Gated unconditionally — startFirstCurriculumSession's topic-intent
-      // matcher (matchTopicByIntent) dispatches the LLM when MATCHER_ENABLED
-      // and multiple candidate topics exist; this endpoint is the only
-      // entry point.
-      await assertLlmConsent(db, profileId);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
       try {
@@ -1063,16 +1057,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // retrySummaryFeedback -> evaluateSummary unconditionally dispatches
-      // the LLM.
-      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const profileMeta = c.get('profileMeta');
       const result = await retrySummaryFeedback(db, profileId, sessionId, {
         conversationLanguage: parseConversationLanguage(
           profileMeta?.conversationLanguage,
         ),
+        ageBracket:
+          profileMeta == null
+            ? undefined
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
       });
 
       return c.json(retrySummaryFeedbackResultSchema.parse(result));
@@ -1087,9 +1085,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // submitSummary -> evaluateSummary unconditionally dispatches the LLM.
-      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
       // i18n Phase 1 — thread conversation_language to summary evaluation.
@@ -1103,6 +1098,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             summaryProfileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            summaryProfileMeta == null
+              ? undefined
+              : computeAgeBracketFromDate(
+                  summaryProfileMeta.birthYear,
+                  summaryProfileMeta.birthMonth ?? undefined,
+                  summaryProfileMeta.birthDay ?? undefined,
+                ),
         },
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
@@ -1162,9 +1165,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // generateRecallBridge unconditionally dispatches the LLM.
-      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
 
       const session = await getSession(db, profileId, sessionId);

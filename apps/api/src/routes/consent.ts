@@ -12,6 +12,10 @@ import {
   selfConsentWithdrawRequestSchema,
   selfConsentAcceptResultSchema,
   consentAccountabilityReportSchema,
+  guardianAttachmentRequestSchema,
+  guardianAttachmentResultSchema,
+  guardianAttachmentInitiationRequestSchema,
+  guardianAttachmentInitiationResultSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -66,6 +70,12 @@ import {
   createSlidingWindowRateLimiter,
   resolveRateLimitIp,
 } from '../services/rate-limit';
+import { GuardianAttachmentRejectedError } from '../services/identity-v2/guardian-attachment';
+import {
+  attachGuardianConsentFromDurableAuthorityToken,
+  GuardianVerifierUnavailableError,
+  initiateGuardianAuthorityVerification,
+} from '../services/identity-v2/guardian-attachment-verifier';
 
 // [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
 // emailed link, no session). The token is a 122-bit UUID so brute-force is
@@ -106,6 +116,21 @@ const consentRespondLimiter = createSlidingWindowRateLimiter({
   max: CONSENT_RESPOND_RATE_LIMIT_MAX,
   maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
 });
+
+const guardianAttachmentLimiter = createSlidingWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
+});
+
+function guardianAttachmentRateLimited(c: Context<ConsentRouteEnv>): boolean {
+  return guardianAttachmentLimiter.isLimited(
+    resolveRateLimitIp(
+      c.req.header('cf-connecting-ip'),
+      c.req.header('x-forwarded-for'),
+    ),
+  );
+}
 
 export function __resetConsentRespondRateLimit(): void {
   consentRespondLimiter.reset();
@@ -179,6 +204,9 @@ type ConsentRouteEnv = {
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
     CONSENT_POLICY_VERSION: string;
+    GUARDIAN_AUTHORITY_TOKEN_SECRET?: string;
+    GUARDIAN_AUTHORITY_VERIFIER_URL?: string;
+    GUARDIAN_AUTHORITY_VERIFIER_KEY?: string;
     // [WI-1138] Consent-deny Stripe teardown when the denied person is
     // themselves the payer.
     STRIPE_SECRET_KEY?: string;
@@ -198,6 +226,114 @@ type ConsentRouteEnv = {
 };
 
 export const consentRoutes = new Hono<ConsentRouteEnv>()
+  .post(
+    '/consent/guardian-attachment/initiate',
+    zValidator('json', guardianAttachmentInitiationRequestSchema),
+    async (c) => {
+      if (guardianAttachmentRateLimited(c)) {
+        return apiError(
+          c,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Too many guardian verification attempts. Please try again later.',
+        );
+      }
+      const callerPersonId = c.get('callerPersonId');
+      const tokenSecret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
+      const verifierUrl = c.env.GUARDIAN_AUTHORITY_VERIFIER_URL;
+      const verifierKey = c.env.GUARDIAN_AUTHORITY_VERIFIER_KEY;
+      if (!callerPersonId) {
+        return unauthorized(c, 'No identity is provisioned for this login.');
+      }
+      if (!tokenSecret || !verifierUrl || !verifierKey) {
+        return apiError(
+          c,
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Guardian authority verification is not configured.',
+        );
+      }
+
+      try {
+        const result = await initiateGuardianAuthorityVerification(
+          c.get('db'),
+          {
+            ...c.req.valid('json'),
+            callerPersonId,
+            verifierUrl,
+            verifierKey,
+            tokenSecret,
+          },
+        );
+        return c.json(guardianAttachmentInitiationResultSchema.parse(result));
+      } catch (error) {
+        if (error instanceof GuardianAttachmentRejectedError) {
+          return forbidden(
+            c,
+            'Guardian authority is not valid for this learner.',
+          );
+        }
+        if (error instanceof GuardianVerifierUnavailableError) {
+          return apiError(
+            c,
+            503,
+            ERROR_CODES.SERVICE_UNAVAILABLE,
+            error.message,
+          );
+        }
+        throw error;
+      }
+    },
+  )
+  .post(
+    '/consent/guardian-attachment',
+    zValidator('json', guardianAttachmentRequestSchema),
+    async (c) => {
+      if (guardianAttachmentRateLimited(c)) {
+        return apiError(
+          c,
+          429,
+          ERROR_CODES.RATE_LIMITED,
+          'Too many guardian verification attempts. Please try again later.',
+        );
+      }
+      const callerPersonId = c.get('callerPersonId');
+      const secret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
+      const input = c.req.valid('json');
+      if (!callerPersonId) {
+        return unauthorized(c, 'No identity is provisioned for this login.');
+      }
+      if (!secret) {
+        return apiError(
+          c,
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Guardian authority verification is not configured.',
+        );
+      }
+
+      try {
+        const result = await attachGuardianConsentFromDurableAuthorityToken(
+          c.get('db'),
+          {
+            callerPersonId,
+            chargePersonId: input.chargePersonId,
+            authorityToken: input.authorityToken,
+            tokenSecret: secret,
+          },
+        );
+        return c.json(guardianAttachmentResultSchema.parse(result));
+      } catch (error) {
+        if (error instanceof GuardianAttachmentRejectedError) {
+          return forbidden(
+            c,
+            'Guardian authority is not valid for this learner.',
+          );
+        }
+        throw error;
+      }
+    },
+  )
   .post(
     '/consent/request',
     zValidator('json', consentRequestSchema),

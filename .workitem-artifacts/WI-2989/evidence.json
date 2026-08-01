@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The source baseline, exact current base, bounded file set, and complete verification surfaces are recorded for this delivery.",
+      "pointer": ".workitem-artifacts/WI-2989/verification.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "All externally visible consent-ordering variants are covered, including deterministic exits, exact-claim restoration, both restoration-failure shapes, and one active-consent grader dispatch.",
+      "pointer": "apps/api/src/services/retention-data.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The structural guard now classifies retention as a granular service-owned boundary after deterministic cooldown and claim exits while retaining route-owned metering.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Focused red, candidate green, production-only revert red, exact restore green, and routed validation evidence are preserved with commands and results.",
+      "pointer": ".workitem-artifacts/WI-2989/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The diff remains limited to the six authorized collision files and lifecycle evidence; no schema, policy, provider, metering, or deployment surface changed.",
+      "pointer": ".workitem-artifacts/WI-2989/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-01",
+  "redGreenPointer": ".workitem-artifacts/WI-2989/red-green-revert.md"
+}

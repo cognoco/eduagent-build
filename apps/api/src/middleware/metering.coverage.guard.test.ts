@@ -26,8 +26,10 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import {
+  GRANULAR_LLM_CONSENT_BOUNDARIES,
   LLM_CALL_SITE_FILES,
   LLM_CALL_SITE_EXEMPT,
+  ROUTE_OWNED_LLM_CONSENT_BOUNDARIES,
 } from './metering.coverage.manifest';
 
 // Jest rootDir is the repo root. process.cwd() during jest execution may be
@@ -96,6 +98,63 @@ function scanCallSites(): Set<string> {
     }
   }
   return matches;
+}
+
+function readRepoFile(path: string): string {
+  return readFileSync(join(REPO_ROOT, path), 'utf8');
+}
+
+function sliceBetweenTokens(
+  source: string,
+  startToken: string,
+  endToken: string,
+): string {
+  const start = source.indexOf(startToken);
+  if (start < 0) throw new Error(`Missing start token: ${startToken}`);
+  if (!endToken) return source.slice(start);
+  const end = source.indexOf(endToken, start + startToken.length);
+  if (end < 0) throw new Error(`Missing end token: ${endToken}`);
+  return source.slice(start, end);
+}
+
+function boundsBetweenTokens(
+  source: string,
+  startToken: string,
+  endToken: string,
+): { start: number; end: number } {
+  const start = source.indexOf(startToken);
+  if (start < 0) throw new Error(`Missing start token: ${startToken}`);
+  if (!endToken) return { start, end: source.length };
+  const end = source.indexOf(endToken, start + startToken.length);
+  if (end < 0) throw new Error(`Missing end token: ${endToken}`);
+  return { start, end };
+}
+
+interface RouteConsentAssertion {
+  file: string;
+  index: number;
+}
+
+function scanRouteConsentAssertions(): RouteConsentAssertion[] {
+  const routeFiles: string[] = [];
+  walk(join(SRC_ROOT, 'routes'), routeFiles);
+  const assertions: RouteConsentAssertion[] = [];
+  const assertionRegex = /\bawait\s+assertLlmConsent\s*\(/g;
+  for (const absolutePath of routeFiles) {
+    const source = readFileSync(absolutePath, 'utf8');
+    for (const match of source.matchAll(assertionRegex)) {
+      if (match.index === undefined) {
+        throw new Error(
+          `Consent assertion match had no index: ${absolutePath}`,
+        );
+      }
+      assertions.push({
+        file: relative(REPO_ROOT, absolutePath).replace(/\\/g, '/'),
+        index: match.index,
+      });
+    }
+  }
+  return assertions;
 }
 
 describe('[WI-132] LLM call-site coverage manifest', () => {
@@ -168,4 +227,230 @@ describe('[WI-132] LLM call-site coverage manifest', () => {
     }
     expect(overlap).toEqual([]);
   });
+});
+
+describe('[WI-2543] mixed-route granular consent boundaries', () => {
+  it('uses unique IDs across the request-time consent classification', () => {
+    const ids = [
+      ...ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.map(({ id }) => id),
+      ...GRANULAR_LLM_CONSENT_BOUNDARIES.map(({ id }) => id),
+    ];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('[WI-2989] classifies recall consent after deterministic cooldown and claim exits', () => {
+    expect(
+      ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+        ({ id }) => id === 'retention.recall-test',
+      ),
+    ).toBeUndefined();
+
+    const routeBoundary = GRANULAR_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'retention.recall-test',
+    );
+    expect(routeBoundary).toBeDefined();
+    if (!routeBoundary) return;
+
+    expect(routeBoundary.routeServiceCallTokens).toContain(
+      'processRecallTest(',
+    );
+    const serviceBoundary = routeBoundary.serviceBoundaries[0] as
+      | ((typeof routeBoundary.serviceBoundaries)[number] & {
+          preConsentBranchTokens?: readonly string[];
+        })
+      | undefined;
+    expect(serviceBoundary).toBeDefined();
+    if (!serviceBoundary) return;
+
+    expect(serviceBoundary.preConsentBranchTokens).toEqual([
+      'if (!canRetestTopic(state, lastTestAt)) {',
+      "if (attemptMode !== 'dont_remember') {",
+      'if (!claimed) {',
+    ]);
+    const serviceSource = sliceBetweenTokens(
+      readRepoFile(serviceBoundary.serviceFile),
+      serviceBoundary.serviceStartToken,
+      serviceBoundary.serviceEndToken,
+    );
+    const gateIndex = serviceSource.indexOf(serviceBoundary.consentGateToken);
+    for (const token of serviceBoundary.preConsentBranchTokens ?? []) {
+      expect(serviceSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(serviceSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+  });
+
+  it('[WI-2990] classifies quick-check consent after ownership hiding and before dispatch', () => {
+    const routeBoundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'assessments.quick-check',
+    );
+    expect(routeBoundary).toBeDefined();
+    if (!routeBoundary) return;
+
+    expect(routeBoundary.classification).toBe('route-owned');
+    expect(routeBoundary.preConsentBranchTokens).toEqual([
+      'const session = await getSession(',
+      "if (!session) return notFound(c, 'Session not found');",
+    ]);
+    expect(routeBoundary.consentGateToken).toBe('await assertLlmConsent(');
+    expect(routeBoundary.llmDispatchTokens).toEqual([
+      'await evaluateQuickCheckAnswer(',
+    ]);
+    expect(routeBoundary.llmCallSiteFile).toBe(
+      'apps/api/src/services/assessments.ts',
+    );
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(routeBoundary.routeFile),
+      routeBoundary.routeStartToken,
+      routeBoundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(routeBoundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of routeBoundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of routeBoundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+    expect(LLM_CALL_SITE_FILES).toContain(routeBoundary.llmCallSiteFile);
+  });
+
+  it('[WI-2987] classifies dictation review consent after deterministic rate and prompt-budget exits', () => {
+    const boundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'dictation.review',
+    ) as
+      | ((typeof ROUTE_OWNED_LLM_CONSENT_BOUNDARIES)[number] & {
+          preConsentBranchTokens?: readonly string[];
+          consentGateToken?: string;
+          llmDispatchTokens?: readonly string[];
+        })
+      | undefined;
+    expect(boundary).toBeDefined();
+    if (!boundary) return;
+
+    expect(boundary).toMatchObject({
+      classification: 'route-owned',
+      preConsentBranchTokens: [
+        'const rateLimited = await checkAndLogRateLimit(',
+        'if (rateLimited) {',
+        'if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: ['const result = await reviewDictation({'],
+    });
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(boundary.routeFile),
+      boundary.routeStartToken,
+      boundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(boundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of boundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of boundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+  });
+
+  it('requires an explicit rationale for every remaining route-entry gate', () => {
+    for (const boundary of ROUTE_OWNED_LLM_CONSENT_BOUNDARIES) {
+      expect({
+        id: boundary.id,
+        classification: boundary.classification,
+        hasRationale: boundary.rationale.trim().length > 0,
+      }).toEqual({
+        id: boundary.id,
+        classification: expect.stringMatching(
+          /^(route-owned|route-discriminant|independent-mixed-residue)$/,
+        ),
+        hasRationale: true,
+      });
+    }
+  });
+
+  it('classifies every production route-entry consent assertion exactly once', () => {
+    const assertions = scanRouteConsentAssertions();
+    const sources = new Map<string, string>();
+    const segmentBounds = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.map((boundary) => {
+      const source =
+        sources.get(boundary.routeFile) ?? readRepoFile(boundary.routeFile);
+      sources.set(boundary.routeFile, source);
+      return {
+        ...boundary,
+        ...boundsBetweenTokens(
+          source,
+          boundary.routeStartToken,
+          boundary.routeEndToken,
+        ),
+      };
+    });
+
+    const invalid = assertions.flatMap((assertion) => {
+      const owners = segmentBounds.filter(
+        (boundary) =>
+          boundary.routeFile === assertion.file &&
+          assertion.index >= boundary.start &&
+          assertion.index < boundary.end,
+      );
+      return owners.length === 1
+        ? []
+        : [`${assertion.file}@${assertion.index}: owners=${owners.length}`];
+    });
+    expect(invalid).toEqual([]);
+
+    for (const boundary of segmentBounds) {
+      const ownedCount = assertions.filter(
+        (assertion) =>
+          assertion.file === boundary.routeFile &&
+          assertion.index >= boundary.start &&
+          assertion.index < boundary.end,
+      ).length;
+      expect({ id: boundary.id, ownedCount }).toEqual({
+        id: boundary.id,
+        ownedCount: 1,
+      });
+    }
+  });
+
+  it.each(GRANULAR_LLM_CONSENT_BOUNDARIES)(
+    '$id delegates without an unconditional route-entry consent gate',
+    (boundary) => {
+      const routeSource = sliceBetweenTokens(
+        readRepoFile(boundary.routeFile),
+        boundary.routeStartToken,
+        boundary.routeEndToken,
+      );
+      expect(routeSource).not.toContain('assertLlmConsent(');
+      for (const callToken of boundary.routeServiceCallTokens) {
+        expect(routeSource).toContain(callToken);
+      }
+    },
+  );
+
+  it.each(
+    GRANULAR_LLM_CONSENT_BOUNDARIES.flatMap((routeBoundary) =>
+      routeBoundary.serviceBoundaries.map((serviceBoundary) => ({
+        id: routeBoundary.id,
+        ...serviceBoundary,
+      })),
+    ),
+  )(
+    '$id gates before $llmDispatchToken and stays tied to the LLM manifest',
+    (boundary) => {
+      const serviceSource = sliceBetweenTokens(
+        readRepoFile(boundary.serviceFile),
+        boundary.serviceStartToken,
+        boundary.serviceEndToken,
+      );
+      const gateIndex = serviceSource.indexOf(boundary.consentGateToken);
+      const dispatchIndex = serviceSource.indexOf(boundary.llmDispatchToken);
+      expect(gateIndex).toBeGreaterThanOrEqual(0);
+      expect(dispatchIndex).toBeGreaterThan(gateIndex);
+      expect(LLM_CALL_SITE_FILES).toContain(boundary.llmCallSiteFile);
+    },
+  );
 });

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Pool } from 'pg';
+import { resolveScratchDatabaseUrl } from './scratch-database-url';
 import { closePoolAndDropScratchDatabase } from './scratch-database-teardown';
 
 describe('profiles-dropped migration replay teardown [WI-2794]', () => {
@@ -14,6 +15,32 @@ describe('profiles-dropped migration replay teardown [WI-2794]', () => {
     expect(source).toContain('application_name: scratchApplicationName');
     expect(source).toContain('ownedApplicationName: scratchApplicationName');
     expect(source).not.toMatch(/DROP DATABASE[^`]*WITH \(FORCE\)/s);
+  });
+
+  it('uses the direct Neon endpoint when DATABASE_URL is pooled', () => {
+    expect(
+      resolveScratchDatabaseUrl({
+        databaseUrl:
+          'postgresql://test-user:test-pass@ep-example-123-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+      }),
+    ).toBe(
+      'postgresql://test-user:test-pass@ep-example-123.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+    );
+  });
+
+  it('preserves an explicit direct URL and a local CI URL', () => {
+    const directUrl =
+      'postgresql://direct-user:direct-pass@ep-example-123.eu-central-1.aws.neon.tech/neondb?sslmode=require';
+    expect(
+      resolveScratchDatabaseUrl({
+        directUrl,
+        databaseUrl:
+          'postgresql://pooled-user:pooled-pass@ep-example-123-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require',
+      }),
+    ).toBe(directUrl);
+
+    const localUrl = 'postgresql://test:test@127.0.0.1:5433/eduagent_test';
+    expect(resolveScratchDatabaseUrl({ databaseUrl: localUrl })).toBe(localUrl);
   });
 
   it('attributes an owned backend, waits for it to drain, then drops normally', async () => {

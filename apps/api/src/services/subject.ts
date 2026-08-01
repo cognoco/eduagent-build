@@ -51,6 +51,7 @@ import {
 } from './language-curriculum';
 import { createLogger } from './logger';
 import { getPersonAge } from './identity-v2/helpers';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 import { setNativeLanguage } from './retention-data';
 import { safeSend } from './safe-non-core';
 
@@ -486,6 +487,7 @@ export interface CreatedSubjectWithStructure {
 
 async function persistBroadBookSuggestions(
   db: Database,
+  profileId: string,
   subjectId: string,
   books: Array<{
     title: string;
@@ -494,7 +496,7 @@ async function persistBroadBookSuggestions(
   }>,
   subjectName?: string,
 ): Promise<number> {
-  await ensureCurriculum(db, subjectId);
+  await ensureCurriculum(db, profileId, subjectId);
   // Deterministic backstop: never suggest a book that merely restates the
   // subject it sits under (orphan suggestion). Sibling duplicates are already
   // rejected at generation by bookGenerationResultSchema's distinct-title
@@ -535,6 +537,7 @@ export async function createSubjectWithStructure(
   input: SubjectCreateInput,
   options?: {
     conversationLanguage?: ConversationLanguage;
+    deps?: { assertLlmConsent?: typeof assertLlmConsent };
   },
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
@@ -610,7 +613,7 @@ export async function createSubjectWithStructure(
       );
     });
 
-    await ensureCurriculum(db, targetSubject.id);
+    await ensureCurriculum(db, profileId, targetSubject.id);
 
     const bookRow = await db.transaction(async (tx) => {
       await tx.execute(
@@ -693,6 +696,8 @@ export async function createSubjectWithStructure(
     };
   }
 
+  const consentGate = options?.deps?.assertLlmConsent ?? assertLlmConsent;
+  await consentGate(db, profileId);
   // [WI-867] v2 always: learner age from person.
   const learnerAge = await getPersonAge(db, profileId);
   const { detectSubjectType } = await import('./book-generation');
@@ -725,6 +730,7 @@ export async function createSubjectWithStructure(
     if (fallbackStructure.type === 'broad') {
       const suggestionCount = await persistBroadBookSuggestions(
         db,
+        profileId,
         subject.id,
         fallbackStructure.books,
         subject.name,
@@ -763,6 +769,7 @@ export async function createSubjectWithStructure(
   if (narrowFallbackStructure?.type === 'broad') {
     const suggestionCount = await persistBroadBookSuggestions(
       db,
+      profileId,
       subject.id,
       narrowFallbackStructure.books,
       subject.name,

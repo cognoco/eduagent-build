@@ -9,7 +9,10 @@ import {
   type StrengthEntry,
   type FocusAreaEntry,
 } from '@eduagent/schemas';
-import * as learningTextGuard from '../persisted-learning-text-guard';
+import {
+  isContentSafe,
+  type LearningTextGateResult,
+} from '../learning-text-safety/gate';
 
 export type MemoryFactCategory =
   | 'strength'
@@ -181,11 +184,20 @@ function pushStringRows(
   }
 }
 
+/**
+ * Identity dedupe ONLY — safety is the caller's, via `filterGatedMemoryFactRows`.
+ *
+ * [WI-2628] Both consumers of this builder are now on the multilingual gate:
+ * `memory-facts.ts`'s `replaceActiveMemoryFactsForProfile` (reached from
+ * `learner-profile.ts`) filters the result, and the Inngest backfill uses
+ * `buildBackfillRowsForProfile` + the same filter. Never persist this function's
+ * output unfiltered.
+ */
 export function buildMemoryFactRowsFromProjection(
   profileId: string,
   projection: MemoryProjection,
 ): MemoryFactInsert[] {
-  return dedupeMemoryFactRows([
+  return dedupeMemoryFactRowsByIdentity([
     ...projection.strengths.map((entry) =>
       mapStrengthToFact(profileId, entry, projection.createdAt),
     ),
@@ -225,20 +237,51 @@ export function memoryFactIdentityKey(row: MemoryFactInsert): string {
   ].join('\u001f');
 }
 
-export function dedupeMemoryFactRows(
+/**
+ * Identity dedupe ONLY — no safety filtering, by design.
+ *
+ * The multilingual gate is async and this module is pure and synchronous, so a
+ * builder cannot consult it. Builders that produce gate-filtered rows dedupe with
+ * this and leave safety to `filterGatedMemoryFactRows`, which their async consumer
+ * calls. Never persist this function's output without that filter.
+ */
+export function dedupeMemoryFactRowsByIdentity(
   rows: MemoryFactInsert[],
 ): MemoryFactInsert[] {
   const byIdentity = new Map<string, MemoryFactInsert>();
   for (const row of rows) {
-    if (
-      learningTextGuard.scrubClinicalInferenceFromLearningRecord(row.text) ===
-      null
-    ) {
-      continue;
-    }
     byIdentity.set(memoryFactIdentityKey(row), row);
   }
   return [...byIdentity.values()];
+}
+
+/**
+ * Drop every candidate row whose text the gate did not clear.
+ *
+ * The builders here are pure and synchronous, so they cannot consult the async
+ * gate — the candidate rows must exist BEFORE the gate runs. Hence the ordering
+ * every consumer must follow:
+ *
+ *   1. build the candidate rows
+ *   2. `evaluateLearningTextByContent({ texts: rows.map((r) => r.text), … })`
+ *   3. `filterGatedMemoryFactRows(rows, gate)` — and persist ONLY the result
+ *
+ * CALLER CONTRACT — the gate is keyed on content, and step 2 hashes exactly the
+ * `row.text` that step 3 checks and the caller then writes. That identity is
+ * structural here rather than a convention: the row object already exists before
+ * the check, so there is nothing to re-derive and nothing to get wrong. Do not
+ * rebuild or re-map the rows between steps — a row whose text the batch never saw
+ * resolves unsafe and is dropped, which is the correct direction but will silently
+ * discard legitimate rows if the steps disagree about the bytes.
+ *
+ * `gate` is required rather than optional so no consumer can persist unfiltered
+ * rows by omission — this module cannot detect that from the inside.
+ */
+export function filterGatedMemoryFactRows(
+  rows: MemoryFactInsert[],
+  gate: LearningTextGateResult,
+): MemoryFactInsert[] {
+  return rows.filter((row) => isContentSafe(gate, row.text));
 }
 
 export function buildBackfillRowsForProfile(profile: {
@@ -337,7 +380,7 @@ export function buildBackfillRowsForProfile(profile: {
       mapSuppressedInferenceToFact(profile.profileId, value, profile.createdAt),
   );
 
-  return { rows: dedupeMemoryFactRows(rows), malformed };
+  return { rows: dedupeMemoryFactRowsByIdentity(rows), malformed };
 }
 
 export function coerceConfidence(value: unknown): ConfidenceLevel {
