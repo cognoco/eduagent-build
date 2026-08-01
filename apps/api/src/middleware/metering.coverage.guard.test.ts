@@ -279,6 +279,43 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
     }
   });
 
+  it('[WI-2990] classifies quick-check consent after ownership hiding and before dispatch', () => {
+    const routeBoundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'assessments.quick-check',
+    );
+    expect(routeBoundary).toBeDefined();
+    if (!routeBoundary) return;
+
+    expect(routeBoundary.classification).toBe('route-owned');
+    expect(routeBoundary.preConsentBranchTokens).toEqual([
+      'const session = await getSession(',
+      "if (!session) return notFound(c, 'Session not found');",
+    ]);
+    expect(routeBoundary.consentGateToken).toBe('await assertLlmConsent(');
+    expect(routeBoundary.llmDispatchTokens).toEqual([
+      'await evaluateQuickCheckAnswer(',
+    ]);
+    expect(routeBoundary.llmCallSiteFile).toBe(
+      'apps/api/src/services/assessments.ts',
+    );
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(routeBoundary.routeFile),
+      routeBoundary.routeStartToken,
+      routeBoundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(routeBoundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of routeBoundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of routeBoundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+    expect(LLM_CALL_SITE_FILES).toContain(routeBoundary.llmCallSiteFile);
+  });
+
   it('requires an explicit rationale for every remaining route-entry gate', () => {
     for (const boundary of ROUTE_OWNED_LLM_CONSENT_BOUNDARIES) {
       expect({

@@ -260,11 +260,12 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const sessionId = c.req.param('sessionId');
       const { answer } = c.req.valid('json');
 
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      await assertLlmConsent(db, profileId);
-
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
+
+      // [WI-2990] Preserve the scoped not-found result before enforcing the
+      // consent boundary shared by topic-scoped and general LLM dispatches.
+      await assertLlmConsent(db, profileId);
 
       // Load topic scope for LLM context.
       const topicContext = session.topicId

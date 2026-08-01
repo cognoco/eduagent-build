@@ -137,6 +137,10 @@ export interface RouteOwnedLlmConsentBoundary {
   routeFile: string;
   routeStartToken: string;
   routeEndToken: string;
+  preConsentBranchTokens?: readonly string[];
+  consentGateToken?: string;
+  llmDispatchTokens?: readonly string[];
+  llmCallSiteFile?: string;
   classification:
     | 'route-owned'
     | 'route-discriminant'
@@ -251,9 +255,16 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
       routeFile: 'apps/api/src/routes/assessments.ts',
       routeStartToken: "'/sessions/:sessionId/quick-check'",
       routeEndToken: '',
-      classification: 'independent-mixed-residue',
+      preConsentBranchTokens: [
+        'const session = await getSession(',
+        "if (!session) return notFound(c, 'Session not found');",
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: ['await evaluateQuickCheckAnswer('],
+      llmCallSiteFile: 'apps/api/src/services/assessments.ts',
+      classification: 'route-owned',
       rationale:
-        'The deterministic missing-session response still follows the route gate.',
+        'The scoped missing-session return precedes the route-owned consent boundary shared by topic-scoped and general quick-check dispatches.',
     },
     {
       id: 'filing.request',
