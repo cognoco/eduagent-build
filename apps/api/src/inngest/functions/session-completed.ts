@@ -1797,7 +1797,7 @@ export const sessionCompleted = inngest.createFunction(
                 )
               : [];
 
-            const analysis = await analyzeSessionTranscript(
+            const analyzed = await analyzeSessionTranscript(
               transcriptEvents,
               subjectRow?.name ?? null,
               topicTitle,
@@ -1806,9 +1806,10 @@ export const sessionCompleted = inngest.createFunction(
               { knownStruggles, suppressedTopics },
             );
 
-            if (!analysis) {
+            if (!analyzed) {
               return;
             }
+            const { analysis, author } = analyzed;
 
             const analysisResult = await applyAnalysis(
               db,
@@ -1817,6 +1818,7 @@ export const sessionCompleted = inngest.createFunction(
               subjectRow?.name ?? null,
               'inferred',
               subjectId,
+              author,
             );
 
             // FR247.6 — struggle pushes to the parent, sent at the source so
