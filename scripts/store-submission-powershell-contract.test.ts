@@ -9,6 +9,13 @@ const verifierPath = join(
   repoRoot,
   'scripts/verify-store-submission-powershell.ps1',
 );
+const powershellAvailable =
+  spawnSync(
+    'pwsh',
+    ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', 'exit 0'],
+    { stdio: 'ignore', timeout: 30_000 },
+  ).status === 0;
+const describeWithPowerShell = powershellAvailable ? describe : describe.skip;
 
 function verifyRunbook(path: string, executeCleanup = false) {
   const args = [
@@ -22,10 +29,10 @@ function verifyRunbook(path: string, executeCleanup = false) {
   ];
   if (executeCleanup) args.push('-ExecuteCleanupContract');
 
-  return spawnSync('pwsh', args, { encoding: 'utf8' });
+  return spawnSync('pwsh', args, { encoding: 'utf8', timeout: 30_000 });
 }
 
-describe('WI-2937 store-submission PowerShell contract', () => {
+describeWithPowerShell('WI-2937 store-submission PowerShell contract', () => {
   it('parses every documented PowerShell block with the PowerShell parser', () => {
     const result = verifyRunbook(runbookPath);
 
