@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (erasure targets come from the originating account/profile event)
 import { NonRetriableError, type GetStepTools } from 'inngest';
 import {
   ensurePendingClerkErasures,
