@@ -9,7 +9,7 @@
 
 | Role | Who | Responsibility |
 |---|---|---|
-| **Breach Lead** | DPO (`[DPO name — TODO before launch]`, `[dpo@…]`) | Owns the response end-to-end; makes the notify/don't-notify call; signs the regulator notification. |
+| **Breach Lead** | DPO (`[DPO name — TODO; blocked on OPQ-102 DPO appointment (Operator Queue, pending), not forgotten]`, `[dpo@…]`) | Owns the response end-to-end; makes the notify/don't-notify call; signs the regulator notification. |
 | **Technical Responder** | Engineering on-call | Detect, contain, preserve evidence, scope which data and how many people are affected. |
 | **Comms** | Founder / DPO | Drafts the message to affected families if Art 34 notification is required. |
 
@@ -28,15 +28,15 @@
 ## Extra notices that may stack on top
 
 - **US users affected** → US **state breach-notification laws** add their own notices (timing and content vary by state). Flag to counsel if any affected user is US-resident.
-- **Processor breach** → if the breach is at a vendor (Clerk, Neon, RevenueCat, an LLM provider, Sentry, Resend, Inngest, Voyage, Expo push, Cloudflare), their DPA (A11) should oblige them to notify *you* without undue delay; **your** 72-hour clock to Datatilsynet starts when they make you aware. Keep their breach-contact details with their DPA.
+- **Processor breach** → if the breach is at a vendor (Clerk, Neon, RevenueCat, an LLM provider, Sentry, Resend, Inngest, Voyage, Expo push, Cloudflare), their DPA (A11) should oblige them to notify *you* without undue delay; **your** 72-hour clock to Datatilsynet starts when they make you aware. Keep their breach-contact details with their DPA. *(Vendor-DPA completeness is gated by OPQ-110 — vendor DPAs, Operator Queue, pending — so this reliance is conditional until that closes.)*
 
 ## Pre-filled facts (so they're not looked up mid-incident)
 
 - **Regulator:** Datatilsynet — www.datatilsynet.no — breach form on their site.
 - **Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway.
-- **DPO contact:** `[dpo@… — TODO]`.
+- **DPO contact:** `[dpo@… — TODO; blocked on OPQ-102 DPO appointment (Operator Queue, pending), not forgotten]`.
 - **Representative:** none for the ruled EEA perimeter (controller established in Norway); UK representation reopens only if the UK is later enabled.
-- **Processor breach-contacts:** maintained in each provider's DPA file (see `ropa.md` recipients column; current processor inventory: [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md)).
+- **Processor breach-contacts:** maintained in each provider's DPA file (see `ropa.md` recipients column; current processor inventory: [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md)). DPA files are complete only once **OPQ-110** (vendor DPAs — Operator Queue, pending) closes.
 
 ---
 
