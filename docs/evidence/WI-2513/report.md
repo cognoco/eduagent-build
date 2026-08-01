@@ -34,7 +34,7 @@ indistinguishable from a legitimate retry.
 | Retention / deletion / access | New PII table: retention cron, profile-deletion cascade, RLS scoping, DPIA treatment pre-launch | None | None |
 | PII | Transiently persists rationale/misconception in a second store (C-3 tension), encryption-at-rest required | None persisted | None — key evaluates over two opaque UUIDs already in the event (`packages/schemas/src/inngest-events.ts:427-433`) |
 | Cost | Migration + table + cron + DPIA sign-off, PLUS the lease/takeover/fencing protocol design and its tests; M-L | No migration; S, plus pooling verification and long-open txns | XS-S — one config field + one opts-assertion test; 15+ in-repo precedents (§6) |
-| Failure residuals | Repays on pay-then-die like C (absent provider idempotency); adds claim-row leak/GC and lease-steal-vs-zombie overlap | Crash between lock and write re-pays (same as C); pooling defects void the lock with no signal | Not exactly-once: bounded repayments on failed/zombie runs (§7, accepted) |
+| Failure residuals | Repays on pay-then-die like C (absent provider idempotency); adds claim-row leak/GC and lease-steal-vs-zombie overlap | Crash between lock and write re-pays (same as C); pooling defects void the lock with no signal | Not exactly-once: per-attempt/per-run/cross-run repayment bounds and acceptance status in §7 |
 
 A does not fully close the zombie case with a pre-call claim alone — the
 marginal coverage it can buy requires a takeover/fencing protocol or provider
@@ -43,14 +43,22 @@ advisory-lock-under-pooling semantics. C rests on scheduler semantics the repo
 already relies on in 15+ functions, with a documented prior fix of this exact
 failure mode (BUG-148).
 
-### Option D — LLM-provider request idempotency (named; unavailable today)
+### Option D — LLM-provider request idempotency (no qualifying design found)
 
-The design AC-1 names: thread a client-generated idempotency key (the natural
-choice: `learnerMessageEventId`) on the paid provider request so the provider
-dedupes retries server-side and returns the original completion. **Retry
-semantics:** the only zero-new-storage design that would close the
-pay-then-die/zombie window exactly — a repaid request returns the cached
-result instead of a second charge. **Retention/deletion/access/PII:** the
+The provider-supported design AC-1 names would thread a client-generated
+idempotency key (the natural choice: `learnerMessageEventId`) on the paid
+provider request so the provider dedupes retries server-side. **Finding: no
+qualifying provider-supported idempotency design exists on the current call
+path** — none of the routed providers documents or implements such a contract
+(evidence below), so this option is HYPOTHETICAL and is described here for
+AC-1 completeness, not offered as coverage. If AC-1 is read as literally
+requiring a selectable provider-supported design, that requirement needs an
+explicit architecture ruling or waiver (§9). **Retry semantics (REQUIRED, not
+observed):** to qualify, a future provider contract would have to guarantee
+server-side dedupe that returns the original completion without a second
+charge — these are requirements any qualifying design must document, not
+semantics any routed provider is claimed to have; no concrete contract
+exists to cite. **Retention/deletion/access/PII:** the
 dedupe cache lives with the provider; the prompt already crosses that boundary
 today, so no new PII *class*, but provider-side retention of the cached
 completion would need DPA/retention verification per vendor. **Cost:** zero
@@ -144,9 +152,12 @@ Because normal dispatch emits one calibration event per session (§3), any two
 executions E1, E2 evaluating to the same key are, in practice, executions of
 the SAME event/receipt (`learnerMessageEventId`) — a re-fire past the 24h
 dedupe window, a replay, or a retry racing a concluded prior attempt. The
-proof and the at-most-one-paid-call claim are scoped to that same-receipt
-case; a fabricated distinct receipt is a distinct paid operation (§3). For
-same-receipt E1, E2:
+guarantee this proof establishes is narrower than "one call per receipt": it
+covers only executions that begin AFTER a prior attempt successfully
+committed the receipt row. Serialization does not prevent sequential
+repayment when every prior attempt failed after payment and before commit —
+those bounds are §7's. A fabricated distinct receipt is a distinct paid
+operation (§3). For same-receipt E1, E2:
 
 1. Their `rehydrate-grade-and-record` step instances cannot overlap; one —
    say E1's — finishes first (or terminates abnormally, §7).
@@ -157,8 +168,10 @@ same-receipt E1, E2:
 3. E2's step instance then starts with `loadCommittedGradeReceipt`
    (lines 239-246), finds the committed row, validates context invariants
    (lines 94-99), and returns the structured decision — control never reaches
-   `evaluateRecallQuality` at line 278. Symmetric if E2 ran first. At most one
-   serialized execution pays.
+   `evaluateRecallQuality` at line 278. Symmetric if E2 ran first. Any
+   serialized execution starting after a successful receipt commit pays
+   nothing; when no attempt has yet committed, each new attempt may pay,
+   within the §7 bounds.
 
 Concurrency alone does not dedupe — it converts the unratified *concurrent
 pre-commit* race into the *sequential post-commit* shape WI-2009 already
@@ -191,38 +204,48 @@ double-execution mode: `memory-facts-backfill.test.ts:4` ("[BUG-148] …
 concurrency:1"), the model for the opts-assertion test that is deliverable
 (b) of the contract (§3).
 
-## 7. Failure residuals (accepted; not exactly-once)
+## 7. Failure residuals (not exactly-once)
 
 This design bounds and prices duplicate payments — it does not eliminate them.
-Distinct residuals:
+Payment bounds, stated at each level:
 
-- **Ordinary serialized operation:** at most **one** paid call across all
-  serialized executions of the same receipt (§4).
-- **Failed run:** `retries: 2` (line 479) means initial attempt + 2 retries.
+- **Per-attempt:** each execution attempt of the grade step makes at most
+  **one** paid call — `evaluateRecallQuality` has a single call site inside
+  the step closure (line 278) — and any attempt that begins after a prior
+  successful receipt commit pays **nothing** (§4).
+- **Per-run:** `retries: 2` (line 479) means initial attempt + 2 retries.
   If every attempt of one run fails inside the window between the paid call
   (line 278) and the commit (lines 294-307 / 341-357), that run pays up to
   **3 times** (2 repayments) before exhausting retries.
-- **Written-off zombie:** a slow paid call pushed past the attempt's write-off
-  frees the concurrency slot while the worker still runs; a retry may then
-  overlap the zombie pre-commit and both may pay — scheduler-level
+- **Cross-run:** **no finite global bound.** A re-fire past the 24h
+  idempotency window, a replay, or a new distinct operation starts a fresh
+  run with its own per-run bound; if no attempt has ever committed the
+  receipt, each such run can pay again. (A same-receipt re-fire after any
+  successful commit resolves from the committed row and pays nothing.)
+- **Written-off zombie:** a slow paid call pushed past the attempt's
+  write-off frees the concurrency slot while the worker still runs; a retry
+  may then overlap the zombie pre-commit and both may pay — scheduler-level
   serialization cannot arbitrate an executor the scheduler no longer tracks.
-- **Distinct runs outside the 24h idempotency window** (or other dedupe
-  misses) each carry their own retry budget. A same-receipt re-fire resolves
-  from the committed row without paying; only a fabricated distinct receipt
-  pays again, as a distinct operation (§3).
+
+**Acceptance status (AC-3):** the operator ruling (2026-07-29, recorded in
+the Work Item) accepted only the narrow case — *a crash inside the narrow
+serialized pre-commit window re-pays one grading call*. The other residuals
+enumerated above — zombie-overlap double payment, per-run accumulation up to
+3 payments, and the absence of a finite cross-run bound — are **newly
+identified by this design work, NOT covered by that acceptance**, and require
+explicit architecture/operator ruling alongside the §9 approval.
 
 Row-level invariant in every case above: the deterministic
 `learnerMessageEventId` PK with `onConflictDoNothing` ensures at most one
 `retrieval_events` row per receipt, and a lost conflict reloads the canonical
 row (lines 308-320, 358-370). No broader corruption-prevention claim is made
 for other fields, write paths, or external calls. Closing the
-zombie/pay-then-die window would require provider-side request idempotency
-(Option D, §2 — not uniformly available through the repo's provider
-abstraction today) or Option A's full lease/takeover/fencing protocol — costs
-the ruling rejected or the platform does not offer. **The bounded repayments
-above are the operator-accepted residual.** Not residuals: in-window duplicates
-(idempotency), lost-ack replays (WI-2009 receipt), insert-conflict divergence
-(conflict reload).
+zombie/pay-then-die windows would require a qualifying provider-side
+idempotency contract (Option D, §2 — none found) or Option A's full
+lease/takeover/fencing protocol — costs the ruling rejected or the platform
+does not offer. Not residuals: in-window duplicates (idempotency),
+executions after a successful receipt commit (WI-2009 receipt path),
+insert-conflict divergence (conflict reload).
 
 ## 8. C-3 / RR-9 preservation and external effects (AC-2, AC-3)
 
@@ -253,4 +276,8 @@ The ruling selected the direction; it did not waive the architecture gate.
 This document is the artifact submitted for explicit architecture approval;
 implementation (both §3 deliverables: the config field and the BUG-148-style
 opts-assertion test) is a separate, later item and must not begin before that
-approval.
+approval. Two further rulings are needed with it: (a) whether AC-1's
+provider-supported-design requirement is satisfied by the Option D
+no-qualifying-design finding or needs a waiver (§2), and (b) acceptance of
+the newly identified residuals beyond the narrow pre-commit crash repayment
+(§7).
