@@ -36,21 +36,51 @@ fi
 count_phase() {
   local phase=$1
   local count=0
+  local rg_status=0
   if [[ "$phase_events_valid" == "1" ]]; then
-    count=$(rg -c -x "$phase" "$phase_events" 2>/dev/null || true)
+    count=$(rg -c -x "$phase" "$phase_events" 2>/dev/null) || rg_status=$?
+    if (( rg_status == 1 )); then
+      count=0
+    elif (( rg_status != 0 )); then
+      return "$rg_status"
+    fi
     count=${count:-0}
   fi
   print -r -- "$count"
 }
 
-reporter_ready_count=$(count_phase reporter-ready)
-web_server_command_started_count=$(count_phase web-server-command-started)
-global_setup_started_count=$(count_phase global-setup-started)
-global_setup_completed_count=$(count_phase global-setup-completed)
-global_setup_failed_count=$(count_phase global-setup-failed)
-discovery_completed_count=$(count_phase tests-discovered)
-setup_test_begin_count=$(count_phase setup-test-begin)
-setup_body_entered_count=$(count_phase setup-test-body-entered)
+reporter_ready_count=$(count_phase reporter-ready) || {
+  phase_events_valid=0
+  reporter_ready_count=0
+}
+web_server_command_started_count=$(count_phase web-server-command-started) || {
+  phase_events_valid=0
+  web_server_command_started_count=0
+}
+global_setup_started_count=$(count_phase global-setup-started) || {
+  phase_events_valid=0
+  global_setup_started_count=0
+}
+global_setup_completed_count=$(count_phase global-setup-completed) || {
+  phase_events_valid=0
+  global_setup_completed_count=0
+}
+global_setup_failed_count=$(count_phase global-setup-failed) || {
+  phase_events_valid=0
+  global_setup_failed_count=0
+}
+discovery_completed_count=$(count_phase tests-discovered) || {
+  phase_events_valid=0
+  discovery_completed_count=0
+}
+setup_test_begin_count=$(count_phase setup-test-begin) || {
+  phase_events_valid=0
+  setup_test_begin_count=0
+}
+setup_body_entered_count=$(count_phase setup-test-body-entered) || {
+  phase_events_valid=0
+  setup_body_entered_count=0
+}
 setup_scenario_count=$(print -r -- "$setup_results" | jq -r 'length')
 setup_passed_count=$(print -r -- "$setup_results" | jq -r '[.[] | select(.outcome == "passed")] | length')
 setup_failed_count=$(print -r -- "$setup_results" | jq -r '[.[] | select(.outcome == "failed")] | length')

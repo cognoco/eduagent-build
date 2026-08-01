@@ -237,4 +237,20 @@ describe('resolveClerkPublishableKey', () => {
       'global-setup-started\nglobal-setup-failed\n',
     );
   });
+
+  it('rethrows the original setup error when the failure phase cannot be recorded', async () => {
+    phaseDir = await mkdtemp(path.join(tmpdir(), 'wi2948-global-setup-'));
+    const phaseFile = path.join(phaseDir, 'phases.txt');
+    process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE = phaseFile;
+    process.env.PLAYWRIGHT_SKIP_LOCAL_API = '1';
+    delete process.env.CLERK_SECRET_KEY;
+    process.env.CLERK_PUBLISHABLE_KEY = 'pk_test_dummy';
+    const setupError = new Error('original setup failure');
+    jest.mocked(clerkSetup).mockImplementationOnce(async () => {
+      await rm(phaseDir!, { recursive: true, force: true });
+      throw setupError;
+    });
+
+    await expect(globalSetup()).rejects.toBe(setupError);
+  });
 });

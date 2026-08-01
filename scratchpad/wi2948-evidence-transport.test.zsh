@@ -4,6 +4,9 @@ set -eu
 
 target=${0:A:h}/wi2948-ramtop-receipt.zsh
 classifier=${0:A:h}/wi2948-classify-playwright-result.zsh
+discriminator=${0:A:h}/wi2948-preload-discriminator.test.mjs
+playwright_config=apps/mobile/playwright.config.ts
+evidence_readme=docs/evidence/WI-2948/README.md
 classification_literal='.workitem-artifacts/WI-2948/ramtop-node22-seeded-signin-classification.txt'
 
 classification_line=$(rg -n -F "$classification_literal" "$target" | cut -d: -f1 || true)
@@ -37,11 +40,17 @@ rg -q -F 'chmod 600 "$phase_events"' "$target" || {
   exit 1
 }
 
-rg -q -F -- '--reporter=json,./scratchpad/wi2948-preload-phase-reporter.cjs' \
-  "$target" || {
-  print -u2 'proof wrapper does not install the bounded phase reporter'
+rg -q -F "process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE" "$playwright_config" &&
+  rg -q -F "['json']" "$playwright_config" &&
+  rg -q -F '[preloadPhaseReporter]' "$playwright_config" || {
+  print -u2 'Playwright config does not compose the bounded JSON and phase reporters on the proof path'
   exit 1
 }
+
+if rg -q -F -- '--reporter=' "$target"; then
+  print -u2 'proof wrapper overrides the configured line reporter'
+  exit 1
+fi
 
 rg -q -F -- '--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY"' \
   "$target" || {
@@ -58,6 +67,28 @@ if rg -q -F 'CLERK_SECRET_KEY crossed the allowlisted boundary' "$target"; then
   print -u2 'proof wrapper still rejects the Clerk backend key that clerkSetup requires'
   exit 1
 fi
+
+rg -q -F 'PLAYWRIGHT_JSON_OUTPUT_FILE=<mode-0700-temporary-directory>' \
+  "$target" || {
+  print -u2 'durable command shape omits the private JSON reporter destination'
+  exit 1
+}
+
+rg -q -F 'if (!mutant.ok)' "$discriminator" &&
+  rg -q -F 'mutation-classifier-error' "$discriminator" || {
+  print -u2 'mutation harness does not separate classifier failure from a killed mutant'
+  exit 1
+}
+
+if rg -q -F '[ramtop-node22-seeded-signin-receipt.json]' "$evidence_readme"; then
+  print -u2 'evidence README retains a dead success-receipt link'
+  exit 1
+fi
+rg -q -F 'exactly `TEST_SEED_SECRET`, `CLERK_PUBLISHABLE_KEY`, and the aligned staging `CLERK_SECRET_KEY`' \
+  "$evidence_readme" || {
+  print -u2 'evidence README does not state the current three-secret proof boundary'
+  exit 1
+}
 
 if rg -q 'trap .*classification_file|rm .*classification_file' "$target"; then
   print -u2 'classification file appears in a cleanup path'
@@ -100,5 +131,21 @@ if [[ "$classification" == *SENSITIVE* ]]; then
   print -u2 'early-run classification leaked raw error or console material'
   exit 1
 fi
+
+fixture_bin="$fixture_tmp/bin"
+fixture_rg="$fixture_bin/rg"
+mkdir -p "$fixture_bin"
+{
+  print -r -- '#!/usr/bin/env zsh'
+  print -r -- 'exit 2'
+} >"$fixture_rg"
+chmod 700 "$fixture_rg"
+rg_failure_classification=$(PATH="$fixture_bin:$PATH" /bin/zsh -f "$classifier" "$fixture_json" "$fixture_phases")
+[[ "$rg_failure_classification" == *$'PHASE_EVENTS_VALID=0\n'* ]] &&
+  [[ "$rg_failure_classification" == *$'FAILURE_CLASSES=unclassified-preload'* ]] || {
+  print -u2 'phase counting command failure did not fail closed'
+  print -u2 -- "$rg_failure_classification"
+  exit 1
+}
 
 print 'WI-2948 evidence transport contract OK'

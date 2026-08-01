@@ -2,6 +2,16 @@
 
 This directory preserves the secret-free, independently inspectable evidence for the second repair attempt.
 
+## Final signed-staging disposition
+
+The repaired candidate completed the authorized Ramtop Node 22 staging setup proof
+on 2026-08-01 at exact head `719b2b5254a88111ada253fc1b5fb2e60bc15551`.
+All three setup/sign-in scenarios passed once each with retries disabled, and the
+global teardown reset passed. The sanitized machine-readable receipt is
+[ramtop-node22-seeded-signin-receipt.json](ramtop-node22-seeded-signin-receipt.json).
+It supersedes the earlier bounded failure classifications below without deleting
+their audit history.
+
 ## Cross-lane Clerk preflight regression
 
 The regression command was run under the repository Node 22 toolchain with the production workflow as the system under test:
@@ -26,9 +36,14 @@ The broader focused validation ran the complete workflow contract, Clerk alignme
 
 ## Ramtop Node 22 staging setup
 
-No durable success receipt exists. A future successful proof would record [ramtop-node22-seeded-signin-receipt.json](ramtop-node22-seeded-signin-receipt.json) with the UTC interval, machine and Node identity, exact secret-free command shape, zero-retry configuration and observed retry indexes, all three scenario outcomes, candidate source blobs, and the stable repository artifact pointer.
+A durable success receipt now exists at
+`ramtop-node22-seeded-signin-receipt.json`. It records the UTC interval, Ramtop
+and Node identity, exact secret-free command shape, zero-retry configuration and
+observed retry indexes, all three successful scenario outcomes, candidate source
+blobs, successful global teardown reset, and the stable repository artifact
+pointer.
 
-The run explicitly removes `CLERK_SECRET_KEY` from the local environment and asks Doppler for only `TEST_SEED_SECRET` and `CLERK_PUBLISHABLE_KEY`. Raw Playwright reporter output is processed only in a mode-`0700` temporary directory and destroyed after allowlisted outcome extraction; it is not a durable artifact because reporter output contains seeded identity data.
+The current wrapper explicitly removes ambient `CLERK_SECRET_KEY` and `CLERK_TESTING_TOKEN` from the local environment, then asks Doppler for exactly `TEST_SEED_SECRET`, `CLERK_PUBLISHABLE_KEY`, and the aligned staging `CLERK_SECRET_KEY`. Raw Playwright reporter output is processed only in a mode-`0700` temporary directory and destroyed after allowlisted outcome extraction; it is not a durable artifact because reporter output contains seeded identity data. The historical two-secret invocation described below remains a fact about that earlier run, not the current wrapper boundary.
 
 Three earlier diagnostic invocations exited at the Clerk preflight before Playwright launched. They were not Playwright attempts or retries. The read-only checks below supersede their initial classification: Doppler `mentomate/stg` is aligned; a login-shell startup file reintroduced a host-scoped production Clerk key after the outer command had unset it.
 
