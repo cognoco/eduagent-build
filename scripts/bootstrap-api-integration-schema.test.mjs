@@ -440,6 +440,42 @@ test('records a failed push and refuses to retry it', async () => {
   );
 });
 
+test('records a failed post-push replay and requires recreation', async () => {
+  const store = makeStore();
+  const originalApplyDirectSchema = store.applyDirectSchema;
+  let applyCount = 0;
+  store.applyDirectSchema = async (input) => {
+    applyCount += 1;
+    await originalApplyDirectSchema(input);
+    if (applyCount === 2) throw new Error('synthetic post-push failure');
+  };
+  const { deps, pushes } = baseDependencies(store);
+
+  await assert.rejects(
+    bootstrapDisposableApiIntegrationSchema(
+      {
+        revision: REVISION,
+        operatorRuling: 'operator:BID-48/WI-2939:approved',
+      },
+      deps,
+    ),
+    /destroy and recreate/i,
+  );
+
+  assert.equal(pushes.length, 1);
+  assert.deepEqual(
+    store.calls.map(([name]) => name),
+    [
+      'inspect',
+      'createApplyingMarker',
+      'applyDirectSchema',
+      'applyDirectSchema',
+      'markFailed',
+      'close',
+    ],
+  );
+});
+
 test('records failed direct SQL and never reaches push', async () => {
   const store = makeStore();
   store.applyDirectSchema = async (input) => {
