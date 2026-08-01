@@ -2,13 +2,14 @@
 
 Date: 2026-08-02 (Europe/Berlin local publication date; GitHub's UTC
 timestamps may show Aug 1)
-Status: **Design only.** Option C is this report's evidence-backed
-recommendation — no direction has been durably ratified on the Work Item
-(§9), and
-**selection of the direction, acceptance of every residual risk (§7), and
-explicit architecture approval of this contract are all still required before
-ANY implementation** (AC-3). No production code, schema, workflow, or test
-changes accompany this document.
+Status: **Design only.** Option C is **RATIFIED as the chosen direction** —
+durable source: WI-2513 Description property, page
+`3a38bce9-1f7c-819a-899d-f19492b22b01`, last edited 2026-08-01T22:06:00Z
+("OPTION C RATIFIED as the chosen direction"). The same ruling keeps
+**explicit architecture approval of this contract required before ANY
+implementation** (AC-3) — selection is not approval, and approval plus the
+residual acceptances beyond §7's ratified narrow case remain OPEN (§9). No
+production code, schema, workflow, or test changes accompany this document.
 
 ## 1. Problem
 
@@ -31,7 +32,7 @@ indistinguishable from a legitimate retry.
 
 ## 2. Option comparison (AC-1)
 
-| Dimension | A — first-party encrypted receipt store | B — idempotency + pg advisory lock | **C — concurrency key, limit 1 (recommended)** |
+| Dimension | A — first-party encrypted receipt store | B — idempotency + pg advisory lock | **C — concurrency key, limit 1 (ratified direction — Status/§9 provenance)** |
 | --- | --- | --- | --- |
 | Mechanism | Encrypted claim row (`profileId+sessionId+answerEventId`) written before the paid call, same txn as the cooldown claim; second execution sees claim, waits/reuses. A bare claim is NOT enough: if the claimant dies after paying but before publishing the result, a taker-over cannot know whether payment happened — waiting strands the answer, lease-expiry/steal can overlap a slow zombie. Honest A needs a full lease + takeover + result-publication + zombie-fencing protocol, or provider-side idempotency keys | Keep existing `idempotency` (line 480) + `pg_advisory_xact_lock` on a hash of the same triple, held across the paid call | `concurrency: { key: 'event.data.sessionId + "-" + event.data.topicId', limit: 1 }`; scheduler serializes step execution per key |
 | Retry semantics | Closes the two-live-executions race via DB arbitration; the pay-then-die window remains unless provider idempotency is added — same repay class as C, plus protocol failure modes of its own | Closes it only if the lock holds: xact-scoped lock means a transaction open across an LLM call, and Neon pooling makes lock/connection affinity a verification burden; a mis-hashed key fails open silently | Serializes scheduler-visible overlap; second execution then hits the WI-2009 receipt check and never pays (§4); key stable across retries (§5) |
@@ -250,9 +251,16 @@ exposure. Stated at each level:
   guide (<https://www.inngest.com/docs/guides/concurrency>) does not specify
   it — so this is carried as an OPEN risk (§9), not asserted as fact.
 
-**Acceptance status (AC-3):** no residual acceptance is durably recorded on
-the Work Item. Every residual above is OPEN and listed in §9 with its
-decision owner.
+**Acceptance status (AC-3):** the durable ruling on the Work Item (WI-2513
+Description property, page `3a38bce9-1f7c-819a-899d-f19492b22b01`, last
+edited 2026-08-01T22:06:00Z) accepts exactly one residual: "a crash inside
+the narrow pre-commit window re-pays one grading call — rare, bounded,
+cheap." "One grading call" there is the application-level
+`evaluateRecallQuality` → `routeAndCall` invocation (line 278). That ruling
+does NOT explicitly accept the router fan-out of up to 8 provider
+requests/possible charges per attempt, the 24-per-Inngest-run maximum, the
+unbounded cross-run aggregate, or the hypothetical zombie overlap — each of
+those remains OPEN in §9 with its decision owner.
 
 Row-level invariant in every case above: the deterministic
 `learnerMessageEventId` PK with `onConflictDoNothing` ensures at most one
@@ -291,22 +299,23 @@ commit (WI-2009 receipt path), insert-conflict divergence (conflict reload).
 
 ## 9. OPEN — pending ruling (approval gate)
 
-Provenance note: no selection, acceptance, or waiver asserted anywhere in
-this report carries a durable Work Item record. The Work Item body's
-first-pass refinement leans Option B pending architect ratification, and
-Option C is challenger-proposed there (WI-2513 body, "Design options" block);
-Option C is this report's evidence-backed recommendation on the analysis
-above. Everything below is OPEN, with its decision owner:
+Provenance: Option C selection is RATIFIED on the Work Item (Description
+property, page `3a38bce9-1f7c-819a-899d-f19492b22b01`, last edited
+2026-08-01T22:06:00Z), which also records the single accepted residual quoted
+in §7 and explicitly keeps architecture approval required; the body's earlier
+first-pass lean toward Option B ("Design options" block) is superseded by
+that ruling. Everything below remains OPEN, with its decision owner:
 
-1. **Contract selection and approval** (owner: architecture): adopt Option C
-   as specified in §3 — both deliverables, the config field and the
-   BUG-148-style opts-assertion test. Implementation must not begin before
-   this ruling.
+1. **Contract approval** (owner: architecture): approve the §3 contract —
+   both deliverables, the config field and the BUG-148-style opts-assertion
+   test — implementing the ratified Option C direction. Selection is
+   ratified; approval is not. Implementation must not begin before approval.
 2. **AC-1 provider-supported-design requirement** (owner: architecture):
    accept the Option D no-qualifying-design finding as satisfying AC-1's
    comparison requirement, or issue a waiver (§2).
-3. **Residual-risk acceptance** (owner: operator): every §7 residual —
-   narrow pre-commit crash repayment, the hypothetical zombie-overlap double
-   payment (§7 — mechanism unverified), per-attempt provider fan-out (up to
-   8 requests), per-run accumulation (up to 24 requests), and the unbounded
-   cross-run aggregate — none is recorded as accepted in any durable source.
+3. **Residual-risk acceptance beyond the ratified narrow case** (owner:
+   operator): the router fan-out of up to 8 provider requests/possible
+   charges per attempt, the up-to-24-per-run maximum, the unbounded
+   cross-run aggregate, and the hypothetical zombie-overlap double payment
+   (§7 — mechanism unverified) are not covered by the recorded acceptance
+   and remain unruled.
