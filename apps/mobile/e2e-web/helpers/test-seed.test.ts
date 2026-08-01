@@ -2,6 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { createOwnerJourneyPhaseDiagnostics } from './owner-journey-phase-diagnostics';
+
 const originalEmailPrefix = process.env.PLAYWRIGHT_EMAIL_PREFIX;
 const originalApiUrl = process.env.PLAYWRIGHT_API_URL;
 const originalTestSeedSecret = process.env.PLAYWRIGHT_TEST_SEED_SECRET;
@@ -11,6 +13,7 @@ const originalFetch = global.fetch;
 const originalCwd = process.cwd();
 
 afterEach(() => {
+  jest.useRealTimers();
   if (originalEmailPrefix === undefined) {
     delete process.env.PLAYWRIGHT_EMAIL_PREFIX;
   } else {
@@ -81,6 +84,76 @@ function seedResponse(email: string): Response {
     { status: 200 },
   );
 }
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+describe('owner journey seed and Clerk diagnostics', () => {
+  it('retains distinct seed and Clerk phases while their requests are delayed', async () => {
+    jest.useFakeTimers({ now: 1_000 });
+    process.env.CLERK_SECRET_KEY = 'sk_test_external';
+    process.env.PLAYWRIGHT_SKIP_LOCAL_API = '1';
+    const email = 'seeded@example.com';
+    const seed = deferred<Response>();
+    const lookup = deferred<Response>();
+    const verification = deferred<Response>();
+    global.fetch = jest
+      .fn()
+      .mockImplementationOnce(() => seed.promise)
+      .mockImplementationOnce(() => lookup.promise)
+      .mockImplementationOnce(() => verification.promise) as jest.Mock;
+    const output: string[] = [];
+    const diagnostics = createOwnerJourneyPhaseDiagnostics({
+      emit: (line) => output.push(line),
+    });
+    const { seedScenario } = loadTestSeedHelper();
+
+    const result = seedScenario(
+      { scenario: 'solo-learner', email },
+      diagnostics,
+    );
+    await jest.advanceTimersByTimeAsync(5_000);
+    expect(output).toContain(
+      '[V2 owner journey] phase=seed-request elapsedMs=5000 attempt=1 pathname=/v1/__test/seed',
+    );
+
+    seed.resolve(seedResponse(email));
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(5_000);
+    expect(output).toContain(
+      '[V2 owner journey] phase=clerk-lookup elapsedMs=10000 attempt=1 pathname=/v1/users',
+    );
+
+    lookup.resolve(
+      new Response(
+        JSON.stringify([
+          {
+            id: 'user-id',
+            email_addresses: [{ id: 'email-address-id', email_address: email }],
+          },
+        ]),
+        { status: 200 },
+      ),
+    );
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(5_000);
+    expect(output).toContain(
+      '[V2 owner journey] phase=clerk-verification elapsedMs=15000 attempt=1 pathname=/v1/email_addresses/:id',
+    );
+
+    verification.resolve(new Response('{}', { status: 200 }));
+    await expect(result).resolves.toMatchObject({ email });
+    diagnostics.dispose();
+  });
+});
 
 describe('local Playwright Clerk identity contract (WI-2936)', () => {
   const email = 'seeded@example.com';

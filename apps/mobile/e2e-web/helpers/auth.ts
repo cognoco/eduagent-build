@@ -39,7 +39,7 @@ async function isAppShellAtPathVisible(
     .catch(() => false);
 }
 
-type SignedInReadyState =
+export type SignedInReadyState =
   | 'post-approval'
   | 'landing'
   | 'app-shell'
@@ -86,7 +86,7 @@ async function waitForLandingVisible(
   });
 }
 
-async function waitForSignedInReady(
+export async function waitForSignedInReady(
   page: Page,
   options: SignInOptions,
   waitOptions: { allowPostApproval: boolean },

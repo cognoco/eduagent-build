@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   createOwnerJourneyPhaseDiagnostics,
   ownerEntryPhase,
@@ -26,7 +24,11 @@ describe('createOwnerJourneyPhaseDiagnostics', () => {
     ['seed-request', '/v1/__test/seed', 'seed-response'],
     ['clerk-lookup', '/v1/users', 'clerk-email-address'],
     ['sign-in-readiness', '/mentor', 'mentor-screen'],
-    ['journal-leaf-ready', '/more/notifications', 'leaf-screen'],
+    [
+      ownerEntryPhase('journal', 'leaf-ready'),
+      '/more/notifications',
+      'leaf-screen',
+    ],
   ] as const)(
     'retains delayed %s timing before the outer test budget expires',
     async (phase, pathname, readinessMarker) => {
@@ -107,46 +109,4 @@ describe('createOwnerJourneyPhaseDiagnostics', () => {
       expect(ownerEntryPhase('journal', phase)).toBe(`journal-${phase}`);
     },
   );
-
-  it('threads diagnostics through seed, Clerk, sign-in, and all per-entry waits', () => {
-    const root = process.cwd();
-    const seedAndSignIn = readFileSync(
-      join(root, 'apps/mobile/e2e-web/helpers/seed-and-sign-in.ts'),
-      'utf8',
-    );
-    const testSeed = readFileSync(
-      join(root, 'apps/mobile/e2e-web/helpers/test-seed.ts'),
-      'utf8',
-    );
-    const auth = readFileSync(
-      join(root, 'apps/mobile/e2e-web/helpers/auth.ts'),
-      'utf8',
-    );
-    const ownerSpec = readFileSync(
-      join(root, 'apps/mobile/e2e-web/flows/v2/v2-account-owner.spec.ts'),
-      'utf8',
-    );
-
-    expect(seedAndSignIn).toContain('const seeded = await seedScenario(');
-    expect(seedAndSignIn).toContain('options.diagnostics');
-    expect(testSeed).toContain("phase: 'seed-request'");
-    expect(testSeed).toContain("backoffPhase: 'seed-backoff'");
-    expect(testSeed).toContain("phase: 'clerk-lookup'");
-    expect(testSeed).toContain("phase: 'clerk-verification'");
-    expect(auth).toContain("phase: 'sign-in-setup'");
-    expect(auth).toContain("phase: 'sign-in-session'");
-    expect(auth).toContain("phase: 'sign-in-readiness'");
-
-    for (const phase of [
-      'account-entry',
-      'account-ready',
-      'leaf-ready',
-      'browser-back',
-      'account-return',
-      'initiating-tab-return',
-    ]) {
-      expect(ownerSpec).toContain(`ownerEntryPhase(entry.token, '${phase}')`);
-    }
-    expect(ownerSpec).toContain('diagnostics.dispose()');
-  });
 });
