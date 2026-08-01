@@ -1,4 +1,10 @@
-import { renderHook, waitFor, act } from '@testing-library/react-native';
+import {
+  renderHook,
+  waitFor,
+  act,
+  render,
+} from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ApiResponseShapeError,
@@ -6,10 +12,17 @@ import {
   type NowResponse,
 } from '@eduagent/schemas';
 
-import { createHookWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
 import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
-import { resetMentorNoticePolicyStoreForTests } from '../lib/mentor-notice-policy';
+import {
+  foldMentorNoticePolicyFor,
+  resetMentorNoticePolicyStoreForTests,
+} from '../lib/mentor-notice-policy';
+import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 
 import {
   useMentorNoticeActions,
@@ -363,6 +376,217 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     ).toContain('mentor_notice');
 
     mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2933 Gate-1 lint fix] The regression the `noticeSafeFallback` memo's
+  // dependency on a pair-scoped LIVE policy subscription (`fallbackPolicy`)
+  // exists to prevent: if the memo stopped re-running when the bound pair's
+  // policy store changed, a projection that painted permissively (no floor
+  // yet observed) would keep painting forever, silently, even after a
+  // sibling surface observed a disable for the SAME pair — every prior test
+  // in this file still passes, because none of them mutate the store AFTER
+  // the fallback has already painted.
+  // -------------------------------------------------------------------------
+  it('[WI-2933 Gate-1] re-blanks the cached notice surface when the bound pair’s policy store observes a disable after the projection already painted', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // Deliberately no stored floor yet — the projection paints permissively,
+    // same precondition as the NO-stored-floor control above.
+
+    const { result, queryClient } = await renderSlowFallback();
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+    // Precondition: the notice really did paint, so the assertion below is a
+    // BLANKING, not an artifact of an already-empty projection.
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).toContain('mentor_notice');
+
+    // A SIBLING surface observes a disable for the SAME (actor, profile) pair
+    // — no re-render of `useNowFeed`'s own props, no new fetch. This is
+    // exactly the "sibling surface observing a disable" the memo's comment
+    // describes: the reactivity under test is the memo noticing a STORE
+    // change, not a prop change.
+    await act(async () => {
+      foldMentorNoticePolicyFor(
+        CACHE_BINDING.actorId,
+        CACHE_BINDING.profileId,
+        {
+          revision: 7,
+          enabled: false,
+        },
+      );
+      await Promise.resolve();
+    });
+
+    // THE CRITERION: the retained projection is re-judged and blanked without
+    // any other trigger.
+    await waitFor(() =>
+      expect(
+        result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+      ).not.toContain('mentor_notice'),
+    );
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2933 re-open] Gate-2 REJECTED the fix above: `fallbackPairRef` is
+  // reassigned during RENDER (`if (cacheBinding) { fallbackPairRef.current =
+  // cacheBinding; }`) whenever `cacheBinding` is truthy, independent of when
+  // `fallbackFeed` was populated. On a bound A -> B profile transition, React
+  // can commit a render where `cacheBinding` has already flipped to B but the
+  // cleanup effect that clears A's retained `fallbackFeed` has not yet run —
+  // that render judges A's raw projection against B's (permissive) floor and
+  // can expose A's mentor_notice card.
+  //
+  // The two tests above deliberately do NOT force a rerender (mutating
+  // `mockActorId` alone triggers none — see their own comments), so neither
+  // can observe this. This one does: a real profile prop swap through a
+  // rendered tree, with EVERY intermediate render captured. The leak, if it
+  // exists, is gone by the time React settles (a later effect clears
+  // `fallbackFeed` once the epoch/pair mismatch is noticed), so asserting only
+  // on the final settled `result.current` — as `renderHook` callers do
+  // elsewhere in this file — would prove nothing; this test records every
+  // render `useNowFeed` produces, including the transient one.
+  // -------------------------------------------------------------------------
+  it('[WI-2933 re-open] never exposes pair A’s notice card while bound to pair B, across every render of a real A->B transition', async () => {
+    const PROFILE_A = 'wi2933-profile-a';
+    const PROFILE_B = 'wi2933-profile-b';
+    const pairA = { actorId: CACHE_BINDING.actorId, profileId: PROFILE_A };
+    const pairB = { actorId: CACHE_BINDING.actorId, profileId: PROFILE_B };
+
+    // Pair A: warm notice-bearing cache + a durable floor that forbids it.
+    const cachedA = noticeFeed();
+    await AsyncStorage.setItem(
+      buildNowFeedCacheKey({ ...pairA, policyEpoch: ENABLED_EPOCH }),
+      JSON.stringify(cachedA),
+    );
+    await AsyncStorage.setItem(
+      `now-feed-policy-epoch::${pairA.actorId}::${pairA.profileId}`,
+      ENABLED_EPOCH,
+    );
+    await AsyncStorage.setItem(
+      `mentor-notice-policy-state::${pairA.actorId}::${pairA.profileId}`,
+      '{"revision":7,"enabled":false,"observedDisableRevision":7}',
+    );
+    // Pair B: hydrated to the SAME epoch (isolates the assertion to the
+    // actor/profile identity, not an epoch mismatch); deliberately no stored
+    // floor — the permissive default.
+    await AsyncStorage.setItem(
+      `now-feed-policy-epoch::${pairB.actorId}::${pairB.profileId}`,
+      ENABLED_EPOCH,
+    );
+
+    mockFetch.mockReturnValue(new Promise(() => undefined));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        // `gcTime: Infinity` (not the usual test default of 0) — pair B's
+        // observed-epoch query is seeded below before anything observes it;
+        // a short gcTime would garbage-collect that seed on the next timer
+        // tick (this test advances fake timers), reintroducing exactly the
+        // async storage-read gap this setup exists to avoid.
+        queries: { retry: false, gcTime: Infinity, staleTime: Infinity },
+        mutations: { gcTime: 0 },
+      },
+    });
+    // Pre-hydrate BOTH pairs' observed-epoch queries so `epochHydrated` (and
+    // therefore `cacheBinding`) is available synchronously on the
+    // profile-switch render, with no async storage-read gap for the switch
+    // to fall through — the transition under test is A -> B directly.
+    queryClient.setQueryData(
+      ['now-feed-observed-policy-epoch', pairA.actorId, pairA.profileId],
+      ENABLED_EPOCH,
+    );
+    queryClient.setQueryData(
+      ['now-feed-observed-policy-epoch', pairB.actorId, pairB.profileId],
+      ENABLED_EPOCH,
+    );
+
+    const renders: Array<ReturnType<typeof useNowFeed>> = [];
+    function Reader() {
+      const value = useNowFeed();
+      renders.push(value);
+      return null;
+    }
+    function Probe({ profileId }: { profileId: string }) {
+      const profile = createTestProfile({ id: profileId });
+      const profileContextValue: ProfileContextValue = {
+        profiles: [profile],
+        activeProfile: profile,
+        isExplicitProxyMode: false,
+        switchProfile: async () => ({ success: true }),
+        isLoading: false,
+        profileLoadError: null,
+        profileWasRemoved: false,
+        acknowledgeProfileRemoval: () => undefined,
+      };
+      return (
+        <ProfileContext.Provider value={profileContextValue}>
+          <Reader />
+        </ProfileContext.Provider>
+      );
+    }
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <Probe profileId={PROFILE_A} />
+      </QueryClientProvider>,
+    );
+
+    // Precondition — the notice-bearing cache for A really is readable
+    // (mirrors `seedWarmNoticeCache`'s own precondition check above). This is
+    // the RAW payload the internal `fallbackFeed` state retains; while
+    // correctly bound to A its disabling floor strips the card from the
+    // hook's exposed field below, so that field cannot be used to prove the
+    // raw retention — the retained raw payload is what the transition can
+    // leak.
+    await expect(
+      readCachedNowFeed({ ...pairA, policyEpoch: ENABLED_EPOCH }),
+    ).resolves.toEqual(cachedA);
+
+    // Let the slow-fallback timer populate `fallbackFeed` while bound to A.
+    await act(async () => {
+      jest.advanceTimersByTime(2_001);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(renders.at(-1)?.fallbackFeed).not.toBeNull());
+    // CONTROL — correctly bound to A, its own disabling floor already
+    // strips the card. This is the exposed field working as designed for
+    // the pair it is actually bound to; the defect is specific to the
+    // transition, asserted below.
+    expect(
+      renders.at(-1)?.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).not.toContain('mentor_notice');
+
+    const preSwitchRenderCount = renders.length;
+
+    // The real A -> B transition: a prop swap through the rendered tree —
+    // exactly like a profile switch — not a module-variable mutation.
+    await act(async () => {
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <Probe profileId={PROFILE_B} />
+        </QueryClientProvider>,
+      );
+      await Promise.resolve();
+    });
+
+    // THE CRITERION: across every render this transition produced — not just
+    // the final settled one — no mentor_notice card sourced from A's
+    // projection is ever exposed once bound to B.
+    const postSwitchRenders = renders.slice(preSwitchRenderCount);
+    expect(postSwitchRenders.length).toBeGreaterThan(0);
+    const leaked = postSwitchRenders.some((r) =>
+      (r.fallbackFeed?.cards ?? []).some(
+        (card) => card.kind === 'mentor_notice',
+      ),
+    );
+    expect(leaked).toBe(false);
+
     queryClient.clear();
   });
 
