@@ -9,7 +9,7 @@ active-consent variants retain their existing behavior.
 **Verification:** The focused route suite passes all 34 cases. Preserved evidence
 contains baseline RED, candidate GREEN, production-only REVERT RED with the same
 single expected failure, and exact RESTORE GREEN. Routed validation completed
-TypeScript, all 506 API unit suites (10,154 passing cases), the no-Gemini runtime
+TypeScript, the complete API unit test suite, the no-Gemini runtime
 ratchet, and the test-only-export guard successfully. ESLint, Prettier, and
 `git diff --check` are also green.
 
