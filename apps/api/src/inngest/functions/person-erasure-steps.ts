@@ -1,10 +1,12 @@
 import { NonRetriableError, type GetStepTools } from 'inngest';
-import type {
-  PersonErasureAttemptResultV2,
-  PersonErasureSnapshotV2,
+import {
+  ensurePendingClerkErasures,
+  markPendingClerkErasuresComplete,
+  type PersonErasureAttemptResultV2,
+  type PersonErasureSnapshotV2,
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
-import { getStepClerkSecretKey } from '../helpers';
+import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
 import { inngest } from '../client';
 
 type DurableStep = GetStepTools<typeof inngest>;
@@ -47,6 +49,17 @@ export async function completePersonErasureExternalWork(args: {
   }
 
   if (args.result.clerkUserIds.length > 0) {
+    const reserved = await args.step.run(
+      `${args.stepPrefix}-clerk-users-reserve`,
+      () =>
+        ensurePendingClerkErasures(getStepDatabase(), args.result.clerkUserIds),
+    );
+    if (!reserved) {
+      throw new NonRetriableError(
+        `${args.stepPrefix}: clerk_erasure_target_rebound; reroute for operator reconciliation`,
+      );
+    }
+
     await args.step.run(`${args.stepPrefix}-clerk-users`, () =>
       Promise.all(
         args.result.clerkUserIds.map((userId) =>
@@ -55,6 +68,12 @@ export async function completePersonErasureExternalWork(args: {
             clerkSecretKey: getStepClerkSecretKey(),
           }),
         ),
+      ),
+    );
+    await args.step.run(`${args.stepPrefix}-clerk-users-release`, () =>
+      markPendingClerkErasuresComplete(
+        getStepDatabase(),
+        args.result.clerkUserIds,
       ),
     );
   }

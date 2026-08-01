@@ -59,6 +59,7 @@
 // unconditionally now.
 // ---------------------------------------------------------------------------
 
+import { createHash } from 'crypto';
 import {
   and,
   eq,
@@ -82,6 +83,7 @@ import {
   login,
   membership,
   organization,
+  pendingClerkErasure,
   person,
   subscription,
   supportership,
@@ -104,6 +106,7 @@ import { captureException } from '../sentry';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+const CLERK_ERASURE_RELEASE_GRACE_MS = 15 * 60 * 1000;
 
 /**
  * Per-person serializing advisory-lock key (WI-583 pattern). A restore
@@ -130,6 +133,10 @@ export type DeletionReason =
   | 'guardian_initiated'
   | 'abandonment';
 
+export function clerkErasureDigest(clerkUserId: string): string {
+  return createHash('sha256').update(clerkUserId).digest('hex');
+}
+
 export interface PersonErasureSnapshotV2 {
   personExists: boolean;
   personId: string;
@@ -152,6 +159,50 @@ export type PersonErasureAttemptResultV2 = {
   organizationDeleted: boolean;
   subscriptionStoreTeardownTargets: SubscriptionStoreTeardownTarget[];
 };
+
+export interface OrganizationErasureSnapshotV2 {
+  organizationExists: boolean;
+  organizationId: string;
+  personIds: string[];
+  clerkUserIds: string[];
+  loginEmails: string[];
+  subscriptionStoreTeardownTargets: SubscriptionStoreTeardownTarget[];
+}
+
+export async function getOrganizationErasureSnapshotV2(
+  db: Database,
+  organizationId: string,
+): Promise<OrganizationErasureSnapshotV2> {
+  const organizationRow = await db.query.organization.findFirst({
+    where: eq(organization.id, organizationId),
+    columns: { id: true },
+  });
+  const memberships = organizationRow
+    ? await db.query.membership.findMany({
+        where: eq(membership.organizationId, organizationId),
+        columns: { personId: true },
+      })
+    : [];
+  const personIds = memberships.map((row) => row.personId).sort();
+  const loginRows =
+    personIds.length > 0
+      ? await db
+          .select({ clerkUserId: login.clerkUserId, email: login.email })
+          .from(login)
+          .where(inArray(login.personId, personIds))
+      : [];
+
+  return {
+    organizationExists: !!organizationRow,
+    organizationId,
+    personIds,
+    clerkUserIds: loginRows.map((row) => row.clerkUserId).sort(),
+    loginEmails: loginRows.map((row) => row.email).sort(),
+    subscriptionStoreTeardownTargets: organizationRow
+      ? await getSubscriptionStoreTeardownTargetsV2(db, organizationId)
+      : [],
+  };
+}
 
 /**
  * Capture every external identity/provider target before a person-scoped
@@ -400,12 +451,17 @@ export async function getOrganizationOwnerEmailV2(
 // executeDeletionV2 — the re-home delete (§6.1)
 // ---------------------------------------------------------------------------
 
-export type DeletionResult = 'deleted' | 'cancelled' | 'already_deleted';
+export type DeletionResult =
+  | 'deleted'
+  | 'cancelled'
+  | 'already_deleted'
+  | 'snapshot_changed';
 
 export interface ExecuteDeletionV2Input {
   organizationId: string;
   /** Pre-read owner email (step 1) — the D2 byok_waitlist erase key. */
   ownerEmail: string | null;
+  expectedSnapshot?: OrganizationErasureSnapshotV2;
   reason: DeletionReason;
   /**
    * The actor who initiated deletion → `deletion_audit.deleted_by`. Null for
@@ -428,7 +484,8 @@ export async function executeDeletionV2(
   db: Database,
   input: ExecuteDeletionV2Input,
 ): Promise<DeletionResult> {
-  const { organizationId, ownerEmail, reason, deletedBy } = input;
+  const { organizationId, ownerEmail, expectedSnapshot, reason, deletedBy } =
+    input;
 
   return db.transaction(async (tx) => {
     // Atomic TOCTOU guard: claim the org for deletion only if a non-cancelled
@@ -486,11 +543,78 @@ export async function executeDeletionV2(
     }
 
     // The persons in this org (the deletion fan-out).
-    const memberships = await tx.query.membership.findMany({
-      where: eq(membership.organizationId, organizationId),
-      columns: { personId: true },
-    });
-    const personIds = memberships.map((m) => m.personId);
+    const memberships = await tx
+      .select({ personId: membership.personId })
+      .from(membership)
+      .where(eq(membership.organizationId, organizationId))
+      .for('update');
+    const personIds = canonicalStringArray(
+      memberships.map((row) => row.personId),
+    );
+    const loginRows =
+      personIds.length > 0
+        ? await tx
+            .select({
+              clerkUserId: login.clerkUserId,
+              email: login.email,
+            })
+            .from(login)
+            .where(inArray(login.personId, personIds))
+            .for('update')
+        : [];
+    const clerkUserIds = canonicalStringArray(
+      loginRows.map((row) => row.clerkUserId),
+    );
+    const loginEmails = canonicalStringArray(loginRows.map((row) => row.email));
+    const lockedSubscriptions = await tx
+      .select({
+        id: subscription.id,
+        planTier: subscription.planTier,
+        status: subscription.status,
+        stripeCustomerId: subscription.stripeCustomerId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        revenuecatOriginalAppUserId: subscription.revenuecatOriginalAppUserId,
+        storeProductId: subscription.storeProductId,
+        storePlatform: subscription.storePlatform,
+      })
+      .from(subscription)
+      .where(eq(subscription.organizationId, organizationId))
+      .for('update');
+    const currentStoreTargets = lockedSubscriptions
+      .map((row) => ({
+        subscriptionId: row.id,
+        planTier: row.planTier,
+        status: row.status,
+        stripe: {
+          customerId: row.stripeCustomerId,
+          subscriptionId: row.stripeSubscriptionId,
+        },
+        revenueCat: {
+          originalAppUserId: row.revenuecatOriginalAppUserId,
+          storeProductId: row.storeProductId,
+          storePlatform: row.storePlatform,
+        },
+      }))
+      .sort((left, right) =>
+        left.subscriptionId.localeCompare(right.subscriptionId),
+      );
+
+    if (
+      expectedSnapshot &&
+      (!expectedSnapshot.organizationExists ||
+        expectedSnapshot.organizationId !== organizationId ||
+        !sameStringArray(expectedSnapshot.personIds, personIds) ||
+        !sameStringArray(expectedSnapshot.clerkUserIds, clerkUserIds) ||
+        !sameStringArray(expectedSnapshot.loginEmails, loginEmails) ||
+        !sameSubscriptionTargets(
+          expectedSnapshot.subscriptionStoreTeardownTargets,
+          currentStoreTargets,
+        ))
+    ) {
+      return 'snapshot_changed';
+    }
+
+    await reservePendingClerkErasuresTx(tx, clerkUserIds);
 
     // Step 2a (WI-849 Gap 3) — tear down the guardianship + supportership edges
     // INCIDENT to the persons in this org, BEFORE any person drop. Both edges'
@@ -534,7 +658,13 @@ export async function executeDeletionV2(
     // Step 3b prep — snapshot the org's subscriptions ONCE (read before any
     // person drop; subscriptions outlive persons — data-model.md §3.2) for the
     // per-person financial_record payload.
-    const orgSubscriptions = await readOrgSubscriptionsTx(tx, organizationId);
+    const orgSubscriptions = lockedSubscriptions.map((row) => ({
+      id: row.id,
+      planTier: row.planTier,
+      status: row.status,
+      stripeCustomerId: row.stripeCustomerId,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+    }));
 
     // Step G1 — tear down the org's subscription(s) BEFORE the person drops.
     // `subscription.{organization_id, payer_person_id}` are ON DELETE RESTRICT;
@@ -612,8 +742,14 @@ export async function executeDeletionV2(
     // email. byok_waitlist is email-only with no FK to the identity graph, so
     // the cascade never reaches it. Idempotent: a no-op if the owner never
     // joined or joined with a different email.
-    if (ownerEmail) {
-      await tx.delete(byokWaitlist).where(eq(byokWaitlist.email, ownerEmail));
+    const waitlistEmails = canonicalStringArray([
+      ...loginEmails,
+      ...(ownerEmail ? [ownerEmail] : []),
+    ]);
+    if (waitlistEmails.length > 0) {
+      await tx
+        .delete(byokWaitlist)
+        .where(inArray(byokWaitlist.email, waitlistEmails));
     }
 
     return 'deleted';
@@ -1010,6 +1146,140 @@ async function rehomeGrantsTx(
 
 type DeletionTx = Parameters<Parameters<Database['transaction']>[0]>[0];
 
+function canonicalClerkUserIds(clerkUserIds: readonly string[]): string[] {
+  return [...new Set(clerkUserIds)].sort();
+}
+
+function clerkErasureSetDigest(clerkUserIds: readonly string[]): string {
+  const memberDigests =
+    canonicalClerkUserIds(clerkUserIds).map(clerkErasureDigest);
+  return createHash('sha256')
+    .update(JSON.stringify(memberDigests))
+    .digest('hex');
+}
+
+async function acquireClerkErasureLocksTx(
+  tx: Pick<Database, 'execute'>,
+  clerkUserIds: readonly string[],
+): Promise<void> {
+  const digests = canonicalClerkUserIds(clerkUserIds)
+    .map(clerkErasureDigest)
+    .sort();
+  for (const digest of digests) {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`clerk-erasure:${digest}`}, 0))`,
+    );
+  }
+}
+
+async function reservePendingClerkErasuresTx(
+  tx: DeletionTx,
+  clerkUserIds: readonly string[],
+): Promise<void> {
+  const canonicalIds = canonicalClerkUserIds(clerkUserIds);
+  if (canonicalIds.length === 0) return;
+
+  await acquireClerkErasureLocksTx(tx as unknown as Database, canonicalIds);
+  const now = new Date();
+  const erasureSetDigest = clerkErasureSetDigest(canonicalIds);
+  await tx
+    .insert(pendingClerkErasure)
+    .values(
+      canonicalIds.map((clerkUserId) => ({
+        clerkUserIdDigest: clerkErasureDigest(clerkUserId),
+        erasureSetDigest,
+        releaseAfter: null,
+        updatedAt: now,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: pendingClerkErasure.clerkUserIdDigest,
+      set: { erasureSetDigest, releaseAfter: null, updatedAt: now },
+    });
+}
+
+export async function assertClerkIdentityBootstrapAllowedTx(
+  tx: Database,
+  clerkUserId: string,
+): Promise<void> {
+  await acquireClerkErasureLocksTx(tx, [clerkUserId]);
+  const digest = clerkErasureDigest(clerkUserId);
+  const fence = await tx.query.pendingClerkErasure.findFirst({
+    where: eq(pendingClerkErasure.clerkUserIdDigest, digest),
+  });
+  if (!fence) return;
+
+  const now = new Date();
+  if (!fence.releaseAfter || fence.releaseAfter > now) {
+    throw new ConflictError('Identity deletion is still in progress.');
+  }
+
+  await tx
+    .delete(pendingClerkErasure)
+    .where(eq(pendingClerkErasure.clerkUserIdDigest, digest));
+}
+
+export async function ensurePendingClerkErasures(
+  db: Database,
+  clerkUserIds: readonly string[],
+): Promise<boolean> {
+  const canonicalIds = canonicalClerkUserIds(clerkUserIds);
+  if (canonicalIds.length === 0) return true;
+
+  return db.transaction(async (tx) => {
+    await acquireClerkErasureLocksTx(tx as unknown as Database, canonicalIds);
+    const rebound = await tx
+      .select({ clerkUserId: login.clerkUserId })
+      .from(login)
+      .where(inArray(login.clerkUserId, canonicalIds))
+      .for('update');
+    if (rebound.length > 0) return false;
+
+    const now = new Date();
+    const erasureSetDigest = clerkErasureSetDigest(canonicalIds);
+    await tx
+      .insert(pendingClerkErasure)
+      .values(
+        canonicalIds.map((clerkUserId) => ({
+          clerkUserIdDigest: clerkErasureDigest(clerkUserId),
+          erasureSetDigest,
+          releaseAfter: null,
+          updatedAt: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: pendingClerkErasure.clerkUserIdDigest,
+        set: { erasureSetDigest, releaseAfter: null, updatedAt: now },
+      });
+    return true;
+  });
+}
+
+export async function markPendingClerkErasuresComplete(
+  db: Database,
+  clerkUserIds: readonly string[],
+): Promise<void> {
+  const canonicalIds = canonicalClerkUserIds(clerkUserIds);
+  if (canonicalIds.length === 0) return;
+
+  await db.transaction(async (tx) => {
+    await acquireClerkErasureLocksTx(tx as unknown as Database, canonicalIds);
+    const now = new Date();
+    await tx
+      .update(pendingClerkErasure)
+      .set({
+        releaseAfter: new Date(now.getTime() + CLERK_ERASURE_RELEASE_GRACE_MS),
+        updatedAt: now,
+      })
+      .where(
+        inArray(
+          pendingClerkErasure.clerkUserIdDigest,
+          canonicalIds.map(clerkErasureDigest),
+        ),
+      );
+  });
+}
+
 async function currentGdprGrantSetTx(
   tx: DeletionTx,
   personId: string,
@@ -1356,6 +1626,7 @@ async function erasePreparedPersonTx(
   reason: DeletionReason,
   deletedBy: string | null,
 ): Promise<PersonErasureAttemptResultV2> {
+  await reservePendingClerkErasuresTx(tx, context.clerkUserIds);
   if (context.deleteOrganization && context.subscriptions.length > 0) {
     await tx
       .delete(subscription)
@@ -1455,28 +1726,6 @@ export type SubscriptionSnapshot = {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
 };
-
-/**
- * Read the org's subscription snapshot once, inside the deletion transaction,
- * for the financial_record payload. Read before the person drop (subscriptions
- * outlive persons in the retain-tier split — data-model.md §3.2). A no-op-safe
- * empty array when the org has no subscription.
- */
-async function readOrgSubscriptionsTx(
-  tx: DeletionTx,
-  organizationId: string,
-): Promise<SubscriptionSnapshot[]> {
-  return tx.query.subscription.findMany({
-    where: eq(subscription.organizationId, organizationId),
-    columns: {
-      id: true,
-      planTier: true,
-      status: true,
-      stripeCustomerId: true,
-      stripeSubscriptionId: true,
-    },
-  });
-}
 
 /**
  * Pre-read store provider identifiers for whole-org erasure before

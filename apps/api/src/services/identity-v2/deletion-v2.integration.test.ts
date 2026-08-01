@@ -32,7 +32,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
@@ -45,6 +45,7 @@ import {
   login,
   membership,
   organization,
+  pendingClerkErasure,
   person,
   subscription,
   supportership,
@@ -53,14 +54,18 @@ import {
 import {
   cancelDeletionV2,
   attemptPersonIfNoConsentErasureV2,
+  clerkErasureDigest,
   deleteArchivedPersonIfStillEligibleV2,
   deletePersonIfConsentWithdrawnV2,
   deletePersonIfNoConsentV2,
   deletePersonV2,
   executeDeletionV2,
+  getOrganizationErasureSnapshotV2,
   getPersonErasureSnapshotV2,
   scheduleDeletionV2,
 } from './deletion-v2';
+import * as deletionV2Module from './deletion-v2';
+import { createIdentityGraph } from './identity-graph';
 import { scheduledDeletion } from '../../inngest/functions/account-deletion';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { ConflictError } from '../../errors';
@@ -74,6 +79,7 @@ const RUN = !!process.env.DATABASE_URL;
     let db: Database;
     const personIds: string[] = [];
     const orgIds: string[] = [];
+    const clerkUserIds: string[] = [];
 
     beforeAll(() => {
       db = createDatabase(process.env.DATABASE_URL!);
@@ -83,6 +89,16 @@ const RUN = !!process.env.DATABASE_URL;
       // Defensive teardown: executeDeletionV2 removes most of this on the happy
       // path, but a RED revert run (or an early assertion failure) can leave
       // rows behind. Clear children before parents; both edge directions.
+      if (clerkUserIds.length > 0) {
+        await db
+          .delete(pendingClerkErasure)
+          .where(
+            inArray(
+              pendingClerkErasure.clerkUserIdDigest,
+              clerkUserIds.map(clerkErasureDigest),
+            ),
+          );
+      }
       for (const pid of personIds) {
         await db
           .delete(consentGrant)
@@ -116,6 +132,7 @@ const RUN = !!process.env.DATABASE_URL;
       }
       personIds.length = 0;
       orgIds.length = 0;
+      clerkUserIds.length = 0;
     });
 
     // -----------------------------------------------------------------------
@@ -175,6 +192,188 @@ const RUN = !!process.env.DATABASE_URL;
       });
       return p!.id;
     }
+
+    it('[WI-2788] captures every organization login in one stable erasure snapshot', async () => {
+      const getOrganizationErasureSnapshotV2 = (
+        deletionV2Module as unknown as {
+          getOrganizationErasureSnapshotV2?: (
+            database: Database,
+            organizationId: string,
+          ) => Promise<{
+            personIds: string[];
+            clerkUserIds: string[];
+            loginEmails: string[];
+          }>;
+        }
+      ).getOrganizationErasureSnapshotV2;
+      expect(getOrganizationErasureSnapshotV2).toBeDefined();
+      if (!getOrganizationErasureSnapshotV2) return;
+
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const [secondPerson] = await db
+        .insert(person)
+        .values({
+          displayName: 'Second Member',
+          birthDate: '1992-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(secondPerson!.id);
+      await db.insert(membership).values({
+        personId: secondPerson!.id,
+        organizationId: orgId,
+        roles: ['learner'],
+      });
+      await db.insert(login).values([
+        {
+          personId: ownerId,
+          clerkUserId: `clerk-owner-a-${ownerId}`,
+          email: `owner-a-${ownerId}@example.com`,
+        },
+        {
+          personId: ownerId,
+          clerkUserId: `clerk-owner-b-${ownerId}`,
+          email: `owner-b-${ownerId}@example.com`,
+        },
+        {
+          personId: secondPerson!.id,
+          clerkUserId: `clerk-member-${secondPerson!.id}`,
+          email: `member-${secondPerson!.id}@example.com`,
+        },
+      ]);
+      clerkUserIds.push(
+        `clerk-owner-a-${ownerId}`,
+        `clerk-owner-b-${ownerId}`,
+        `clerk-member-${secondPerson!.id}`,
+      );
+
+      const snapshot = await getOrganizationErasureSnapshotV2(db, orgId);
+
+      expect(snapshot.personIds).toEqual([ownerId, secondPerson!.id].sort());
+      expect(snapshot.clerkUserIds).toEqual(
+        [
+          `clerk-owner-a-${ownerId}`,
+          `clerk-owner-b-${ownerId}`,
+          `clerk-member-${secondPerson!.id}`,
+        ].sort(),
+      );
+      expect(snapshot.loginEmails).toEqual(
+        [
+          `owner-a-${ownerId}@example.com`,
+          `owner-b-${ownerId}@example.com`,
+          `member-${secondPerson!.id}@example.com`,
+        ].sort(),
+      );
+    });
+
+    it('[WI-2788] aborts whole-organization deletion when the external snapshot changes', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      await db.insert(login).values({
+        personId: ownerId,
+        clerkUserId: `clerk-first-${ownerId}`,
+        email: `first-${ownerId}@example.com`,
+      });
+      clerkUserIds.push(`clerk-first-${ownerId}`);
+      const snapshot = await getOrganizationErasureSnapshotV2(db, orgId);
+      await db.insert(login).values({
+        personId: ownerId,
+        clerkUserId: `clerk-second-${ownerId}`,
+        email: `second-${ownerId}@example.com`,
+      });
+      clerkUserIds.push(`clerk-second-${ownerId}`);
+
+      const result = await (
+        executeDeletionV2 as unknown as (
+          database: Database,
+          input: {
+            organizationId: string;
+            ownerEmail: null;
+            reason: 'user_initiated';
+            deletedBy: string;
+            expectedSnapshot: typeof snapshot;
+          },
+        ) => Promise<string>
+      )(db, {
+        organizationId: orgId,
+        ownerEmail: null,
+        reason: 'user_initiated',
+        deletedBy: ownerId,
+        expectedSnapshot: snapshot,
+      });
+
+      expect(result).toBe('snapshot_changed');
+      expect(
+        await db.query.person.findFirst({
+          where: eq(person.id, ownerId),
+          columns: { id: true },
+        }),
+      ).toBeDefined();
+    });
+
+    it('[WI-2788] reserves every Clerk identity before whole-organization deletion commits', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const [secondPerson] = await db
+        .insert(person)
+        .values({
+          displayName: 'Second Member',
+          birthDate: '1992-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(secondPerson!.id);
+      await db.insert(membership).values({
+        personId: secondPerson!.id,
+        organizationId: orgId,
+        roles: ['learner'],
+      });
+      const ids = [
+        `clerk-owner-a-${ownerId}`,
+        `clerk-owner-b-${ownerId}`,
+        `clerk-member-${secondPerson!.id}`,
+      ];
+      clerkUserIds.push(...ids);
+      await db.insert(login).values([
+        {
+          personId: ownerId,
+          clerkUserId: ids[0]!,
+          email: `owner-a-${ownerId}@example.com`,
+        },
+        {
+          personId: ownerId,
+          clerkUserId: ids[1]!,
+          email: `owner-b-${ownerId}@example.com`,
+        },
+        {
+          personId: secondPerson!.id,
+          clerkUserId: ids[2]!,
+          email: `member-${secondPerson!.id}@example.com`,
+        },
+      ]);
+      const snapshot = await getOrganizationErasureSnapshotV2(db, orgId);
+
+      await expect(
+        executeDeletionV2(db, {
+          organizationId: orgId,
+          ownerEmail: snapshot.loginEmails[0] ?? null,
+          expectedSnapshot: snapshot,
+          reason: 'user_initiated',
+          deletedBy: ownerId,
+        }),
+      ).resolves.toBe('deleted');
+
+      const guards = await db
+        .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+        .from(pendingClerkErasure)
+        .where(
+          inArray(
+            pendingClerkErasure.clerkUserIdDigest,
+            ids.map(clerkErasureDigest),
+          ),
+        );
+      expect(guards.map((row) => row.digest).sort()).toEqual(
+        ids.map(clerkErasureDigest).sort(),
+      );
+    });
 
     // -----------------------------------------------------------------------
     // [WI-1128, port of Bug #494] TOCTOU cancellation-race guard, ported from
@@ -399,6 +598,7 @@ const RUN = !!process.env.DATABASE_URL;
             email: `b-${ownerId}@example.com`,
           },
         ]);
+        clerkUserIds.push(`clerk-a-${ownerId}`, `clerk-b-${ownerId}`);
         const snapshot = await getPersonErasureSnapshotV2(db, ownerId);
 
         const result = await attemptPersonIfNoConsentErasureV2(
@@ -421,6 +621,48 @@ const RUN = !!process.env.DATABASE_URL;
           organizationDeleted: true,
           clerkUserIds: [`clerk-a-${ownerId}`, `clerk-b-${ownerId}`],
         });
+
+        const guards = await db
+          .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+          .from(pendingClerkErasure)
+          .where(
+            inArray(
+              pendingClerkErasure.clerkUserIdDigest,
+              snapshot.clerkUserIds.map(clerkErasureDigest),
+            ),
+          );
+        expect(guards).toHaveLength(2);
+      });
+
+      it('[WI-2788] blocks same-Clerk bootstrap after DB erasure and before external cleanup', async () => {
+        const { ownerId } = await seedScheduledOrgWithOwner();
+        const clerkUserId = `clerk-replay-${ownerId}`;
+        clerkUserIds.push(clerkUserId);
+        await db.insert(login).values({
+          personId: ownerId,
+          clerkUserId,
+          email: `replay-${ownerId}@example.com`,
+        });
+        const snapshot = await getPersonErasureSnapshotV2(db, ownerId);
+
+        await expect(
+          attemptPersonIfNoConsentErasureV2(db, ownerId, snapshot),
+        ).resolves.toMatchObject({ status: 'deleted' });
+        await expect(
+          createIdentityGraph(db, {
+            clerkUserId,
+            verifiedEmail: `rebound-${ownerId}@example.com`,
+            displayName: 'Rebound Owner',
+            birthYear: 1990,
+            location: 'EU',
+          }),
+        ).rejects.toBeInstanceOf(ConflictError);
+        expect(
+          await db.query.login.findFirst({
+            where: eq(login.clerkUserId, clerkUserId),
+            columns: { id: true },
+          }),
+        ).toBeUndefined();
       });
 
       it('performs no deletion when the durable external snapshot changed', async () => {
@@ -430,12 +672,14 @@ const RUN = !!process.env.DATABASE_URL;
           clerkUserId: `clerk-first-${ownerId}`,
           email: `first-${ownerId}@example.com`,
         });
+        clerkUserIds.push(`clerk-first-${ownerId}`);
         const staleSnapshot = await getPersonErasureSnapshotV2(db, ownerId);
         await db.insert(login).values({
           personId: ownerId,
           clerkUserId: `clerk-second-${ownerId}`,
           email: `second-${ownerId}@example.com`,
         });
+        clerkUserIds.push(`clerk-second-${ownerId}`);
 
         await expect(
           attemptPersonIfNoConsentErasureV2(db, ownerId, staleSnapshot),

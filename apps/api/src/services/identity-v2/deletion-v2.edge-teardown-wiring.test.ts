@@ -60,6 +60,8 @@ const TRANSACTIONAL_ERASURE_FNS = [
 const TEARDOWN_CALL = 'tearDownPersonEdgesTx(tx, personId)';
 const PERSON_DROP = '.delete(person)';
 const SHARED_ERASURE_CALL = 'erasePreparedPersonTx(';
+const CLERK_FENCE_CALL =
+  'reservePendingClerkErasuresTx(tx, context.clerkUserIds)';
 
 /** Body of a top-level function: from its declaration to the next top-level
  *  `function`/`export` declaration (or EOF). */
@@ -97,10 +99,13 @@ describe('[WI-2004] deletion edge-teardown gate is wired on every person-scoped 
 
   it('the shared erasure helper tears down incident edges before the person-row drop', () => {
     const helper = functionBody(SOURCE, 'erasePreparedPersonTx');
+    const fenceAt = helper.indexOf(CLERK_FENCE_CALL);
     const gateAt = helper.indexOf(TEARDOWN_CALL);
     const dropAt = helper.indexOf(PERSON_DROP);
+    expect(fenceAt).toBeGreaterThanOrEqual(0);
     expect(gateAt).toBeGreaterThanOrEqual(0);
     expect(dropAt).toBeGreaterThanOrEqual(0);
+    expect(fenceAt).toBeLessThan(gateAt);
     expect(gateAt).toBeLessThan(dropAt);
   });
 

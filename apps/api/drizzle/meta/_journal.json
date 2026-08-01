@@ -1142,6 +1142,13 @@
       "when": 1785575599987,
       "tag": "0164_busy_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1785613846250,
+      "tag": "0165_gifted_mantis",
+      "breakpoints": true
     }
   ]
 }
