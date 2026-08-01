@@ -47,4 +47,3 @@ bash scripts/check-change-class.sh --run --fast
 The database URL was an explicit disposable local database. No staging database,
 schema, migration, secret, provider configuration, rate-limit policy, metering
 policy, or deployment was touched.
-

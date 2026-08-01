@@ -8,10 +8,10 @@ dispatch. A rate-eligible, in-budget request still returns the established 403 o
 withdrawn consent before dispatch. The structural boundary manifest and guard now
 encode rate/budget -> consent -> dispatch ordering for this route-owned flow.
 
-**Verification:** Focused tests are green on current `origin/main` with 84/84 cases.
+**Verification:** The focused command exited 0 on current `origin/main`.
 Preserved evidence contains baseline RED, candidate GREEN, production-only REVERT
 RED with the same four expected failures, and exact RESTORE GREEN. Routed validation
-completed TypeScript, all 506 API unit suites (10,152 passing cases), the no-Gemini
+completed TypeScript, all API unit suites and cases, the no-Gemini
 runtime ratchet, and the test-only-export guard successfully. ESLint, Prettier, and
 `git diff --check` are also green.
 

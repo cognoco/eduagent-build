@@ -62,4 +62,3 @@ focused command was repeated:
 - Suites: `2 passed, 2 total`
 - Cases: `84 passed, 84 total`
 - Time: `1.302 s`
-
