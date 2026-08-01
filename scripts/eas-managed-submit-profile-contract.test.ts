@@ -40,6 +40,13 @@ describe('WI-2937 production EAS submit contract', () => {
       'doppler run -c prd -- pnpm mobile:submit:preflight',
     );
     expect(runbook).toContain('stale local credential');
+    expect(runbook).toContain(
+      'Remove-Item -LiteralPath $credentialPath -Force -ErrorAction SilentlyContinue',
+    );
+    expect(runbook).toContain('if (Test-Path -LiteralPath $credentialPath) {');
+    expect(runbook).not.toContain(
+      'test ! -e apps/mobile/.eas-submit/google-play-service-account.json',
+    );
     expect(runbook).not.toContain('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON');
     expect(runbook).toContain('OPQ-37');
     expect(runbook).toContain('OPQ-155');
