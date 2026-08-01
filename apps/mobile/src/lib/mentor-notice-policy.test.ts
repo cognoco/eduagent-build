@@ -926,6 +926,27 @@ describe('useMentorNoticePolicy', () => {
       act(() => result.current.observe(observation(3, true)));
       expect(result.current.state).toEqual({ revision: 3, enabled: true });
 
+      // ...BUT THE INTERNAL FOLD IS NOT THE CRITERION, AND THIS LINE MUST NOT BE
+      // READ AS BLESSING RESURRECTION. Gate-2 read the assertion directly above
+      // as the suite "preserving rather than guarding against" the original
+      // symptom, which is a fair reading of a bare `state` assertion sitting in a
+      // storage-failure test: `{revision:3, enabled:true}` is literally the
+      // resurrected value. The distinction the assertion above cannot carry on
+      // its own is that `state` is the internal fold, while what a SURFACE gets
+      // is `suppressed()` — and the two deliberately disagree here.
+      //
+      // The gate is the READ, not the fold: while the read is untrusted, an
+      // observation-less payload stays blank no matter what the fold says. So the
+      // property is asserted here, at the exact point the fold adopts the stale
+      // enabled value, rather than only in the dedicated in-session block further
+      // down this file. A future reader arriving at the line above now finds the
+      // answer beside it instead of having to know where else to look.
+      expect(result.current.suppressed(undefined)).toBe(true);
+      // ...and the device is not dark: a payload carrying its own live
+      // observation still renders, because the server has already stripped notice
+      // data if the rollout is off.
+      expect(result.current.suppressed(observation(3, true))).toBe(false);
+
       // Wait for the write path to have FINISHED, by a condition both the fixed
       // and the broken implementation satisfy — otherwise this wait would itself
       // become the assertion and the durable check below would never be reached.
