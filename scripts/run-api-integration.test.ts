@@ -289,6 +289,9 @@ describe('run-api-integration.mjs', () => {
     expect(readPnpmCommands(pnpmLaunchMarker)).toContain(
       'exec jest --config apps/api/jest.integration.config.cjs --forceExit apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage',
     );
+    expect(readPnpmCommands(pnpmLaunchMarker)).not.toContain(
+      'jest.integration.remote.config.cjs',
+    );
   });
 
   test('refuses arguments passed to the Nx launcher instead of dropping them', () => {
@@ -411,8 +414,39 @@ describe('run-api-integration.mjs', () => {
     const result = run(['--jest'], dedicatedDatabase);
 
     expect(result.status).toBe(0);
-    expect(readPnpmCommands(pnpmLaunchMarker)).toContain('exec jest');
+    expect(readPnpmCommands(pnpmLaunchMarker)).toContain(
+      'exec jest --config apps/api/jest.integration.remote.config.cjs --forceExit',
+    );
     expect(readMarker(pnpmMarker)).toBe('');
+  });
+
+  test('explicitly refuses the loopback-only repair suite on a remote target', () => {
+    const result = run(
+      [
+        '--jest',
+        'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts',
+      ],
+      dedicatedDatabase,
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/repair suite.*loopback-only/i);
+    expect(readPnpmCommands(pnpmLaunchMarker)).not.toContain('exec jest');
+  });
+
+  test('remote config preserves base exclusions and separates the loopback suite', () => {
+    const baseConfig = require('../apps/api/jest.integration.config.cjs') as {
+      testPathIgnorePatterns: string[];
+    };
+    const remoteConfig =
+      require('../apps/api/jest.integration.remote.config.cjs') as {
+        testPathIgnorePatterns: string[];
+      };
+
+    expect(remoteConfig.testPathIgnorePatterns).toEqual([
+      ...baseConfig.testPathIgnorePatterns,
+      'apps/api/src/db/curriculum-dedup-index-repair\\.integration\\.test\\.ts$',
+    ]);
   });
 
   test('canonical package command selects mentomate/dev_integration explicitly', () => {

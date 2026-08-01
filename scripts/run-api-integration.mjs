@@ -12,6 +12,10 @@ const PACKAGE_JSON = join(REPO_ROOT, 'package.json');
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const LOCAL_DATABASE_MARKER = /(^|[_-])(test|tests|integration)([_-]|$)/i;
 const PROTECTED_LABEL = /(^|[._-])(stg|staging|prd|prod|production)([._-]|$)/i;
+const LOOPBACK_ONLY_REPAIR_SUITE =
+  'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts';
+const LOCAL_JEST_CONFIG = 'apps/api/jest.integration.config.cjs';
+const REMOTE_JEST_CONFIG = 'apps/api/jest.integration.remote.config.cjs';
 
 function refuse(reason) {
   throw new Error(`API integration launch refused before Jest: ${reason}`);
@@ -150,7 +154,7 @@ function assertDatabaseContract() {
         `local database metadata "${databaseName}" is not explicitly test/integration-scoped.`,
       );
     }
-    return;
+    return { isLocal: true };
   }
 
   requiredEnv('DOPPLER_PROJECT');
@@ -192,20 +196,30 @@ function assertDatabaseContract() {
       );
     }
   }
+  return { isLocal: false };
 }
 
 function main() {
   const [mode, ...forwardedArgs] = process.argv.slice(2);
 
   if (mode === '--jest') {
-    assertDatabaseContract();
+    const { isLocal } = assertDatabaseContract();
+    if (
+      !isLocal &&
+      forwardedArgs.some(
+        (arg) => arg.replaceAll('\\', '/') === LOOPBACK_ONLY_REPAIR_SUITE,
+      )
+    ) {
+      refuse('the curriculum dedup repair suite is loopback-only.');
+    }
     const launch = assertPinnedPnpm();
+    const jestConfig = isLocal ? LOCAL_JEST_CONFIG : REMOTE_JEST_CONFIG;
     return run(launch.binary, [
       ...launch.args,
       'exec',
       'jest',
       '--config',
-      'apps/api/jest.integration.config.cjs',
+      jestConfig,
       '--forceExit',
       ...forwardedArgs,
     ]);

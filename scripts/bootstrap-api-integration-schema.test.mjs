@@ -403,6 +403,24 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
       `expected post-push policy replay for ${policyName}`,
     );
   }
+  const familyPolicyCreateIndex = plan.postPushStatements.findIndex(
+    (statement) =>
+      statement.includes(
+        'CREATE POLICY "family_preferences_profile_isolation"',
+      ),
+  );
+  const familyPolicyAlterIndex = plan.postPushStatements.findIndex(
+    (statement) =>
+      statement.includes('ALTER POLICY "family_preferences_profile_isolation"'),
+  );
+  assert.ok(
+    familyPolicyAlterIndex > familyPolicyCreateIndex,
+    'expected final ALTER POLICY replay after the historical CREATE POLICY',
+  );
+  assert.match(
+    plan.postPushStatements[familyPolicyAlterIndex],
+    /to_regclass\('[^']+'\) IS NOT NULL[\s\S]*app\.current_profile_id/,
+  );
   assert.ok(
     plan.postPushStatements.every(
       (statement) => !/\bCREATE\s+(?:TABLE|TYPE)\b/i.test(statement),

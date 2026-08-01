@@ -97,6 +97,24 @@ function buildPostPushStatements(statements) {
   }
   postPushStatements.push(...policiesByIdentity.values());
 
+  const policyAltersByIdentity = new Map();
+  for (const match of sql.matchAll(
+    new RegExp(
+      `ALTER\\s+POLICY\\s+(${identifier})\\s+ON\\s+(${qualifiedIdentifier})[\\s\\S]*?;`,
+      'gi',
+    ),
+  )) {
+    const policySql = match[0].trim();
+    const table = match[2].replace(/\s+/g, '');
+    const tableLiteral = table.replaceAll("'", "''");
+    const identity = `${table}.${match[1]}`;
+    policyAltersByIdentity.set(
+      identity,
+      `DO $zdx_post_push$ BEGIN\nIF to_regclass('${tableLiteral}') IS NOT NULL THEN\n${policySql}\nEND IF;\nEND $zdx_post_push$;`,
+    );
+  }
+  postPushStatements.push(...policyAltersByIdentity.values());
+
   return postPushStatements;
 }
 
