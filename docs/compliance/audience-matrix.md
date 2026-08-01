@@ -19,15 +19,20 @@ of current or target behavior.
 > gating inventory, not the country/consent matrix. Product age bands, national
 > Article 8 thresholds, and launch-country eligibility live in
 > [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md).
-
+>
 > **V0 non-regression boundary (ruled 2026-06-09, still standing).** All currently
 > shipped flag states — the flags-off legacy shell, the V0 mode shells, and the
 > V1/V2 shells — must not regress across any nav PR until the V0-retirement ruling
 > (`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §13, owner: product)
 > is executed at its S6 milestone. The legacy helpers
 > (`apps/mobile/src/lib/legacy-navigation-contract.ts`) and the flags-off
-> short-circuits in `app-context.tsx` stay alive; `resolveNavigationContract`
-> wiring sits behind `MODE_NAV_V1_ENABLED` and never replaces the legacy fallback.
+> short-circuits in `app-context.tsx` stay alive. The resolver itself
+> (`resolveNavigationContract`) runs under **every** flag state
+> (`useResolvedNavigationState`, `use-navigation-contract.ts:63-122`); what is
+> flag-gated is which output consumers use — `resolveShellVisibleTabs()` selects
+> contract vs legacy tab sets on `MODE_NAV_V1_ENABLED`, and `useEntryGate` falls
+> back to the proxy-only check when V1 is off — so the legacy fallback is never
+> replaced.
 
 ## Related documents
 
@@ -117,11 +122,19 @@ the build profile in question. As read from `apps/mobile/eas.json` and
 | `fallback` (`eas.json:57-63`) | on | on | off | Banned combo, grandfathered |
 | local example (`apps/mobile/.env.example:8`) | off | off | off | Flags-off legacy shell |
 
-Production therefore ships the **V2 3-tab shell** today. Earlier snapshots saying
-"production is V0-on/V1-off" (AGENTS.md's 2026-06-09 note, the flow inventory's
-2026-07-19 table) describe the pre-2026-07-27 state. The non-regression boundary
-above still protects the flags-off and V0 shells regardless of which profile
-currently ships them.
+The `production` **build profile** is therefore configured for Config T — the
+next production binary built from it carries the V2 3-tab shell. That is a
+build-profile fact, **not release evidence**: flags are baked in at build time,
+installed binaries do not change when `eas.json` does, and as of this refresh
+the store-submission pipeline still records the production build/submission
+steps as open (`docs/plans/2026-07-11-store-submission-pipeline.md`;
+`docs/runbooks/store-submission.md` — approval alone does not build or release).
+Treat Config T as the **production candidate** and classify real users by the
+flag triple of the build they actually run — which may still be a pre-flip V0
+binary. Earlier snapshots saying "production is V0-on/V1-off" (AGENTS.md's
+2026-06-09 note, the flow inventory's 2026-07-19 table) describe the
+pre-2026-07-27 profile state. The non-regression boundary above still protects
+the flags-off and V0 shells regardless of which profile currently carries them.
 
 ### Mode semantics (V0 vs V1)
 
@@ -171,9 +184,16 @@ authoritative layer:
 - Data reads/writes: `createScopedRepository(profileId)` or parent-chain
   `profileId` WHERE enforcement (repo-wide rule, `AGENTS.md` → "Non-Negotiable
   Engineering Rules").
-- Billing/subscription routes enforce the owner constraint server-side; the
-  client `gates.showBilling` is intentional duplication (see the comment at
-  `more/account.tsx:119-124`).
+- Owner-gated billing operations enforce the constraint server-side:
+  `GET /subscription` (403 for non-owners, BUG-644,
+  `apps/api/src/routes/billing.ts:128-140`), checkout (`:270`), cancel
+  (`:365-370`), top-up purchase (`:469-477`), billing portal (`:786-794`).
+  **Exception:** `GET /usage` (`:541`) is deliberately *not* owner-gated — it
+  serves non-owner viewers a self-scoped response and masks family-wide
+  aggregates (`:674-738`; see `docs/flows/mobile-app-flow-inventory.md` quota
+  model). Do not treat `/usage` as owner-only in authorization reviews. The
+  client `gates.showBilling` is intentional defense-in-depth duplication (see
+  the comment at `more/account.tsx:119-124`).
 
 A green navigation-contract test is therefore **not** evidence about server-side
 authorization, and vice versa. Findings below are labeled by layer.
@@ -199,16 +219,16 @@ adjacent risks are gone.
 | F7 | UI | Mentor-memory "Set by parent" copy variation misread as a visibility gate. | **Retired (non-finding).** The copy branch survives (`mentor-memory.tsx:491`, on `isOwnerSelf` ← `gates.sessionIsOwner` at `:71`) and is UX copy, not a gate. |
 | F8 | UI | `RequireFamilyContext` mutated mode (`setMode('family')`) as a guard side effect. | **Resolved.** The guard is now explicitly read-only ([PARENT-03], `RequireFamilyContext.tsx:12-16`); mode changes require the explicit user CTA (`useEnterFamilyMode`). |
 | F9 | UI/data | `mode` was React state only, not persisted; cross-account leak surface. | **Superseded (split).** Under V1, mode is server-persisted (`profile.defaultAppContext`, `profiles.ts:397-451`) with a session-only client override cleared on profile change (`app-context.tsx:63, 74, 103`). Under V0 (dev-zone profiles only), mode remains client-only until V0 retirement. Do not add storage-backed client persistence without re-reviewing the leak guarantee. |
-| F10 | Product/billing | Pro tier treated identically to Family for navigation (BUG-899). | **Still current.** `more/index.tsx:46` (`tier === 'family' \|\| tier === 'pro'`) and the contract's tier-blind `familyCapable` predicate keep the equivalence. Open product decision, not a navigation defect. |
+| F10 | — | Pro tier treated identically to Family for navigation (BUG-899). | **Retired (misattributed).** The navigation contract is tier-blind by design — `familyCapable` derives from adult-owner + `hasFamilyLinks` (`navigation-contract.ts:220-223`), never tier — so there is no navigation-layer Family/Pro equivalence to track. The `tier === 'family' \|\| tier === 'pro'` read at `more/index.tsx:46` only enables the family-pool subscription query; it gates no navigation. BUG-899 itself is a billing guardrail (Family/Pro SKUs read-only unless already entitled — `docs/flows/master-directory/billing/BILLING-04.md`), tracked there, not here. |
 | F11 | UI | Tab composition, deep-route guards, and home selection recomputed in ~10 files. | **Resolved.** Single resolution path: `useNavigationShellContract()` for tabs, `useEntryGate()` for deep routes, `home.tsx:166` for home selection. Residual sanctioned legacy read: `own-learning.tsx:32` (legacy-only tab). |
 | F12 | UI (perf) | Contract hook must memoize on a stable signature, not array reference. | **Open (accepted).** `useResolvedNavigationState` memoizes with `profiles`/`activeProfile` references in the dep list (`use-navigation-contract.ts:78-112`), so a refetch-produced new array reference recomputes the contract. Resolution is a pure, cheap function — correctness is unaffected; this stays a perf note, not a gating bug. |
 | F13 | — | Reserved slot; content never recovered. | **Retired.** Same as F4. |
 | F14 | — | Reserved slot; content never recovered. | **Retired.** Same as F4. |
 
 **Unresolved-by-anything items to carry forward:** F2 (consent stays a separate
-shell layer — audit it separately), F10 (Pro/Family product divergence undecided),
-F12 (memoization identity churn). None of these are closed by the navigation
-contract, and a green contract test says nothing about them.
+shell layer — audit it separately) and F12 (memoization identity churn). Neither
+is closed by the navigation contract, and a green contract test says nothing
+about them.
 
 ---
 
