@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+import { parse as parseYaml } from 'yaml';
 
 import {
   RLS_TEST_ROLE,
   RlsRoleSetupRefusal,
   ensureRlsIsolationTestRole,
 } from './setup-rls-isolation-test-role.mjs';
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 function readyState(overrides = {}) {
   return {
@@ -131,4 +138,39 @@ test('required table grants are checked individually', async () => {
       error.message.includes('missing one or more required grants'),
   );
   assert.equal(store.applyCount, 0);
+});
+
+test('every CI job that runs profile isolation provisions the local role first', () => {
+  const workflow = parseYaml(
+    readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8'),
+  );
+  const contracts = [
+    ['main', 'API integration tests'],
+    ['integration-flag-on', 'API integration tests (flag-ON)'],
+  ];
+
+  for (const [jobName, integrationStepName] of contracts) {
+    const steps = workflow.jobs[jobName].steps;
+    const provisionIndex = steps.findIndex(
+      (step) => step.run === 'pnpm db:setup:rls-test-role:local',
+    );
+    const integrationIndex = steps.findIndex(
+      (step) => step.name === integrationStepName,
+    );
+
+    assert.notEqual(
+      provisionIndex,
+      -1,
+      `${jobName} must provision the RLS isolation test role`,
+    );
+    assert.notEqual(
+      integrationIndex,
+      -1,
+      `${jobName} must retain ${integrationStepName}`,
+    );
+    assert.ok(
+      provisionIndex < integrationIndex,
+      `${jobName} must provision the role before ${integrationStepName}`,
+    );
+  }
 });

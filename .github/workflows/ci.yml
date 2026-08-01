@@ -626,6 +626,9 @@ jobs:
         working-directory: packages/database
         run: pnpm exec drizzle-kit migrate
 
+      - name: Provision local RLS isolation test role
+        run: pnpm db:setup:rls-test-role:local
+
       # Run the full integration suite with the flag on.
       # Reds here are expected (D1-D4/FG1/:709 defects) and are the diagnostic
       # signal this lane exists to surface. They do NOT fail the `main` job.
