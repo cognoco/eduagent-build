@@ -38,6 +38,83 @@ const PRIMARY_EMAIL = 'integration-profile-primary@integration.test';
 const SECONDARY_USER_ID = 'integration-profile-secondary';
 const SECONDARY_EMAIL = 'integration-profile-secondary@integration.test';
 const FABRICATED_PROFILE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+const RLS_TEST_ROLE = 'rls_isolation_test';
+
+type RlsRoleState = {
+  currentUser: string;
+  roleExists: boolean;
+  canLogin: boolean;
+  isSuperuser: boolean;
+  canBypassRls: boolean;
+  canSetRole: boolean;
+  hasSchemaUsage: boolean;
+  hasConceptsSelect: boolean;
+  hasConceptsInsert: boolean;
+  hasMasterySelect: boolean;
+  hasMasteryInsert: boolean;
+};
+
+function rowsFromExecute<T>(raw: unknown): T[] {
+  return Array.isArray(raw)
+    ? (raw as T[])
+    : ((raw as { rows?: T[] }).rows ?? []);
+}
+
+async function assertRlsTestRoleReady(): Promise<void> {
+  const db = createIntegrationDb();
+  const raw = await db.execute(
+    sql.raw(`
+    SELECT
+      current_user AS "currentUser",
+      r.oid IS NOT NULL AS "roleExists",
+      coalesce(r.rolcanlogin, false) AS "canLogin",
+      coalesce(r.rolsuper, false) AS "isSuperuser",
+      coalesce(r.rolbypassrls, false) AS "canBypassRls",
+      coalesce(pg_has_role(current_user, r.oid, 'SET'), false) AS "canSetRole",
+      coalesce(has_schema_privilege(r.oid, 'public', 'USAGE'), false) AS "hasSchemaUsage",
+      coalesce(has_table_privilege(r.oid, 'public.concepts', 'SELECT'), false) AS "hasConceptsSelect",
+      coalesce(has_table_privilege(r.oid, 'public.concepts', 'INSERT'), false) AS "hasConceptsInsert",
+      coalesce(has_table_privilege(r.oid, 'public.concept_mastery', 'SELECT'), false) AS "hasMasterySelect",
+      coalesce(has_table_privilege(r.oid, 'public.concept_mastery', 'INSERT'), false) AS "hasMasteryInsert"
+    FROM (SELECT 1) AS singleton
+    LEFT JOIN pg_catalog.pg_roles r ON r.rolname = '${RLS_TEST_ROLE}'
+  `),
+  );
+  const state = rowsFromExecute<RlsRoleState>(raw)[0];
+  const ready =
+    state?.roleExists &&
+    !state.canLogin &&
+    !state.isSuperuser &&
+    !state.canBypassRls &&
+    state.canSetRole &&
+    state.hasSchemaUsage &&
+    state.hasConceptsSelect &&
+    state.hasConceptsInsert &&
+    state.hasMasterySelect &&
+    state.hasMasteryInsert;
+  if (!ready) {
+    throw new Error(
+      `${RLS_TEST_ROLE} is not ready for ${state?.currentUser ?? 'current_user'}; ` +
+        'run the guarded local setup or the operator-owned shared setup in ' +
+        'docs/runbooks/rls-isolation-test-role.md.',
+    );
+  }
+}
+
+async function assertCurrentRlsRole(tx: {
+  execute(query: ReturnType<typeof sql.raw>): Promise<unknown>;
+}): Promise<void> {
+  const raw = await tx.execute(
+    sql.raw(
+      `SELECT current_user AS "currentUser", session_user AS "sessionUser"`,
+    ),
+  );
+  const row = rowsFromExecute<{ currentUser: string; sessionUser: string }>(
+    raw,
+  )[0];
+  expect(row?.currentUser).toBe(RLS_TEST_ROLE);
+  expect(row?.sessionUser).not.toBe(RLS_TEST_ROLE);
+}
 
 async function createProfile(input: {
   userId: string;
@@ -300,12 +377,11 @@ describe('Integration: Profile Isolation (P0-006)', () => {
  *
  * PostgreSQL superusers bypass row-level security even with FORCE ROW LEVEL
  * SECURITY, so the integration test DB's owner role cannot observe RLS effects
- * directly.  The workaround: each test creates a temporary non-superuser role
- * with minimal grants, switches to it with SET LOCAL ROLE (superusers may set
- * role to any role), and performs the RLS-gated operation.  Non-superuser roles
- * are subject to ENABLE ROW LEVEL SECURITY without needing FORCE.  Each
- * transaction rolls back atomically, dropping the ephemeral role and any
- * inserted rows.
+ * directly. A dedicated NOLOGIN, non-owner role has only the table privileges
+ * needed by these assertions, and the integration harness has SET membership.
+ * Role setup is explicit: CI provisions it only on disposable loopback
+ * PostgreSQL; shared Neon setup remains an operator-owned action. Tests only
+ * switch role and never mutate external role catalog state.
  *
  * CONCEPT_CAPTURE_ENABLED is now true (WI-781), so the concept-capture write
  * path is live-capable; these tests validate the RLS policy predicate that
@@ -313,6 +389,8 @@ describe('Integration: Profile Isolation (P0-006)', () => {
  * call site additionally requires CHALLENGE_ROUND_RUNTIME_ENABLED.)
  */
 describe('concepts RLS policy enforcement (WI-1104)', () => {
+  beforeAll(assertRlsTestRoleReady);
+
   it('USING: row written under profile A not visible under profile B GUC (non-owner role)', async () => {
     const profileA = await createProfile({
       userId: PRIMARY_USER_ID,
@@ -332,9 +410,6 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
       subjectId: subject.id,
       topics: [{ title: 'rls-using-test-topic' }],
     });
-    // Unique role name avoids cross-test collisions on concurrent runs.
-    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     let assertionsRan = false;
     try {
       await db.transaction(async (tx) => {
@@ -347,14 +422,10 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
           normalizedLabel: 'rls-using-test',
         });
 
-        // Create a temporary non-superuser role to observe RLS.
-        // PostgreSQL DDL is transactional: this role is dropped on rollback.
-        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
-        await tx.execute(sql.raw(`GRANT SELECT ON concepts TO ${testRole}`));
-
         // Switch to the non-owner role; RLS is now enforced by ENABLE ROW
         // LEVEL SECURITY (set in migration 0107) without needing FORCE.
-        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${RLS_TEST_ROLE}`));
+        await assertCurrentRlsRole(tx);
 
         // Sanity: own profile sees its row (guards against a false pass where
         // the table is simply empty for both profiles).
@@ -378,7 +449,7 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
         expect(leaked).toHaveLength(0);
 
         assertionsRan = true;
-        throw new Error('test-rollback'); // drops role + rows atomically
+        throw new Error('test-rollback'); // rolls back the seeded row atomically
       });
     } catch (e: unknown) {
       if (!(e instanceof Error && e.message === 'test-rollback')) throw e;
@@ -406,14 +477,11 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
       subjectId: subject.id,
       topics: [{ title: 'rls-check-test-topic' }],
     });
-    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     // profile B's GUC + profileId = profile A → WITH CHECK rejects.
     await expect(
       db.transaction(async (tx) => {
-        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
-        await tx.execute(sql.raw(`GRANT INSERT ON concepts TO ${testRole}`));
-        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${RLS_TEST_ROLE}`));
+        await assertCurrentRlsRole(tx);
         await tx.execute(
           sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
         );
@@ -442,6 +510,8 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
  * (FK), so a valid concept row is seeded as superuser before switching role.
  */
 describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
+  beforeAll(assertRlsTestRoleReady);
+
   it('USING: row written under profile A not visible under profile B GUC (non-owner role)', async () => {
     const profileA = await createProfile({
       userId: PRIMARY_USER_ID,
@@ -461,8 +531,6 @@ describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
       subjectId: subject.id,
       topics: [{ title: 'cm-rls-using-topic' }],
     });
-    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     let assertionsRan = false;
     try {
       await db.transaction(async (tx) => {
@@ -484,11 +552,8 @@ describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
           lastEvaluatedAt: new Date(),
         });
 
-        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
-        await tx.execute(
-          sql.raw(`GRANT SELECT ON concept_mastery TO ${testRole}`),
-        );
-        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${RLS_TEST_ROLE}`));
+        await assertCurrentRlsRole(tx);
 
         // Sanity: own profile sees its row.
         await tx.execute(
@@ -539,8 +604,6 @@ describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
       subjectId: subject.id,
       topics: [{ title: 'cm-rls-check-topic' }],
     });
-    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     // Seed parent concept as superuser (bypasses RLS); need a valid concept FK.
     const [concept] = await db
       .insert(concepts)
@@ -556,11 +619,8 @@ describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
     // profileB's GUC + profileId = profileA → WITH CHECK rejects.
     await expect(
       db.transaction(async (tx) => {
-        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
-        await tx.execute(
-          sql.raw(`GRANT INSERT ON concept_mastery TO ${testRole}`),
-        );
-        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${RLS_TEST_ROLE}`));
+        await assertCurrentRlsRole(tx);
         await tx.execute(
           sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
         );
