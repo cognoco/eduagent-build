@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PublicProfile } from '@eduagent/schemas';
 import * as ExpoSecureStore from 'expo-secure-store';
@@ -121,6 +122,7 @@ describe('ProfileProvider', () => {
   afterEach(() => {
     jest.useRealTimers();
     queryClient?.clear();
+    jest.restoreAllMocks();
   });
 
   it('fetches profiles and selects owner as active by default', async () => {
@@ -303,6 +305,167 @@ describe('ProfileProvider', () => {
     expect(consumeHubToSessionTransition('removed-profile-subject')).toBe(
       false,
     );
+  });
+
+  it('[WI-2128] replaces a saved family-owner ID with the joined learner returned for that credential', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+        status: 200,
+      }),
+    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'mentomate_active_profile_id' ? OWNER_PROFILE_ID : null,
+        ),
+      );
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.profiles.map((profile) => profile.id)).toEqual([
+      CHILD_PROFILE_ID,
+    ]);
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    expect(result.current.activeProfile?.isOwner).toBe(false);
+    expect(pushProfileIdToApiClient).not.toHaveBeenCalledWith(OWNER_PROFILE_ID);
+    expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
+      'mentomate_active_profile_id',
+      CHILD_PROFILE_ID,
+    );
+  });
+
+  it('[WI-2128][BREAK] clears persisted proxy mode when the credential can operate only the joined learner', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+        status: 200,
+      }),
+    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) => {
+        if (key === 'mentomate_active_profile_id') {
+          return Promise.resolve(OWNER_PROFILE_ID);
+        }
+        if (key === 'parent-proxy-active') {
+          return Promise.resolve('true');
+        }
+        return Promise.resolve(null);
+      });
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    expect(result.current.isExplicitProxyMode).toBe(false);
+    expect(setProxyMode).toHaveBeenLastCalledWith(false);
+    expect(ExpoSecureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'parent-proxy-active',
+    );
+  });
+
+  it('[WI-2128][J-03] keeps the cached shell mounted during an authoritative remount refetch', async () => {
+    mockFetch.mockReset();
+    let resolveProfiles!: (response: Response) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveProfiles = resolve;
+      }),
+    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'mentomate_active_profile_id' ? OWNER_PROFILE_ID : null,
+        ),
+      );
+
+    const wrapper = createWrapper();
+    queryClient.setQueryData(
+      queryKeys.profiles.list('clerk-user-test'),
+      mockProfiles,
+    );
+    const { result } = renderHook(() => useProfile(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
+    });
+    expect(result.current.isLoading).toBe(false);
+    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(OWNER_PROFILE_ID);
+    expect(setProxyMode).toHaveBeenLastCalledWith(false);
+
+    await act(async () => {
+      resolveProfiles(
+        new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+          status: 200,
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    expect(result.current.activeProfile?.isOwner).toBe(false);
+  });
+
+  it('[WI-2128][J-03] keeps the cached shell mounted during foreground authority revalidation', async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const removeListener = jest.fn();
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: removeListener };
+      });
+
+    const { result, unmount } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    let resolveProfiles!: (response: Response) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveProfiles = resolve;
+      }),
+    );
+    act(() => {
+      appStateListener?.('active');
+    });
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+    expect(result.current.isLoading).toBe(false);
+    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(OWNER_PROFILE_ID);
+    expect(setProxyMode).toHaveBeenLastCalledWith(false);
+
+    await act(async () => {
+      resolveProfiles(
+        new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+          status: 200,
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+
+    unmount();
+    expect(removeListener).toHaveBeenCalled();
   });
 
   it('[BREAK] falls back to owner when active-profile SecureStore restore hangs', async () => {
@@ -768,7 +931,7 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile).toBeNull();
   });
 
-  it('[BREAK] keeps cached profiles usable when a background profile refetch fails', async () => {
+  it('[WI-2128][BREAK] fails closed when an authoritative profile refetch fails with cached capability metadata', async () => {
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
     });
@@ -788,7 +951,7 @@ describe('ProfileProvider', () => {
 
     expect(result.current.profiles).toEqual(mockProfiles);
     expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
-    expect(result.current.profileLoadError).toBeNull();
+    expect(result.current.profileLoadError).toBeTruthy();
   });
 
   it('[BREAK] clears mentomate_parent_home_seen on sign-out', async () => {

@@ -44,6 +44,7 @@ jest.mock(
 );
 
 import {
+  sessionPurgeBacklogObserve,
   sessionPurgeDelayedObserve,
   sessionTranscriptPurgedObserve,
   sessionTranscriptPurgeSkippedObserve,
@@ -121,12 +122,16 @@ describe('sessionPurgeDelayedObserve [BUG-369]', () => {
         '00000000-0000-4000-8000-000000000013',
       ],
       missingPreconditionCount: 1,
+      nullSummaryGeneratedAtCount: 2,
       timestamp: '2026-01-01T00:00:00.000Z',
     });
     const entry = lastJsonLine(consoleWarnSpy);
     expect(entry?.message).toBe('session.purge.delayed.received');
     expect(entry?.level).toBe('warn');
-    expect(entry?.context).toMatchObject({ delayedCount: 3 });
+    expect(entry?.context).toMatchObject({
+      delayedCount: 3,
+      nullSummaryGeneratedAtCount: 2,
+    });
   });
 
   it('[BREAK] returns schema_error on invalid payload', async () => {
@@ -153,6 +158,52 @@ describe('sessionPurgeDelayedObserve [BUG-369]', () => {
         extra: expect.objectContaining({ issues: expect.any(Array) }),
       }),
     );
+  });
+});
+
+describe('sessionPurgeBacklogObserve [WI-2739]', () => {
+  it('is registered as the listener for app/session.purge.backlog', () => {
+    const trigger = (
+      sessionPurgeBacklogObserve as unknown as { trigger: unknown }
+    ).trigger;
+    expect(trigger).toEqual({ event: 'app/session.purge.backlog' });
+  });
+
+  it('is included in the exported functions array', () => {
+    expect(functions).toContain(sessionPurgeBacklogObserve);
+  });
+
+  it('logs the lower-bound backlog signal', async () => {
+    const result = await invoke(sessionPurgeBacklogObserve, {
+      dailyCapacity: 100,
+      minimumEligibleCount: 101,
+      minimumDeferredCount: 1,
+      timestamp: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'logged',
+      minimumEligibleCount: 101,
+    });
+    const entry = lastJsonLine(consoleWarnSpy);
+    expect(entry?.message).toBe('session.purge.backlog.received');
+    expect(entry?.context).toMatchObject({
+      dailyCapacity: 100,
+      minimumEligibleCount: 101,
+      minimumDeferredCount: 1,
+    });
+  });
+
+  it('[BREAK] captures schema drift for a non-over-cap payload', async () => {
+    const result = await invoke(sessionPurgeBacklogObserve, {
+      dailyCapacity: 100,
+      minimumEligibleCount: 100,
+      minimumDeferredCount: 0,
+      timestamp: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({ status: 'schema_error' });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 });
 

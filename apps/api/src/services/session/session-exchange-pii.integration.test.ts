@@ -23,6 +23,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../../test-utils/conversation-language-confirmation';
 import { prepareExchangeContext } from './session-exchange';
 import { buildSystemPrompt } from '../exchanges';
 
@@ -54,6 +55,7 @@ async function seedLearner(
     displayName: input.displayName,
     birthDate: `${input.birthYear}-06-15`,
     residenceJurisdiction: 'US',
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
   });
   await db.insert(membership).values({
     personId: profileId,

@@ -85,7 +85,7 @@ Cloudflare, Expo, APNs, FCM.
 
 | Tier | Recipients | What they receive |
 |---|---|---|
-| **Receives full/raw learner conversation content** | OpenAI, Anthropic, Mistral, Cerebras, Gemini (legacy path), Voyage AI | Full tutor-exchange prompts/messages (system + user + assistant turns), homework images (vision calls), session-summary/session-event text embedded for memory recall |
+| **Receives learner conversation content after deterministic text minimisation** | OpenAI, Anthropic, Mistral, Cerebras, Gemini (legacy path), Voyage AI | Tutor-exchange prompts/messages and embedding input after the WI-2737 last-hop filter masks recognised volunteered direct identifiers and explicit first-person special-category disclosures. Vision providers still receive unmodified homework image bytes; only textual captions/prompts are filtered. |
 | **Receives conversation-DERIVED but structured/limited content** | Neon (DB) | Everything, by construction — it's the system of record | 
 | **Receives only account/telemetry/billing metadata — never conversation content** | Clerk, RevenueCat, Apple, Google (billing), Resend, Sentry (post-scrub), Inngest (post-scrub), Cloudflare (compute host), Expo (push copy only, templated) | Emails, auth identifiers, subscription state, error diagnostics, push tokens, structured event payloads |
 
@@ -163,9 +163,15 @@ terms don't carve out a training-use right that would make them an independent c
 that secondary purpose — the `identity-compliance-register.md` C-1 rule already requires
 minors be pinned to a single "papered" (contractually vetted) endpoint for exactly this reason.
 
-**Personal data sent — the important finding:** these providers receive **full tutor-conversation
-messages** (system prompt + safety/personalization preamble + the actual multi-turn
-user/assistant exchange), not just metadata. Evidence:
+**Personal data sent — the important finding:** these providers receive tutor-conversation
+messages (system prompt + safety/personalization preamble + the multi-turn
+user/assistant exchange), not just metadata. Since WI-2737, user-role text and
+named learner-derived regions in string or multipart system prompts are passed
+through `learner-egress-filter.ts` at the final router boundary before a primary
+or fallback adapter receives them. Assistant-authored turns and non-text parts
+remain unchanged. The filter masks recognised email, phone, address, handle,
+school/name cues and explicit first-person special-category disclosures; it is
+not anonymisation. Evidence:
 - Safety/personalization preamble construction: `router.ts:302-427` (`withSafetyPreamble`) —
   built once at the router layer and prepended to every provider call regardless of vendor.
 - Personalization line includes the learner's **pronouns** verbatim (sanitized, `router.ts:365-373`)
@@ -179,6 +185,9 @@ user/assistant exchange), not just metadata. Evidence:
   Small, per the V2 vision branch `router.ts:891-904`) via the OCR flow, `apps/api/src/services/ocr.ts:8`
   (`routeAndCall` with the vision capability) — so a photographed homework page (which can
   contain handwriting, and incidentally a name/school letterhead) reaches the LLM vendor too.
+  The WI-2737 filter masks the accompanying textual caption/prompt but deliberately
+  preserves the base64 image bytes: detecting PII inside those pixels before remote
+  OCR would require a local/on-device vision pass. This is the principal residual.
 
 ### 3a. OpenAI
 
@@ -280,11 +289,11 @@ user/assistant exchange), not just metadata. Evidence:
 | Field | Value |
 |---|---|
 | **Role (reasoning)** | **Processor.** |
-| **Personal data sent** | **Raw learner conversation text** — not a summary. `apps/api/src/services/embeddings.ts:184-216` (`extractSessionContent`) pulls `user_message` + `ai_response` event content straight from `session_events` and joins it into a single string (truncated to 8 000 chars, line 171/213-215) which is then sent verbatim as the `input` field to Voyage's embeddings endpoint (`generateEmbedding`, lines 110-127, `VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings'` at line 81). Called from `apps/api/src/services/embeddings.ts:227-243` (`storeSessionEmbedding`), invoked by the `session-completed` Inngest function (per the file's own doc comment, line 219). |
+| **Personal data sent** | Learner conversation text — not merely a summary — after the shared WI-2737 deterministic filter masks recognised volunteered direct identifiers and explicit first-person special-category disclosures. `extractSessionContent` still joins `user_message` + `ai_response` content; `generateEmbedding` filters that string immediately before serialising the exact Voyage `input` body. |
 | **Where in code** | `apps/api/src/services/embeddings.ts` (see line citations above). |
 | **Processing location** | TODO. |
 | **DPA/terms reference** | TODO. |
-| **Notes/gaps** | This is arguably the **least-visible** high-sensitivity recipient — it doesn't appear anywhere in typical "LLM vendor" framing because it's an embeddings-only API call, but it receives the same raw conversation text the tutoring LLMs do. ROPA row #9 already lists Voyage as a recipient for "Semantic embeddings" but does not flag that the *input* to the embedding call is raw transcript text (not a pre-summarized/anonymized derivative) — worth a ROPA wording tightening. |
+| **Notes/gaps** | This remains a high-sensitivity recipient because the input is filtered transcript text rather than an anonymous derivative. The deterministic filter can miss non-English, oblique, or unusual disclosures, and it does not prevent inference from otherwise non-sensitive learning content. ROPA row #9 now records that reality. |
 
 ## 4. Infra / observability
 

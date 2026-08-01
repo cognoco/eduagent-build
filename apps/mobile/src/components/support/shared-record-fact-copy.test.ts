@@ -2,6 +2,7 @@ import { createInstance } from 'i18next';
 import type { ReportableFact, SharedRecordView } from '@eduagent/schemas';
 
 import de from '../../i18n/locales/de.json';
+import pl from '../../i18n/locales/pl.json';
 import type { Translate } from '../../i18n';
 import {
   renderSharedRecordFact,
@@ -17,6 +18,17 @@ async function germanTranslate(): Promise<Translate> {
     interpolation: { escapeValue: false },
   });
   return instance.getFixedT('de') as Translate;
+}
+
+async function polishTranslate(): Promise<Translate> {
+  const instance = createInstance();
+  await instance.init({
+    lng: 'pl',
+    fallbackLng: false,
+    resources: { pl: { translation: pl } },
+    interpolation: { escapeValue: false },
+  });
+  return instance.getFixedT('pl') as Translate;
 }
 
 function fact(overrides: Partial<ReportableFact>): ReportableFact {
@@ -74,6 +86,7 @@ describe('shared-record fact copy', () => {
     ['book_completed', 1, undefined, 'Ein Buch abgeschlossen'],
     ['learning_time', 2, undefined, '2 Stunden gelernt'],
     ['cefr_level_up', 1, undefined, 'Sprachlevel erhöht'],
+    ['topics_explored', 1, 'Physik', '1 Thema in Physik erkundet'],
     ['topics_explored', 6, 'Physik', '6 Themen in Physik erkundet'],
   ])(
     'renders %s milestone metadata through localized copy',
@@ -97,6 +110,33 @@ describe('shared-record fact copy', () => {
         title: 'Meilenstein erreicht',
         detail: expectedDetail,
       });
+    },
+  );
+
+  it.each([
+    [1, 'Matematyka: 1 zbadany temat'],
+    [2, 'Matematyka: 2 zbadane tematy'],
+    [5, 'Matematyka: 5 zbadanych tematów'],
+    [22, 'Matematyka: 22 zbadane tematy'],
+  ])(
+    'renders Polish topic counts without requiring an inflected subject name (%i)',
+    async (threshold, expectedDetail) => {
+      const t = await polishTranslate();
+      const rendered = renderSharedRecordFact(
+        fact({
+          kind: 'mastery',
+          metadata: {
+            templateKey: 'milestone',
+            milestoneType: 'topics_explored',
+            threshold,
+            subjectName: 'Matematyka',
+          },
+        }),
+        t,
+        'pl',
+      );
+
+      expect(rendered.detail).toBe(expectedDetail);
     },
   );
 

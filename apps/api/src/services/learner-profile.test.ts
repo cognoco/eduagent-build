@@ -11,6 +11,7 @@ import {
   buildAccommodationBlock,
   buildMemoryBlock,
   cleanCurrentlyWorkingOnLabel,
+  deleteMemoryItem,
   detectStruggleNotifications,
   filterUnsupportedResolvedTopics,
   mergeCommunicationNotes,
@@ -22,9 +23,15 @@ import {
   shouldUpdateLearningStyle,
 } from './learner-profile';
 import type { Database } from '@eduagent/database';
+import { scanLearningText } from './learning-text-safety/scan';
+import { ConflictError } from '../errors';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 import * as sentry from './sentry';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
+// [WI-2952 AC-4] The REAL resolver. The `./llm/router` mock below spreads
+// `jest.requireActual`, so this binding is the production implementation — the
+// exclusion is decided by the same code the judge path runs, not by a stub.
+import { resolveJudgeEligibleVendors } from './llm/router';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -1788,7 +1795,10 @@ describe('analyzeSessionTranscript', () => {
       null,
     );
 
-    expect(result?.resolvedTopics).toBeNull();
+    // [WI-2952] `analyzeSessionTranscript` now returns `{analysis, author}` so
+    // the producing vendor survives to the safety gate; the analysis it carries
+    // is unchanged.
+    expect(result?.analysis.resolvedTopics).toBeNull();
   });
 
   it('keeps resolvedTopics when the learner demonstrates the resolved idea', () => {
@@ -1983,8 +1993,141 @@ describe('analyzeSessionTranscript — flow label (FCR-2026-05-23-L15.LOW3)', ()
 });
 
 // ---------------------------------------------------------------------------
+// [WI-2952 AC-4] analyzeSessionTranscript — judge independence
+//
+// Asserted where the exclusion is actually DECIDED. The threaded value feeds
+// `resolveJudgeEligibleVendors`, which filters a VENDOR pool, so the
+// discriminating assertion is not "a producer string was returned" but "the
+// producing vendor is ABSENT from the resolved pool". A model id satisfies the
+// former and fails the latter — and the matrix rejects only a *blank* vendor, so
+// a model id sits in the field, matches no exclusion-vocabulary member, and lets
+// the producing vendor grade its own output without failing closed. That exact
+// defect shipped once already here (a fixture threading 'cerebras' kept hundreds
+// of tests green while production threaded a model id). Precedent for the shape:
+// `memory/dedup-llm.test.ts` [WI-2628].
+// ---------------------------------------------------------------------------
+
+describe('analyzeSessionTranscript — judge independence (WI-2952 AC-4)', () => {
+  const PRODUCER_VENDOR = 'anthropic';
+  const PRODUCER_MODEL = 'claude-sonnet-4-6';
+
+  const events = [
+    { eventType: 'user_message', content: 'I keep messing up long division.' },
+    { eventType: 'ai_response', content: 'Let us walk one through together.' },
+    { eventType: 'user_message', content: 'That helped, thanks.' },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRouteAndCall.mockResolvedValue({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+      model: PRODUCER_MODEL,
+      provider: PRODUCER_VENDOR,
+    });
+  });
+
+  it('returns a vendor that ACTUALLY EXCLUDES itself from the judge pool', async () => {
+    const result = await analyzeSessionTranscript(
+      events,
+      'Math',
+      'Division',
+      null,
+    );
+
+    expect(result?.author.provenance).toBe('llm');
+    if (result?.author.provenance !== 'llm') return;
+
+    // The property: the value threaded downstream removes its own vendor.
+    expect(
+      resolveJudgeEligibleVendors({
+        mode: 'model-output',
+        producerVendor: result.author.producerVendor,
+      }),
+    ).not.toContain(PRODUCER_VENDOR);
+
+    // The control that makes the assertion above non-trivial: the MODEL id —
+    // the value a threading mistake substitutes — excludes nothing at all, so
+    // the producer stays eligible to grade its own output.
+    expect(
+      resolveJudgeEligibleVendors({
+        mode: 'model-output',
+        producerVendor: PRODUCER_MODEL,
+      }),
+    ).toContain(PRODUCER_VENDOR);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // applyAnalysis — GDPR consent gate (WI-221)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// [WI-2628] applyAnalysis now takes an UNLOCKED pre-read on the outer `db`
+// before opening its transaction, so it can evaluate candidate text against the
+// multilingual gate without holding a pooled connection across an LLM
+// round-trip. Every `applyAnalysis` unit stub therefore needs a profile-read
+// chain on the OUTER db, not only on the tx. Absent one, the failure surfaces as
+// `tx.select is not a function` raised from `getOrCreateLearningProfileTx` — a
+// harness gap wearing a product bug's clothes.
+// ---------------------------------------------------------------------------
+
+/** Minimal learning-profile row: satisfies the pre-read and the locked read. */
+const MINIMAL_LEARNING_PROFILE = {
+  memoryConsentStatus: 'granted',
+  memoryCollectionEnabled: true,
+  memoryEnabled: true,
+  memoryInjectionEnabled: true,
+  interests: [],
+  strengths: [],
+  struggles: [],
+  communicationNotes: [],
+  suppressedInferences: [],
+  interestTimestamps: {},
+  recentlyResolvedTopics: [],
+  learningStyle: null,
+  effectivenessSessionCount: 0,
+  version: 0,
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  id: 'lp-stub',
+  activeUrgency: null,
+  lastSessionSummary: null,
+  lastSessionExchangeCount: null,
+  parkedQuestions: null,
+};
+
+/**
+ * `select().from().where().for('update').limit(1)` → `[row]`, plus a no-op
+ * `insert().values().onConflictDoNothing()` for the create branch.
+ */
+function profileReadStub(row: Record<string, unknown>) {
+  return {
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          for: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([row]),
+          }),
+          limit: jest.fn().mockResolvedValue([row]),
+        }),
+      }),
+    }),
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
+    }),
+  };
+}
 
 describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
   const profileId = 'profile-gdpr-test-001';
@@ -2048,6 +2191,7 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
           });
     const db = {
       transaction: txMock,
+      ...profileReadStub({ profileId, ...MINIMAL_LEARNING_PROFILE }),
       query: {
         membership: { findFirst: membershipFindFirst },
         consentGrant: { findFirst: consentGrantFindFirst },
@@ -2096,6 +2240,7 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
     });
     const db = {
       transaction: txMock,
+      ...profileReadStub({ profileId, ...MINIMAL_LEARNING_PROFILE }),
       query: {
         membership: {
           findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
@@ -2230,6 +2375,7 @@ describe('applyAnalysis — in-transaction GDPR re-check (WI-82 TOCTOU)', () => 
         .mockImplementation(
           async (callback: (tx: unknown) => Promise<unknown>) => callback(tx),
         ),
+      ...profileReadStub(minimalProfile),
       query: {
         membership: {
           findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
@@ -2400,4 +2546,493 @@ describe('listStruggleTopicNames', () => {
       listStruggleTopicNames(makeDb(undefined), PROFILE_ID, 2),
     ).resolves.toEqual([]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2628] AC-5 — this boundary is on the shared multilingual gate.
+//
+// Three properties, in the order they can fail:
+//   1. the gate actually decides what persists, in a language the retired
+//      English-only guard could not see;
+//   2. a string the batch never evaluated is a COVERAGE MISS (retry), not a
+//      block — otherwise a concurrent write silently wipes a learner's whole
+//      memory projection;
+//   3. exhausting the retry bound writes NOTHING. Fail-closed, never a
+//      fall-through to an ungated write.
+// ---------------------------------------------------------------------------
+
+describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at the persistence boundary', () => {
+  const profileId = 'profile-wi2628-001';
+
+  // THE NON-TRIVIALITY CONTROL for every assertion below: a Czech
+  // person-attribution carrying a real protected lexeme in an educational
+  // construction. `scrubClinicalInferenceFromLearningRecord` RETURNS this string
+  // unchanged (it is English-only), while the multilingual gate blocks it. A test
+  // built on an English case would stay green if the wiring silently regressed to
+  // the old guard; this one cannot.
+  const CLINICAL_CS = 'Petr má dyslexii a potřebuje pomoc.';
+  const CLEAR_NOTE = 'The learner responds well to worked examples.';
+
+  const analysisWithNotes = (notes: string[]): SessionAnalysisOutput => ({
+    confidence: 'high',
+    interests: null,
+    strengths: null,
+    struggles: null,
+    resolvedTopics: null,
+    communicationNotes: notes,
+    engagementLevel: null,
+    explanationEffectiveness: null,
+  });
+
+  const consentQueries = () => ({
+    membership: {
+      findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+    },
+    consentGrant: {
+      findFirst: jest.fn().mockResolvedValue({
+        granted: true,
+        withdrawnAt: null,
+        grantedAt: new Date('2026-01-01'),
+      }),
+    },
+    consentRequest: {
+      findFirst: jest.fn().mockResolvedValue({
+        status: 'approved',
+        requestedAt: new Date('2026-01-01'),
+        createdAt: new Date('2026-01-01'),
+      }),
+    },
+  });
+
+  /**
+   * A `where(...)` result that is BOTH awaitable and chainable.
+   *
+   * `getOrCreateLearningProfileTx` continues `.for('update').limit(1)`, while
+   * `replaceActiveMemoryFactsForProfile` awaits `.where(...)` directly. One stub
+   * has to serve both or the second read throws from inside the writer and looks
+   * like a product crash.
+   */
+  function whereResult(rows: unknown[]) {
+    return Object.assign(Promise.resolve(rows), {
+      for: () => ({ limit: () => Promise.resolve(rows) }),
+      limit: () => Promise.resolve(rows),
+    });
+  }
+
+  /**
+   * BOTH reads are sequenced per attempt, because a retry that only re-reads
+   * under the lock proves the loop iterates, not that it converges. In
+   * production the world MOVES and the retry's fresh unlocked pre-read is what
+   * catches up; a frozen pre-read can only ever succeed by the locked row
+   * reverting, which is the opposite situation.
+   *
+   * @param preReadProfiles rows the UNLOCKED outer pre-read returns, one per
+   *   attempt (the last repeats once exhausted)
+   * @param lockedProfiles rows the in-transaction FOR UPDATE read returns, one
+   *   per attempt (the last repeats once exhausted)
+   */
+  function makeHarness(
+    preReadProfiles: Record<string, unknown>[],
+    lockedProfiles: Record<string, unknown>[],
+  ) {
+    const setCalls: Array<Record<string, unknown>> = [];
+    const insertedFactRows: Array<Record<string, unknown>[]> = [];
+    let txCount = 0;
+    let preReadCount = 0;
+    const at = (rows: Record<string, unknown>[], index: number) =>
+      rows[Math.min(index, rows.length - 1)]!;
+
+    const makeWriter = (profileRow: Record<string, unknown>) => ({
+      // `.select()` with no argument = the profile lock read; `.select({...})`
+      // with a column map = the memory-facts embedding-reuse read.
+      select: jest.fn().mockImplementation((columns?: unknown) => ({
+        from: jest.fn().mockReturnValue({
+          where: jest
+            .fn()
+            .mockImplementation(() =>
+              whereResult(columns === undefined ? [profileRow] : []),
+            ),
+        }),
+      })),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockImplementation((rows: unknown) => {
+          if (Array.isArray(rows)) {
+            insertedFactRows.push(rows as Record<string, unknown>[]);
+          }
+          return Object.assign(Promise.resolve(undefined), {
+            onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          });
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockImplementation((values: Record<string, unknown>) => {
+          setCalls.push(values);
+          return { where: jest.fn().mockResolvedValue(undefined) };
+        }),
+      }),
+    });
+
+    const transaction = jest
+      .fn()
+      .mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const locked = at(lockedProfiles, txCount);
+          txCount += 1;
+          return callback({ ...makeWriter(locked), query: consentQueries() });
+        },
+      );
+
+    // The outer pre-read is resolved LAZILY per `select()` so each attempt's
+    // unlocked read advances the sequence, mirroring a moving world.
+    const outerWriter = makeWriter(at(preReadProfiles, 0));
+    const db = {
+      transaction,
+      ...outerWriter,
+      select: jest.fn().mockImplementation((columns?: unknown) => {
+        const row = at(preReadProfiles, preReadCount);
+        if (columns === undefined) preReadCount += 1;
+        return {
+          from: jest.fn().mockReturnValue({
+            where: jest
+              .fn()
+              .mockImplementation(() =>
+                whereResult(columns === undefined ? [row] : []),
+              ),
+          }),
+        };
+      }),
+      query: consentQueries(),
+    } as unknown as Database;
+
+    return {
+      db,
+      transaction,
+      setCalls,
+      insertedFactRows,
+      factTexts: () => insertedFactRows.flat().map((row) => row['text']),
+    };
+  }
+
+  const profileRow = (overrides: Record<string, unknown> = {}) => ({
+    profileId,
+    ...MINIMAL_LEARNING_PROFILE,
+    ...overrides,
+  });
+
+  it('drops a Czech clinical note from BOTH the profile update and the memory facts', async () => {
+    const row = profileRow();
+    const harness = makeHarness([row], [row]);
+
+    await applyAnalysis(
+      harness.db,
+      profileId,
+      analysisWithNotes([CLINICAL_CS, CLEAR_NOTE]),
+      null,
+    );
+
+    // The learning_profiles update carries the sanitised projection.
+    const profileUpdate = harness.setCalls.find((values) =>
+      Object.prototype.hasOwnProperty.call(values, 'communicationNotes'),
+    );
+    expect(profileUpdate?.['communicationNotes']).toEqual([CLEAR_NOTE]);
+    // …and the derived memory facts carry only the cleared row.
+    expect(harness.factTexts()).toEqual([CLEAR_NOTE]);
+  });
+
+  it('treats an unevaluated string as a COVERAGE MISS and CONVERGES on the moved state', async () => {
+    // The world moves between attempt 1's pre-read and its locked read, and then
+    // STAYS moved — which is the production shape. Attempt 1 misses (the locked
+    // row carries a note its batch never saw); attempt 2's fresh pre-read sees
+    // the moved row and evaluates it, so the locked read is covered.
+    //
+    // The assertion that makes this convergence rather than mere iteration: the
+    // surviving text includes `MOVED_NOTE`, which ONLY the moved row carries. A
+    // loop that retried without re-reading could never produce it.
+    const MOVED_NOTE = 'The learner asked to revisit long division.';
+    const original = profileRow();
+    const moved = profileRow({ communicationNotes: [MOVED_NOTE] });
+    const harness = makeHarness([original, moved], [moved, moved]);
+
+    await applyAnalysis(
+      harness.db,
+      profileId,
+      analysisWithNotes([CLEAR_NOTE]),
+      null,
+    );
+
+    expect(harness.transaction).toHaveBeenCalledTimes(2);
+    expect(harness.factTexts()).toEqual(
+      expect.arrayContaining([MOVED_NOTE, CLEAR_NOTE]),
+    );
+  });
+
+  it('FAILS CLOSED when the retry bound is exhausted — applyAnalysis writes nothing', async () => {
+    // Every locked read disagrees with the pre-read, so no attempt is ever
+    // covered. The bound must stop the loop AND write nothing: an implementation
+    // that fell through to the write on the final attempt would persist text the
+    // gate never cleared, which is strictly worse than dropping it.
+    const preRead = profileRow();
+    const foreverStale = profileRow({
+      communicationNotes: ['Unseen prior note.'],
+    });
+    const harness = makeHarness([preRead], [foreverStale]);
+
+    const result = await applyAnalysis(
+      harness.db,
+      profileId,
+      analysisWithNotes([CLEAR_NOTE]),
+      null,
+    );
+
+    expect(result).toEqual({ fieldsUpdated: [], notifications: [] });
+    expect(harness.transaction).toHaveBeenCalledTimes(3);
+    expect(harness.setCalls).toEqual([]);
+    expect(harness.insertedFactRows).toEqual([]);
+  });
+
+  it('FAILS CLOSED when the retry bound is exhausted — deleteMemoryItem raises instead of writing', async () => {
+    const preRead = profileRow({ interests: ['astronomy'] });
+    const foreverStale = profileRow({
+      interests: ['astronomy'],
+      communicationNotes: ['Unseen prior note.'],
+    });
+    const harness = makeHarness([preRead], [foreverStale]);
+
+    await expect(
+      deleteMemoryItem(
+        harness.db,
+        profileId,
+        undefined,
+        'interests',
+        'astronomy',
+      ),
+    ).rejects.toThrow(ConflictError);
+
+    expect(harness.transaction).toHaveBeenCalledTimes(3);
+    expect(harness.setCalls).toEqual([]);
+    expect(harness.insertedFactRows).toEqual([]);
+  });
+
+  it('derives the SAME gated text twice for a populated profile — no clock value reaches a gated expression', async () => {
+    // THE LOAD-BEARING ASSUMPTION of the whole retry design: the derivation
+    // (`buildAnalysisUpdates` → `mergeProfileState` → sanitiser → row mappers) is
+    // a pure function of the profile row. If any clock value reached a gated text
+    // expression, EVERY call would miss coverage three times and write nothing —
+    // a total silent regression that no other test here would catch, because the
+    // other fixtures leave the time-sensitive collections empty.
+    //
+    // This one populates exactly the paths where `nowIso()` lives —
+    // `mergeStruggles` stamps `lastSeen`, `mergeInterests` stamps
+    // `interestTimestamps` — and drives them with a real incoming analysis so the
+    // merge actually runs. The composed row texts embed `confidence` and
+    // `attempts`, both derived from a COUNT, never from the clock; `lastSeen` and
+    // the timestamps reach `observedAt`/`metadata` only.
+    //
+    // One transaction call is the whole assertion: identical pre-read and locked
+    // rows must produce identical strings, so coverage holds first time.
+    const populated = profileRow({
+      interests: ['astronomy'],
+      interestTimestamps: { astronomy: '2026-01-01T00:00:00.000Z' },
+      struggles: [
+        {
+          subject: 'Math',
+          topic: 'long division',
+          confidence: 'low',
+          attempts: 1,
+          lastSeen: '2026-01-01T00:00:00.000Z',
+          source: 'inferred',
+        },
+      ],
+      strengths: [
+        {
+          subject: 'Reading',
+          topics: ['comprehension'],
+          confidence: 'high',
+          source: 'inferred',
+        },
+      ],
+    });
+    const harness = makeHarness([populated], [populated]);
+
+    await applyAnalysis(
+      harness.db,
+      profileId,
+      {
+        confidence: 'high',
+        interests: ['geology'],
+        strengths: null,
+        struggles: [{ subject: 'Math', topic: 'long division' }],
+        resolvedTopics: null,
+        communicationNotes: [CLEAR_NOTE],
+        engagementLevel: null,
+        explanationEffectiveness: null,
+      } as unknown as SessionAnalysisOutput,
+      null,
+    );
+
+    expect(harness.transaction).toHaveBeenCalledTimes(1);
+    // And the write actually happened — a green "called once" would otherwise be
+    // satisfiable by an early return that never reached the coverage check.
+    expect(harness.factTexts()).toEqual(expect.arrayContaining([CLEAR_NOTE]));
+  });
+
+  // -------------------------------------------------------------------------
+  // CASE 3 — pre-evaluation saw non-empty text; the in-transaction re-derive
+  // yields null. Reachable here because the projection is re-derived from a row
+  // read under FOR UPDATE, and a JSONB field that held a string at pre-read time
+  // can be null by then. `isContentSafe(gate, null)` is TRUE by contract, and the
+  // trap is reading that true as "the surrounding write is cleared".
+  // -------------------------------------------------------------------------
+  it('a null re-derived subject is trivially safe and does NOT clear the unsafe topic beside it', async () => {
+    const struggleWith = (subject: string | null) => [
+      {
+        subject,
+        topic: CLINICAL_CS,
+        confidence: 'medium',
+        attempts: 1,
+        lastSeen: '2026-01-01T00:00:00.000Z',
+        source: 'inferred',
+      },
+    ];
+    // Pre-read: subject is a non-empty string, so it enters the batch.
+    const preRead = profileRow({ struggles: struggleWith('Math') });
+    // Locked: the same entry with a NULL subject. Null is never a coverage miss,
+    // so the attempt proceeds — and the clinical topic must still be dropped.
+    const locked = profileRow({ struggles: struggleWith(null) });
+    const harness = makeHarness([preRead], [locked]);
+
+    await applyAnalysis(harness.db, profileId, analysisWithNotes([]), null);
+
+    // Exactly one attempt: the null subject did not manufacture a miss.
+    expect(harness.transaction).toHaveBeenCalledTimes(1);
+    const profileUpdate = harness.setCalls.find((values) =>
+      Object.prototype.hasOwnProperty.call(values, 'struggles'),
+    );
+    expect(profileUpdate?.['struggles']).toEqual([]);
+    expect(harness.factTexts()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2952] Caller provenance reaches the safety gate.
+//
+// `evaluateProfileFieldTexts` hard-coded `provenance:'llm'` + `producerVendor:
+// null` for EVERY caller. Under the fail-closed matrix (scan.ts) `'llm'` with a
+// blank vendor resolves the referral to null and BLOCKS — so a learner's own
+// typed self-description never reached the judge and was silently dropped from
+// `interests[]`. The strings below are the operator's own examples from the
+// 2026-07-26 ruling, which amended the matrix precisely to remove that
+// learner-capability regression.
+//
+// These assert the GUARANTEED PROPERTY per provenance — does the text survive
+// to the projection — not an internal field's shape.
+// ---------------------------------------------------------------------------
+describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => {
+  // The operator's own example strings. Each contains a protected clinical
+  // lexeme with NO person attribution — the exact "ambiguous, refer" case.
+  const EDUCATIONAL_TEXTS = [
+    'ADHD can affect executive function.',
+    "I'm learning about autism.",
+  ] as const;
+
+  describe.each(EDUCATIONAL_TEXTS)('operator example: %s', (text) => {
+    // AC-6, boundary `learner-profile.ts`: learner-authored educational text
+    // must REACH the judge rather than being blocked outright. Under the
+    // pre-fix hard-coded 'llm' + null vendor this resolved to null and blocked.
+    // (AC-6 names its two boundaries by FILE — `learner-profile.ts` and
+    // `inngest/functions/memory-facts-backfill.ts` — not by test layer.)
+    it('user provenance REFERS to the judge rather than being refused by the matrix', () => {
+      // Asserted at the SCAN layer, which is where the matrix decision lives.
+      // The gate one layer up then consults the judge, and an unavailable judge
+      // blocks — correctly, per the ruling: "the ruling moves this case to the
+      // JUDGE, not to allowed". So a gate-level `blockedCount` cannot tell
+      // "the matrix refused it" from "the judge was unavailable", and only the
+      // first is this item's subject.
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'user',
+        fieldKind: 'learner_profile_field',
+      });
+      expect(result.classification).toBe('ambiguous');
+      expect(result.disposition).toBe('refer');
+    });
+
+    // AC-5: LLM text WITH a known vendor reaches the judge too.
+    it('llm provenance with a known vendor REFERS, carrying that vendor', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'llm',
+        fieldKind: 'learner_profile_field',
+        producerVendor: 'anthropic',
+      });
+      expect(result.disposition).toBe('refer');
+    });
+
+    // AC-5: LLM text with a BLANK vendor still fails closed. This is the branch
+    // the operator deliberately left unchanged, and the reason the pre-fix
+    // hard-code was harmful rather than merely wrong.
+    it('llm provenance with a blank vendor still fails closed AT THE MATRIX', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'llm',
+        fieldKind: 'learner_profile_field',
+        producerVendor: '',
+      });
+      expect(result.disposition).toBe('block');
+    });
+
+    // AC-5: migration never refers. Backfill text has no live author.
+    it('migration provenance never refers', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'migration',
+        fieldKind: 'memory_fact',
+      });
+      expect(result.disposition).toBe('block');
+    });
+  });
+
+  // AC-6 write-path coverage for the `learner-profile.ts` boundary IS NOW
+  // CLOSED, end to end, in
+  // `tests/integration/wi-2952-analysis-provenance.integration.test.ts`: it
+  // drives `applyAnalysis` against a real database with both operator strings,
+  // asserts the persisted `interests` CONTAINS the text under
+  // `{provenance:'user'}` and does NOT contain it under the pre-fix
+  // `{provenance:'llm', producerVendor:''}`, and was proven red against the
+  // reverted implementation. WI-2971, filed while the gap was open, is
+  // superseded by that test.
+  //
+  // Two earlier unit-level attempts failed to discriminate, which is why the
+  // evidence had to move to an integration test:
+  //
+  //   1. `expect(txMock).toHaveBeenCalled()` — measured against mutation 1
+  //      (reverting `evaluateProfileFieldTexts` to the hard-coded 'llm' + null):
+  //      275/275 still green. The transaction fires whether or not the gate
+  //      blanked the projection, so it discriminates nothing.
+  //   2. Capturing `tx.update(...).set(payload)` through a hand-built tx stub —
+  //      the stub does not satisfy enough of the real transaction body to reach
+  //      the write.
+  //
+  // AC-6's SECOND boundary — `inngest/functions/memory-facts-backfill.ts` — is
+  // REFUSED AS WRITTEN, not skipped. That file hard-codes
+  // `provenance: 'migration'` with no caller-supplied author, so no
+  // caller-provenance decision exists there for this item's fix to change. The
+  // operator's 2026-07-26 ruling (quoted in `learning-text-safety/scan.ts`)
+  // keeps migration text blocked BY DESIGN: backfill text has no live author.
+  // Making the operator strings pass at that boundary would contradict the
+  // ruling, so the clause is unsatisfiable as written and is declined on that
+  // authority rather than left silently uncovered.
+  //
+  // AC-4's named trap (provider vs model id) IS covered — see the
+  // `analyzeSessionTranscript — judge independence (WI-2952 AC-4)` describe
+  // earlier in this file: it asserts the producing vendor is absent from the
+  // RESOLVED judge pool against the real resolver, with a model-id control
+  // proving a `result.model` mutation would leave the vendor present.
 });

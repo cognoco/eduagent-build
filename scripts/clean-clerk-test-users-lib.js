@@ -60,9 +60,24 @@ function classifyClerkTestUserForCleanup(user, options = {}) {
   return { eligible: true, reason: 'stale-owned-seed-user' };
 }
 
+async function restoreAllClerkDeletionMarkers(pendingDeletions, restoreOne) {
+  const results = await Promise.allSettled(
+    pendingDeletions.map((pendingDeletion) => restoreOne(pendingDeletion)),
+  );
+  const failedRestores = results.filter(
+    (result) => result.status === 'rejected',
+  ).length;
+  if (failedRestores > 0) {
+    throw new Error(
+      `[clean-clerk] failed to restore ${failedRestores} of ${pendingDeletions.length} Clerk deletion markers`,
+    );
+  }
+}
+
 module.exports = {
   SEED_CLERK_PREFIX,
   OWNED_STALE_EMAIL_PREFIXES,
   PROTECTED_REUSABLE_EMAILS,
   classifyClerkTestUserForCleanup,
+  restoreAllClerkDeletionMarkers,
 };

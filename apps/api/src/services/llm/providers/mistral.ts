@@ -36,7 +36,7 @@ const logger = createLogger();
 //     toOpenAIContent, which Mistral's multimodal endpoint accepts.
 // ---------------------------------------------------------------------------
 
-const MISTRAL_BASE_URL = 'https://api.mistral.ai/v1/chat/completions';
+const MISTRAL_BASE_URL = 'https://api.eu.mistral.ai/v1/chat/completions';
 
 // 25s timeout — CF Workers 30s subrequest wall minus 5s buffer; matches the
 // other providers so the circuit breaker sees timely failures.

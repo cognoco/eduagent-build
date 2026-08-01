@@ -39,6 +39,8 @@
 export interface PersonScopeOverrides {
   profileId?: string;
   birthYear?: number | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
   location?: string | null;
   consentStatus?: string | null;
   isOwner?: boolean;
@@ -56,6 +58,8 @@ export function personScope(overrides: PersonScopeOverrides = {}) {
     profileId: overrides.profileId ?? 'test-profile-id',
     meta: {
       birthYear: overrides.birthYear ?? null,
+      birthMonth: overrides.birthMonth ?? null,
+      birthDay: overrides.birthDay ?? null,
       location: overrides.location ?? null,
       consentStatus: overrides.consentStatus ?? 'CONSENTED',
       hasPremiumLlm: overrides.hasPremiumLlm ?? false,

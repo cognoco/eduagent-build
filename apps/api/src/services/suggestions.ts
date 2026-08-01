@@ -17,11 +17,13 @@ import {
   curriculumBooks,
 } from '@eduagent/database';
 import type {
+  AgeBracket,
   BookSuggestion,
   BookSuggestionsTopupOutcome,
   ConversationLanguage,
 } from '@eduagent/schemas';
 import { createLogger } from './logger';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 
 const logger = createLogger();
 
@@ -180,7 +182,14 @@ export async function getUnpickedBookSuggestionsWithTopup(
   db: Database,
   profileId: string,
   subjectId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+    deps?: {
+      assertLlmConsent?: typeof assertLlmConsent;
+      generateCategorizedBookSuggestions?: (typeof import('./book-suggestion-generation'))['generateCategorizedBookSuggestions'];
+    };
+  },
 ): Promise<Envelope> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -205,14 +214,21 @@ export async function getUnpickedBookSuggestionsWithTopup(
   let topupOutcome: BookSuggestionsTopupOutcome = 'not_needed';
 
   if (unpicked.length < 4) {
+    const consentGate = options?.deps?.assertLlmConsent ?? assertLlmConsent;
+    await consentGate(db, profileId);
     try {
-      const { generateCategorizedBookSuggestions } =
-        await import('./book-suggestion-generation');
+      const generateCategorizedBookSuggestions =
+        options?.deps?.generateCategorizedBookSuggestions ??
+        (await import('./book-suggestion-generation'))
+          .generateCategorizedBookSuggestions;
       topupOutcome = await generateCategorizedBookSuggestions(
         db,
         profileId,
         subjectId,
-        { conversationLanguage: options?.conversationLanguage },
+        {
+          conversationLanguage: options?.conversationLanguage,
+          ageBracket: options?.ageBracket,
+        },
       );
       unpicked = await db
         .select()

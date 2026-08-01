@@ -347,6 +347,10 @@ jobs:
             fi
             echo "Production retention gate passed."
           fi
+          if [ "$SYNC_TARGET" = "stg" ]; then
+            doppler run -p mentomate -c "$SYNC_TARGET" -- \
+              node scripts/check-clerk-key-alignment.mjs
+          fi
           pnpm secrets:sync "$SYNC_TARGET"
 
       - name: Deploy to Cloudflare Workers
@@ -407,6 +411,7 @@ jobs:
     # Only run after a staging deploy (push-to-main always deploys staging;
     # manual dispatch to staging also qualifies). Skip for production deploys.
     if: |
+      always() &&
       needs.api-deploy.result == 'success' &&
       (github.event_name == 'push' || inputs.api_environment == 'staging')
     runs-on: ubuntu-latest

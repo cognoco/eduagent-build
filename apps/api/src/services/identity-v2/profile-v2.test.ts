@@ -8,7 +8,11 @@
 // by the integration suite.
 // ---------------------------------------------------------------------------
 
-import { jurisdictionToLocation, loadProfileRowByIdV2 } from './profile-v2';
+import {
+  jurisdictionToLocation,
+  listProfilesV2,
+  loadProfileRowByIdV2,
+} from './profile-v2';
 
 describe('jurisdictionToLocation (profileMeta.location reverse-map)', () => {
   it('inverts the reseed JURISDICTION_CASE: US→US, EU→EU, ROW→OTHER', () => {
@@ -124,5 +128,71 @@ describe('[WI-586] loadProfileRowByIdV2 — person→profiles row shaping', () =
   it('returns null when no live person row matches', async () => {
     const out = await loadProfileRowByIdV2(stubDb(null), 'missing');
     expect(out).toBeNull();
+  });
+});
+
+describe('[WI-1556] listProfilesV2 — first-Mentor language launch hints', () => {
+  const personId = '550e8400-e29b-41d4-a716-446655440000';
+  const organizationId = '660e8400-e29b-41d4-a716-446655440000';
+  const row = {
+    id: personId,
+    displayName: 'Ada',
+    avatarUrl: null,
+    birthDate: '2000-05-01',
+    residenceJurisdiction: 'EU',
+    conversationLanguage: 'cs',
+    conversationLanguageConfirmedAt: null,
+    pronouns: null,
+    defaultAppContext: null,
+    createdAt: new Date('2026-07-30T10:00:00Z'),
+    updatedAt: new Date('2026-07-30T10:00:00Z'),
+    roles: ['learner'],
+  };
+
+  function listDb() {
+    return {
+      select: jest.fn((projection: Record<string, unknown>) => {
+        const rows =
+          'displayName' in projection
+            ? [row]
+            : 'personId' in projection
+              ? [{ personId }]
+              : [];
+        const chain = {
+          from: () => chain,
+          innerJoin: () => chain,
+          where: () => chain,
+          limit: () => Promise.resolve(rows),
+          then: (resolve: (value: unknown[]) => void) => resolve(rows),
+        };
+        return chain;
+      }),
+      query: {
+        guardianship: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      },
+    } as never;
+  }
+
+  it('marks only the server-resolved caller as current and preserves unconfirmed state', async () => {
+    const [profile] = await listProfilesV2(listDb(), organizationId, personId);
+
+    expect(profile).toMatchObject({
+      id: personId,
+      conversationLanguage: 'cs',
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+  });
+
+  it('does not enumerate a sibling target as the authenticated caller', async () => {
+    const profiles = await listProfilesV2(
+      listDb(),
+      organizationId,
+      '770e8400-e29b-41d4-a716-446655440000',
+    );
+
+    expect(profiles).toEqual([]);
   });
 });

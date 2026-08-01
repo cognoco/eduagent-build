@@ -2,12 +2,10 @@
 // Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 //
-// GC6 deferred: 6 internal mocks (gc1-allow annotated) — ../services/sentry,
-// ../services/account, ../services/profile, ../services/billing,
-// ../services/session, ../inngest/client. Burn-down is out of scope here
-// (2000+ line route test spanning multiple service layers); tracked in
-// docs/plans/2026-05-12-internal-mock-cleanup-inventory.md alongside the
-// broader sessions-route harness work.
+// [WI-2514] The six deferred internal module mocks were removed. This suite
+// keeps the real module graph and observes only the exact Sentry, billing,
+// session, and Inngest exports that form route boundaries. Legacy account and
+// profile mocks were deleted after the identity-v2 cutover made them dead.
 
 import {
   installTestJwksInterceptor,
@@ -15,24 +13,6 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
-
-// [BUG-666] capture mock used by the SSE-onComplete-failure break test
-const mockCaptureException = jest.fn();
-const mockAddBreadcrumb = jest.fn();
-const mockCaptureMessage = jest.fn();
-
-jest.mock('../services/sentry', () => {
-  const actual = jest.requireActual(
-    '../services/sentry',
-  ) as typeof import('../services/sentry');
-  return {
-    ...actual,
-    // overrides
-    addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-    captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
-  };
-});
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -47,72 +27,26 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-// ---------------------------------------------------------------------------
-// Mock account + session services — no DB interaction
-// ---------------------------------------------------------------------------
-
-jest.mock('../services/account', () => {
-  const actual = jest.requireActual(
-    '../services/account',
-  ) as typeof import('../services/account');
-  return {
-    ...actual,
-    // overrides
-    findOrCreateAccount: jest.fn().mockResolvedValue({
-      id: 'test-account-id',
-      clerkUserId: 'user_test',
-      email: 'test@example.com',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
-  };
-});
-
-// ---------------------------------------------------------------------------
-// Mock profile service — middleware auto-resolves owner profile
-// ---------------------------------------------------------------------------
-
-jest.mock('../services/profile', () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    // overrides
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: null,
-      location: null,
-      consentStatus: 'CONSENTED',
-    }),
-    findOwnerProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: null,
-      location: null,
-      consentStatus: 'CONSENTED',
-    }),
-  };
-});
-
 // [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the account middleware resolves
 // identity via resolveIdentityV2; stub it so flag-ON route tests authenticate
 // without an unmocked DB (resolver itself is covered by identity integration tests).
+const mockResolveIdentityV2 = jest.fn().mockResolvedValue({
+  account: {
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  personId: 'test-profile-id',
+  organizationId: 'test-account-id',
+  isOwner: true,
+  roles: ['admin'],
+});
 jest.mock(
   '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
   () => ({
-    resolveIdentityV2: jest.fn().mockResolvedValue({
-      account: {
-        id: 'test-account-id',
-        clerkUserId: 'user_test',
-        email: 'test@example.com',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      personId: 'test-profile-id',
-      organizationId: 'test-account-id',
-      isOwner: true,
-      roles: ['admin'],
-    }),
+    resolveIdentityV2: (...a: unknown[]) => mockResolveIdentityV2(...a),
   }),
 );
 
@@ -165,13 +99,14 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by /summary, /summary/retry-feedback,
-// /recall-bridge, and /subjects/:subjectId/sessions/first-curriculum — the
-// request-time LLM routes OUTSIDE the exchange pipeline) runs
+// assertLlmConsent is mocked as a route-level tripwire for the mixed summary
+// and Recall Bridge routes. Their service boundaries own the real checks; a
+// rejecting mock here proves deterministic route branches do not over-gate.
+// The real helper runs
 // isLlmExchangeConsentAllowed, which reads db.query.membership /
 // consentGrant — real queries with no controllable behavior on this file's
 // mock DB. Defaults to allowed (resolves undefined = no throw); the
-// consent-withdrawal test suite below overrides with
+// consent-withdrawal test suites below override with
 // mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
 // refusal path. Mirrors the subjects.test.ts pattern. The exchange pipeline
 // itself (/messages, /stream) is gated separately inside the mocked
@@ -250,48 +185,6 @@ const mockRefundQuotaOrEscalate = jest.fn(
       ? mockSafeRefundQuota(db, subscriptionId, ctx)
       : { refunded: false },
 );
-
-jest.mock('../services/billing', () => {
-  const actual = jest.requireActual(
-    '../services/billing',
-  ) as typeof import('../services/billing');
-  return {
-    ...actual,
-    // overrides
-    getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
-    ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
-    getEffectiveAccessForSubscription: jest.fn().mockResolvedValue({
-      subscription: mockSubscription,
-      effectiveAccessTier: 'plus',
-      billingAccess: 'current',
-    }),
-    getQuotaPool: jest.fn().mockResolvedValue({
-      id: 'qp-1',
-      subscriptionId: 'sub-1',
-      monthlyLimit: 500,
-      usedThisMonth: 10,
-      dailyLimit: null,
-      usedToday: 0,
-      cycleResetAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
-    getOrProvisionProfileQuotaUsage: (...args: unknown[]) =>
-      mockGetOrProvisionProfileQuotaUsage(...args),
-    decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
-    getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
-    incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
-    safeRefundQuota: (...args: unknown[]) =>
-      mockSafeRefundQuota(args[0], args[1] as string, args[2]),
-    refundQuotaOrEscalate: (...args: unknown[]) =>
-      mockRefundQuotaOrEscalate(
-        args[0],
-        args[1] as string | undefined,
-        args[2] as { source?: string } | undefined,
-      ),
-    createSubscription: jest.fn(),
-  };
-});
 
 // [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the metering middleware reads
 // the billing-v2 store twins instead of the legacy billing reads. Stub them with
@@ -372,72 +265,17 @@ jest.mock(
   },
 );
 
-jest.mock('../services/session', () => {
-  // Use real error classes so instanceof checks in route handlers match production behavior.
-  const actual = jest.requireActual(
-    '../services/session',
-  ) as typeof import('../services/session');
-  return {
-    ...actual,
-    // overrides
-    // [L8-F11] Mock shape extended to match learningSessionSchema, which
-    // the route now parses (was previously passing through unvalidated).
-    // Added fields: inputMode, verificationType, wallClockSeconds, filedAt,
-    // filingStatus, filingRetryCount, and nullable display fields.
-    startSession: jest
-      .fn()
-      .mockImplementation((_db, _profileId, subjectId, input) => ({
-        id: SESSION_ID,
-        subjectId,
-        topicId: input.topicId ?? null,
-        topicTitle: null,
-        subjectName: null,
-        bookId: null,
-        bookTitle: null,
-        sessionType: 'learning',
-        inputMode: 'text',
-        verificationType: null,
-        status: 'active',
-        escalationRung: 1,
-        exchangeCount: 0,
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        endedAt: null,
-        durationSeconds: null,
-        wallClockSeconds: null,
-        filedAt: null,
-        filingStatus: null,
-        filingRetryCount: 0,
-      })),
-    startFirstCurriculumSession: jest
-      .fn()
-      .mockImplementation((_db, _profileId, subjectId, input) => ({
-        id: SESSION_ID,
-        subjectId,
-        topicId: '770e8400-e29b-41d4-a716-446655440001',
-        topicTitle: null,
-        subjectName: null,
-        bookId: null,
-        bookTitle: null,
-        sessionType: input.sessionType ?? 'learning',
-        inputMode: 'text',
-        verificationType: null,
-        status: 'active',
-        escalationRung: 1,
-        exchangeCount: 0,
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        endedAt: null,
-        durationSeconds: null,
-        wallClockSeconds: null,
-        filedAt: null,
-        filingStatus: null,
-        filingRetryCount: 0,
-      })),
-    getSession: jest.fn().mockResolvedValue({
+const sessionServiceOverrides = {
+  // [L8-F11] Mock shape extended to match learningSessionSchema, which
+  // the route now parses (was previously passing through unvalidated).
+  // Added fields: inputMode, verificationType, wallClockSeconds, filedAt,
+  // filingStatus, filingRetryCount, and nullable display fields.
+  startSession: jest
+    .fn()
+    .mockImplementation((_db, _profileId, subjectId, input) => ({
       id: SESSION_ID,
-      subjectId: SUBJECT_ID,
-      topicId: null,
+      subjectId,
+      topicId: input.topicId ?? null,
       topicTitle: null,
       subjectName: null,
       bookId: null,
@@ -456,182 +294,228 @@ jest.mock('../services/session', () => {
       filedAt: null,
       filingStatus: null,
       filingRetryCount: 0,
-      metadata: {
-        effectiveMode: 'recitation',
-        __serverRecitationSetupClaim: {
-          phase: 'ready',
-          clarificationCount: 1,
-          lastClientId: 'private-replay-key',
-        },
-      },
-    }),
-    processMessage: jest.fn().mockResolvedValue({
-      response: 'Mock AI tutor response',
+    })),
+  startFirstCurriculumSession: jest
+    .fn()
+    .mockImplementation((_db, _profileId, subjectId, input) => ({
+      id: SESSION_ID,
+      subjectId,
+      topicId: '770e8400-e29b-41d4-a716-446655440001',
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
+      sessionType: input.sessionType ?? 'learning',
+      inputMode: 'text',
+      verificationType: null,
+      status: 'active',
       escalationRung: 1,
-      isUnderstandingCheck: false,
-      exchangeCount: 1,
-    }),
-    closeSession: jest
-      .fn()
-      .mockImplementation((_db, _profileId, sessionId, input = {}) => ({
-        message: 'Session closed',
-        sessionId,
-        topicId: null,
-        subjectId: SUBJECT_ID,
-        sessionType: 'learning',
-        verificationType: null,
-        wallClockSeconds: 600,
-        summaryStatus: input.summaryStatus ?? 'pending',
-        escalationRungs: [1, 2],
-      })),
-    getSessionCompletionContext: jest
-      .fn()
-      .mockImplementation((_db, _profileId, sessionId) => ({
-        sessionId,
-        topicId: null,
-        subjectId: SUBJECT_ID,
-        sessionType: 'learning',
-        verificationType: null,
-        escalationRungs: [1, 2],
-      })),
-    getSessionTranscript: jest.fn().mockResolvedValue({
-      session: {
-        sessionId: SESSION_ID,
-        subjectId: SUBJECT_ID,
-        topicId: null,
-        sessionType: 'learning',
-        startedAt: new Date().toISOString(),
-        exchangeCount: 2,
-        inputMode: 'text',
-        milestonesReached: ['polar_star'],
-        wallClockSeconds: 600,
+      exchangeCount: 0,
+      startedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+    })),
+  getSession: jest.fn().mockResolvedValue({
+    id: SESSION_ID,
+    subjectId: SUBJECT_ID,
+    topicId: null,
+    topicTitle: null,
+    subjectName: null,
+    bookId: null,
+    bookTitle: null,
+    sessionType: 'learning',
+    inputMode: 'text',
+    verificationType: null,
+    status: 'active',
+    escalationRung: 1,
+    exchangeCount: 0,
+    startedAt: new Date().toISOString(),
+    lastActivityAt: new Date().toISOString(),
+    endedAt: null,
+    durationSeconds: null,
+    wallClockSeconds: null,
+    filedAt: null,
+    filingStatus: null,
+    filingRetryCount: 0,
+    metadata: {
+      effectiveMode: 'recitation',
+      __serverRecitationSetupClaim: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastClientId: 'private-replay-key',
       },
-      exchanges: [
-        {
-          role: 'user',
-          content: 'What is gravity?',
-          timestamp: new Date().toISOString(),
-        },
-        {
-          role: 'assistant',
-          content: 'Gravity pulls objects together.',
-          timestamp: new Date().toISOString(),
-          escalationRung: 1,
-        },
-        {
-          role: 'assistant',
-          content:
-            "Still working on it? Take your time - I'm here when you're ready.",
-          timestamp: new Date().toISOString(),
-          isSystemPrompt: true,
-        },
-      ],
-    }),
-    recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
-    recordSessionEvent: jest.fn().mockResolvedValue(undefined),
-    setSessionInputMode: jest
-      .fn()
-      .mockImplementation((_db, _profileId, sessionId, input) => ({
-        id: sessionId,
-        subjectId: SUBJECT_ID,
-        topicId: null,
-        topicTitle: null,
-        subjectName: null,
-        bookId: null,
-        bookTitle: null,
-        sessionType: 'learning',
-        inputMode: input.inputMode,
-        verificationType: null,
-        status: 'active',
+    },
+  }),
+  processMessage: jest.fn().mockResolvedValue({
+    response: 'Mock AI tutor response',
+    escalationRung: 1,
+    isUnderstandingCheck: false,
+    exchangeCount: 1,
+  }),
+  closeSession: jest
+    .fn()
+    .mockImplementation((_db, _profileId, sessionId, input = {}) => ({
+      message: 'Session closed',
+      sessionId,
+      topicId: null,
+      subjectId: SUBJECT_ID,
+      sessionType: 'learning',
+      verificationType: null,
+      wallClockSeconds: 600,
+      summaryStatus: input.summaryStatus ?? 'pending',
+      escalationRungs: [1, 2],
+    })),
+  getSessionCompletionContext: jest
+    .fn()
+    .mockImplementation((_db, _profileId, sessionId) => ({
+      sessionId,
+      topicId: null,
+      subjectId: SUBJECT_ID,
+      sessionType: 'learning',
+      verificationType: null,
+      escalationRungs: [1, 2],
+    })),
+  getSessionTranscript: jest.fn().mockResolvedValue({
+    session: {
+      sessionId: SESSION_ID,
+      subjectId: SUBJECT_ID,
+      topicId: null,
+      sessionType: 'learning',
+      startedAt: new Date().toISOString(),
+      exchangeCount: 2,
+      inputMode: 'text',
+      milestonesReached: ['polar_star'],
+      wallClockSeconds: 600,
+    },
+    exchanges: [
+      {
+        role: 'user',
+        content: 'What is gravity?',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        role: 'assistant',
+        content: 'Gravity pulls objects together.',
+        timestamp: new Date().toISOString(),
         escalationRung: 1,
-        exchangeCount: 2,
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
-        endedAt: null,
-        durationSeconds: null,
-        wallClockSeconds: null,
-        filedAt: null,
-        filingStatus: null,
-        filingRetryCount: 0,
-      })),
-    flagContent: jest.fn().mockResolvedValue({
-      message: 'Content flagged for review. Thank you!',
-    }),
-    getSessionSummary: jest.fn().mockResolvedValue(null),
-    skipSummary: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
+      },
+      {
+        role: 'assistant',
+        content:
+          "Still working on it? Take your time - I'm here when you're ready.",
+        timestamp: new Date().toISOString(),
+        isSystemPrompt: true,
+      },
+    ],
+  }),
+  recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
+  recordSessionEvent: jest.fn().mockResolvedValue(undefined),
+  setSessionInputMode: jest
+    .fn()
+    .mockImplementation((_db, _profileId, sessionId, input) => ({
+      id: sessionId,
+      subjectId: SUBJECT_ID,
+      topicId: null,
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
+      sessionType: 'learning',
+      inputMode: input.inputMode,
+      verificationType: null,
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 2,
+      startedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+    })),
+  flagContent: jest.fn().mockResolvedValue({
+    message: 'Content flagged for review. Thank you!',
+  }),
+  getSessionSummary: jest.fn().mockResolvedValue(null),
+  skipSummary: jest.fn().mockImplementation((_db, _profileId, sessionId) => ({
+    summary: {
+      id: 'summary-1',
+      sessionId,
+      content: '',
+      aiFeedback: null,
+      status: 'skipped',
+    },
+  })),
+  syncHomeworkState: jest.fn().mockResolvedValue({
+    metadata: {
+      problemCount: 2,
+      currentProblemIndex: 1,
+      problems: [],
+    },
+  }),
+  submitSummary: jest
+    .fn()
+    .mockImplementation((_db, _profileId, sessionId, input) => ({
       summary: {
         id: 'summary-1',
         sessionId,
-        content: '',
-        aiFeedback: null,
-        status: 'skipped',
+        content: input.content,
+        aiFeedback: 'Great summary! You captured the key concepts.',
+        feedbackStatus: 'available',
+        status: 'accepted',
+        baseXp: null,
+        reflectionBonusXp: null,
       },
     })),
-    syncHomeworkState: jest.fn().mockResolvedValue({
-      metadata: {
-        problemCount: 2,
-        currentProblemIndex: 1,
-        problems: [],
+  retrySummaryFeedback: jest
+    .fn()
+    .mockImplementation((_db, _profileId, sessionId) => ({
+      summary: {
+        id: '880e8400-e29b-41d4-a716-446655440001',
+        sessionId,
+        content: 'Saved learner summary',
+        aiFeedback: 'Clear explanation.',
+        feedbackStatus: 'available',
+        status: 'accepted',
       },
-    }),
-    submitSummary: jest
-      .fn()
-      .mockImplementation((_db, _profileId, sessionId, input) => ({
-        summary: {
-          id: 'summary-1',
-          sessionId,
-          content: input.content,
-          aiFeedback: 'Great summary! You captured the key concepts.',
-          feedbackStatus: 'available',
-          status: 'accepted',
-          baseXp: null,
-          reflectionBonusXp: null,
-        },
-      })),
-    retrySummaryFeedback: jest
-      .fn()
-      .mockImplementation((_db, _profileId, sessionId) => ({
-        summary: {
-          id: '880e8400-e29b-41d4-a716-446655440001',
-          sessionId,
-          content: 'Saved learner summary',
-          aiFeedback: 'Clear explanation.',
-          feedbackStatus: 'available',
-          status: 'accepted',
-        },
-      })),
-    streamMessage: jest.fn().mockImplementation(() =>
-      Promise.resolve({
-        stream: (async function* () {
-          yield 'Hello ';
-          yield 'world!';
-        })(),
-        onComplete: jest.fn().mockResolvedValue({
-          exchangeCount: 1,
-          escalationRung: 1,
-        }),
+    })),
+  streamMessage: jest.fn().mockImplementation(() =>
+    Promise.resolve({
+      stream: (async function* () {
+        yield 'Hello ';
+        yield 'world!';
+      })(),
+      onComplete: jest.fn().mockResolvedValue({
+        exchangeCount: 1,
+        escalationRung: 1,
       }),
-    ),
-    claimSessionForFilingRetry: actual.claimSessionForFilingRetry,
-    markSessionKeptOutOfLibrary: jest.fn(),
-    requestSessionLibraryFiling: jest.fn(),
-    restoreSessionForAutoFiling: jest.fn(),
-    resetFilingForRetry: jest.fn(),
-    getSubjectSessions: jest.fn().mockResolvedValue([
-      {
-        id: '11111111-1111-4111-8111-111111111111',
-        topicId: '22222222-2222-4222-8222-222222222222',
-        topicTitle: 'Fractions',
-        bookId: '33333333-3333-4333-8333-333333333333',
-        bookTitle: 'Numbers',
-        chapter: 'Chapter 1',
-        sessionType: 'learning',
-        durationSeconds: 600,
-        createdAt: '2026-05-01T10:00:00.000Z',
-      },
-    ]),
-  };
-});
+    }),
+  ),
+  markSessionKeptOutOfLibrary: jest.fn(),
+  requestSessionLibraryFiling: jest.fn(),
+  restoreSessionForAutoFiling: jest.fn(),
+  resetFilingForRetry: jest.fn(),
+  getSubjectSessions: jest.fn().mockResolvedValue([
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      topicId: '22222222-2222-4222-8222-222222222222',
+      topicTitle: 'Fractions',
+      bookId: '33333333-3333-4333-8333-333333333333',
+      bookTitle: 'Numbers',
+      chapter: 'Chapter 1',
+      sessionType: 'learning',
+      durationSeconds: 600,
+      createdAt: '2026-05-01T10:00:00.000Z',
+    },
+  ]),
+};
 
 const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   sessionId: 'interleaved-session-001',
@@ -674,7 +558,9 @@ jest.mock('../services/recall-bridge', () => {
     ...actual,
     // overrides
     generateRecallBridge: jest.fn().mockResolvedValue({
-      bridge: 'mock bridge',
+      questions: [],
+      topicId: '',
+      topicTitle: '',
     }),
   };
 });
@@ -698,24 +584,242 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../inngest/client', () => {
-  const actual = jest.requireActual(
-    '../inngest/client',
-  ) as typeof import('../inngest/client');
-  return {
-    ...actual,
-    // overrides
-    inngest: {
-      send: (...args: unknown[]) => mockInngestSend(...args),
-      createFunction: jest.fn().mockReturnValue(jest.fn()),
-    },
-  };
-});
-
 import { inngest } from '../inngest/client';
-import {
+import * as billingService from '../services/billing';
+import * as sentryService from '../services/sentry';
+import * as sessionService from '../services/session';
+import { app } from '../index';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
+import { FILING_CONFIG } from '../config/filing';
+import { generateRecallBridge } from '../services/recall-bridge';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+
+// [WI-2514] Observe the real internal modules at their exported boundaries.
+// The spies prevent external egress / database-backed service execution while
+// keeping every non-overridden export and the real module graph intact.
+const mockCaptureException = jest
+  .spyOn(sentryService, 'captureException')
+  .mockImplementation(() => undefined);
+const mockAddBreadcrumb = jest
+  .spyOn(sentryService, 'addBreadcrumb')
+  .mockImplementation(() => undefined);
+const mockCaptureMessage = jest
+  .spyOn(sentryService, 'captureMessage')
+  .mockImplementation(() => undefined);
+
+jest
+  .spyOn(billingService, 'decrementQuota')
+  .mockImplementation((...args) => mockDecrementQuota(...args));
+jest.spyOn(billingService, 'getTopUpCreditsRemaining').mockResolvedValue(0);
+jest
+  .spyOn(billingService, 'safeRefundQuota')
+  .mockImplementation((...args) =>
+    mockSafeRefundQuota(args[0], args[1], args[2]),
+  );
+jest
+  .spyOn(billingService, 'refundQuotaOrEscalate')
+  .mockImplementation((...args) =>
+    mockRefundQuotaOrEscalate(args[0], args[1], args[2]),
+  );
+
+jest
+  .spyOn(sessionService, 'startSession')
+  .mockImplementation(sessionServiceOverrides.startSession);
+jest
+  .spyOn(sessionService, 'startFirstCurriculumSession')
+  .mockImplementation(sessionServiceOverrides.startFirstCurriculumSession);
+jest
+  .spyOn(sessionService, 'getSession')
+  .mockImplementation(sessionServiceOverrides.getSession);
+jest
+  .spyOn(sessionService, 'processMessage')
+  .mockImplementation(sessionServiceOverrides.processMessage);
+jest
+  .spyOn(sessionService, 'closeSession')
+  .mockImplementation(sessionServiceOverrides.closeSession);
+jest
+  .spyOn(sessionService, 'getSessionCompletionContext')
+  .mockImplementation(sessionServiceOverrides.getSessionCompletionContext);
+jest
+  .spyOn(sessionService, 'getSessionTranscript')
+  .mockImplementation(sessionServiceOverrides.getSessionTranscript);
+jest
+  .spyOn(sessionService, 'recordSystemPrompt')
+  .mockImplementation(sessionServiceOverrides.recordSystemPrompt);
+jest
+  .spyOn(sessionService, 'recordSessionEvent')
+  .mockImplementation(sessionServiceOverrides.recordSessionEvent);
+jest
+  .spyOn(sessionService, 'setSessionInputMode')
+  .mockImplementation(sessionServiceOverrides.setSessionInputMode);
+jest
+  .spyOn(sessionService, 'flagContent')
+  .mockImplementation(sessionServiceOverrides.flagContent);
+jest
+  .spyOn(sessionService, 'getSessionSummary')
+  .mockImplementation(sessionServiceOverrides.getSessionSummary);
+jest
+  .spyOn(sessionService, 'skipSummary')
+  .mockImplementation(sessionServiceOverrides.skipSummary);
+jest
+  .spyOn(sessionService, 'syncHomeworkState')
+  .mockImplementation(sessionServiceOverrides.syncHomeworkState);
+jest
+  .spyOn(sessionService, 'submitSummary')
+  .mockImplementation(sessionServiceOverrides.submitSummary);
+jest
+  .spyOn(sessionService, 'retrySummaryFeedback')
+  .mockImplementation(sessionServiceOverrides.retrySummaryFeedback);
+jest
+  .spyOn(sessionService, 'streamMessage')
+  .mockImplementation(sessionServiceOverrides.streamMessage);
+jest
+  .spyOn(sessionService, 'markSessionKeptOutOfLibrary')
+  .mockImplementation(sessionServiceOverrides.markSessionKeptOutOfLibrary);
+jest
+  .spyOn(sessionService, 'requestSessionLibraryFiling')
+  .mockImplementation(sessionServiceOverrides.requestSessionLibraryFiling);
+jest
+  .spyOn(sessionService, 'restoreSessionForAutoFiling')
+  .mockImplementation(sessionServiceOverrides.restoreSessionForAutoFiling);
+jest
+  .spyOn(sessionService, 'resetFilingForRetry')
+  .mockImplementation(sessionServiceOverrides.resetFilingForRetry);
+jest
+  .spyOn(sessionService, 'getSubjectSessions')
+  .mockImplementation(sessionServiceOverrides.getSubjectSessions);
+
+const mockInngestSend = jest
+  .spyOn(inngest, 'send')
+  .mockResolvedValue({ ids: [] } as never);
+
+function resetPersistentBoundarySpies(): void {
+  mockCaptureException.mockReset().mockImplementation(() => undefined);
+  mockAddBreadcrumb.mockReset().mockImplementation(() => undefined);
+  mockCaptureMessage.mockReset().mockImplementation(() => undefined);
+
+  jest
+    .mocked(billingService.decrementQuota)
+    .mockReset()
+    .mockImplementation((...args) => mockDecrementQuota(...args));
+  jest
+    .mocked(billingService.getTopUpCreditsRemaining)
+    .mockReset()
+    .mockResolvedValue(0);
+  jest
+    .mocked(billingService.safeRefundQuota)
+    .mockReset()
+    .mockImplementation((...args) =>
+      mockSafeRefundQuota(args[0], args[1], args[2]),
+    );
+  jest
+    .mocked(billingService.refundQuotaOrEscalate)
+    .mockReset()
+    .mockImplementation((...args) =>
+      mockRefundQuotaOrEscalate(args[0], args[1], args[2]),
+    );
+
+  jest
+    .mocked(sessionService.startSession)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.startSession);
+  jest
+    .mocked(sessionService.startFirstCurriculumSession)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.startFirstCurriculumSession);
+  jest
+    .mocked(sessionService.getSession)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.getSession);
+  jest
+    .mocked(sessionService.processMessage)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.processMessage);
+  jest
+    .mocked(sessionService.closeSession)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.closeSession);
+  jest
+    .mocked(sessionService.getSessionCompletionContext)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.getSessionCompletionContext);
+  jest
+    .mocked(sessionService.getSessionTranscript)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.getSessionTranscript);
+  jest
+    .mocked(sessionService.recordSystemPrompt)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.recordSystemPrompt);
+  jest
+    .mocked(sessionService.recordSessionEvent)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.recordSessionEvent);
+  jest
+    .mocked(sessionService.setSessionInputMode)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.setSessionInputMode);
+  jest
+    .mocked(sessionService.flagContent)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.flagContent);
+  jest
+    .mocked(sessionService.getSessionSummary)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.getSessionSummary);
+  jest
+    .mocked(sessionService.skipSummary)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.skipSummary);
+  jest
+    .mocked(sessionService.syncHomeworkState)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.syncHomeworkState);
+  jest
+    .mocked(sessionService.submitSummary)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.submitSummary);
+  jest
+    .mocked(sessionService.retrySummaryFeedback)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.retrySummaryFeedback);
+  jest
+    .mocked(sessionService.streamMessage)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.streamMessage);
+  jest
+    .mocked(sessionService.markSessionKeptOutOfLibrary)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.markSessionKeptOutOfLibrary);
+  jest
+    .mocked(sessionService.requestSessionLibraryFiling)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.requestSessionLibraryFiling);
+  jest
+    .mocked(sessionService.restoreSessionForAutoFiling)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.restoreSessionForAutoFiling);
+  jest
+    .mocked(sessionService.resetFilingForRetry)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.resetFilingForRetry);
+  jest
+    .mocked(sessionService.getSubjectSessions)
+    .mockReset()
+    .mockImplementation(sessionServiceOverrides.getSubjectSessions);
+
+  for (const override of Object.values(sessionServiceOverrides)) {
+    override.mockClear();
+  }
+  mockDecrementQuota.mockClear();
+  mockIncrementQuota.mockClear();
+  mockSafeRefundQuota.mockClear();
+  mockRefundQuotaOrEscalate.mockClear();
+  mockInngestSend.mockReset().mockResolvedValue({ ids: [] } as never);
+}
+
+const {
   closeSession,
   processMessage,
   streamMessage,
@@ -735,13 +839,7 @@ import {
   submitSummary,
   retrySummaryFeedback,
   getSessionSummary,
-} from '../services/session';
-import { app } from '../index';
-import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
-import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
-import { FILING_CONFIG } from '../config/filing';
-import { generateRecallBridge } from '../services/recall-bridge';
-import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+} = sessionService;
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -760,11 +858,44 @@ describe('session routes', () => {
   });
 
   beforeEach(() => {
-    mockGetMentorNoticeReceipt.mockResolvedValue(null);
+    resetPersistentBoundarySpies();
+    mockResolveIdentityV2.mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'test-profile-id',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    });
+    mockGetPersonScope.mockResolvedValue({
+      profileId: 'test-profile-id',
+      meta: {
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    });
+    jest
+      .mocked(generateRecallBridge)
+      .mockReset()
+      .mockResolvedValue({ questions: [], topicId: '', topicTitle: '' });
+    jest.mocked(assertLlmConsent).mockReset().mockResolvedValue(undefined);
+    mockGetMentorNoticeReceipt.mockReset().mockResolvedValue(null);
     clearJWKSCache();
   });
   describe('POST /v1/sessions/:sessionId/recall-bridge mentor notice suppression', () => {
-    it('returns typed 409 before invoking the Recall Bridge generator', async () => {
+    it('returns typed 409 after consent withdrawal without invoking the Recall Bridge generator', async () => {
+      jest
+        .mocked(assertLlmConsent)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
       jest.mocked(getSession).mockResolvedValueOnce({
         sessionType: 'homework',
       } as never);
@@ -785,6 +916,7 @@ describe('session routes', () => {
         code: 'RECALL_BRIDGE_SUPPRESSED',
       });
       expect(generateRecallBridge).not.toHaveBeenCalled();
+      expect(assertLlmConsent).not.toHaveBeenCalled();
     });
   });
 
@@ -874,17 +1006,19 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). generateRecallBridge unconditionally dispatches the LLM.
+  // [WI-2543 rework 2] The mixed route delegates to the Recall Bridge service;
+  // that service gates only its final LLM branch.
   // -------------------------------------------------------------------------
   describe('[WI-2396] recall-bridge consent-withdrawal gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls generateRecallBridge when consent is withdrawn', async () => {
-      // The consent gate runs before getSession, so no getSession fixture
-      // is needed here — a leftover mockResolvedValueOnce would never be
-      // consumed and would leak into a later, unrelated test.
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
+      jest.mocked(getSession).mockResolvedValueOnce({
+        sessionType: 'homework',
+      } as never);
+      jest
+        .mocked(generateRecallBridge)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/recall-bridge`,
@@ -895,10 +1029,11 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(generateRecallBridge).not.toHaveBeenCalled();
+      expect(generateRecallBridge).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
+    it('delegates the LLM-ready branch without a route-entry consent gate', async () => {
       jest.mocked(getSession).mockResolvedValueOnce({
         sessionType: 'homework',
       } as never);
@@ -915,10 +1050,7 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(generateRecallBridge).toHaveBeenCalled();
     });
   });
@@ -1082,21 +1214,18 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). startFirstCurriculumSession's topic-intent matcher
-  // (matchTopicByIntent -> routeAndCall) dispatches the LLM when
-  // MATCHER_ENABLED and multiple candidate topics exist; gated
-  // unconditionally since this endpoint is the only entry point.
+  // [WI-2543] Consent gate lives inside the first-curriculum service at each
+  // LLM dispatch boundary; deterministic service branches remain callable.
   // -------------------------------------------------------------------------
-  describe('[WI-2396] first-curriculum consent-withdrawal gate', () => {
+  describe('[WI-2543] first-curriculum granular consent gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls startFirstCurriculumSession when consent is withdrawn', async () => {
-      // Clear call history from the preceding describe's tests so
-      // .not.toHaveBeenCalled() below asserts this request's behavior, not
-      // an earlier test's leftover call count.
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
       jest.mocked(startFirstCurriculumSession).mockClear();
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      assertLlmConsentMock.mockClear();
+      jest
+        .mocked(startFirstCurriculumSession)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
@@ -1111,26 +1240,33 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(startFirstCurriculumSession).not.toHaveBeenCalled();
+      expect(startFirstCurriculumSession).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
-      const res = await app.request(
-        `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
-        },
-        TEST_ENV,
-      );
+    it('delegates deterministic service branches after consent withdrawal', async () => {
+      assertLlmConsentMock.mockClear();
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+      try {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              sessionType: 'learning',
+              inputMode: 'text',
+            }),
+          },
+          TEST_ENV,
+        );
 
-      expect(res.status).toBe(201);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
-      expect(startFirstCurriculumSession).toHaveBeenCalled();
+        expect(res.status).toBe(201);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(startFirstCurriculumSession).toHaveBeenCalled();
+      } finally {
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
     });
   });
 
@@ -1677,7 +1813,6 @@ describe('session routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/sessions/:sessionId/close', () => {
-    let sendSpy: jest.SpyInstance;
     const AUTO_FILE_PROFILE_ID = TEST_PROFILE_ID;
     const AUTO_FILE_AUTH_HEADERS = {
       ...AUTH_HEADERS,
@@ -1701,17 +1836,38 @@ describe('session routes', () => {
     };
 
     beforeEach(() => {
+      mockGetPersonScope.mockResolvedValue({
+        profileId: AUTO_FILE_PROFILE_ID,
+        meta: {
+          birthYear: null,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      });
+      mockResolveIdentityV2.mockResolvedValue({
+        account: {
+          id: 'test-account-id',
+          clerkUserId: 'user_test',
+          email: 'test@example.com',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        personId: AUTO_FILE_PROFILE_ID,
+        organizationId: 'test-account-id',
+        isOwner: true,
+        roles: ['admin'],
+      });
       mockSessionCrudGetSession.mockImplementation((...args) =>
         (getSession as jest.Mock)(...args),
       );
-      sendSpy = jest
-        .spyOn(inngest, 'send')
-        .mockResolvedValue({ ids: [] } as never);
+      mockInngestSend.mockClear();
     });
 
     afterEach(() => {
       mockSessionCrudGetSession.mockReset();
-      sendSpy.mockRestore();
     });
 
     it('returns 200 with session closed', async () => {
@@ -1747,7 +1903,7 @@ describe('session routes', () => {
       // [BUG-820] id: keyed on (sessionId, summaryStatus) so a retried
       // /close with summaryStatus='skipped' is deduped by Inngest instead of
       // double-applying the post-session pipeline.
-      expect(sendSpy).toHaveBeenCalledWith({
+      expect(mockInngestSend).toHaveBeenCalledWith({
         id: `session-completed-${SESSION_ID}-skipped`,
         name: 'app/session.completed',
         data: expect.objectContaining({
@@ -1772,7 +1928,7 @@ describe('session routes', () => {
         TEST_ENV,
       );
 
-      expect(sendSpy).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
     });
 
     it('dispatches close-path auto-file for eligible freeform sessions with the initial dedupe id', async () => {
@@ -1809,7 +1965,7 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(sendSpy).toHaveBeenCalledWith({
+      expect(mockInngestSend).toHaveBeenCalledWith({
         id: `auto-file-${SESSION_ID}-initial`,
         name: 'app/session.auto_file_requested',
         data: expect.objectContaining({
@@ -1855,7 +2011,7 @@ describe('session routes', () => {
         TEST_ENV,
       );
 
-      expect(sendSpy).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
     });
 
     it('does not fail close when opportunistic auto-file dispatch fails', async () => {
@@ -1880,7 +2036,7 @@ describe('session routes', () => {
         filingStatus: null,
         filingRetryCount: 0,
       });
-      sendSpy.mockRejectedValueOnce(new Error('inngest unavailable'));
+      mockInngestSend.mockRejectedValueOnce(new Error('inngest unavailable'));
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
@@ -1895,7 +2051,7 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.message).toBe('Session closed');
-      expect(sendSpy).toHaveBeenCalledWith(
+      expect(mockInngestSend).toHaveBeenCalledWith(
         expect.objectContaining({
           id: `auto-file-${SESSION_ID}-initial`,
           name: 'app/session.auto_file_requested',
@@ -1912,7 +2068,7 @@ describe('session routes', () => {
       // This is a CORE dispatch — silent drop breaks pipeline integrity.
       // The fix captures context for Sentry then RETHROWS so the global
       // onError handler converts it into a 5xx and the client retries.
-      sendSpy.mockRejectedValueOnce(new Error('inngest network down'));
+      mockInngestSend.mockRejectedValueOnce(new Error('inngest network down'));
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
@@ -1927,8 +2083,8 @@ describe('session routes', () => {
       // Must NOT be 200 — that would mean the failure was swallowed and
       // the client thinks the session completed cleanly.
       expect(res.status).toBeGreaterThanOrEqual(500);
-      // sendSpy was still called — it threw, not skipped.
-      expect(sendSpy).toHaveBeenCalledWith(
+      // The persistent send spy was still called — it threw, not skipped.
+      expect(mockInngestSend).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'app/session.completed' }),
       );
     });
@@ -1996,7 +2152,7 @@ describe('session routes', () => {
       const body = await res.json();
       // With summaryStatus stripped → defaults to 'pending' → no event dispatch
       expect(body.summaryStatus).toBe('pending');
-      expect(sendSpy).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
     });
 
     it('strips summaryStatus auto_closed from external callers', async () => {
@@ -2071,7 +2227,7 @@ describe('session routes', () => {
         TEST_ENV,
       );
 
-      expect(sendSpy).not.toHaveBeenCalledWith(
+      expect(mockInngestSend).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: 'app/session.completed' }),
       );
     });
@@ -2380,9 +2536,11 @@ describe('session routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockInngestSend).toHaveBeenCalledTimes(1);
-      expect(mockInngestSend.mock.calls[0]?.[0].data).not.toHaveProperty(
-        'qualityRating',
-      );
+      const dispatchedEvent = mockInngestSend.mock.calls[0]?.[0];
+      if (!dispatchedEvent || Array.isArray(dispatchedEvent)) {
+        throw new Error('Expected one summary-submitted Inngest event');
+      }
+      expect(dispatchedEvent.data).not.toHaveProperty('qualityRating');
     });
 
     it('returns 401 without auth header', async () => {
@@ -2519,20 +2677,20 @@ describe('session routes', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). submitSummary / retrySummaryFeedback -> evaluateSummary
-  // unconditionally dispatch the LLM. Separate from the exchange pipeline's
-  // own [WI-2372] gate ([WI-2372] tests above, /messages and /stream).
+  // [WI-2543 rework 2] Summary routes delegate to service-owned granular
+  // gates. Separate from the exchange pipeline's own [WI-2372] gate.
   // ---------------------------------------------------------------------------
   describe('[WI-2396] summary consent-withdrawal gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('POST /sessions/:sessionId/summary refuses with 403 CONSENT_WITHDRAWN and never calls submitSummary when consent is withdrawn', async () => {
+    it('POST /sessions/:sessionId/summary maps a service-boundary refusal to 403 CONSENT_WITHDRAWN', async () => {
       // Clear call history from earlier describes' tests so
       // .not.toHaveBeenCalled() below asserts this request's behavior, not
       // an earlier test's leftover call count.
       jest.mocked(submitSummary).mockClear();
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      jest
+        .mocked(submitSummary)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
@@ -2550,10 +2708,12 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(submitSummary).not.toHaveBeenCalled();
+      expect(submitSummary).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('POST /sessions/:sessionId/summary proceeds (LLM dispatched) when consent is active', async () => {
+    it('POST /sessions/:sessionId/summary delegates a saved-summary result after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
         {
@@ -2568,19 +2728,18 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(submitSummary).toHaveBeenCalled();
     });
 
-    it('POST /sessions/:sessionId/summary/retry-feedback refuses with 403 CONSENT_WITHDRAWN and never calls retrySummaryFeedback when consent is withdrawn', async () => {
+    it('POST /sessions/:sessionId/summary/retry-feedback maps a service-boundary refusal to 403 CONSENT_WITHDRAWN', async () => {
       // Clear call history from earlier describes' tests so
       // .not.toHaveBeenCalled() below asserts this request's behavior, not
       // an earlier test's leftover call count.
       jest.mocked(retrySummaryFeedback).mockClear();
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      jest
+        .mocked(retrySummaryFeedback)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
@@ -2591,10 +2750,12 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(retrySummaryFeedback).not.toHaveBeenCalled();
+      expect(retrySummaryFeedback).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('POST /sessions/:sessionId/summary/retry-feedback proceeds (LLM dispatched) when consent is active', async () => {
+    it('POST /sessions/:sessionId/summary/retry-feedback delegates a no-claim result after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
         { method: 'POST', headers: AUTH_HEADERS },
@@ -2602,10 +2763,7 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(retrySummaryFeedback).toHaveBeenCalled();
     });
   });
@@ -3919,21 +4077,19 @@ describe('session routes', () => {
     };
 
     beforeEach(() => {
-      // Override getProfile to return a UUID profile id so filingRetryEventSchema.parse
-      // does not throw (it validates profileId as z.string().uuid()).
-      const profileServiceMock = jest.requireMock('../services/profile') as {
-        getProfile: jest.Mock;
-        findOwnerProfile: jest.Mock;
-      };
-      profileServiceMock.getProfile.mockResolvedValue({
-        id: RETRY_PROFILE_ID,
-        birthYear: null,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
+      mockResolveIdentityV2.mockResolvedValue({
+        account: {
+          id: 'test-account-id',
+          clerkUserId: 'user_test',
+          email: 'test@example.com',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        personId: RETRY_PROFILE_ID,
+        organizationId: 'test-account-id',
         isOwner: true,
+        roles: ['admin'],
       });
-
       // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (v2).
       // Override to return RETRY_PROFILE_ID so filingRetryEventSchema.parse succeeds.
       mockGetPersonScope.mockResolvedValue({
@@ -3965,17 +4121,6 @@ describe('session routes', () => {
       (requestSessionLibraryFiling as jest.Mock).mockReset();
       (restoreSessionForAutoFiling as jest.Mock).mockReset();
       (resetFilingForRetry as jest.Mock).mockReset();
-      // Restore getProfile to its original mock value so other test blocks are unaffected.
-      const profileServiceMock = jest.requireMock('../services/profile') as {
-        getProfile: jest.Mock;
-        findOwnerProfile: jest.Mock;
-      };
-      profileServiceMock.getProfile.mockResolvedValue({
-        id: 'test-profile-id',
-        birthYear: null,
-        location: null,
-        consentStatus: 'CONSENTED',
-      });
       // [WI-867] Restore default getPersonScope.
       mockGetPersonScope.mockResolvedValue({
         profileId: 'test-profile-id',

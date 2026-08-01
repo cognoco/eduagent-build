@@ -124,7 +124,11 @@ describe('createMentorNoticeFromExchange', () => {
         expect(sendSpy).toHaveBeenCalledTimes(1);
         expect(sendSpy).toHaveBeenCalledWith({
           name: 'app/notice.created',
-          data: { noticeId: NOTICE_ID, profileId: PROFILE_ID },
+          data: {
+            noticeId: NOTICE_ID,
+            profileId: PROFILE_ID,
+            timestamp: expect.any(String),
+          },
         });
       } finally {
         sendResult.resolve({ ids: [] });

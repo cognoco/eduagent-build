@@ -1,0 +1,58 @@
+WI-2530 controlled-delay RGR leg 2 — LANDED-GREEN
+
+$ git rev-parse HEAD
+f9f904eb8726c94493115c848fa53531e97aaacb
+command_exit_code=0
+
+$ git restore --source=f9f904eb8726c94493115c848fa53531e97aaacb -- apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+command_exit_code=0
+
+$ git rev-parse f9f904eb8726c94493115c848fa53531e97aaacb:apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+3a4a7ced95cbaad67cf2f6ba98fd2360702e0fb7
+command_exit_code=0
+
+$ git hash-object apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+3a4a7ced95cbaad67cf2f6ba98fd2360702e0fb7
+command_exit_code=0
+source_blob_matches=yes
+
+$ git apply --check <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+command_exit_code=0
+
+$ git apply <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+command_exit_code=0
+
+$ git hash-object apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+6b50b04cde2b3a8018e70edef64b6e924f0fed65
+command_exit_code=0
+expected_controlled_blob=6b50b04cde2b3a8018e70edef64b6e924f0fed65
+controlled_blob_matches=yes
+
+$ sha256sum <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+f0a0bea6d9bbda6f0ca9782c47b60262ca0ba9327a8651e65110624c0df76d57  <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+command_exit_code=0
+expected_patch_sha256=f0a0bea6d9bbda6f0ca9782c47b60262ca0ba9327a8651e65110624c0df76d57
+patch_sha256_matches=yes
+
+started_utc=2026-08-01T10:42:36Z
+$ CI=1 FORCE_COLOR=0 pnpm dlx node@22 --max-old-space-size=6144 ./node_modules/jest/bin/jest.js --config apps/mobile/jest.config.cjs --runInBand --forceExit --runTestsByPath apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx --testNamePattern="shows session metadata when displaySummary is present"
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+PASS @eduagent/mobile apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+
+Test Suites: 1 passed, 1 total
+Tests:       14 skipped, 1 passed, 15 total
+Snapshots:   0 total
+Time:        2.316 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+jest_exit_code=0
+expected_jest_exit_code=0
+ended_utc=2026-08-01T10:42:40Z
+
+$ git restore --source=HEAD --staged --worktree -- apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+command_exit_code=0
+
+$ git status --short
+command_exit_code=0
+status_lines=0
+
+leg_result=PASS

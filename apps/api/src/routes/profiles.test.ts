@@ -65,13 +65,12 @@ jest.mock('../services/identity-v2/identity-graph', () => {
   };
 });
 
-// [WI-1302] POST /v1/profiles/switch's owner-elevation gate now derives
-// "is the caller already the owner" from callerPersonId via
-// verifyPersonIsOrgAdminV2, which runs a raw membership db.select() the
-// `{}` mock DB these route tests inject cannot satisfy. The
-// caller-identity-vs-X-Profile-Id-spoof distinction this guard exists to
-// enforce is covered by the real-DB break test in
-// tests/integration/profile-switch-elevation-idor.integration.test.ts.
+// [WI-1302 / WI-2128] The owner-elevation and profile-write gates derive
+// authority from callerPersonId via raw membership / Guardianship queries the
+// mock DB these route tests inject cannot satisfy. Caller identity versus
+// selected-profile spoofing is covered by the real-DB break tests in
+// profile-switch-elevation-idor.integration.test.ts and
+// wi2128-family-join-identity.integration.test.ts.
 jest.mock('../services/identity-v2/ownership-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/ownership-v2',
@@ -79,6 +78,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   return {
     ...actual,
     verifyPersonIsOrgAdminV2: jest.fn(),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -230,6 +230,18 @@ const verifyPersonIsOrgAdminV2Mock = jest.mocked(verifyPersonIsOrgAdminV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getPersonScopeMock.mockResolvedValue({
+    profileId: PROFILE_ID_A,
+    meta: {
+      birthYear: 2000,
+      location: null,
+      consentStatus: null,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    },
+  });
   // [WI-1302] Default: the caller is the account owner (mirrors the prior
   // default isOwner:true happy-path convention below). Non-owner-caller break
   // tests override to false per-case.
@@ -254,6 +266,7 @@ describe('GET /v1/profiles', () => {
     expect(listProfilesV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       ACCOUNT_ID,
+      CALLER_PERSON_ID,
     );
   });
 
@@ -353,6 +366,7 @@ describe('GET /v1/profiles', () => {
     expect(listProfilesV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       ACCOUNT_ID,
+      CALLER_PERSON_ID,
     );
   });
 
@@ -416,15 +430,18 @@ describe('POST /v1/profiles', () => {
     });
     getOwnerProfileV2Mock.mockResolvedValue(profile);
 
-    const res = await makeApp().request('/v1/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        displayName: 'Alex',
-        birthYear: 2000,
-        location: 'EU',
-      }),
-    });
+    const res = await makeApp({ callerPersonId: PROFILE_ID_A }).request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Alex',
+          birthYear: 2000,
+          location: 'EU',
+        }),
+      },
+    );
 
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -661,23 +678,29 @@ describe('POST /v1/profiles', () => {
 
   // [WI-867] CUT: assertProfileCreationAllowed gates no longer called in v2 path.
   // WI-811 tests below cover the v2 child-create authorization.
-  it('[WI-811] returns 403 when a non-owner attempts a non-child POST (owner-only gate)', async () => {
-    getOwnerProfileV2Mock.mockResolvedValue(null);
+  it('[WI-2128][BREAK] returns 403 before disclosing the owner on a non-owner replay POST', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+    );
 
-    const res = await makeApp({ isOwner: false }).request('/v1/profiles', {
+    const res = await makeApp({
+      isOwner: false,
+      callerPersonId: PROFILE_ID_B,
+      profileId: PROFILE_ID_B,
+    }).request('/v1/profiles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         displayName: 'Alex',
         birthYear: 2000,
         location: 'EU',
-        kind: 'child',
       }),
     });
 
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(body).not.toHaveProperty('profile');
     expect(createChildProfileV2Mock).not.toHaveBeenCalled();
   });
 
@@ -944,6 +967,21 @@ describe('GET /v1/profiles/:id', () => {
       PROFILE_ID_A,
       ACCOUNT_ID,
     );
+    expect(getPersonScopeMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID_A,
+      ACCOUNT_ID,
+      CALLER_PERSON_ID,
+    );
+  });
+
+  it('[WI-2128] returns 403 before reading a same-org profile the caller cannot operate', async () => {
+    getPersonScopeMock.mockResolvedValue(null);
+
+    const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_B}`);
+
+    expect(res.status).toBe(403);
+    expect(getProfileV2Mock).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the profile does not exist', async () => {
@@ -1516,21 +1554,11 @@ describe('POST /v1/profiles/switch', () => {
     });
   });
 
-  it('[WI-301] returns 200 when a non-owner switches to owner with fresh fva', async () => {
-    const ownerSwitchResult = {
-      profileId: PROFILE_ID_A,
-      meta: {
-        birthYear: 2000,
-        location: null,
-        consentStatus: null,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        isOwner: true,
-      },
-    } as Awaited<ReturnType<typeof getPersonScope>>;
-    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
-    // [WI-1302] Genuinely not the owner — the fresh fva is what carries this
-    // request through the gate, not caller identity.
+  it('[WI-2128] denies a non-owner switch to owner even with fresh fva', async () => {
+    // Caller-aware getPersonScope rejects the owner before the legacy
+    // reverification gate: fresh factors prove the learner credential more
+    // strongly; they cannot transform it into the owner's credential.
+    getPersonScopeMock.mockResolvedValue(null);
     verifyPersonIsOrgAdminV2Mock.mockResolvedValue(false);
 
     const res = await makeApp({
@@ -1554,9 +1582,10 @@ describe('POST /v1/profiles/switch', () => {
       body: JSON.stringify({ profileId: PROFILE_ID_A }),
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body).toMatchObject({ profileId: PROFILE_ID_A });
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(verifyPersonIsOrgAdminV2Mock).not.toHaveBeenCalled();
   });
 
   it('[WI-1302] allows the real owner (callerPersonId resolves admin) to switch to the owner profile without fresh fva', async () => {
@@ -1652,7 +1681,7 @@ describe('POST /v1/profiles/switch', () => {
     expect(body).toMatchObject({ code: 'OWNER_ELEVATION_REQUIRED' });
   });
 
-  it('[WI-301] allows a non-owner to switch to another non-owner without fva', async () => {
+  it('[WI-301] allows a guardian to switch to an operable managed charge without fva', async () => {
     const childSwitchResult = {
       profileId: PROFILE_ID_B,
       meta: {
@@ -1738,19 +1767,8 @@ describe('POST /v1/profiles/switch', () => {
     });
   });
 
-  it('[WI-301] bypasses owner elevation when OWNER_ELEVATION_GATE_ENABLED is false', async () => {
-    const ownerSwitchResult = {
-      profileId: PROFILE_ID_A,
-      meta: {
-        birthYear: 2000,
-        location: null,
-        consentStatus: null,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        isOwner: true,
-      },
-    } as Awaited<ReturnType<typeof getPersonScope>>;
-    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
+  it('[WI-2128] does not bypass caller authority when OWNER_ELEVATION_GATE_ENABLED is false', async () => {
+    getPersonScopeMock.mockResolvedValue(null);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
@@ -1777,9 +1795,9 @@ describe('POST /v1/profiles/switch', () => {
       { OWNER_ELEVATION_GATE_ENABLED: 'false' },
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body).toMatchObject({ profileId: PROFILE_ID_A });
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
   });
 });
 

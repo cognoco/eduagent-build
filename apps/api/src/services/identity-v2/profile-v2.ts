@@ -33,6 +33,7 @@ import {
   resolveLatestConsentSetStatusAnyBasis,
   resolveLatestConsentSetStatusesAnyBasis,
 } from './consent-status-v2';
+import { resolvePersonOperationAuthorityV2 } from './ownership-v2';
 
 /**
  * The v2 profile-scope context: the verified profileId plus the byte-identical
@@ -100,8 +101,8 @@ function deriveHasPremiumLlm(): boolean {
 }
 
 /**
- * Build the byte-identical ProfileMeta from a person row + its membership +
- * the resolved consent status. Pure given its inputs.
+ * Build ProfileMeta from a person row + its membership + the resolved consent
+ * status. Pure given its inputs.
  */
 function buildProfileMeta(args: {
   birthDate: string;
@@ -116,8 +117,12 @@ function buildProfileMeta(args: {
   // explicit owner as 'auto'.
   resolvedVia: 'auto' | 'explicit-header';
 }): ProfileMeta {
+  const { birthMonth, birthDay } = birthMonthDayFromDate(args.birthDate);
+
   return {
     birthYear: birthYearFromDate(args.birthDate),
+    birthMonth,
+    birthDay,
     location: jurisdictionToLocation(args.residenceJurisdiction),
     consentStatus: args.consentStatus,
     hasPremiumLlm: deriveHasPremiumLlm(),
@@ -200,6 +205,7 @@ export async function getOwnerProfileV2(
       birthDate: person.birthDate,
       residenceJurisdiction: person.residenceJurisdiction,
       conversationLanguage: person.conversationLanguage,
+      conversationLanguageConfirmedAt: person.conversationLanguageConfirmedAt,
       pronouns: person.pronouns,
       defaultAppContext: person.defaultAppContext,
       createdAt: person.createdAt,
@@ -243,6 +249,8 @@ export async function getOwnerProfileV2(
     hasFamilyLinks: false,
     conversationLanguage:
       owner.conversationLanguage as Profile['conversationLanguage'],
+    conversationLanguageConfirmed:
+      owner.conversationLanguageConfirmedAt !== null,
     pronouns: owner.pronouns ?? null,
     consentStatus,
     linkCreatedAt: null,
@@ -358,15 +366,19 @@ export async function getProfileV2(
 }
 
 /**
- * Resolve a specific person within an organization (the v2 `getProfile` —
- * verifies the person belongs to the org via membership). Returns the
- * profileId + ProfileMeta, or null when the person is not in the org or is
- * archived (mirrors the legacy account-scoped, archived-excluded read).
+ * Resolve a specific person within an organization. When `callerPersonId` is
+ * supplied, membership is necessary but not sufficient: the target must be the
+ * caller or an uncredentialed charge the caller actively guards. Returns null
+ * for non-members, archived Persons, and non-operable same-org Persons.
+ *
+ * Omitting `callerPersonId` retains the membership-visibility reader used by
+ * non-authority service checks; request/capability boundaries must supply it.
  */
 export async function getPersonScope(
   db: Database,
   profileId: string,
   organizationId: string,
+  callerPersonId?: string,
 ): Promise<PersonProfileScope | null> {
   const row = await db
     .select({
@@ -389,6 +401,17 @@ export async function getPersonScope(
 
   const found = row[0];
   if (!found) return null;
+  if (callerPersonId) {
+    const authority = await resolvePersonOperationAuthorityV2(
+      db,
+      profileId,
+      organizationId,
+      callerPersonId,
+    );
+    if (authority !== 'self' && authority !== 'managed-charge') {
+      return null;
+    }
+  }
 
   const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
     db,
@@ -441,18 +464,19 @@ export async function getPersonScope(
 // ---------------------------------------------------------------------------
 
 /**
- * List every non-archived person in the caller's organization as a byte-identical
- * `Profile[]`. `organizationId` MUST be the caller's own resolved org id
- * (account.id = organization.id); the `membership` join scopes the read to that
- * org and is the IDOR guard against cross-org/cross-person enumeration.
+ * List non-archived Persons in an organization as byte-identical `Profile[]`.
+ * When `callerPersonId` is supplied, return only self plus uncredentialed
+ * managed charges. Omitting it retains the org-membership visibility reader for
+ * non-capability service use. Request boundaries must supply callerPersonId.
  */
 export async function listProfilesV2(
   db: Database,
   organizationId: string,
+  callerPersonId?: string,
 ): Promise<Profile[]> {
   // Org-scoped person read (the IDOR guard): only persons with a membership in
   // THIS org, non-archived. person.id = profiles.id; account.id = organization.id.
-  const rows = await db
+  let rows = await db
     .select({
       id: person.id,
       displayName: person.displayName,
@@ -460,6 +484,7 @@ export async function listProfilesV2(
       birthDate: person.birthDate,
       residenceJurisdiction: person.residenceJurisdiction,
       conversationLanguage: person.conversationLanguage,
+      conversationLanguageConfirmedAt: person.conversationLanguageConfirmedAt,
       pronouns: person.pronouns,
       defaultAppContext: person.defaultAppContext,
       createdAt: person.createdAt,
@@ -474,6 +499,26 @@ export async function listProfilesV2(
         isNull(person.archivedAt),
       ),
     );
+
+  if (callerPersonId) {
+    const authorityResults = await Promise.all(
+      rows.map(async (row) => ({
+        row,
+        authority: await resolvePersonOperationAuthorityV2(
+          db,
+          row.id,
+          organizationId,
+          callerPersonId,
+        ),
+      })),
+    );
+    rows = authorityResults
+      .filter(
+        ({ authority }) =>
+          authority === 'self' || authority === 'managed-charge',
+      )
+      .map(({ row }) => row);
+  }
 
   if (rows.length === 0) return [];
 
@@ -551,6 +596,9 @@ export async function listProfilesV2(
       hasFamilyLinks,
       conversationLanguage:
         row.conversationLanguage as Profile['conversationLanguage'],
+      conversationLanguageConfirmed:
+        row.conversationLanguageConfirmedAt !== null,
+      isCurrentUser: row.id === callerPersonId,
       pronouns: row.pronouns ?? null,
       consentStatus: consentByPersonId.get(row.id) ?? null,
       linkCreatedAt: isOwner ? null : (chargeGrantedAt?.toISOString() ?? null),

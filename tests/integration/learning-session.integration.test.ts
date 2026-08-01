@@ -12,6 +12,7 @@
 
 import * as React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { and, asc, eq } from 'drizzle-orm';
 import {
   login,
@@ -35,6 +36,7 @@ import {
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { markConversationLanguageConfirmedForTest } from '../../apps/api/src/test-utils/conversation-language-confirmation';
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
@@ -165,7 +167,15 @@ async function createOwnerProfile(): Promise<string> {
 
   expect(res.status).toBe(201);
   const body = await res.json();
-  return body.profile.id as string;
+  const profileId = body.profile.id as string;
+  // [WI-1556] The route creates a first-run profile with no confirmed
+  // conversation language. These suites exercise ordinary session flows, so
+  // the learner must be an ordinary confirmed existing user.
+  await markConversationLanguageConfirmedForTest(
+    createIntegrationDb(),
+    profileId,
+  );
+  return profileId;
 }
 
 async function loadAccount(): Promise<{ id: string } | undefined> {
@@ -397,6 +407,12 @@ async function renderRealMobileSession(input: {
   let currentHook: ReturnType<typeof useSessionStreaming> | null = null;
   let currentSessionId = input.activeSessionId ?? null;
   let messageId = 0;
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
   const silenceTimerRef: React.MutableRefObject<ReturnType<
     typeof setTimeout
   > | null> = { current: null };
@@ -509,7 +525,13 @@ async function renderRealMobileSession(input: {
 
   let mounted!: { unmount: () => void };
   await renderer.act(async () => {
-    mounted = renderer.create(React.createElement(Harness));
+    mounted = renderer.create(
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        React.createElement(Harness),
+      ),
+    );
   });
 
   return {

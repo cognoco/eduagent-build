@@ -38,24 +38,44 @@ function pinnedPnpmVersion() {
   return match[1];
 }
 
+function packageManagerLaunch() {
+  const pnpmCli = process.env.npm_execpath?.trim();
+  if (!pnpmCli) {
+    refuse(
+      'npm_execpath is required; run the canonical pnpm test:api:integration command.',
+    );
+  }
+  return /\.(?:c?js)$/i.test(pnpmCli)
+    ? {
+        binary: process.execPath,
+        args: [pnpmCli],
+      }
+    : {
+        binary: pnpmCli,
+        args: [],
+      };
+}
+
 function assertPinnedPnpm() {
   const expected = pinnedPnpmVersion();
-  const result = spawnSync('corepack', ['pnpm', '--version'], {
+  const launch = packageManagerLaunch();
+  const result = spawnSync(launch.binary, [...launch.args, '--version'], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
   });
   if (result.error || result.status !== 0) {
     refuse(
-      `Corepack could not resolve the repository-pinned pnpm ${expected}. ` +
-        'Install/enable Corepack and retry the canonical command.',
+      `npm_execpath could not resolve the repository-pinned pnpm ${expected}. ` +
+        'Retry the canonical pnpm command.',
     );
   }
   const actual = result.stdout.trim();
   if (actual !== expected) {
     refuse(
-      `package.json requires pnpm ${expected}, but Corepack resolved ${actual}.`,
+      `package.json requires pnpm ${expected}, but npm_execpath resolved ${actual}.`,
     );
   }
+  return launch;
 }
 
 function requiredEnv(name) {
@@ -113,9 +133,9 @@ function assertDatabaseContract() {
       `Doppler project "${dopplerProject}" is refused; expected "mentomate".`,
     );
   }
-  if (dopplerConfig && dopplerConfig !== 'integration') {
+  if (dopplerConfig && dopplerConfig !== 'dev_integration') {
     refuse(
-      `Doppler config "${dopplerConfig}" is refused; expected "integration".`,
+      `Doppler config "${dopplerConfig}" is refused; expected "dev_integration".`,
     );
   }
   if (dopplerEnvironment && dopplerEnvironment !== 'dev') {
@@ -135,8 +155,8 @@ function assertDatabaseContract() {
 
   requiredEnv('DOPPLER_PROJECT');
   requiredEnv('DOPPLER_ENVIRONMENT');
-  if (dopplerConfig !== 'integration') {
-    refuse('DOPPLER_CONFIG=integration is required for a remote database.');
+  if (dopplerConfig !== 'dev_integration') {
+    refuse('DOPPLER_CONFIG=dev_integration is required for a remote database.');
   }
 
   const expectedHost = requiredEnv('INTEGRATION_DATABASE_HOST').toLowerCase();
@@ -179,9 +199,9 @@ function main() {
 
   if (mode === '--jest') {
     assertDatabaseContract();
-    assertPinnedPnpm();
-    return run('corepack', [
-      'pnpm',
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
       'exec',
       'jest',
       '--config',
@@ -197,9 +217,9 @@ function main() {
     }
     // Defense in depth: --jest repeats both checks after Nx re-invokes this script.
     assertDatabaseContract();
-    assertPinnedPnpm();
-    return run('corepack', [
-      'pnpm',
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
       'exec',
       'nx',
       'run',
@@ -218,7 +238,7 @@ function main() {
     '--project',
     'mentomate',
     '--config',
-    'integration',
+    'dev_integration',
     '--',
     process.execPath,
     SCRIPT,

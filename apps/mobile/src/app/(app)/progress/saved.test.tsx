@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react-native';
 
 import SavedBookmarksScreen from './saved';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ── Translation stub ─────────────────────────────────────────────────────────
 
@@ -271,18 +272,50 @@ describe('SavedBookmarksScreen', () => {
       screen.getByTestId('saved-empty-library-cta');
     });
 
-    it('navigates directly to library (not via goBackOrReplace) when "Go to library" is pressed [LEARN-24]', () => {
-      // [LEARN-24] The CTA copy says "Go to Library" — it must always land on Library.
-      // Using goBackOrReplace would pick router.back() when canGoBack() is true,
-      // which sends the user back to Progress instead. A direct replace is correct.
-      mockHooks({ bookmarks: [] });
-      render(<SavedBookmarksScreen />);
-      fireEvent.press(screen.getByTestId('saved-empty-library-cta'));
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
-      expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
-        expect.anything(),
-        '/(app)/library',
-      );
+    describe('"Go to library" CTA destination [WI-2467]', () => {
+      let originalV2: boolean;
+
+      beforeEach(() => {
+        originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      });
+
+      afterEach(() => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = originalV2;
+      });
+
+      it('navigates directly to library (not via goBackOrReplace) when V2 nav is off [LEARN-24]', () => {
+        // [LEARN-24] The CTA copy says "Go to Library" — it must always land on
+        // the browse destination. Using goBackOrReplace would pick
+        // router.back() when canGoBack() is true, which sends the user back
+        // to Progress instead. A direct replace is correct.
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = false;
+        mockHooks({ bookmarks: [] });
+        render(<SavedBookmarksScreen />);
+        fireEvent.press(screen.getByTestId('saved-empty-library-cta'));
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+        expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
+          expect.anything(),
+          '/(app)/library',
+        );
+      });
+
+      it('navigates directly to V2 Subjects (not via goBackOrReplace) when V2 nav is on', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockHooks({ bookmarks: [] });
+        render(<SavedBookmarksScreen />);
+        fireEvent.press(screen.getByTestId('saved-empty-library-cta'));
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+        expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
+          expect.anything(),
+          '/(app)/subjects',
+        );
+      });
     });
   });
 

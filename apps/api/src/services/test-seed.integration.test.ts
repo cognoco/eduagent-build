@@ -40,7 +40,7 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
-import { resetDatabase, SEED_CLERK_PREFIX } from './test-seed';
+import { resetDatabase, seedScenario, SEED_CLERK_PREFIX } from './test-seed';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -231,6 +231,37 @@ const RUN = !!process.env.DATABASE_URL;
       expect(requestsAfter).toEqual([]);
       expect(personAfter).toEqual([]);
       expect(orgAfter).toEqual([]);
+    });
+
+    it('[WI-2820] survives eight back-to-back seed-reset cycles for the same email', async () => {
+      const prefix = `wi2820-${generateUUIDv7()}-`;
+      const email = `${prefix}repeat@example.com`;
+
+      try {
+        for (let cycle = 0; cycle < 8; cycle += 1) {
+          await expect(
+            seedScenario(db, 'learning-active', email),
+          ).resolves.toMatchObject({ scenario: 'learning-active', email });
+
+          const seededLogins = await db
+            .select({ id: login.id })
+            .from(login)
+            .where(eq(login.email, email));
+          expect(seededLogins).toHaveLength(1);
+
+          await expect(
+            resetDatabase(db, {}, { prefix, preserveClerkUsers: true }),
+          ).resolves.toMatchObject({ deletedCount: 1 });
+
+          const resetLogins = await db
+            .select({ id: login.id })
+            .from(login)
+            .where(eq(login.email, email));
+          expect(resetLogins).toEqual([]);
+        }
+      } finally {
+        await resetDatabase(db, {}, { prefix, preserveClerkUsers: true });
+      }
     });
   },
 );

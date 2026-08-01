@@ -22,7 +22,6 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { parseConversationLanguage } from '../services/llm';
 import {
   getSubjectRetention,
@@ -117,16 +116,6 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
-      // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
-      // (canon R5). processRecallTest -> evaluateRecallQuality dispatches the
-      // LLM for every attemptMode EXCEPT 'dont_remember', which short-circuits
-      // to a deterministic quality-0 result with no LLM dispatch (see
-      // processRecallTest). Gate all modes except that one, and fail closed —
-      // an absent attemptMode defaults to 'standard' server-side, so it is
-      // gated.
-      if (input.attemptMode !== 'dont_remember') {
-        await assertLlmConsent(db, profileId);
-      }
 
       // [WI-2114] Read the learner's tutor-prose language so the grader writes
       // the answer-specific feedback in the mentor language (AC-4). Navigation

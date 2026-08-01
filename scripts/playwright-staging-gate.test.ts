@@ -92,6 +92,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         fetchImpl: async () => ({ status }),
       });
       expect(result.state).toBe(GATE_STATES.NOT_RUN);
+      expect(result.reason).toBe(`http-${status}`);
       expect(result.terminal).toBe(true);
     },
   );
@@ -99,10 +100,16 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
   it('does not run without the secret or with a non-HTTPS target', async () => {
     await expect(
       runCanary({ apiUrl: 'https://api-stg.example.test', secret: '' }),
-    ).resolves.toMatchObject({ state: GATE_STATES.NOT_RUN });
+    ).resolves.toMatchObject({
+      state: GATE_STATES.NOT_RUN,
+      reason: 'secret-missing',
+    });
     await expect(
       runCanary({ apiUrl: 'http://api-stg.example.test', secret: 'present' }),
-    ).resolves.toMatchObject({ state: GATE_STATES.NOT_RUN });
+    ).resolves.toMatchObject({
+      state: GATE_STATES.NOT_RUN,
+      reason: 'invalid-target',
+    });
     await expect(
       runCanary({
         apiUrl: 'https://api-stg.example.test',
@@ -963,6 +970,25 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     );
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('Invalid staging-gate decision input');
+  });
+
+  it('[WI-2970] emits the bounded canary reason on the CLI semantic channel', () => {
+    const result = spawnSync(
+      process.execPath,
+      [join(process.cwd(), 'scripts/playwright-staging-gate.cjs'), '--canary'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLAYWRIGHT_API_URL: TEST_API_URL,
+          TEST_SEED_SECRET: '',
+        },
+      },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe(
+      'GATE_STATE=not-run\nGATE_REASON=secret-missing\n',
+    );
   });
 
   it('uses stdout as the classifier CLI semantic channel', () => {

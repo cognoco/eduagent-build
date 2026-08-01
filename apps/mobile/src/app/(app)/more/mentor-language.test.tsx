@@ -94,6 +94,7 @@ const owner = createTestProfile({
   isOwner: true,
   birthYear: 1990,
   conversationLanguage: 'en',
+  isCurrentUser: true,
 });
 
 const child = createTestProfile({
@@ -103,6 +104,7 @@ const child = createTestProfile({
   isOwner: false,
   birthYear: 2014,
   conversationLanguage: 'en',
+  isCurrentUser: false,
 });
 
 const onboardingRoutes = { '/onboarding/': { success: true } };

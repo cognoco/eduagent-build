@@ -29,7 +29,10 @@ import {
   stripNoticeOverflowItems,
   writeCachedNowFeed,
 } from '../lib/now-feed-cache';
-import { useMentorNoticePolicy } from '../lib/mentor-notice-policy';
+import {
+  noticesSuppressedForPayload,
+  useMentorNoticePolicy,
+} from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
@@ -177,7 +180,20 @@ export function useNowFeed(): NowFeedQueryResult {
   const cacheBindingRef = useRef(cacheBinding);
   cacheBindingRef.current = cacheBinding;
   const noticesVisible = !navigationContract.isParentProxy;
-  const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
+  // [WI-2933 re-open] The projection and the pair it was populated FOR are
+  // written in one `setState`, never separately — see the effect below. This
+  // makes "a feed exists whose `pair` doesn't match who cached it" a type
+  // that cannot be constructed, not a sequencing rule two writes have to
+  // honour. The previous shape (`fallbackFeed` state + a `fallbackPairRef`
+  // reassigned during render from `cacheBinding`) is exactly what Gate-2
+  // rejected: the ref tracked "whatever pair is bound RIGHT NOW", which can
+  // legitimately be a DIFFERENT pair than the one that populated the still-
+  // retained `fallbackFeed`, for one render, on a bound A -> B transition
+  // (React commits before the cleanup effect clears A's retained feed).
+  const [fallbackEntry, setFallbackEntry] = useState<{
+    feed: NowResponse;
+    pair: NonNullable<typeof cacheBinding>;
+  } | null>(null);
   const [isSlowFallback, setIsSlowFallback] = useState(false);
   // [WI-2504 bounce 2] The epoch `fallbackFeed` was last populated (or
   // cleared) for — lets the effect below tell "still the same pending fetch"
@@ -198,26 +214,7 @@ export function useNowFeed(): NowFeedQueryResult {
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        let data: NowResponse;
-        try {
-          data = await parseJson(okRes, nowResponseSchema, 'GET /now');
-        } catch (err) {
-          // [WI-2627] A malformed `mentorNoticePolicy` fails the WHOLE response
-          // schema, so `parseJson` throws and the fold below never runs. Left
-          // there, the reducer is never REACHED: TanStack Query retains the
-          // prior notice-bearing `data` after a failed background refetch,
-          // policy stays enabled, and those cards keep rendering indefinitely —
-          // "missing/malformed never exposes data" defeated by a route that
-          // never gets to the reducer.
-          //
-          // Deliberately over-broad: this fires on ANY unparseable /now body,
-          // not only a bad policy field, because we cannot tell which field
-          // failed without a second read of a single-use body. That is the
-          // correct side to err on — a response we cannot parse is one whose
-          // policy we cannot confirm, and notices are the private feature.
-          policy.observeMalformed();
-          throw err;
-        }
+        const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
         // [WI-2627] This response is also the ORDERED observation. Fold it
         // before the cache write below, so a response that carries a rollback
         // is not persisted with its own notice cards intact.
@@ -276,7 +273,7 @@ export function useNowFeed(): NowFeedQueryResult {
     if (!cacheBinding || !query.isFetching || query.data) {
       setIsSlowFallback(false);
       if (!query.isError) {
-        setFallbackFeed(null);
+        setFallbackEntry(null);
       }
       fallbackEpochRef.current = null;
       return undefined;
@@ -291,18 +288,26 @@ export function useNowFeed(): NowFeedQueryResult {
     // notice-bearing) cached feed until — or unless — this fetch's own cache
     // read lands.
     if (fallbackEpochRef.current !== cacheBinding.policyEpoch) {
-      setFallbackFeed(null);
+      setFallbackEntry(null);
       setIsSlowFallback(false);
       fallbackEpochRef.current = cacheBinding.policyEpoch ?? null;
     }
 
+    // [WI-2933 re-open] `cacheBinding` is captured by this closure at the
+    // moment the effect ran (it is the effect's own dependency), so it is
+    // GUARANTEED to be the same pair `readCachedNowFeed` below reads for —
+    // there is no later render that can move it out from under this
+    // callback. Writing `{ feed, pair: cacheBinding }` in the SAME
+    // `setFallbackEntry` call is what makes the two agree by construction:
+    // there is no second write (a ref reassigned during render, elsewhere)
+    // that can race ahead of or fall behind this one.
     let cancelled = false;
     const timer = setTimeout(() => {
       void readCachedNowFeed(cacheBinding, Date.now(), {
         noticesVisible,
       }).then((cached) => {
         if (cancelled || !cached) return;
-        setFallbackFeed(cached);
+        setFallbackEntry({ feed: cached, pair: cacheBinding });
         setIsSlowFallback(true);
       });
     }, NOW_FEED_SLOW_FALLBACK_MS);
@@ -325,9 +330,10 @@ export function useNowFeed(): NowFeedQueryResult {
   //     that left the server at revision 6 landing after the client learned
   //     revision 7 carries pre-rollback cards; the fold correctly ignores its
   //     observation and does nothing about its cards);
-  //   - `fallbackFeed` — the persisted projection, which carries NO observation
-  //     of its own, so it is suppressed purely on stored policy state. This is
-  //     the cached-resurrection case the store exists for;
+  //   - `fallbackEntry.feed` — the persisted projection, which carries NO
+  //     observation of its own, so it is suppressed purely on stored policy
+  //     state for the pair it was CACHED FOR. This is the cached-resurrection
+  //     case the store exists for;
   //   - and both re-evaluate on any store change, because a sibling surface
   //     observing a disable must blank this one too.
   const noticeSafeData = useMemo(() => {
@@ -337,12 +343,57 @@ export function useNowFeed(): NowFeedQueryResult {
       : query.data;
   }, [query.data, policy]);
 
+  // [WI-2933 lint fix] A LIVE subscription scoped to `fallbackEntry.pair` — not
+  // the currently-bound `policy` above, which tracks whichever pair is bound at
+  // THIS render and only coincidentally matches `fallbackEntry.pair` outside
+  // the one-render A -> B transition window described above. Its `state` /
+  // `observed` / `hydrated` / `trusted` fields ARE `fallbackEntry.pair`'s
+  // knowledge, passed into `noticesSuppressedForPayload` below as an argument
+  // rather than re-derived from a module-level read inside the memo body — so
+  // the dependency the exhaustive-deps rule wants is the same value the memo
+  // actually reads. No suppression needed.
+  const fallbackPolicy = useMentorNoticePolicy(
+    fallbackEntry?.pair.actorId,
+    fallbackEntry?.pair.profileId,
+  );
+
+  // [WI-2933] Judge the persisted projection against the floor of the pair it
+  // was CACHED FOR, not against whatever pair happens to be bound at render.
+  //
+  // `fallbackEntry` can only ever be populated while BOUND — the effect above
+  // returns early without a `cacheBinding`, and the write that populates it
+  // always carries the pair alongside the feed (see the effect). Whether it
+  // SURVIVES the pair going unbound (sign-out, auth teardown, profile
+  // cleared) is CONDITIONAL, and that condition is the whole reachability
+  // question: the same early-return branch clears it unless `query.isError`,
+  // so retention past an unbind requires the query to be in an error state.
+  // Measured (WI-2933 reachability run): forcing a real re-render with a null
+  // user gives `fallbackEntry = null, isError = false` — with no error the
+  // projection does not survive.
+  //
+  // Because `fallbackEntry.pair` is written atomically with `.feed`, "a
+  // retained feed judged against a DIFFERENT pair's floor" is not a state
+  // this hook can be in — there is no code path that can update one half
+  // without the other, so `fallbackPair ? ... : policy.suppressed(undefined)`
+  // (a defensive branch for "feed present but its pair unknown") no longer
+  // has a reachable `else`: whenever `fallbackEntry` exists, `.pair` exists
+  // with it, by construction. The `isError: true` AND unbound combination is
+  // still unmeasured (once the pair is unbound the query stops fetching, so
+  // the harness could not drive it into an error state afterwards) — but on
+  // that combination `fallbackEntry.pair` is still the pair that ACTUALLY
+  // populated the retained feed, so the floor it is judged against is correct
+  // by construction rather than merely plausible.
+  //
+  // A device that has NEVER been bound has no cached projection to paint and
+  // no floor to consult (`fallbackEntry` is `null`), so it keeps today's
+  // permissive default and nothing is blanked fleet-wide (AC-2).
   const noticeSafeFallback = useMemo(() => {
-    if (!fallbackFeed) return fallbackFeed;
-    return policy.suppressed(undefined)
-      ? stripNoticeCards(fallbackFeed)
-      : fallbackFeed;
-  }, [fallbackFeed, policy]);
+    if (!fallbackEntry) return null;
+    const suppressed = noticesSuppressedForPayload(fallbackPolicy, undefined);
+    return suppressed
+      ? stripNoticeCards(fallbackEntry.feed)
+      : fallbackEntry.feed;
+  }, [fallbackEntry, fallbackPolicy]);
 
   // The cast is the `UseQueryResult` discriminated union, not a type escape:
   // overriding `data` on a spread widens it to `NowResponse | undefined`, which
@@ -440,17 +491,6 @@ export function useNowOverflow(
         { query: { scope: 'self' } },
         { init: { signal } },
       ),
-    // [WI-2627 rework] `select` runs AFTER the wrapper's parse, so a malformed
-    // `mentorNoticePolicy` fails the whole schema and the fold below is never
-    // reached — and TanStack Query then RETAINS the prior notice-bearing page
-    // and keeps rendering it with policy still enabled. `onParseError` is the
-    // wrapper's seam for exactly that: it fires before the error propagates, so
-    // the store goes fail-closed and the suppression memo below re-evaluates
-    // and strips the data the query kept.
-    //
-    // Deliberately over-broad, as in `useNowFeed`: a body we cannot parse is one
-    // whose policy we cannot confirm, and notices are the private feature.
-    onParseError: () => policy.observeMalformed(),
     // [WI-2627] The fold happens HERE, not in an effect. `useApiQuery` runs
     // `select` inside the query fn, i.e. BEFORE the query publishes — which is
     // the only place a fold can sit without the surface painting a frame first.

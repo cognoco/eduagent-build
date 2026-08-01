@@ -351,6 +351,13 @@ if hit '^apps/api/drizzle/(.*\.sql|meta/.*)$'; then
   note "db-migrations: Include Rollback section if dropping columns/tables/types"
 fi
 
+# ── Cross-package integration typecheck ───────────────────────────────────
+if hit '(^tests/integration/|^scripts/check-integration-typecheck(\.test)?\.ts$|^package\.json$|^pnpm-lock\.yaml$|^tsconfig\.base\.json$|^\.github/workflows/ci\.yml$)'; then
+  CLASSES+=("integration-typecheck")
+  add_cmd fast "pnpm typecheck:integration" "Jest-selected integration TypeScript checker"
+  add_cmd slow "pnpm test:integration" "Cross-package integration tests"
+fi
+
 # ── LLM Prompts ──────────────────────────────────────────────────────────
 # services/llm/ is matched recursively (providers/ subdirectory included) so
 # the CI eval gate that routes on this class covers provider-level prompt
@@ -610,10 +617,12 @@ if hit '(^apps/api/scripts/verify-wrangler-kv-binding(\.test)?\.mjs$|^\.github/w
   add_cmd fast "node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs" "API KV-binding script guard tests"
 fi
 
-if hit '^(package\.json|packages/database/package\.json|packages/database/scripts/(check-db-push-target(\.test)?|check-identity-fk-drift(\.test)?|verify-db-target-lib)\.mjs|\.github/workflows/ci\.yml)$'; then
+if hit '^(package\.json|packages/database/package\.json|packages/database/scripts/(check-db-push-target(\.test)?|check-development-schema(\.test)?|check-identity-fk-drift(\.test)?|reconcile-development-schema(\.test)?|verify-db-target-lib)\.mjs|\.github/workflows/ci\.yml)$'; then
   CLASSES+=("database-script-guards")
   add_cmd fast "node --test packages/database/scripts/check-db-push-target.test.mjs" "Database push-target guard tests"
+  add_cmd fast "node --test packages/database/scripts/check-development-schema.test.mjs" "Development schema freshness guard tests"
   add_cmd fast "node --test packages/database/scripts/check-identity-fk-drift.test.mjs" "Identity FK catalog guard tests"
+  add_cmd fast "node --test packages/database/scripts/reconcile-development-schema.test.mjs" "Development schema reconciliation guard tests"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════

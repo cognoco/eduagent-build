@@ -100,7 +100,8 @@ export const consentEmailRevocation = inngest.createFunction(
             name: 'app/consent.email-revocation.failed',
             data: {
               chargePersonId,
-              error: error instanceof Error ? error.message : String(error),
+              runId: event.data.run_id ?? null,
+              errorClass: error instanceof Error ? 'error' : 'non_error',
               timestamp: new Date().toISOString(),
             },
           }),

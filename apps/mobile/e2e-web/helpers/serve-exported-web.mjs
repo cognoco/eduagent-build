@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { createReadStream, mkdirSync } from 'node:fs';
+import { appendFileSync, createReadStream, mkdirSync } from 'node:fs';
 import { access, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { statSync } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
@@ -17,6 +17,22 @@ const distDir = path.join(projectRoot, 'dist');
 const port = Number(process.env.PLAYWRIGHT_WEB_PORT ?? '19006');
 const host = '127.0.0.1';
 const metroTempDir = path.join(projectRoot, '.tmp', `e2e-metro-${port}`);
+
+function recordPreloadPhase(phase) {
+  const phaseFile = process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE;
+  if (!phaseFile) return;
+
+  try {
+    appendFileSync(phaseFile, `${phase}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+  } catch {
+    throw new Error('Playwright preload phase recording failed');
+  }
+}
+
+recordPreloadPhase('web-server-command-started');
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',

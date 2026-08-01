@@ -82,24 +82,32 @@ describe('assertNotProxyMode', () => {
 // [BREAK / SEC-2 / BUG-718] Server-derived proxy-mode break tests.
 //
 // Pre-fix, the X-Proxy-Mode header was the only signal: a client could omit
-// it to gain write access on a child profile. Post-fix, profileMeta.isOwner
-// (set server-side after verifying X-Profile-Id ownership) is authoritative.
+// it to gain write access on a child profile. The server now combines the
+// verified profile selection with the server-resolved caller identity.
 // ---------------------------------------------------------------------------
 
-function createAppWithProfileMeta(meta: {
-  isOwner: boolean;
-  resolvedVia?: 'auto' | 'explicit-header';
-}) {
+function createAppWithProfileMeta(
+  meta: {
+    isOwner: boolean;
+    resolvedVia?: 'auto' | 'explicit-header';
+  },
+  identity: {
+    callerPersonId?: string;
+    profileId?: string;
+  } = {},
+) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('profileMeta' as never, meta);
     // [WI-2398] Caller-self identity — see createApp's comment above. Only
-    // exercised on the paths that reach assertCanWriteProfile (isOwner:true
-    // + resolvedVia:'explicit-header' + no X-Proxy-Mode:true); the BREAK
-    // tests below reject earlier and never touch these.
+    // exercised on paths that reach assertCanWriteProfile (explicit selection,
+    // matching caller/profile identity, and no X-Proxy-Mode:true).
     c.set('account' as never, { id: 'test-account-id' });
-    c.set('callerPersonId' as never, CALLER_PERSON_ID);
-    c.set('profileId' as never, CALLER_PERSON_ID);
+    c.set(
+      'callerPersonId' as never,
+      identity.callerPersonId ?? CALLER_PERSON_ID,
+    );
+    c.set('profileId' as never, identity.profileId ?? CALLER_PERSON_ID);
     await next();
   });
   app.post('/test', async (c) => {
@@ -110,16 +118,47 @@ function createAppWithProfileMeta(meta: {
 }
 
 describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
+  it('[WI-2128][WI-2653][RGR] allows a credentialed non-owner acting as themselves', async () => {
+    const app = createAppWithProfileMeta({
+      isOwner: false,
+      resolvedVia: 'explicit-header',
+    });
+    const res = await app.request('/test', { method: 'POST' });
+    expect(res.status).toBe(200);
+  });
+
+  it('[WI-2653] rejects a different caller selecting a non-owner profile', async () => {
+    const app = createAppWithProfileMeta(
+      {
+        isOwner: false,
+        resolvedVia: 'explicit-header',
+      },
+      {
+        callerPersonId: 'guardian-person-id',
+        profileId: 'charge-person-id',
+      },
+    );
+    const res = await app.request('/test', { method: 'POST' });
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: 'PROXY_MODE' });
+  });
+
   it('[BREAK] rejects writes for non-owner profile EVEN when X-Proxy-Mode header is omitted', async () => {
+    // Caller and target match here; missing explicit selection is the
+    // effective rejection gate after WI-2653, not the non-owner role itself.
     const app = createAppWithProfileMeta({ isOwner: false });
     const res = await app.request('/test', { method: 'POST' });
     expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.message).toBe('Not available in proxy mode');
   });
 
-  it('[BREAK] rejects writes for non-owner profile EVEN when X-Proxy-Mode: false is sent', async () => {
-    const app = createAppWithProfileMeta({ isOwner: false });
+  it('[WI-2128][BREAK] rejects a guardian proxy write when caller and selected Person differ', async () => {
+    const app = createAppWithProfileMeta(
+      { isOwner: false, resolvedVia: 'explicit-header' },
+      {
+        callerPersonId: CALLER_PERSON_ID,
+        profileId: 'managed-charge-person-id',
+      },
+    );
     const res = await app.request('/test', {
       method: 'POST',
       headers: { 'X-Proxy-Mode': 'false' },

@@ -12,6 +12,8 @@ import {
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import * as familyIntentOnboardingState from '../../../lib/family-intent-onboarding-state';
+import { Sentry } from '../../../lib/sentry';
 
 jest.mock(
   'react-i18next',
@@ -47,6 +49,10 @@ jest.mock('../../../lib/scope-context', () => ({
   ...jest.requireActual('../../../lib/scope-context'),
   useScopeContext: () => mockScopeContext,
 }));
+
+const clearFamilyIntentOnboardingSpy = jest
+  .spyOn(familyIntentOnboardingState, 'clearFamilyIntentOnboarding')
+  .mockResolvedValue(undefined);
 
 // `visibilityContractSchema` requires UUID-shaped person ids; the mock
 // response fixture uses fixed UUIDs independent of the non-UUID
@@ -86,6 +92,10 @@ function renderInitiateScreen(
 }
 
 describe('InitiateLinkScreen', () => {
+  afterAll(() => {
+    clearFamilyIntentOnboardingSpy.mockRestore();
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     // [WI-2188] clearAllMocks() clears call history but NOT a prior
@@ -391,6 +401,80 @@ describe('InitiateLinkScreen', () => {
         original;
     }
   }, 10_000);
+
+  it('[WI-2532] opens the existing-account invitation form and consumes its durable destination marker', async () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+      await waitFor(() => {
+        expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(
+        screen.queryByTestId(
+          'visibility-link-initiate-existing-teen-unavailable',
+        ),
+      ).toBeNull();
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
+
+  it('[WI-2532] consumes the durable marker after the V2-off unavailable destination mounts so relaunch does not replay it', async () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-unavailable');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+      await waitFor(() => {
+        expect(clearFamilyIntentOnboardingSpy).toHaveBeenCalledTimes(1);
+      });
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
+
+  it('[WI-2532] reports destination-marker cleanup failure while leaving the invitation usable', async () => {
+    const error = new Error('storage unavailable');
+    clearFamilyIntentOnboardingSpy.mockRejectedValueOnce(error);
+    const captureSpy = jest
+      .spyOn(Sentry, 'captureException')
+      .mockImplementation(() => 'test-event-id');
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockParams = { target: 'existingTeen' };
+
+    try {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      await waitFor(() => {
+        expect(captureSpy).toHaveBeenCalledWith(error);
+      });
+    } finally {
+      captureSpy.mockRestore();
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  });
 
   it('shows an empty-state message when there are zero eligible managed children', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });

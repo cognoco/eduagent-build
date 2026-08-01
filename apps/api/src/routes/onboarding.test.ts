@@ -291,6 +291,7 @@ describe('onboarding routes', () => {
         'test-profile-id',
         'test-account-id',
         'nb',
+        false,
       );
     });
 
@@ -355,7 +356,7 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 400 when profile cannot be resolved (no X-Profile-Id and no owner)', async () => {
+    it('[WI-2128] returns 403 when a profile write omits explicit X-Profile-Id selection', async () => {
       const res = await app.request(
         '/v1/onboarding/language',
         {
@@ -365,15 +366,11 @@ describe('onboarding routes', () => {
         },
         TEST_ENV,
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
-    // [CR-2026-05-21-011] Break test: a non-owner (child) profile must NOT be
-    // able to PATCH conversationLanguage on its own profile. The tutor language
-    // is an account-level setting owned by the parent.
-    it('[CR-2026-05-21-011] returns 403 when non-owner profile tries to PATCH conversationLanguage', async () => {
-      // Caller is a child profile (isOwner: false)
+    it('[WI-1556] lets a credentialed non-owner update their exact own Person', async () => {
       mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
@@ -386,30 +383,50 @@ describe('onboarding routes', () => {
         TEST_ENV,
       );
 
+      expect(res.status).toBe(200);
+      expect(mockUpdateConversationLanguageV2).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        'test-account-id',
+        'nb',
+        false,
+      );
+    });
+
+    it('[WI-1556] rejects a caller targeting another Person through the self route', async () => {
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ profileId: CHILD_PROFILE_ID, isOwner: false }),
+      );
+
+      const res = await app.request(
+        '/v1/onboarding/language',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders({ 'X-Profile-Id': CHILD_PROFILE_ID }),
+          body: JSON.stringify({
+            conversationLanguage: 'de',
+            confirm: true,
+          }),
+        },
+        TEST_ENV,
+      );
+
       expect(res.status).toBe(403);
-      // toEqual asserts the exact serialized body — proves the
-      // assertOwnerProfile message-passthrough (thrown ForbiddenError apiCode
-      // is undefined → dropped by JSON, so the body is exactly { code, message }).
-      const body = await res.json();
-      expect(body).toEqual({
-        code: 'FORBIDDEN',
-        message: 'Only the account owner can change the conversation language.',
-      });
       expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
-    // [CR-2026-05-21-011] Positive companion: an owner profile can still PATCH
-    // conversationLanguage successfully.
-    it('[CR-2026-05-21-011] returns 200 when owner profile PATCHes conversationLanguage', async () => {
+    it('[WI-1556] records explicit owner confirmation separately from automatic sync', async () => {
       mockUpdateConversationLanguageV2.mockResolvedValueOnce(true);
-      // Default mock already returns isOwner: true — no override needed.
 
       const res = await app.request(
         '/v1/onboarding/language',
         {
           method: 'PATCH',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({ conversationLanguage: 'de' }),
+          body: JSON.stringify({
+            conversationLanguage: 'de',
+            confirm: true,
+          }),
         },
         TEST_ENV,
       );
@@ -422,6 +439,7 @@ describe('onboarding routes', () => {
         'test-profile-id',
         'test-account-id',
         'de',
+        true,
       );
     });
   });
@@ -437,7 +455,12 @@ describe('onboarding routes', () => {
         {
           method: 'PATCH',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({ conversationLanguage: 'nb' }),
+          body: JSON.stringify({
+            conversationLanguage: 'nb',
+            // A guardian can choose the managed-child preference, but cannot
+            // complete the child's later exact-self confirmation.
+            confirm: true,
+          }),
         },
         TEST_ENV,
       );
@@ -449,6 +472,7 @@ describe('onboarding routes', () => {
         CHILD_PROFILE_ID,
         'test-account-id',
         'nb',
+        false,
       );
     });
 

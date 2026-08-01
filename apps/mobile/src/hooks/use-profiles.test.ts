@@ -1,11 +1,16 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import type { PublicProfile } from '@eduagent/schemas';
+import { AppState, type AppStateStatus } from 'react-native';
 import {
   createHookWrapper,
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId } from '../lib/api-client';
+import {
+  setActiveProfileId,
+  setProxyMode,
+  useApiClient,
+} from '../lib/api-client';
 import {
   useProfiles,
   useUpdateProfileAppContext,
@@ -19,11 +24,13 @@ const mockGetToken = jest.fn().mockResolvedValue('mock-token');
 type MockAuthState = {
   isSignedIn: boolean;
   userId: string | undefined;
+  sessionId: string | undefined;
   getToken: typeof mockGetToken;
 };
 const mockUseAuth = jest.fn<MockAuthState, []>(() => ({
   isSignedIn: true,
   userId: 'user-1',
+  sessionId: 'session-1',
   getToken: mockGetToken,
 }));
 jest.mock('@clerk/expo', () => ({
@@ -76,6 +83,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({
     isSignedIn: true,
     userId: 'user-1',
+    sessionId: 'session-1',
     getToken: mockGetToken,
   });
   jest.clearAllMocks();
@@ -86,6 +94,8 @@ beforeEach(() => {
 afterEach(() => {
   queryClient?.clear();
   setActiveProfileId(undefined);
+  setProxyMode(false);
+  jest.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -120,6 +130,140 @@ describe('useProfiles', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual(profiles);
+  });
+
+  it('[WI-2128] reuses the authoritative profile result across provider remounts', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ profiles: [createPublicProfile()] }), {
+          status: 200,
+        }),
+      ),
+    );
+    const wrapper = createWrapper();
+    const first = renderHook(() => useProfiles(), { wrapper });
+
+    await waitFor(() => {
+      expect(first.result.current.isSuccess).toBe(true);
+    });
+    first.unmount();
+
+    const second = renderHook(() => useProfiles(), { wrapper });
+    await waitFor(() => {
+      expect(second.result.current.fetchStatus).toBe('idle');
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    second.unmount();
+  });
+
+  it('[WI-2128] refreshes authority when the same user starts a new Clerk session', async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ profiles: [createPublicProfile()] }), {
+          status: 200,
+        }),
+      ),
+    );
+    const wrapper = createWrapper();
+    const hook = renderHook(() => useProfiles(), { wrapper });
+
+    await waitFor(() => {
+      expect(hook.result.current.isSuccess).toBe(true);
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'user-1',
+      sessionId: 'session-2',
+      getToken: mockGetToken,
+    });
+    hook.rerender({});
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+    hook.unmount();
+  });
+
+  it('[WI-2128][BREAK] keeps the selected Person on a concurrent request during foreground authority refresh', async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    let profileListCalls = 0;
+    let resolveRefresh!: (response: Response) => void;
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.endsWith('/profiles')) {
+        profileListCalls += 1;
+        if (profileListCalls === 1) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ profiles: [createPublicProfile()] }),
+              { status: 200 },
+            ),
+          );
+        }
+        return new Promise<Response>((resolve) => {
+          resolveRefresh = resolve;
+        });
+      }
+      if (url.endsWith(`/profiles/${CHILD_PROFILE_ID}`)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              profile: createPublicProfile({ id: CHILD_PROFILE_ID }),
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    const wrapper = createWrapper();
+    const hook = renderHook(
+      () => ({ profiles: useProfiles(), client: useApiClient() }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(hook.result.current.profiles.isSuccess).toBe(true);
+    });
+
+    setActiveProfileId(CHILD_PROFILE_ID);
+    setProxyMode(true);
+    act(() => {
+      appStateListener?.('active');
+    });
+    await waitFor(() => {
+      expect(profileListCalls).toBe(2);
+    });
+
+    await hook.result.current.client.profiles[':id'].$get({
+      param: { id: CHILD_PROFILE_ID },
+    });
+
+    const scopedCall = mockFetch.mock.calls.find(([input]) =>
+      String(input).endsWith(`/profiles/${CHILD_PROFILE_ID}`),
+    );
+    expect(scopedCall).toBeDefined();
+    const headers = new Headers(scopedCall?.[1]?.headers);
+    expect(headers.get('X-Profile-Id')).toBe(CHILD_PROFILE_ID);
+    expect(headers.get('X-Proxy-Mode')).toBe('true');
+
+    await act(async () => {
+      resolveRefresh(
+        new Response(JSON.stringify({ profiles: [createPublicProfile()] }), {
+          status: 200,
+        }),
+      );
+    });
+    hook.unmount();
   });
 
   it('returns empty array when no profiles exist', async () => {
@@ -158,6 +302,7 @@ describe('useProfiles', () => {
     mockUseAuth.mockReturnValue({
       isSignedIn: false,
       userId: undefined,
+      sessionId: undefined,
       getToken: mockGetToken,
     });
 
@@ -210,6 +355,44 @@ describe('useUpdateProfileName', () => {
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
     });
+  });
+
+  it('preserves first-Mentor gate hints when the PATCH response omits them', async () => {
+    const cachedProfile = createPublicProfile({
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+    const updatedProfile = createPublicProfile({ displayName: 'New Name' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: updatedProfile }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    queryClient.setDefaultOptions({
+      queries: { retry: false, gcTime: Infinity },
+    });
+    queryClient.setQueryData(['profiles', 'user-1'], [cachedProfile]);
+    const { result } = renderHook(() => useUpdateProfileName(), { wrapper });
+
+    result.current.mutate({
+      profileId: OWNER_PROFILE_ID,
+      displayName: 'New Name',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(
+      queryClient.getQueryData<PublicProfile[]>(['profiles', 'user-1']),
+    ).toEqual([
+      expect.objectContaining({
+        displayName: 'New Name',
+        conversationLanguageConfirmed: false,
+        isCurrentUser: true,
+      }),
+    ]);
   });
 });
 
@@ -272,5 +455,48 @@ describe('useUpdateProfileAppContext', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves first-Mentor gate hints when the app-context response omits them', async () => {
+    const cachedProfile = createPublicProfile({
+      conversationLanguageConfirmed: false,
+      isCurrentUser: true,
+    });
+    const updatedProfile = createPublicProfile({
+      defaultAppContext: 'family',
+      hasFamilyLinks: true,
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: updatedProfile }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    queryClient.setDefaultOptions({
+      queries: { retry: false, gcTime: Infinity },
+    });
+    queryClient.setQueryData(['profiles', 'user-1'], [cachedProfile]);
+    const { result } = renderHook(() => useUpdateProfileAppContext(), {
+      wrapper,
+    });
+
+    result.current.mutate({
+      profileId: OWNER_PROFILE_ID,
+      defaultAppContext: 'family',
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(
+      queryClient.getQueryData<PublicProfile[]>(['profiles', 'user-1']),
+    ).toEqual([
+      expect.objectContaining({
+        defaultAppContext: 'family',
+        conversationLanguageConfirmed: false,
+        isCurrentUser: true,
+      }),
+    ]);
   });
 });

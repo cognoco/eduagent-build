@@ -319,7 +319,7 @@ describe('dashboard routes', () => {
       );
     });
 
-    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+    it('[WI-2128] auto-resolves the authenticated caller when X-Profile-Id is absent', async () => {
       const res = await app.request(
         '/v1/dashboard',
         {
@@ -328,8 +328,13 @@ describe('dashboard routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
-      expect(mockGetChildrenForParent).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(mockGetChildrenForParent).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 401 without auth header', async () => {

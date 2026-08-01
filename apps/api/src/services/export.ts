@@ -23,6 +23,10 @@ import {
   needsDeepeningTopics,
   learningProfiles,
   mentorActivityLedger,
+  concepts,
+  conceptMastery,
+  topicNotes,
+  mentorNotices,
   type Database,
 } from '@eduagent/database';
 import {
@@ -43,6 +47,10 @@ import {
   dataExportSessionEmbeddingRowSchema,
   dataExportNeedsDeepeningTopicRowSchema,
   dataExportMentorActivityLedgerRowSchema,
+  dataExportConceptRowSchema,
+  dataExportConceptMasteryRowSchema,
+  dataExportTopicNoteRowSchema,
+  dataExportMentorNoticeRowSchema,
   DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
 } from '@eduagent/schemas';
 import type { DataExport } from '@eduagent/schemas';
@@ -350,6 +358,34 @@ export async function generateExport(
         })
       : [];
 
+  const conceptRows =
+    profileIds.length > 0
+      ? await db.query.concepts.findMany({
+          where: inArray(concepts.profileId, profileIds),
+        })
+      : [];
+
+  const conceptMasteryRows =
+    profileIds.length > 0
+      ? await db.query.conceptMastery.findMany({
+          where: inArray(conceptMastery.profileId, profileIds),
+        })
+      : [];
+
+  const topicNoteRows =
+    profileIds.length > 0
+      ? await db.query.topicNotes.findMany({
+          where: inArray(topicNotes.profileId, profileIds),
+        })
+      : [];
+
+  const mentorNoticeRows =
+    profileIds.length > 0
+      ? await db.query.mentorNotices.findMany({
+          where: inArray(mentorNotices.profileId, profileIds),
+        })
+      : [];
+
   return {
     // [WI-1364] identity/billing placeholders — the sole caller (export-v2)
     // overrides account / profiles / consentStates / familyLinks / subscriptions
@@ -451,6 +487,18 @@ export async function generateExport(
     })) as DataExport['learningProfiles'],
     mentorActivityLedger: mentorActivityLedgerRows.map((row) =>
       dataExportMentorActivityLedgerRowSchema.parse(serializeDates(row)),
+    ),
+    concepts: conceptRows.map((row) =>
+      dataExportConceptRowSchema.parse(serializeDates(row)),
+    ),
+    conceptMastery: conceptMasteryRows.map((row) =>
+      dataExportConceptMasteryRowSchema.parse(serializeDates(row)),
+    ),
+    topicNotes: topicNoteRows.map((row) =>
+      dataExportTopicNoteRowSchema.parse(serializeDates(row)),
+    ),
+    mentorNotices: mentorNoticeRows.map((row) =>
+      dataExportMentorNoticeRowSchema.parse(serializeDates(row)),
     ),
     exportedAt: new Date().toISOString(),
   };

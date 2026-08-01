@@ -250,20 +250,17 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2396] assertLlmConsent (called by POST /retention/recall-test) runs
-// isLlmExchangeConsentAllowed, which reads db.query.membership /
-// consentGrant — real queries with no controllable behavior on this file's
-// mock DB. Defaults to allowed (resolves undefined = no throw); the
-// consent-withdrawal test suite below overrides with
-// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
-// refusal path. Mirrors the subjects.test.ts pattern.
-// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
-// consentGrant reads with no real implementation available in this file's
-// mock-DB environment (same class as verifyPersonOwnershipV2 above).
-jest.mock('../services/identity-v2/consent-status-v2', () => ({
-  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
-  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
-}));
+// Global consent middleware and the pre-fix route assertion both resolve the
+// identity-v2 consent decision through DB reads this route harness cannot run.
+// Keep the boundary allowed here; service-level tests own ordering/refusal,
+// while the structural guard proves the route itself has no assertion.
+jest.mock(
+  '../services/identity-v2/consent-status-v2' /* gc1-allow: route unit test — service regressions cover the controlled consent decision; this harness covers HTTP delegation/mapping */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+    assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 import { app } from '../index';
 import { retentionRoutes } from './retention';
@@ -282,7 +279,6 @@ import {
 import { NotFoundError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { ConsentWithdrawnError } from '../services/session';
 
 // WI-867: DATABASE_URL required so databaseMiddleware sets db on context;
@@ -349,7 +345,7 @@ describe('retention routes', () => {
       expect(body.reviewDueCount).toBe(0);
     });
 
-    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+    it('[WI-2128] auto-resolves the authenticated caller when X-Profile-Id is absent', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/retention`,
         {
@@ -358,8 +354,8 @@ describe('retention routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
-      expect(getSubjectRetention).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(getSubjectRetention).toHaveBeenCalled();
     });
 
     it('returns 401 without auth header', async () => {
@@ -435,9 +431,9 @@ describe('retention routes', () => {
       );
     });
 
-    // Break test: aggregate route MUST require X-Profile-Id, otherwise it
-    // would leak retention rows across profiles. [Verified-by: 400 status]
-    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+    // Headerless reads are scoped to the login-bound caller Person, never the
+    // family owner or a shared organization aggregate.
+    it('[WI-2128] scopes a headerless aggregate read to the authenticated caller', async () => {
       const res = await app.request(
         '/v1/library/retention',
         {
@@ -446,8 +442,11 @@ describe('retention routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
-      expect(getAllSubjectsRetention).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(getAllSubjectsRetention).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
     });
 
     // Break test: aggregate route MUST require auth.
@@ -633,19 +632,11 @@ describe('retention routes', () => {
       expect(res.status).toBe(401);
     });
 
-    // -----------------------------------------------------------------------
-    // [WI-2396] Consent-withdrawal gate — refuses immediately before LLM
-    // dispatch (canon R5). processRecallTest -> evaluateRecallQuality
-    // dispatches the LLM for every attemptMode EXCEPT 'dont_remember', which
-    // short-circuits to a deterministic quality-0 result with no routeAndCall.
-    // The route gates all modes except that one; the deterministic-branch
-    // control at the end of this block proves 'dont_remember' is not gated.
-    // -----------------------------------------------------------------------
-    describe('[WI-2396] consent-withdrawal gate', () => {
-      const assertLlmConsentMock = jest.mocked(assertLlmConsent);
-
-      it('refuses with 403 CONSENT_WITHDRAWN and never calls processRecallTest when consent is withdrawn', async () => {
-        assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+    describe('[WI-2989] service-owned consent boundary', () => {
+      it('maps a service consent denial to 403 CONSENT_WITHDRAWN', async () => {
+        (processRecallTest as jest.Mock).mockRejectedValueOnce(
+          new ConsentWithdrawnError(),
+        );
 
         const res = await app.request(
           '/v1/retention/recall-test',
@@ -664,10 +655,10 @@ describe('retention routes', () => {
         expect(res.status).toBe(403);
         const body = (await res.json()) as { code?: string };
         expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
-        expect(processRecallTest).not.toHaveBeenCalled();
+        expect(processRecallTest).toHaveBeenCalledTimes(1);
       });
 
-      it('proceeds (LLM dispatched) when consent is active', async () => {
+      it('delegates an omitted attemptMode to the service-owned boundary', async () => {
         (processRecallTest as jest.Mock).mockResolvedValue({
           passed: true,
           masteryScore: 0.75,
@@ -691,16 +682,20 @@ describe('retention routes', () => {
         );
 
         expect(res.status).toBe(200);
-        expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
-        expect(processRecallTest).toHaveBeenCalled();
+        expect(processRecallTest).toHaveBeenCalledTimes(1);
+        expect(processRecallTest).toHaveBeenCalledWith(
+          expect.anything(),
+          'test-profile-id',
+          expect.objectContaining({
+            topicId: TOPIC_ID,
+            answer:
+              'Photosynthesis converts light energy into chemical energy.',
+          }),
+          'en',
+        );
       });
 
-      // Deterministic-branch control: 'dont_remember' dispatches no LLM, so the
-      // consent gate must NOT run for it. Even with consent withdrawn (mock set
-      // to reject), the request must succeed and assertLlmConsent must never be
-      // called — proving the WI-2396 over-gate on the deterministic branch is
-      // removed while the LLM path above stays gated.
-      it('does NOT gate the deterministic dont_remember attempt (no 403, no consent check) even when consent is withdrawn', async () => {
+      it('delegates the deterministic dont_remember attempt unchanged', async () => {
         (processRecallTest as jest.Mock).mockResolvedValue({
           passed: false,
           masteryScore: 0,
@@ -708,32 +703,21 @@ describe('retention routes', () => {
           nextReviewAt: '2026-02-22T10:00:00.000Z',
           failureCount: 1,
         });
-        // Persistent reject: assertLlmConsent would throw if the dont_remember
-        // path reached it. It must not.
-        assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
-        try {
-          const res = await app.request(
-            '/v1/retention/recall-test',
-            {
-              method: 'POST',
-              headers: AUTH_HEADERS,
-              body: JSON.stringify({
-                topicId: TOPIC_ID,
-                attemptMode: 'dont_remember',
-              }),
-            },
-            TEST_ENV,
-          );
+        const res = await app.request(
+          '/v1/retention/recall-test',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              topicId: TOPIC_ID,
+              attemptMode: 'dont_remember',
+            }),
+          },
+          TEST_ENV,
+        );
 
-          expect(res.status).toBe(200);
-          expect(assertLlmConsentMock).not.toHaveBeenCalled();
-          expect(processRecallTest).toHaveBeenCalled();
-        } finally {
-          // beforeEach only clearAllMocks (clears calls, not implementations),
-          // so restore the file-wide default here to keep this persistent
-          // rejection from leaking into sibling tests.
-          assertLlmConsentMock.mockResolvedValue(undefined);
-        }
+        expect(res.status).toBe(200);
+        expect(processRecallTest).toHaveBeenCalledTimes(1);
       });
     });
   });

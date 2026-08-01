@@ -18,7 +18,10 @@
 // ---------------------------------------------------------------------------
 
 import {
+  billingAliasMergeFailedEventSchema,
   billingAliasReceivedEventSchema,
+  classifyTerminalFailureError,
+  type BillingAliasMergeFailedEvent,
   summarizeRawPayload,
 } from '@eduagent/schemas';
 
@@ -26,6 +29,7 @@ import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { mergeAliasedSubscriptionV2 } from '../../services/billing/billing-v2';
 import { createLogger } from '../../services/logger';
+import { safeSend } from '../../services/safe-non-core';
 import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
@@ -52,6 +56,7 @@ export const billingAliasMerge = inngest.createFunction(
         (event.data.event?.data as { eventId?: string } | undefined)?.eventId ??
         null;
       const runId = event.data.run_id ?? null;
+      const errorName = classifyTerminalFailureError(error);
       const capturedError =
         error instanceof Error
           ? error
@@ -71,8 +76,27 @@ export const billingAliasMerge = inngest.createFunction(
       logger.error('billing.alias_merge.terminal_failure', {
         eventId,
         runId,
-        errorName: error instanceof Error ? error.name : typeof error,
+        errorName,
       });
+
+      const failureEvent: BillingAliasMergeFailedEvent =
+        billingAliasMergeFailedEventSchema.parse({
+          eventId,
+          runId,
+          errorName,
+          timestamp: new Date().toISOString(),
+        });
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: observability-only dead-letter signal consumed by
+            // launch-health alerting and the Inngest dashboard.
+            name: 'app/billing.alias_merge.failed',
+            data: failureEvent,
+          }),
+        'billing-alias-merge.terminal_failure',
+        { eventId, runId },
+      );
 
       return { status: 'terminal_failure' as const, eventId };
     },

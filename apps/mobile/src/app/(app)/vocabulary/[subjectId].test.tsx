@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ProfileContext, type ProfileContextValue } from '../../../lib/profile';
 import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 jest.mock(
   'react-i18next',
@@ -174,5 +175,41 @@ describe('VocabularyListScreen', () => {
 
     screen.getByTestId('vocab-item-vocab-1');
     expect(screen.queryByTestId('vocab-delete-vocab-1')).toBeNull();
+  });
+
+  describe('[BUG-921] no-subjectId empty-state "Open Library" CTA destination [WI-2467]', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      mockUseLocalSearchParams.mockReturnValue({});
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('navigates to library when V2 nav is off', () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        false;
+
+      renderVocabularyScreen();
+      screen.getByTestId('vocabulary-no-subject');
+      fireEvent.press(screen.getByTestId('vocabulary-empty-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('navigates to V2 Subjects when V2 nav is on', () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+
+      renderVocabularyScreen();
+      screen.getByTestId('vocabulary-no-subject');
+      fireEvent.press(screen.getByTestId('vocabulary-empty-library'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    });
   });
 });

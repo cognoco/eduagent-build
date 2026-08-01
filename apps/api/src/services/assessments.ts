@@ -34,6 +34,7 @@ import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import { mapEvaluateQualityToSm2 } from './evaluate';
 import { updateRetentionFromSession } from './retention-data';
 import { insertSessionXpEntry } from './xp';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 
 // [BUG-665 / S-5] Structured logger for parse-fallback observability. Sentry
 // covers production aggregation, but the structured logger surfaces the same
@@ -464,6 +465,7 @@ export interface SubmitAssessmentAnswerDependencies {
   lockAssessmentForAnswerSubmission: typeof lockAssessmentForAnswerSubmission;
   shouldEndAssessmentForReview: typeof shouldEndAssessmentForReview;
   buildNeedsReviewEvaluation: typeof buildNeedsReviewEvaluation;
+  assertLlmConsent: typeof assertLlmConsent;
   evaluateAssessmentAnswer: typeof evaluateAssessmentAnswer;
   resolveAssessmentStatus: typeof resolveAssessmentStatus;
   updateAssessment: typeof updateAssessment;
@@ -482,6 +484,7 @@ const submitAssessmentAnswerDependencies: SubmitAssessmentAnswerDependencies = {
   lockAssessmentForAnswerSubmission,
   shouldEndAssessmentForReview,
   buildNeedsReviewEvaluation,
+  assertLlmConsent,
   evaluateAssessmentAnswer,
   resolveAssessmentStatus,
   updateAssessment,
@@ -541,21 +544,25 @@ export async function submitAssessmentAnswer(
         answer,
         snapshot.exchangeHistory,
       );
-      const evaluation = forceReview
-        ? deps.buildNeedsReviewEvaluation()
-        : await deps.evaluateAssessmentAnswer(
-            {
-              ...topicContext,
-              currentDepth: snapshot.verificationDepth,
-              exchangeHistory: snapshot.exchangeHistory,
-            },
-            answer,
-            {
-              assessmentStatus: snapshot.status,
-              conversationLanguage: options.conversationLanguage,
-              ageBracket: options.ageBracket,
-            },
-          );
+      let evaluation: AssessmentEvaluation;
+      if (forceReview) {
+        evaluation = deps.buildNeedsReviewEvaluation();
+      } else {
+        await deps.assertLlmConsent(txDb, profileId);
+        evaluation = await deps.evaluateAssessmentAnswer(
+          {
+            ...topicContext,
+            currentDepth: snapshot.verificationDepth,
+            exchangeHistory: snapshot.exchangeHistory,
+          },
+          answer,
+          {
+            assessmentStatus: snapshot.status,
+            conversationLanguage: options.conversationLanguage,
+            ageBracket: options.ageBracket,
+          },
+        );
+      }
 
       const updatedHistory = [
         ...snapshot.exchangeHistory,

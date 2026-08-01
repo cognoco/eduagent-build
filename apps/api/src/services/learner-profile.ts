@@ -9,6 +9,7 @@ import {
 import {
   sessionAnalysisOutputSchema,
   type AccommodationMode,
+  type AnalyzedSessionTranscript,
   type ConfidenceLevel,
   type ExplanationStyle,
   type InterestEntry,
@@ -25,9 +26,16 @@ import {
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
 import {
+  collectMemoryFactTextsForMergedState,
   writeMemoryFactsForAnalysis,
   writeMemoryFactsForDeletion,
 } from './memory/memory-facts';
+import {
+  evaluateLearningTextByContent,
+  isContentSafe,
+  type LearningTextGateResult,
+} from './learning-text-safety/gate';
+import type { LearningTextAuthor } from './learning-text-safety/scan';
 import { cascadeDeleteFactWithAncestry } from './memory/cascade-delete';
 import {
   escapeXml,
@@ -36,6 +44,7 @@ import {
 } from './llm/sanitize';
 import { extractFirstJsonObject } from './llm/extract-json';
 import { projectAiResponseContent } from './llm/project-response';
+import { ConflictError } from '../errors';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { isLlmExchangeConsentAllowed } from './identity-v2/consent-status-v2';
@@ -44,7 +53,6 @@ import {
   requireCallerPersonId,
   type IdentityV2Opts,
 } from './identity-v2/identity-v2-opts';
-import * as learningTextGuard from './persisted-learning-text-guard';
 
 export type { IdentityV2Opts };
 
@@ -1303,12 +1311,27 @@ function mergeProfileState(
   } as LearningProfileRow;
 }
 
-function isSafePersistedLearningText(value: string | null): boolean {
-  return (
-    value === null ||
-    learningTextGuard.scrubClinicalInferenceFromLearningRecord(value) !== null
-  );
-}
+/**
+ * [WI-2628] The per-string verdict the sanitiser applies.
+ *
+ * A PREDICATE rather than a `LearningTextGateResult`, because the sanitiser is
+ * called twice per attempt and the two calls need different verdicts from the
+ * same traversal:
+ *
+ *   COLLECT — `collectAnalysisLearningTexts` passes a recorder that returns true
+ *   for everything, so the strings it captures are EXACTLY the strings the
+ *   sanitiser tests. That is what makes the pre-evaluated batch complete by
+ *   construction: there is no second, hand-maintained enumeration of the field
+ *   families to drift out of step with this traversal.
+ *
+ *   ENFORCE — the real call passes the gate's own per-string verdict, so every
+ *   tested expression is also the expression that gets persisted.
+ *
+ * (Written without naming the verdict helper in call form: the wiring ratchet in
+ * `persisted-learning-text-guard.guard.test.ts` counts its call sites by source
+ * text, and a mention in prose would inflate the count.)
+ */
+type PersistedLearningTextPredicate = (value: string | null) => boolean;
 
 /**
  * Scrub every free-text JSONB field written by session analysis before the
@@ -1316,6 +1339,7 @@ function isSafePersistedLearningText(value: string | null): boolean {
  */
 function sanitizeAnalysisProfileProjection(
   profile: LearningProfileRow,
+  isSafePersistedLearningText: PersistedLearningTextPredicate,
 ): Record<string, unknown> {
   const interests = asStringArray(profile.interests).filter((interest) =>
     isSafePersistedLearningText(interest),
@@ -1376,6 +1400,217 @@ function sanitizeAnalysisProfileProjection(
 }
 
 /**
+ * The notification half of the same verdict. Extracted so it shares the
+ * collect/enforce split with the projection sanitiser above rather than
+ * duplicating a second inline `filter`.
+ */
+function filterSafeStruggleNotifications(
+  notifications: StruggleNotification[],
+  isSafePersistedLearningText: PersistedLearningTextPredicate,
+): StruggleNotification[] {
+  return notifications.filter(
+    (notification) =>
+      isSafePersistedLearningText(notification.topic) &&
+      isSafePersistedLearningText(notification.subject),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// [WI-2628] AC-5 — the shared multilingual gate at this boundary.
+//
+// The text here is derived from a read taken INSIDE a transaction, and the gate
+// can make an LLM round-trip; holding a pooled connection across one is a
+// connection-exhaustion hazard. So every write path below follows the same
+// shape:
+//
+//   1. pre-read the profile WITHOUT a lock, derive the candidate strings
+//   2. evaluate them (content-addressed keys), outside any transaction
+//   3. open the transaction, take the FOR UPDATE lock, RE-DERIVE the strings
+//   4. verify every re-derived string was in the pre-evaluated batch
+//   5. proceed — the gate's verdicts now decide what persists
+//
+// Step 4 is the part that needs saying out loud. `isContentSafe` returning false
+// is genuinely ambiguous at these sites: it means EITHER "the gate blocked this
+// text" (the normal, expected outcome — the sanitiser exists to drop such text)
+// OR "this string was never evaluated, because the profile moved between the
+// pre-read and the lock". Filtering on that alone would silently discard a
+// learner's whole memory projection whenever a concurrent write landed in the
+// window. So coverage is checked FIRST, against the exact set of strings that
+// was evaluated, and a miss is a RETRY rather than a block.
+//
+// The retry itself does NOT consult `version` — it simply re-runs step 1 against
+// whatever the row now holds, and the fresh batch is what converges. `version`
+// appears only in the miss/exhaustion log lines, as the observability handle for
+// how far the row had moved. Deliberately not the trigger: a concurrent write
+// that touched no gated text bumps `version` while leaving coverage intact, and
+// that case must proceed rather than spend a retry.
+// ---------------------------------------------------------------------------
+
+/**
+ * Bounded, and exhaustion FAILS CLOSED — never a fall-through to an ungated
+ * write. Three attempts: a single contended window is common, three in a row on
+ * the same profile is a pathology worth surfacing rather than spinning on.
+ */
+const MAX_LEARNING_TEXT_GATE_ATTEMPTS = 3;
+
+/** Sentinel: this attempt's batch did not cover the locked state. Retry. */
+const GATE_COVERAGE_MISS = Symbol('learning-text-gate-coverage-miss');
+
+/**
+ * Record every string the traversal tests, clearing all of them.
+ *
+ * Returns the recorder AND its backing list so callers can hand the recorder to
+ * the sanitiser and read the captured strings back out afterwards.
+ */
+function createLearningTextCollector(): {
+  readonly texts: (string | null)[];
+  readonly record: PersistedLearningTextPredicate;
+} {
+  const texts: (string | null)[] = [];
+  return {
+    texts,
+    record: (value) => {
+      texts.push(value);
+      return true;
+    },
+  };
+}
+
+/**
+ * Whether every string the locked state would gate was in the pre-evaluated set.
+ *
+ * Compares the exact strings rather than their digests — the gate's keys ARE
+ * content hashes of these bytes, so string identity is the same relation one
+ * level more directly, with no second hashing implementation to drift.
+ */
+function coversEveryText(
+  evaluated: ReadonlySet<string>,
+  texts: readonly (string | null | undefined)[],
+): boolean {
+  for (const text of texts) {
+    // Null/undefined is trivially safe to the gate (there is no string to
+    // persist) and is never a batch member, so it can never be a miss.
+    if (typeof text !== 'string') continue;
+    if (!evaluated.has(text)) return false;
+  }
+  return true;
+}
+
+function evaluatedTextSet(
+  texts: readonly (string | null | undefined)[],
+): ReadonlySet<string> {
+  return new Set(
+    texts.filter((text): text is string => typeof text === 'string'),
+  );
+}
+
+/**
+ * The gate for the profile's own free-text JSONB fields and the struggle
+ * notifications derived alongside them.
+ *
+ * Provenance is a property of the CALLER, and since WI-2952 the callers declare
+ * it: `applyAnalysis` threads its `author` argument here, and every production
+ * caller passes one explicitly.
+ *
+ *   inngest/functions/session-completed.ts  → 'llm' + `result.provider` (the
+ *                                             vendor `analyzeSessionTranscript`
+ *                                             now returns alongside the analysis)
+ *   services/learner-input.ts (LLM path)    → 'llm' + `result.provider`
+ *   services/learner-input.ts (fallback)    → 'user'. `fallbackAnalysis` regexes
+ *                                             the learner's OWN typed words into
+ *                                             `interests[]` and `struggles[].topic`
+ *                                             verbatim — no model involved, so the
+ *                                             learner's self-disclosure is JUDGED
+ *                                             rather than silently dropped.
+ *
+ * The `applyAnalysis` default `{provenance: 'llm', producerVendor: ''}` remains
+ * the strictest reading — a blank vendor fails the scan closed on anything
+ * ambiguous — so a caller that omits `author` can only be MORE restrictive than
+ * intended, never less.
+ *
+ * WHEN THREADING A VENDOR HERE, pass the VENDOR (`anthropic`), never the model id
+ * (`claude-sonnet-4-6`). Judge exclusion matches vendor names, so a model id
+ * matches no pool member and the producing vendor ends up grading its own output.
+ * It does NOT fail closed — the guard rejects only a BLANK vendor — and both
+ * fields are typed `string`, so the compiler will not catch it. The real guard is
+ * the test asserting the producing vendor is absent from the RESOLVED judge pool
+ * against the real resolver: `analyzeSessionTranscript — judge independence
+ * (WI-2952 AC-4)` in learner-profile.test.ts.
+ */
+function evaluateProfileFieldTexts(
+  texts: readonly (string | null | undefined)[],
+  author: LearningTextAuthor,
+): Promise<LearningTextGateResult> {
+  return evaluateLearningTextByContent({
+    texts,
+    fieldKind: 'learner_profile_field',
+    // No conversation language is read on this path; the gate then scans all ten
+    // attribution grammars and keeps the strictest verdict. Never `'en'` —
+    // assuming English is the defect this Work Item removes.
+    conversationLanguage: undefined,
+    // [WI-2952] Spread, not two literals: the union guarantees a vendor is
+    // present iff the provenance is `'llm'`, and spreading is what carries that
+    // guarantee across the boundary into the flat scan input.
+    ...author,
+  });
+}
+
+/**
+ * The gate for the memory-fact rows the same state maps to.
+ *
+ * A SECOND batch rather than a bigger first one, because the row text is
+ * COMPOSED by the mappers (`subject: topics (confidence)`) and is therefore a
+ * different string from any field it was built out of — clearing the parts does
+ * not clear the whole. `fieldKind: 'memory_fact'` names it accordingly.
+ *
+ * `provenance` differs by path, and the two calls are NOT interchangeable:
+ *
+ *   via `applyAnalysis` (this call threads the caller's `author` through, so
+ *   every provenance that reaches `evaluateProfileFieldTexts` reaches here too):
+ *     'llm' + real vendor — session-completed.ts and learner-input.ts's LLM path
+ *                 thread `result.provider`. With a real vendor the judge CAN be
+ *                 consulted, so this path can now `refer`.
+ *     'user'    — learner-input.ts's fallback path. Note the asymmetry with the
+ *                 'migration' rationale below: here the mapper-composed row text
+ *                 IS built from the learner's own typed words, so 'user' is the
+ *                 honest declaration — and it makes this gate more permissive
+ *                 over composed text than the pre-WI-2952 uniform reading was.
+ *                 That widening is deliberate (the item exists to stop dropping
+ *                 learner self-disclosure), but it is a fail-closed gate getting
+ *                 wider: audit here first if composed-text leaks are suspected.
+ *                 Independence caveat: provenance is per-write-batch (storage
+ *                 has no per-fragment author), so a 'user' write sweeps stored
+ *                 LLM-authored fragments into a batch judged with NO vendor
+ *                 exclusion — a vendor that produced a stored fragment embedded
+ *                 in composed row text can grade that text. Collection-level
+ *                 granularity is tracked as WI-2972.
+ *     'llm' + blank vendor — the `applyAnalysis` default for callers that omit
+ *                 `author`; cannot consult the judge, fails closed on `refer`.
+ *   'migration' — `deleteMemoryItem` / `unsuppressInference`. Determined from the
+ *                 code, not copied from the backfill: the only text these project
+ *                 is text ALREADY STORED on the row, with no identifiable author
+ *                 for this write. The caller's `value` argument is used solely to
+ *                 REMOVE an entry — it never contributes text to the projection —
+ *                 so `'user'` would be a mis-declaration despite a user driving
+ *                 the request.
+ *
+ * The two calls are therefore NOT behaviour-equivalent: 'migration' never
+ * consults the judge, while the `applyAnalysis` path can refer whenever its
+ * author carries a real vendor or 'user' provenance. Do not collapse them.
+ */
+function evaluateMemoryFactTexts(
+  texts: readonly (string | null | undefined)[],
+  author: LearningTextAuthor,
+): Promise<LearningTextGateResult> {
+  return evaluateLearningTextByContent({
+    texts,
+    fieldKind: 'memory_fact',
+    conversationLanguage: undefined,
+    ...author,
+  });
+}
+
+/**
  * Server-side only — called exclusively from Inngest session-completed pipeline.
  * The profileId originates from a trusted DB-sourced session row, not user input.
  * No accountId guard required.
@@ -1389,6 +1624,18 @@ export async function applyAnalysis(
   /** [CR-119.3]: Prefer subjectId for urgency boost writes — name match
    *  is ambiguous when no (profileId, name) uniqueness constraint exists. */
   subjectId?: string | null,
+  /**
+   * [WI-2952] WHO authored the text this analysis carries. Was hard-coded to
+   * `{provenance:'llm', producerVendor:null}` for every caller, which under the
+   * fail-closed matrix resolves the referral to null and BLOCKS — so genuinely
+   * user-authored text never reached the judge and a learner's own
+   * self-description was silently dropped from `interests[]`.
+   *
+   * Optional with an `'llm'`-without-vendor default ONLY so the two in-repo
+   * callers migrate independently; that default is the strictest reading and
+   * blocks on anything ambiguous, never the permissive one.
+   */
+  author: LearningTextAuthor = { provenance: 'llm', producerVendor: '' },
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1414,8 +1661,68 @@ export async function applyAnalysis(
     return { fieldsUpdated: [], notifications: [] };
   }
 
-  const { finalFieldsUpdated, finalNotifications } = await db.transaction(
-    async (tx) => {
+  let attemptOutcome: {
+    finalFieldsUpdated: string[];
+    finalNotifications: StruggleNotification[];
+  } | null = null;
+
+  for (
+    let attempt = 1;
+    attempt <= MAX_LEARNING_TEXT_GATE_ATTEMPTS && attemptOutcome === null;
+    attempt += 1
+  ) {
+    // ---- steps 1+2: pre-read WITHOUT a lock, then evaluate outside any
+    // transaction. `getOrCreateLearningProfileTx` on the outer `db` rather than a
+    // plain select: a profile that does not exist yet has no gated text to
+    // pre-evaluate, so the batch would be empty while the transaction's own
+    // `getOrCreate` produced a merged state full of analysis text — a coverage
+    // miss that no retry could ever resolve. Creating the row here is
+    // behaviour-neutral; the transaction created it at this same point already.
+    const preRead = await getOrCreateLearningProfileTx(db, profileId);
+    const preUpdates = buildAnalysisUpdates(
+      preRead,
+      analysis,
+      source,
+      subjectName,
+    );
+    const preMergedState = mergeProfileState(preRead, preUpdates.updates);
+
+    // COLLECT pass — the recorder clears everything, so `collector.texts` is
+    // exactly the set of strings the ENFORCE pass below will test.
+    const collector = createLearningTextCollector();
+    sanitizeAnalysisProfileProjection(preMergedState, collector.record);
+    filterSafeStruggleNotifications(preUpdates.notifications, collector.record);
+    const profileFieldGate = await evaluateProfileFieldTexts(
+      collector.texts,
+      author,
+    );
+    const evaluatedProfileFields = evaluatedTextSet(collector.texts);
+
+    // The memory-fact batch is derived from the SANITISED state, not the raw
+    // merged one: the composed row text embeds the surviving fields, so a field
+    // the projection gate drops changes every row text it appeared in. Gating the
+    // unsanitised composition would key the batch on strings this path never
+    // persists, and every real row would then resolve unevaluated.
+    const preSafeProjection = sanitizeAnalysisProfileProjection(
+      preMergedState,
+      (value) => isContentSafe(profileFieldGate, value),
+    );
+    const preSafeMergedState = {
+      ...preMergedState,
+      ...preSafeProjection,
+    } as LearningProfileRow;
+    const preMemoryFactTexts = collectMemoryFactTextsForMergedState(
+      profileId,
+      preSafeMergedState,
+    );
+    const memoryFactGate = await evaluateMemoryFactTexts(
+      preMemoryFactTexts,
+      author,
+    );
+    const evaluatedMemoryFacts = evaluatedTextSet(preMemoryFactTexts);
+
+    // ---- steps 3-5.
+    const result = await db.transaction(async (tx) => {
       const profile = await getOrCreateLearningProfileTx(
         tx as unknown as Database,
         profileId,
@@ -1451,15 +1758,39 @@ export async function applyAnalysis(
       }
 
       const mergedState = mergeProfileState(profile, updates);
-      const safeProjection = sanitizeAnalysisProfileProjection(mergedState);
+
+      // RE-DERIVED from the locked row, then coverage-checked. Same traversal,
+      // same recorder, so this asks precisely "was every string I am about to
+      // gate actually evaluated?" — and a no is the profile having moved, not a
+      // block.
+      const txCollector = createLearningTextCollector();
+      sanitizeAnalysisProfileProjection(mergedState, txCollector.record);
+      filterSafeStruggleNotifications(notifications, txCollector.record);
+      if (!coversEveryText(evaluatedProfileFields, txCollector.texts)) {
+        return GATE_COVERAGE_MISS;
+      }
+
+      const safeProjection = sanitizeAnalysisProfileProjection(
+        mergedState,
+        (value) => isContentSafe(profileFieldGate, value),
+      );
       const safeMergedState = {
         ...mergedState,
         ...safeProjection,
       } as LearningProfileRow;
-      const safeNotifications = notifications.filter(
-        (notification) =>
-          isSafePersistedLearningText(notification.topic) &&
-          isSafePersistedLearningText(notification.subject),
+
+      if (
+        !coversEveryText(
+          evaluatedMemoryFacts,
+          collectMemoryFactTextsForMergedState(profileId, safeMergedState),
+        )
+      ) {
+        return GATE_COVERAGE_MISS;
+      }
+
+      const safeNotifications = filterSafeStruggleNotifications(
+        notifications,
+        (value) => isContentSafe(profileFieldGate, value),
       );
       await tx
         .update(learningProfiles)
@@ -1470,14 +1801,44 @@ export async function applyAnalysis(
           updatedAt: new Date(),
         })
         .where(eq(learningProfiles.profileId, profileId));
-      await writeMemoryFactsForAnalysis(tx, profileId, safeMergedState);
+      await writeMemoryFactsForAnalysis(
+        tx,
+        profileId,
+        safeMergedState,
+        memoryFactGate,
+      );
 
       return {
         finalFieldsUpdated: fieldsUpdated,
         finalNotifications: safeNotifications,
       };
-    },
-  );
+    });
+
+    if (result === GATE_COVERAGE_MISS) {
+      // AC-6-safe: version numbers and an attempt count, no text.
+      logger.warn('[learner-profile] learning-text gate coverage miss', {
+        event: 'learner_profile.learning_text_gate.coverage_miss',
+        profileId,
+        attempt,
+        preReadVersion: preRead.version,
+      });
+      continue;
+    }
+    attemptOutcome = result;
+  }
+
+  if (attemptOutcome === null) {
+    // FAIL CLOSED: exhaustion writes nothing at all. Never a fall-through to an
+    // ungated write — the whole point of the bound is that its failure mode is
+    // identical to a block, not weaker than one.
+    logger.error('[learner-profile] learning-text gate attempts exhausted', {
+      event: 'learner_profile.learning_text_gate.exhausted',
+      profileId,
+      attempts: MAX_LEARNING_TEXT_GATE_ATTEMPTS,
+    });
+    return { fieldsUpdated: [], notifications: [] };
+  }
+  const { finalFieldsUpdated, finalNotifications } = attemptOutcome;
 
   if (finalNotifications.length > 0) {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1536,6 +1897,126 @@ export async function applyAnalysis(
   };
 }
 
+/** The exact object drizzle hands a `db.transaction` callback. */
+type DatabaseTransaction = Parameters<
+  Parameters<Database['transaction']>[0]
+>[0];
+
+interface MemoryFactGateHandlers<TDerived> {
+  /**
+   * Pure: profile row in, the updates and merged state out, or `null` when this
+   * input implies no change. Called TWICE per attempt — once on the unlocked
+   * pre-read to build the batch, once on the locked row — so it must not depend
+   * on anything but its argument and the enclosing call's parameters.
+   */
+  readonly deriveMergedState: (profile: LearningProfileRow) => TDerived | null;
+  readonly write: (
+    tx: DatabaseTransaction,
+    derived: TDerived,
+    learningTextGate: LearningTextGateResult,
+  ) => Promise<void>;
+}
+
+/**
+ * The pre-evaluate / lock / re-derive / coverage-check loop for the two user
+ * mutations that re-project stored profile text into memory facts.
+ *
+ * Unlike `applyAnalysis` these paths have no field-level sanitiser — they gate
+ * ONLY the composed memory-fact row text. That is a real widening: before
+ * [WI-2628] they passed `mergedState` through with no safety control at all, so
+ * text the gate finds unsafe or ambiguous is now dropped from the projection even
+ * though the learner's request concerned a different item. Correct for AC-5, and
+ * deliberate.
+ *
+ * Exhaustion raises `ConflictError` rather than `BadRequestError`: nothing here
+ * is the caller's fault and nothing is known to be unsafe — the write lost a race
+ * three times. What matters is that it does NOT fall through to an ungated write.
+ */
+async function withMemoryFactGateRetry<
+  TDerived extends {
+    readonly mergedState: Parameters<
+      typeof collectMemoryFactTextsForMergedState
+    >[1];
+  },
+>(
+  db: Database,
+  profileId: string,
+  surface: string,
+  handlers: MemoryFactGateHandlers<TDerived>,
+): Promise<void> {
+  for (
+    let attempt = 1;
+    attempt <= MAX_LEARNING_TEXT_GATE_ATTEMPTS;
+    attempt += 1
+  ) {
+    const [preRead] = await db
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId))
+      .limit(1);
+    // No profile means nothing to write; the transaction below takes the same
+    // early return on its own locked read.
+    if (!preRead) return;
+    const preDerived = handlers.deriveMergedState(preRead);
+    // `null` means "no change for this input" on the UNLOCKED read. Evaluate an
+    // empty batch and let the locked read decide rather than returning here — if
+    // the locked row disagrees, the coverage check catches it and we retry.
+    const preTexts =
+      preDerived === null
+        ? []
+        : collectMemoryFactTextsForMergedState(
+            profileId,
+            preDerived.mergedState,
+          );
+    const learningTextGate = await evaluateMemoryFactTexts(preTexts, {
+      provenance: 'migration',
+    });
+    const evaluated = evaluatedTextSet(preTexts);
+
+    const outcome = await db.transaction(async (tx) => {
+      const [profile] = await tx
+        .select()
+        .from(learningProfiles)
+        .where(eq(learningProfiles.profileId, profileId))
+        .for('update')
+        .limit(1);
+      if (!profile) return null;
+      const derived = handlers.deriveMergedState(profile);
+      if (derived === null) return null;
+      if (
+        !coversEveryText(
+          evaluated,
+          collectMemoryFactTextsForMergedState(profileId, derived.mergedState),
+        )
+      ) {
+        return GATE_COVERAGE_MISS;
+      }
+      await handlers.write(tx, derived, learningTextGate);
+      return null;
+    });
+
+    if (outcome !== GATE_COVERAGE_MISS) return;
+    // AC-6-safe: versions, surface and attempt count. No text.
+    logger.warn('[learner-profile] learning-text gate coverage miss', {
+      event: 'learner_profile.learning_text_gate.coverage_miss',
+      profileId,
+      surface,
+      attempt,
+      preReadVersion: preRead.version,
+    });
+  }
+
+  logger.error('[learner-profile] learning-text gate attempts exhausted', {
+    event: 'learner_profile.learning_text_gate.exhausted',
+    profileId,
+    surface,
+    attempts: MAX_LEARNING_TEXT_GATE_ATTEMPTS,
+  });
+  throw new ConflictError(
+    'Memory update could not complete because the profile changed concurrently',
+  );
+}
+
 export async function deleteMemoryItem(
   db: Database,
   profileId: string,
@@ -1547,58 +2028,59 @@ export async function deleteMemoryItem(
   opts?: IdentityV2Opts,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId, opts);
-  await db.transaction(async (tx) => {
-    const [profile] = await tx
-      .select()
-      .from(learningProfiles)
-      .where(eq(learningProfiles.profileId, profileId))
-      .for('update')
-      .limit(1);
-    if (!profile) return;
-
-    const updates = buildDeleteMemoryItemUpdates(
-      profile,
-      category,
-      value,
-      suppress,
-      subject,
-    );
-    if (!updates) return;
-
-    const mergedState = mergeProfileState(profile, updates);
-    const factCategory = MEMORY_FACT_CATEGORY_BY_JSONB_CATEGORY[category];
-    if (factCategory) {
-      const matchingRows = await tx
-        .select({ id: memoryFacts.id })
-        .from(memoryFacts)
-        .where(
-          and(
-            eq(memoryFacts.profileId, profileId),
-            eq(memoryFacts.category, factCategory),
-            eq(memoryFacts.textNormalized, normalizeMemoryValue(value)),
-            sql`${memoryFacts.supersededBy} IS NULL`,
-          ),
-        );
-      for (const row of matchingRows) {
-        await cascadeDeleteFactWithAncestry(tx, profileId, row.id, {
-          emit: async (name, payload) => {
-            logger.info('[memory_facts] cascade delete applied', {
-              event: name,
-              ...payload,
-            });
-          },
-        });
+  await withMemoryFactGateRetry(db, profileId, 'delete_memory_item', {
+    deriveMergedState: (profile) => {
+      const updates = buildDeleteMemoryItemUpdates(
+        profile,
+        category,
+        value,
+        suppress,
+        subject,
+      );
+      return updates === null
+        ? null
+        : { updates, mergedState: mergeProfileState(profile, updates) };
+    },
+    write: async (tx, { updates, mergedState }, learningTextGate) => {
+      const factCategory = MEMORY_FACT_CATEGORY_BY_JSONB_CATEGORY[category];
+      if (factCategory) {
+        const matchingRows = await tx
+          .select({ id: memoryFacts.id })
+          .from(memoryFacts)
+          .where(
+            and(
+              eq(memoryFacts.profileId, profileId),
+              eq(memoryFacts.category, factCategory),
+              eq(memoryFacts.textNormalized, normalizeMemoryValue(value)),
+              sql`${memoryFacts.supersededBy} IS NULL`,
+            ),
+          );
+        for (const row of matchingRows) {
+          await cascadeDeleteFactWithAncestry(tx, profileId, row.id, {
+            emit: async (name, payload) => {
+              logger.info('[memory_facts] cascade delete applied', {
+                event: name,
+                ...payload,
+              });
+            },
+          });
+        }
       }
-    }
-    await tx
-      .update(learningProfiles)
-      .set({
-        ...updates,
-        version: sql`${learningProfiles.version} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(learningProfiles.profileId, profileId));
-    await writeMemoryFactsForDeletion(tx, profileId, mergedState);
+      await tx
+        .update(learningProfiles)
+        .set({
+          ...updates,
+          version: sql`${learningProfiles.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(learningProfiles.profileId, profileId));
+      await writeMemoryFactsForDeletion(
+        tx,
+        profileId,
+        mergedState,
+        learningTextGate,
+      );
+    },
   });
 }
 
@@ -1621,26 +2103,27 @@ export async function unsuppressInference(
   opts?: IdentityV2Opts,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId, opts);
-  await db.transaction(async (tx) => {
-    const [profile] = await tx
-      .select()
-      .from(learningProfiles)
-      .where(eq(learningProfiles.profileId, profileId))
-      .for('update')
-      .limit(1);
-    if (!profile) return;
-
-    const updates = buildUnsuppressUpdates(profile, value);
-    const mergedState = mergeProfileState(profile, updates);
-    await tx
-      .update(learningProfiles)
-      .set({
-        ...updates,
-        version: sql`${learningProfiles.version} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(learningProfiles.profileId, profileId));
-    await writeMemoryFactsForDeletion(tx, profileId, mergedState);
+  await withMemoryFactGateRetry(db, profileId, 'unsuppress_inference', {
+    deriveMergedState: (profile) => {
+      const updates = buildUnsuppressUpdates(profile, value);
+      return { updates, mergedState: mergeProfileState(profile, updates) };
+    },
+    write: async (tx, { updates, mergedState }, learningTextGate) => {
+      await tx
+        .update(learningProfiles)
+        .set({
+          ...updates,
+          version: sql`${learningProfiles.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(learningProfiles.profileId, profileId));
+      await writeMemoryFactsForDeletion(
+        tx,
+        profileId,
+        mergedState,
+        learningTextGate,
+      );
+    },
   });
 }
 
@@ -1780,6 +2263,16 @@ function hasLearnerResolutionEvidence(transcriptText: string): boolean {
   );
 }
 
+/**
+ * [WI-2952] The analysis, WITH the vendor that produced it.
+ *
+ * Moved to `@eduagent/schemas` (Gate-1 SHOULD_FIX) — it is returned by this
+ * exported function and crosses the services/ → inngest/functions/ boundary.
+ * Re-exported here so existing imports keep working; see
+ * `packages/schemas/src/learning-profiles.ts` for the full doc comment.
+ */
+export type { AnalyzedSessionTranscript };
+
 export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
   subjectName: string | null,
@@ -1795,7 +2288,7 @@ export async function analyzeSessionTranscript(
     knownStruggles?: Array<{ topic: string; subject: string | null }>;
     suppressedTopics?: string[];
   },
-): Promise<SessionAnalysisOutput | null> {
+): Promise<AnalyzedSessionTranscript | null> {
   const conversationEvents = transcript
     .filter(
       (entry) =>
@@ -1895,7 +2388,17 @@ export async function analyzeSessionTranscript(
     const parsed = JSON.parse(jsonText) as unknown;
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) return null;
-    return filterUnsupportedResolvedTopics(validated.data, transcriptText);
+    return {
+      analysis: filterUnsupportedResolvedTopics(validated.data, transcriptText),
+      // Normalised — see the same guard in learner-input.ts. `provider` is
+      // typed `string` but can arrive undefined at runtime; '' fails closed at
+      // the matrix, which is the safe degradation.
+      author: {
+        provenance: 'llm',
+        producerVendor:
+          typeof result.provider === 'string' ? result.provider : '',
+      },
+    };
   } catch (err) {
     logger.warn('Failed to parse session analysis', {
       error: err instanceof Error ? err.message : String(err),

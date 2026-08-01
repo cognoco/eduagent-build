@@ -32,32 +32,22 @@ const proxyModeBody = {
  * could omit the header to gain full write access on a child profile, or
  * send it spuriously to suppress writes on a non-proxy session.
  *
- * The authoritative signal is `profileMeta.isOwner`, set server-side by
- * profileScopeMiddleware after verifying that X-Profile-Id resolves to a
- * profile belonging to the authenticated account. When the resolved profile
- * is NOT the owner profile (i.e., a parent is acting on behalf of a child),
- * the request is by definition in proxy mode regardless of any header.
+ * The authoritative signals are the verified selected `profileId` and the
+ * server-resolved `callerPersonId`. A non-owner selecting themselves is a
+ * credentialed self-session; a different caller selecting that non-owner is
+ * a proxy session regardless of any header. `profileMeta.isOwner` cannot
+ * identify proxy mode: joined learners have their own credentials and
+ * correctly operate a non-owner Person as self.
  *
  * The X-Proxy-Mode header is still honored as a belt-and-suspenders signal
  * (e.g., a parent explicitly sending it from the owner profile during a
  * switch race) but it can no longer downgrade a true proxy request.
  *
- * [WI-2398 — write-side IDOR] The checks above only prove the client-supplied
- * X-Profile-Id resolves to SOME owner-role profile in the caller's org (via
- * profileMeta.isOwner / resolvedVia) — never that it is the CALLER's own
- * identity. A non-owner org member (own login, own callerPersonId) can send
- * X-Profile-Id = a DIFFERENT owner/admin profile's id, pass every check
- * above, and mutate that profile's self-service data (curriculum
- * skip/unskip/challenge/topics/adapt, onboarding pronouns/interests, and
- * every other write gated solely by this function). The final check below
- * closes that gap: it derives allow/deny from the server-resolved caller
- * (`callerPersonId`, set app-wide by accountMiddleware from the
- * authenticated login->person binding, never request-supplied) via
- * assertCanWriteProfile — the write-authority twin of assertCanReadProfile
- * (WI-2416) — requiring the caller to be self-or-guardian of the
- * header-resolved profile, not merely an org member. Because every call
- * site shares this one function, fixing it here closes the gap at every
- * assertNotProxyMode call site without touching each route individually.
+ * [WI-2398 — write-side IDOR] The client-supplied X-Profile-Id must resolve to
+ * the caller's own Person for a non-proxy write. `callerPersonId` is set by
+ * accountMiddleware from the authenticated login binding and is never
+ * request-supplied. The final `assertCanWriteProfile` check retains
+ * defense-in-depth organization membership validation.
  */
 export async function assertNotProxyMode(
   c: Context<ProfileScopeEnv> | Context,
@@ -69,7 +59,7 @@ export async function assertNotProxyMode(
   // [BUG-975 / CCR-PR126-H-1] Fail closed when profileMeta is absent.
   //
   // profileScopeMiddleware sets profileMeta whenever it can resolve a profile
-  // (explicit X-Profile-Id or auto-resolved owner). When profileMeta is
+  // (explicit X-Profile-Id or auto-resolved caller). When profileMeta is
   // undefined, ownership cannot be verified server-side — historically the
   // function silently passed through, which meant a route mounted without
   // profileScopeMiddleware (or a path where auto-resolve failed silently)
@@ -82,20 +72,23 @@ export async function assertNotProxyMode(
     });
   }
 
-  // Server-derived: any non-owner profile is a proxy session.
-  if (profileMeta.isOwner === false) {
+  // [Issue 901] Writes require affirmative selection even though a headerless
+  // read can safely auto-resolve the login-bound caller Person. This prevents
+  // stale clients from silently entering a capability-bearing write path.
+  if (profileMeta.resolvedVia !== 'explicit-header') {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
       res: c.json(proxyModeBody, 403),
     });
   }
 
-  // [Issue 901] Reject auto-synthesized owner identity. When no X-Profile-Id
-  // header is sent, profileScopeMiddleware auto-resolves the account OWNER
-  // profile (isOwner:true) — so a non-owner caller could omit the header to
-  // pass the isOwner check above. A true (non-proxy) owner session must carry
-  // an explicitly selected, verified owner profile.
-  if (profileMeta.resolvedVia !== 'explicit-header') {
+  const callerPersonId = (c as Context<ProfileScopeEnv>).get('callerPersonId');
+  const profileId = (c as Context<ProfileScopeEnv>).get('profileId');
+  // [WI-2128 / WI-2653] Proxy is an authority relationship, not a profile
+  // shape. A credentialed learner writing their own non-owner Person is self;
+  // any caller selecting a different Person is proxy mode. Both values are
+  // server-derived/verified before this guard.
+  if (!callerPersonId || !profileId || callerPersonId !== profileId) {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
       res: c.json(proxyModeBody, 403),
@@ -113,17 +106,10 @@ export async function assertNotProxyMode(
   }
 
   // [WI-2398] Caller-identity gate — see the function doc above. profileId
-  // here is the HEADER-resolved profile (already proven owner-shaped and
-  // explicitly selected by the checks above); assertCanWriteProfile proves
-  // the server-resolved caller actually has write authority over it (self or
-  // active guardian of an uncredentialed charge), not merely org membership.
-  const profileId = (c as Context<ProfileScopeEnv>).get('profileId');
-  if (!profileId) {
-    throw new HTTPException(403, {
-      message: PROXY_MODE_MESSAGE,
-      res: c.json(proxyModeBody, 403),
-    });
-  }
+  // here is the HEADER-resolved profile (already proven to equal the caller's
+  // server-derived Person and to be explicitly selected);
+  // assertCanWriteProfile additionally proves current organization membership
+  // instead of trusting request context alone.
   try {
     await assertCanWriteProfile(
       c as unknown as CallerIdentitySource,

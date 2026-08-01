@@ -12,7 +12,11 @@
 import { eq } from 'drizzle-orm';
 import { generateUUIDv7, memoryFacts } from '@eduagent/database';
 
-import { replaceActiveMemoryFactsForProfile } from '../../apps/api/src/services/memory/memory-facts';
+import { evaluateLearningTextByContent } from '../../apps/api/src/services/learning-text-safety/gate';
+import {
+  collectMemoryFactTextsForMergedState,
+  replaceActiveMemoryFactsForProfile,
+} from '../../apps/api/src/services/memory/memory-facts';
 import {
   cleanupSeededAccount,
   seedLearningProfile,
@@ -29,6 +33,21 @@ const EMPTY_PROJECTION: MemoryProjection = {
   interestTimestamps: {},
   createdAt: new Date('2026-01-01'),
 };
+
+/**
+ * [WI-2628] A REAL gate over this projection's own candidate texts — never a
+ * hand-rolled always-true stand-in, which would silently satisfy the "force
+ * isSafe true" mutation the unit suites test against. `provenance: 'migration'`
+ * never consults the judge, so no LLM call is made from an integration test.
+ */
+async function gateFor(profileId: string, projection: MemoryProjection) {
+  return evaluateLearningTextByContent({
+    texts: collectMemoryFactTextsForMergedState(profileId, projection),
+    fieldKind: 'memory_fact',
+    conversationLanguage: undefined,
+    provenance: 'migration',
+  });
+}
 
 describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
   it('deletes all rows (active and superseded) for the profile and inserts the new projection', async () => {
@@ -88,7 +107,12 @@ describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
       ],
     };
 
-    await replaceActiveMemoryFactsForProfile(db, profileId, projection);
+    await replaceActiveMemoryFactsForProfile(
+      db,
+      profileId,
+      projection,
+      await gateFor(profileId, projection),
+    );
 
     const remaining = await db.query.memoryFacts.findMany({
       where: eq(memoryFacts.profileId, profileId),
@@ -124,7 +148,12 @@ describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
       confidence: 'medium',
     });
 
-    await replaceActiveMemoryFactsForProfile(db, profileId, EMPTY_PROJECTION);
+    await replaceActiveMemoryFactsForProfile(
+      db,
+      profileId,
+      EMPTY_PROJECTION,
+      await gateFor(profileId, EMPTY_PROJECTION),
+    );
 
     const remaining = await db.query.memoryFacts.findMany({
       where: eq(memoryFacts.profileId, profileId),
@@ -152,7 +181,12 @@ describe('replaceActiveMemoryFactsForProfile (real DB)', () => {
     });
 
     // Replace only profile 1 (empty projection)
-    await replaceActiveMemoryFactsForProfile(db, p1, EMPTY_PROJECTION);
+    await replaceActiveMemoryFactsForProfile(
+      db,
+      p1,
+      EMPTY_PROJECTION,
+      await gateFor(p1, EMPTY_PROJECTION),
+    );
 
     const p2Remaining = await db.query.memoryFacts.findMany({
       where: eq(memoryFacts.profileId, p2),

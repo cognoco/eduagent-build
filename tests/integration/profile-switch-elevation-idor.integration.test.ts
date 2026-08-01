@@ -1,7 +1,6 @@
 /**
- * Integration: WI-1302 — POST /v1/profiles/switch owner-elevation
- * reverification trusts callerPersonId, not the client-supplied
- * X-Profile-Id header.
+ * Integration: WI-1302 + WI-2128 — POST /v1/profiles/switch trusts the
+ * authenticated caller Person, not the client-supplied X-Profile-Id header.
  *
  * THE ATTACK: the switch route's owner-elevation gate previously asked
  * `isExplicitOwnerContext(profileMeta)` — true whenever the resolved
@@ -16,11 +15,10 @@
  * primary-factor reverification requirement while switching into the real
  * owner profile.
  *
- * These tests authenticate as the real non-owner (a distinct login/person,
- * same org) and let the real middleware chain resolve `callerPersonId` from
- * that login binding — the header spoof + a stale/absent `fva` claim is the
- * only attacker lever. The route must reject with 403
- * OWNER_ELEVATION_REQUIRED regardless of what X-Profile-Id claims.
+ * WI-2128 strengthens the shared boundary: a credentialed same-org Person is
+ * not operable through another caller's header at all. The spoof is therefore
+ * rejected with generic FORBIDDEN before the owner-elevation ceremony, and a
+ * fresh-factor claim cannot convert one Person's login into another Person.
  */
 
 import { eq } from 'drizzle-orm';
@@ -130,8 +128,8 @@ async function createNonOwnerSibling(orgId: string): Promise<string> {
   return childPersonId;
 }
 
-describe('WI-1302: POST /v1/profiles/switch owner-elevation gate rejects a spoofed X-Profile-Id', () => {
-  it('[BREAK] non-owner spoofing X-Profile-Id=owner + stale fva is denied OWNER_ELEVATION_REQUIRED (403), not switched', async () => {
+describe('WI-1302 + WI-2128: POST /v1/profiles/switch rejects a spoofed X-Profile-Id', () => {
+  it('[BREAK] non-owner spoofing X-Profile-Id=owner is denied before elevation, not switched', async () => {
     const { profileId: ownerProfileId, orgId } = await createOwner();
     await createNonOwnerSibling(orgId);
 
@@ -154,7 +152,10 @@ describe('WI-1302: POST /v1/profiles/switch owner-elevation gate rejects a spoof
 
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body).toMatchObject({ code: 'OWNER_ELEVATION_REQUIRED' });
+    expect(body).toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Profile does not belong to this account',
+    });
   });
 
   it('control: the real owner (no spoof) switching to themselves is still allowed without fresh fva', async () => {
@@ -200,7 +201,7 @@ describe('WI-1302: POST /v1/profiles/switch owner-elevation gate rejects a spoof
     expect(body).toMatchObject({ profileId: childProfileId });
   });
 
-  it('control: a non-owner with FRESH fva switching to owner is still allowed (reverification path untouched)', async () => {
+  it('[WI-2128][BREAK] fresh fva cannot substitute a non-owner caller for the owner Person', async () => {
     const { profileId: ownerProfileId, orgId } = await createOwner();
     await createNonOwnerSibling(orgId);
 
@@ -212,8 +213,8 @@ describe('WI-1302: POST /v1/profiles/switch owner-elevation gate rejects a spoof
           {
             sub: CHILD_CLERK_ID,
             email: CHILD_EMAIL,
-            // Fresh primary-factor reverification (1 minute old) — the
-            // legitimate bypass path, independent of X-Profile-Id.
+            // Fresh primary-factor reverification (1 minute old) proves the
+            // current login; it does not authorize a different Person.
             fva: [1, -1],
           },
           ownerProfileId,
@@ -223,8 +224,11 @@ describe('WI-1302: POST /v1/profiles/switch owner-elevation gate rejects a spoof
       TEST_ENV,
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body).toMatchObject({ profileId: ownerProfileId });
+    expect(body).toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Profile does not belong to this account',
+    });
   });
 });

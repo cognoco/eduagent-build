@@ -990,18 +990,18 @@ describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () =
   //   pooled connection for its whole duration.
   //
   //   PENDING — the text is derived from a read taken INSIDE a transaction, so the
-  //   gate cannot be evaluated before it without restructuring:
-  //     learner-profile.ts       12 sites on `mergedState`, which merges the
-  //                              in-transaction profile row with analysis output.
-  //     memory/backfill-mapping  `dedupeMemoryFactRows`, reached from BOTH
-  //                              consumers inside a transaction — learner-profile.ts
-  //                              (via writeMemoryFactsForAnalysis) and
-  //                              inngest/functions/memory-facts-backfill.ts.
-  //     memory/dedup-actions.ts  `applyDedupAction` operates on the caller's `tx`.
-  //   Closing those needs a pre-transaction read plus an evaluated-set lookup that
-  //   fails closed on any string not in the set (`isSafe` already has that
-  //   property). That is a separate change-set; AC-5 is NOT fully met until it
-  //   lands, and this test says so out loud rather than reading as an oversight.
+  //   gate cannot be evaluated before it without restructuring.
+  //
+  // PENDING IS NOW EMPTY. The three sites it held — learner-profile.ts,
+  // memory/backfill-mapping.ts and memory/dedup-actions.ts — were closed by the
+  // AC-5 remainder work, with the restructuring this comment predicted: a
+  // pre-transaction read, a CONTENT-ADDRESSED batch, and an in-transaction lookup
+  // that fails closed on any string the batch never saw. The two columns are kept
+  // rather than collapsed to one list, because the split is the thing that made
+  // the partial state visible, and a future boundary can land in either column.
+  //
+  // The empty column is asserted explicitly below, not left to be inferred from
+  // an absent test.
   const GATE_MODULE = 'learning-text-safety';
   /** The English-only guard's exported symbols. Absence is what makes it wired. */
   const RETIRED_SYMBOLS = [
@@ -1019,12 +1019,20 @@ describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () =
     // `dedup-pass.ts` pre-computes before opening it — the content key is what
     // makes "the state moved under me" fail closed for free.
     'memory/dedup-actions.ts',
-  ] as const;
-
-  const PENDING_CALL_SITES = [
+    // Closed by the AC-5 remainder work. `applyAnalysis` pre-reads the profile
+    // WITHOUT a lock, evaluates two content-addressed batches (the profile's own
+    // free-text fields, and the composed memory-fact rows the sanitised state maps
+    // to — a different set of strings, since the mappers compose them), then
+    // re-derives inside the transaction and verifies coverage before writing.
     'learner-profile.ts',
+    // Closed with it: the builders emit candidates and `filterGatedMemoryFactRows`
+    // drops what the caller's batch did not clear. Both consumers — this file's
+    // Inngest backfill and the learner-profile chain via memory-facts.ts — now
+    // pass a REQUIRED gate, so neither can persist unfiltered rows by omission.
     'memory/backfill-mapping.ts',
   ] as const;
+
+  const PENDING_CALL_SITES: readonly string[] = [];
 
   const read = (relativePath: string): string =>
     readFileSync(resolve(__dirname, '..', relativePath), 'utf8');
@@ -1052,22 +1060,36 @@ describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () =
     });
   });
 
-  it.each(PENDING_CALL_SITES)(
-    'pending: %s still uses the English-only guard (tracked, not forgotten)',
-    (relativePath) => {
+  it('has no boundary left on the English-only guard — AC-5 is met', () => {
+    // The assertion this whole partition existed to make eventually true. Stated
+    // as an expectation rather than as the absence of `pending:` cases, so that
+    // re-adding a member is a visible change to a green assertion instead of the
+    // quiet reappearance of a test nobody was watching.
+    expect(PENDING_CALL_SITES).toEqual([]);
+  });
+
+  // A plain loop rather than `it.each`, which throws on an empty array. Degrades
+  // to zero cases today and springs back to per-site assertions if a boundary is
+  // ever moved back.
+  for (const relativePath of PENDING_CALL_SITES) {
+    it(`pending: ${relativePath} still uses the English-only guard (tracked, not forgotten)`, () => {
       const source = read(relativePath);
       expect(source).not.toContain(GATE_MODULE);
       expect(RETIRED_SYMBOLS.some((symbol) => source.includes(symbol))).toBe(
         true,
       );
-    },
-  );
+    });
+  }
 
-  it('keeps the English-only guard alive while any call site still needs it', () => {
-    // Not deleted and not wrapped in a delegate. It is still the live control for
-    // the three pending files, so removing it now would leave them ungated; and
-    // making it delegate to the async gate is impossible — it is synchronous, and
-    // a sync deterministic-only delegate would look wired while never reaching the
+  it('keeps the English-only guard module intact, unchanged and independent', () => {
+    // No production call site references it any more — it is now DEAD production
+    // code, and deleting it is deliberately not this change-set's business
+    // (removal is a separate decision, and its own behavioural tests below are
+    // still the specification of what the retired control did).
+    //
+    // What still matters is that it did not quietly become a delegate. Making it
+    // call through to the async gate is impossible — it is synchronous — and a
+    // sync deterministic-only delegate would look wired while never reaching the
     // judge, which is the shape Gate-2 rejected.
     const guard = readFileSync(
       resolve(__dirname, '..', 'persisted-learning-text-guard.ts'),

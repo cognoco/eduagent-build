@@ -2,6 +2,9 @@ import { clerkSetup } from '@clerk/testing/playwright';
 import dotenv from 'dotenv';
 import path from 'node:path';
 
+import { alignPlaywrightClerkSecret } from './clerk-secret-identity';
+import { recordPreloadPhase } from './preload-phase';
+
 type ClerkEnvironment = Record<string, string | undefined>;
 
 export function resolveClerkPublishableKey(env: ClerkEnvironment): string {
@@ -25,9 +28,17 @@ export function resolveClerkPublishableKey(env: ClerkEnvironment): string {
 }
 
 export default async function globalSetup() {
-  dotenv.config({
-    path: path.join(process.cwd(), 'apps', 'mobile', '.env.local'),
-  });
-  process.env.CLERK_PUBLISHABLE_KEY = resolveClerkPublishableKey(process.env);
-  await clerkSetup();
+  recordPreloadPhase('global-setup-started');
+  try {
+    dotenv.config({
+      path: path.join(process.cwd(), 'apps', 'mobile', '.env.local'),
+    });
+    alignPlaywrightClerkSecret(process.env);
+    process.env.CLERK_PUBLISHABLE_KEY = resolveClerkPublishableKey(process.env);
+    await clerkSetup();
+    recordPreloadPhase('global-setup-completed');
+  } catch (error) {
+    recordPreloadPhase('global-setup-failed');
+    throw error;
+  }
 }

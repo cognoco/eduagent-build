@@ -50,6 +50,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
+import { CONFIRMED_CONVERSATION_LANGUAGE_AT } from '../test-utils/conversation-language-confirmation';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 import { addMonthsClamped } from './billing/billing-shared';
@@ -81,6 +82,12 @@ const CLERK_API_BASE = 'https://api.clerk.com/v1';
 const CLERK_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const CLERK_FETCH_MAX_ATTEMPTS = 4;
 const CLERK_FETCH_BASE_DELAY_MS = 500;
+const CLERK_DELETION_PENDING_PREFIX = `${SEED_CLERK_PREFIX}deletion-pending:`;
+// A successful 15-user Worker reset uses 1 list + 15 marker writes + 30
+// bypass/delete writes = 46 subrequests. On the first failed delete we stop
+// deleting and restore that remaining slice; the worst case is 47 subrequests.
+// Both paths stay below Cloudflare's 50-subrequest cap.
+const MAX_WORKER_CLERK_CLEANUP_USERS = 15;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -213,6 +220,7 @@ export interface SeedResult {
 export interface ResetResult {
   deletedCount: number;
   clerkUsersDeleted: number;
+  clerkUsersSelected?: number;
 }
 
 export interface ResetOptions {
@@ -239,6 +247,11 @@ interface ClerkUser {
   external_id: string | null;
 }
 
+interface PendingClerkDeletion {
+  user: ClerkUser;
+  originalExternalId: string;
+}
+
 function isSeedManagedClerkUserId(
   clerkUserId: string,
   seedClerkUserIds: string[] = [],
@@ -251,6 +264,10 @@ function isSeedManagedClerkUserId(
 
 function isSeedManagedClerkUser(user: ClerkUser): boolean {
   return user.external_id?.startsWith(SEED_CLERK_PREFIX) === true;
+}
+
+function isClerkDeletionPending(user: ClerkUser | null): boolean {
+  return user?.external_id?.startsWith(CLERK_DELETION_PENDING_PREFIX) === true;
 }
 
 async function fetchClerkWithRetry(
@@ -434,21 +451,39 @@ async function findClerkUserByEmail(
   if (!env.CLERK_SECRET_KEY) return null;
 
   const params = new URLSearchParams({ email_address: email });
-  const res = await fetchClerkWithRetry(
-    `${CLERK_API_BASE}/users?${params.toString()}`,
-    {
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-    },
-    `Clerk user lookup`,
-  );
+  const lookup = async (): Promise<ClerkUser | null> => {
+    const res = await fetchClerkWithRetry(
+      `${CLERK_API_BASE}/users?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      },
+      `Clerk user lookup`,
+    );
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Clerk user lookup failed (${res.status}): ${body}`);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Clerk user lookup failed (${res.status}): ${body}`);
+    }
+
+    const users = (await res.json()) as ClerkUser[];
+    return users.length > 0 && users[0] ? users[0] : null;
+  };
+
+  let user = await lookup();
+  for (
+    let attempt = 0;
+    isClerkDeletionPending(user) && attempt < CLERK_FETCH_MAX_ATTEMPTS - 1;
+    attempt++
+  ) {
+    await sleep(CLERK_FETCH_BASE_DELAY_MS * Math.pow(2, attempt));
+    user = await lookup();
   }
 
-  const users = (await res.json()) as ClerkUser[];
-  return users.length > 0 && users[0] ? users[0] : null;
+  if (isClerkDeletionPending(user)) {
+    throw new Error(`Timed out waiting for pending Clerk deletion of ${email}`);
+  }
+
+  return user;
 }
 
 /**
@@ -462,14 +497,13 @@ async function findClerkUserByEmail(
  */
 async function deleteClerkTestUsers(
   env: SeedEnv,
-  options: ResetOptions = {},
+  pendingDeletions: PendingClerkDeletion[],
 ): Promise<{ count: number; clerkUserIds: string[] }> {
-  const seedUsers = await listSeedClerkUsers(env, options);
-
   let deleted = 0;
   const deletedIds: string[] = [];
 
-  for (const user of seedUsers) {
+  for (const [index, pendingDeletion] of pendingDeletions.entries()) {
+    const { user } = pendingDeletion;
     // Revert bypass_client_trust before deleting — belt-and-suspenders in case
     // the delete fails, so the user doesn't retain elevated CAPTCHA-bypass perms.
     await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
@@ -483,17 +517,86 @@ async function deleteClerkTestUsers(
       // Best-effort — don't block cleanup if PATCH fails
     });
 
-    const delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-    });
+    let delRes: Response;
+    try {
+      delRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      });
+    } catch (error) {
+      await restoreClerkDeletionMarkers(env, pendingDeletions.slice(index));
+      throw error;
+    }
     if (delRes.ok) {
       deleted++;
       deletedIds.push(user.id);
+    } else {
+      await restoreClerkDeletionMarkers(env, pendingDeletions.slice(index));
+      break;
     }
   }
 
   return { count: deleted, clerkUserIds: deletedIds };
+}
+
+async function markClerkUsersForDeletion(
+  env: SeedEnv,
+  seedUsers: ClerkUser[],
+  pendingDeletions: PendingClerkDeletion[],
+): Promise<void> {
+  for (const user of seedUsers) {
+    if (!user.external_id) continue;
+
+    const markRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        external_id: `${CLERK_DELETION_PENDING_PREFIX}${user.id}`,
+      }),
+    });
+    if (!markRes.ok) {
+      const body = await markRes.text();
+      throw new Error(
+        `Clerk deletion marker failed (${markRes.status}): ${body}`,
+      );
+    }
+    pendingDeletions.push({
+      user,
+      originalExternalId: user.external_id,
+    });
+  }
+}
+
+async function restoreClerkDeletionMarkers(
+  env: SeedEnv,
+  pendingDeletions: PendingClerkDeletion[],
+): Promise<void> {
+  const results = await Promise.allSettled(
+    pendingDeletions.map(async ({ user, originalExternalId }) => {
+      const restoreRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${env.CLERK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ external_id: originalExternalId }),
+      });
+      if (!restoreRes.ok) {
+        throw new Error('Clerk deletion marker restore failed');
+      }
+    }),
+  );
+  const failed = results.filter(
+    (result) => result.status === 'rejected',
+  ).length;
+  if (failed > 0) {
+    throw new Error(
+      `Clerk deletion marker restore failed for ${failed} of ${pendingDeletions.length} users`,
+    );
+  }
 }
 
 async function verifySeedClerkUserIds(
@@ -503,7 +606,7 @@ async function verifySeedClerkUserIds(
 ): Promise<string[]> {
   if (clerkUserIds.length === 0) return [];
   const requestedIds = new Set(clerkUserIds);
-  const seedUsers = await listSeedClerkUsers(env, options);
+  const seedUsers = await listSeedClerkUsers(env, options, true);
   return seedUsers
     .filter((user) => requestedIds.has(user.id))
     .map((user) => user.id);
@@ -512,6 +615,7 @@ async function verifySeedClerkUserIds(
 async function listSeedClerkUsers(
   env: SeedEnv,
   options: ResetOptions = {},
+  includeDeletionPending = false,
 ): Promise<ClerkUser[]> {
   if (!env.CLERK_SECRET_KEY) return [];
   const prefix = options.prefix?.trim().toLowerCase();
@@ -541,7 +645,11 @@ async function listSeedClerkUsers(
           email.email_address.toLowerCase().startsWith(prefix),
         );
 
-      if (matchesSeedPrefix && matchesEmailPrefix) {
+      if (
+        matchesSeedPrefix &&
+        (includeDeletionPending || !isClerkDeletionPending(user)) &&
+        matchesEmailPrefix
+      ) {
         seedUsers.push(user);
       }
     }
@@ -721,6 +829,7 @@ async function createBaseProfile(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
@@ -6682,6 +6791,49 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
 
+const TEST_SEED_MUTATION_LOCK = 'test-seed:mutation';
+
+/**
+ * Run a complete seed/reset graph mutation atomically and serialize it against
+ * every other seed mutation in the same job-local database.
+ *
+ * Some seeders call services that normally open their own transaction. The
+ * proxy makes those calls join this transaction instead: neon-serverless does
+ * not safely support nested transactions, while the seed graph must commit or
+ * roll back as one unit.
+ */
+async function runTestSeedMutation<T>(
+  db: Database,
+  operation: (txDb: Database) => Promise<T>,
+  onOperationFailure?: () => Promise<void>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${TEST_SEED_MUTATION_LOCK}::text, 0))`,
+    );
+
+    const txDb = new Proxy(tx as unknown as Database, {
+      get(target, property, receiver) {
+        if (property === 'transaction') {
+          // Flatten nested calls: this driver has no safe nested savepoint support.
+          return async (
+            nestedOperation: (nestedTx: Database) => Promise<unknown>,
+          ) => nestedOperation(receiver as Database);
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+
+    try {
+      return await operation(txDb);
+    } catch (error) {
+      await onOperationFailure?.();
+      throw error;
+    }
+  });
+}
+
 export async function seedScenario(
   db: Database,
   scenario: SeedScenario,
@@ -6693,37 +6845,42 @@ export async function seedScenario(
     throw new Error(`Unknown scenario: ${scenario}`);
   }
 
-  const seedMarkedClerkUser =
-    env.CLERK_SECRET_KEY != null
-      ? await findClerkUserByEmail(email, env)
-      : null;
-  const seedClerkUserIds =
-    seedMarkedClerkUser?.external_id?.startsWith(SEED_CLERK_PREFIX) === true
-      ? [seedMarkedClerkUser.id]
-      : [];
+  return runTestSeedMutation(db, async (txDb) => {
+    // Resolve Clerk ownership only after the mutation lock is held. Otherwise
+    // two first-time requests can both observe "no Clerk user"; the loser then
+    // skips cleanup even though the winner created a seed-managed real Clerk ID.
+    const seedMarkedClerkUser =
+      env.CLERK_SECRET_KEY != null
+        ? await findClerkUserByEmail(email, env)
+        : null;
+    const seedClerkUserIds =
+      seedMarkedClerkUser?.external_id?.startsWith(SEED_CLERK_PREFIX) === true
+        ? [seedMarkedClerkUser.id]
+        : [];
 
-  // Idempotent: delete existing seed organizations with the same email before
-  // seeding. Defence-in-depth: look up login by email first, then delete the
-  // organization only if the login has a recognizable local seed marker
-  // (clerk_seed_* prefix) or a real Clerk user ID that Clerk itself marks
-  // with our seed external_id.
-  // Child tables cascade via ON DELETE CASCADE.
-  const existingLogins = await db
-    .select({ personId: login.personId, clerkUserId: login.clerkUserId })
-    .from(login)
-    .where(eq(login.email, email));
-  for (const existing of existingLogins) {
-    if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
-      const existingMemberships = await db
-        .select({ organizationId: membership.organizationId })
-        .from(membership)
-        .where(eq(membership.personId, existing.personId));
-      const orgIdsToDelete = existingMemberships.map((m) => m.organizationId);
-      await deleteOrganizationGraph(db, orgIdsToDelete);
+    // Idempotent: delete existing seed organizations with the same email before
+    // seeding. Defence-in-depth: look up login by email first, then delete the
+    // organization only if the login has a recognizable local seed marker
+    // (clerk_seed_* prefix) or a real Clerk user ID that Clerk itself marks
+    // with our seed external_id.
+    // Child tables cascade via ON DELETE CASCADE.
+    const existingLogins = await txDb
+      .select({ personId: login.personId, clerkUserId: login.clerkUserId })
+      .from(login)
+      .where(eq(login.email, email));
+    for (const existing of existingLogins) {
+      if (isSeedManagedClerkUserId(existing.clerkUserId, seedClerkUserIds)) {
+        const existingMemberships = await txDb
+          .select({ organizationId: membership.organizationId })
+          .from(membership)
+          .where(eq(membership.personId, existing.personId));
+        const orgIdsToDelete = existingMemberships.map((m) => m.organizationId);
+        await deleteOrganizationGraph(txDb, orgIdsToDelete);
+      }
     }
-  }
 
-  return seeder(db, email, env);
+    return seeder(txDb, email, env);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -6883,64 +7040,149 @@ export async function resetDatabase(
   options: ResetOptions = {},
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
+  const pendingClerkDeletions: PendingClerkDeletion[] = [];
+  const restorePendingClerkDeletions = async (): Promise<void> => {
+    if (pendingClerkDeletions.length > 0) {
+      try {
+        await restoreClerkDeletionMarkers(env, pendingClerkDeletions);
+      } finally {
+        pendingClerkDeletions.length = 0;
+      }
+    }
+  };
 
-  const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
-    ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
-        prefix,
-      })
-    : undefined;
+  const cleanupMutation = async (txDb: Database) => {
+    const verifiedSeedClerkUserIds = options.verifiedSeedClerkUserIds
+      ? await verifySeedClerkUserIds(env, options.verifiedSeedClerkUserIds, {
+          prefix,
+        })
+      : undefined;
 
-  if (
-    options.verifiedSeedClerkUserIds &&
-    verifiedSeedClerkUserIds?.length === 0
-  ) {
-    return { deletedCount: 0, clerkUsersDeleted: 0 };
-  }
-
-  // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
-  // because the cleanup script handles Clerk locally after DB rows are removed.
-  const { count: clerkUsersDeleted, clerkUserIds } =
-    options.clerkUserIds || verifiedSeedClerkUserIds
-      ? {
-          count: 0,
-          clerkUserIds:
-            verifiedSeedClerkUserIds ??
-            (options.clerkUserIds ?? []).filter((id) =>
-              id.startsWith(SEED_CLERK_PREFIX),
-            ),
-        }
-      : options.preserveClerkUsers
-        ? {
-            count: 0,
-            clerkUserIds: (await listSeedClerkUsers(env, { prefix })).map(
-              (user) => user.id,
-            ),
-          }
-        : await deleteClerkTestUsers(env, { prefix });
-
-  if (
-    options.clerkUserIds &&
-    !options.verifiedSeedClerkUserIds &&
-    clerkUserIds.length === 0
-  ) {
-    return { deletedCount: 0, clerkUsersDeleted };
-  }
-
-  if (prefix) {
-    const seedLogins = await db
-      .select({ personId: login.personId, clerkUserId: login.clerkUserId })
-      .from(login)
-      .where(like(login.email, `${prefix}%`));
-    const filteredLogins = seedLogins.filter((l) =>
-      isSeedManagedClerkUserId(l.clerkUserId, clerkUserIds),
-    );
-    const seedPersonIds = filteredLogins.map((l) => l.personId);
-
-    if (seedPersonIds.length === 0) {
-      return { deletedCount: 0, clerkUsersDeleted };
+    if (
+      options.verifiedSeedClerkUserIds &&
+      verifiedSeedClerkUserIds?.length === 0
+    ) {
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete: undefined,
+      };
     }
 
-    const seedMemberships = await db
+    // If caller supplied server-verifiable Clerk IDs, skip Clerk deletion
+    // because the cleanup script handles Clerk locally after DB rows are removed.
+    const seedClerkUsers =
+      options.clerkUserIds || verifiedSeedClerkUserIds
+        ? undefined
+        : await listSeedClerkUsers(env, { prefix });
+    const clerkUserIds =
+      verifiedSeedClerkUserIds ??
+      (options.clerkUserIds
+        ? options.clerkUserIds.filter((id) => id.startsWith(SEED_CLERK_PREFIX))
+        : (seedClerkUsers ?? []).map((user) => user.id));
+    let clerkUsersToDelete =
+      options.clerkUserIds ||
+      verifiedSeedClerkUserIds ||
+      options.preserveClerkUsers
+        ? undefined
+        : seedClerkUsers;
+    if (clerkUsersToDelete && clerkUsersToDelete.length > 0 && !prefix) {
+      throw new Error(
+        'Unprefixed Worker Clerk cleanup is forbidden; use scripts/clean-clerk-test-users.mjs with verified Clerk user IDs',
+      );
+    }
+    if (clerkUsersToDelete) {
+      // Keep each Worker invocation below Cloudflare's subrequest limit. The
+      // caller repeats prefix cleanup while a full batch was deleted; Clerk
+      // users are listed before the DB graph is removed, so later batches can
+      // still delete the remaining Clerk users after their DB rows are gone.
+      clerkUsersToDelete = clerkUsersToDelete.slice(
+        0,
+        MAX_WORKER_CLERK_CLEANUP_USERS,
+      );
+    }
+    if (clerkUsersToDelete) {
+      await markClerkUsersForDeletion(
+        env,
+        clerkUsersToDelete,
+        pendingClerkDeletions,
+      );
+    }
+
+    if (
+      options.clerkUserIds &&
+      !options.verifiedSeedClerkUserIds &&
+      clerkUserIds.length === 0
+    ) {
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete,
+      };
+    }
+
+    if (prefix) {
+      const seedLogins = await txDb
+        .select({
+          personId: login.personId,
+          clerkUserId: login.clerkUserId,
+        })
+        .from(login)
+        .where(like(login.email, `${prefix}%`));
+      const filteredLogins = seedLogins.filter((l) =>
+        isSeedManagedClerkUserId(l.clerkUserId, clerkUserIds),
+      );
+      const seedPersonIds = filteredLogins.map((l) => l.personId);
+
+      if (seedPersonIds.length === 0) {
+        return {
+          result: { deletedCount: 0 },
+          clerkUsersToDelete,
+        };
+      }
+
+      const seedMemberships = await txDb
+        .select({ organizationId: membership.organizationId })
+        .from(membership)
+        .where(inArray(membership.personId, seedPersonIds));
+      const seedOrgIds = [
+        ...new Set(seedMemberships.map((m) => m.organizationId)),
+      ];
+
+      if (seedOrgIds.length === 0) {
+        return {
+          result: { deletedCount: 0 },
+          clerkUsersToDelete,
+        };
+      }
+
+      const deletedCount = await deleteOrganizationGraph(txDb, seedOrgIds);
+
+      return {
+        result: { deletedCount },
+        clerkUsersToDelete,
+      };
+    }
+
+    // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
+    // that were created by the seed service.
+    const loginConditions = [like(login.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
+    if (clerkUserIds.length > 0) {
+      loginConditions.push(inArray(login.clerkUserId, clerkUserIds));
+    }
+
+    const seedLogins = await txDb
+      .select({ personId: login.personId })
+      .from(login)
+      .where(or(...loginConditions));
+    const seedPersonIds = seedLogins.map((l) => l.personId);
+
+    if (seedPersonIds.length === 0) {
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete,
+      };
+    }
+
+    const seedMemberships = await txDb
       .select({ organizationId: membership.organizationId })
       .from(membership)
       .where(inArray(membership.personId, seedPersonIds));
@@ -6949,45 +7191,45 @@ export async function resetDatabase(
     ];
 
     if (seedOrgIds.length === 0) {
-      return { deletedCount: 0, clerkUsersDeleted };
+      return {
+        result: { deletedCount: 0 },
+        clerkUsersToDelete,
+      };
     }
 
-    const deletedCount = await deleteOrganizationGraph(db, seedOrgIds);
+    // deleteOrganizationGraph handles RESTRICT-gated dependents before org delete.
+    const deletedCount = await deleteOrganizationGraph(txDb, seedOrgIds);
 
-    return { deletedCount, clerkUsersDeleted };
+    return {
+      result: { deletedCount },
+      clerkUsersToDelete,
+    };
+  };
+
+  let cleanup: { result: { deletedCount: number } };
+  try {
+    cleanup = await runTestSeedMutation(
+      db,
+      cleanupMutation,
+      restorePendingClerkDeletions,
+    );
+  } catch (error) {
+    await restorePendingClerkDeletions();
+    throw error;
   }
 
-  // Build WHERE clause: match fake clerk_seed_* IDs OR real Clerk user IDs
-  // that were created by the seed service.
-  const loginConditions = [like(login.clerkUserId, `${SEED_CLERK_PREFIX}%`)];
-  if (clerkUserIds.length > 0) {
-    loginConditions.push(inArray(login.clerkUserId, clerkUserIds));
-  }
+  const clerkUsersDeleted =
+    pendingClerkDeletions.length > 0
+      ? (await deleteClerkTestUsers(env, pendingClerkDeletions)).count
+      : 0;
 
-  const seedLogins = await db
-    .select({ personId: login.personId })
-    .from(login)
-    .where(or(...loginConditions));
-  const seedPersonIds = seedLogins.map((l) => l.personId);
-
-  if (seedPersonIds.length === 0) {
-    return { deletedCount: 0, clerkUsersDeleted };
-  }
-
-  const seedMemberships = await db
-    .select({ organizationId: membership.organizationId })
-    .from(membership)
-    .where(inArray(membership.personId, seedPersonIds));
-  const seedOrgIds = [...new Set(seedMemberships.map((m) => m.organizationId))];
-
-  if (seedOrgIds.length === 0) {
-    return { deletedCount: 0, clerkUsersDeleted };
-  }
-
-  // deleteOrganizationGraph handles RESTRICT-gated dependents before org delete.
-  const deletedCount = await deleteOrganizationGraph(db, seedOrgIds);
-
-  return { deletedCount, clerkUsersDeleted };
+  return {
+    ...cleanup.result,
+    clerkUsersDeleted,
+    ...(prefix
+      ? { clerkUsersSelected: pendingClerkDeletions.length }
+      : undefined),
+  };
 }
 
 // ---------------------------------------------------------------------------
