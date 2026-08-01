@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 09:43 CEST
+Last reconciled: 2026-08-01 13:11 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,9 +19,45 @@ Last reconciled: 2026-08-01 09:43 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 28 Closed, 4 Executing, 9 Ready.
+- Live stage count at checkpoint: 29 Closed, 4 Executing, 1 Reviewing, 7 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
+
+### Latest authoritative boundary — 2026-08-01 13:11 CEST
+
+- WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
+  evidence-integrity bounce was corrected without production changes. Independent
+  QA passed seven mechanical claims and sanctioned close preserved producer/reviewer
+  separation.
+- WI-2755 PR #2808 passed 14 exact-head checks and a zero-finding Claude review,
+  then landed through the governed merge gate as `223a9cfe`. Execute-complete
+  artifacts validated after the landed commit's own checks concluded; live state is
+  Reviewing with claim cleared, awaiting independent QA/review.
+- WI-2939 implementation rework PR #2809 landed as `c5cc41fe`. The operator amended
+  the credential boundary to permit a branch-scoped role on the existing nine-DB
+  `dev-integration` branch while keeping every connection and mutation pinned to
+  `eduagent_integration_wi2790_811f580999ce`. The role and five authorized
+  `mentomate/dev_integration` keys were repaired; fresh no-cache preflight passed.
+  The target already had a trusted ready marker and 1,843 matching structural facts,
+  so it was not bootstrapped again. Durable Jest cache evidence proves the authorized
+  canonical command ran once from 10:32:07–10:54:36 local: 147/151 suites passed and
+  four failed, but the original executor retained no terminal failure detail. Comment
+  `3af8bce9-1f7c-812d-af48-001d851b5015` and
+  `.workitem-artifacts/WI-2939/exact-once-recovery.json` preserve the result. No rerun
+  or execute-complete occurred from that result. The operator has now selected one
+  full canonical rerun with durable redacted output; it is queued for the first free
+  isolated executor slot and must run exactly once without schema mutation.
+- WI-2826 local instrumentation is published in draft PR #2811 at `140c5233` with
+  focused 4 suites/20 tests, mutation proof, typecheck/lint/format/change-class gates,
+  and normal pre-push green. No hosted run occurred; its controlled seeded-account
+  reproduction remains a later operator gate after WI-2939 is concluded. FO-2086 /
+  `OCC-1B3E2CB142B3` records stale-local-main change-class over-selection without a WI.
+- WI-2921's exact same-owner claim was renewed and its executor resumed now that
+  WI-2936 is Closed. WI-2790 and WI-2939 exact same-owner claims were also renewed;
+  direct live reconciliation shows no expired active claim at this boundary.
+- The operator clarified that the four-WIP figure is throughput guidance, not a
+  reason to leave Ready work idle while executor capacity exists. Dependency/authority
+  waits do not consume practical dispatch capacity.
 
 - WI-2636 — governed PR #2726 landed as `30a034dd`; execute-complete and independent
   QA/review passed; live state is Closed / Done.
