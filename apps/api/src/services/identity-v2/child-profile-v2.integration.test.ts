@@ -176,6 +176,7 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
         where: eq(person.id, child.id),
       });
       expect(personRow?.loginId).toBeNull();
+      expect(personRow?.hasOwnAccount).toBe(false);
 
       // learner membership scoped to the caller's org.
       const mem = await db.query.membership.findFirst({

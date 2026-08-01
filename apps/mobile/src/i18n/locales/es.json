@@ -4580,7 +4580,10 @@
       "existingTeenInviteSending": "Enviando…",
       "existingTeenInviteSentTitle": "Invitación en camino",
       "existingTeenInviteSentMessage": "Si ese correo pertenece a una cuenta de MentoMate, le hemos enviado una invitación. Pídele que abra MentoMate y la acepte.",
-      "existingTeenInviteErrorTitle": "No se pudo enviar la invitación"
+      "existingTeenInviteErrorTitle": "No se pudo enviar la invitación",
+      "wrongProfileTitle": "Esta invitación es para un perfil específico",
+      "wrongProfileMessage": "Esta invitación solo se puede abrir con el perfil al que se envió. Elige ese perfil y vuelve a abrir la invitación.",
+      "wrongProfileSwitch": "Elegir perfil"
     }
   },
   "supporterColdStart": {

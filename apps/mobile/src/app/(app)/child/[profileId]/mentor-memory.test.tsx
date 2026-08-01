@@ -215,6 +215,26 @@ describe('ChildMentorMemoryScreen — interest context rows', () => {
     cleanup();
   });
 
+  it('renders the shared voice control on the Tell Mentor and correction fields (WI-2549)', async () => {
+    const { result, cleanup } = renderWithGuardian();
+
+    await waitFor(() => {
+      result.getByTestId('child-mentor-memory-screen');
+    });
+
+    // Tell Mentor field carries the shared control.
+    result.getByTestId('tell-mentor-mic');
+
+    // The correction field renders its control once opened.
+    fireEvent.press(result.getByTestId('something-wrong-button'));
+    await waitFor(() => {
+      result.getByTestId('correction-input');
+    });
+    result.getByTestId('correction-mic');
+
+    cleanup();
+  });
+
   it('exposes a positive selector only when populated memory categories load', async () => {
     setRoutes({}, [
       {

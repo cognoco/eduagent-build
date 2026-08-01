@@ -64,7 +64,10 @@ import {
   BrandCelebration,
   ShimmerSkeleton,
   ErrorFallback,
+  VoiceInputControl,
+  appendTranscript,
 } from '../../components/common';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
 import { MentorMemoryCue } from '../../components/session-summary/MentorMemoryCue';
 import { SessionSummaryLibraryFilingControls } from '../../components/session-summary/SessionSummaryLibraryFilingControls';
@@ -1688,6 +1691,24 @@ export default function SessionSummaryScreen() {
               testID="summary-input"
               accessibilityLabel={t('sessionSummary.a11yWriteSummary')}
             />
+            <View className="mt-2">
+              <VoiceInputControl
+                value={summaryText}
+                disabled={submitSummary.isPending}
+                voiceLocale={getVoiceLocaleForLanguage(
+                  activeProfile?.conversationLanguage,
+                )}
+                testID="summary-reflection-mic"
+                onTranscript={(finalTranscript) =>
+                  // Clamp to the summarySubmitSchema 2000-char contract:
+                  // TextInput maxLength only bounds native edits, not
+                  // programmatic appends.
+                  setSummaryText((prev) =>
+                    appendTranscript(prev, finalTranscript).slice(0, 2000),
+                  )
+                }
+              />
+            </View>
             <Text className="text-caption text-text-secondary mt-1 text-right">
               {summaryText.length}/2000
             </Text>

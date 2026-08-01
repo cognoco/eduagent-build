@@ -25,7 +25,7 @@
 // ---------------------------------------------------------------------------
 
 import { createHash } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   login,
   membership,
@@ -270,7 +270,22 @@ export async function createIdentityGraph(
         existingByEmail.clerkUserId === input.clerkUserId
       ) {
         const resolved = await resolveIdentityV2(txDb, input.clerkUserId);
-        if (resolved) return resolved;
+        if (resolved) {
+          // [WI-2895] Converge rows created before the persisted credential
+          // indicator had a production writer. Scope the repair to the Person
+          // reached through this exact Login; never infer or mutate an org.
+          await txDb
+            .update(person)
+            .set({ hasOwnAccount: true, updatedAt: new Date() })
+            .where(
+              and(
+                eq(person.id, existingByEmail.personId),
+                eq(person.loginId, existingByEmail.id),
+                eq(person.hasOwnAccount, false),
+              ),
+            );
+          return resolved;
+        }
         // Login exists but graph is incomplete — fall through is unsafe (would
         // re-insert login → 23505); surface as a conflict for the caller.
         throw new ConflictError(
@@ -300,6 +315,10 @@ export async function createIdentityGraph(
             : {}),
           pronouns: input.pronouns ?? null,
           avatarUrl: input.avatarUrl ?? null,
+          // The owner receives a Login in this same transaction. Persist the
+          // canonical credential correlate at creation instead of leaving the
+          // schema's managed-Person default in place.
+          hasOwnAccount: true,
         })
         .returning();
       if (!personRow) throw new Error('person insert did not return a row');
