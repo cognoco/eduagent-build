@@ -95,7 +95,7 @@ suggestion) or `TODO` (no basis found — needs a management/counsel decision).
 | 12 | Backups (Neon PITR / snapshots) | Disaster recovery | **TODO — platform-level Neon project/plan setting, not hardcoded in this repo.** `docs/runbooks/neon-pitr-identity-recovery.md:29-49` explicitly states the retention window and snapshot schedule must be read from the Neon console per-branch, not assumed | N/A | N/A | Infra/ops (Neon console owner) | **Structural exception, not a bug:** a PITR restore can resurrect a deleted person **and** the very `deletion_audit`/`consent_receipt`/`financial_record` rows proving the erasure, unless the mandatory capture→restore→replay procedure (`neon-pitr-identity-recovery.md` §3, §5) is followed every time. `WI-2056`/`WI-2057` are the named forward-repair follow-ups; `WI-2390` is deletion-recovery hardening |
 | 13 | Queues (Inngest event payloads) | Durable async execution — deletion orchestration, purges, notifications | **TODO — no in-repo statement of Inngest's own event-payload retention found** (checked `docs/architecture.md`, no match). One piece of indirect evidence the team already treats Inngest's store as untrusted: `feedback_retry_queue` exists specifically so `app/feedback.delivery_failed` events never carry the user's free-text feedback through Inngest's event store — only an opaque id does (`support.ts:13-24` comment) | N/A | N/A | Infra/ops (Inngest plan owner) | No Cloudflare Queue found in `apps/api/wrangler.toml` — Inngest is the only durable queue layer |
 | 14 | Caches (Cloudflare KV, in-memory rate limiters) | Subscription-status cache; consent-page rate limiting | `SUBSCRIPTION_KV` (`services/kv.ts`): **24-hour TTL** via `expirationTtl` (line 62), code-verified — metadata (tier/quota) only, not conversation content. Consent-page rate limiter: **per-IP, in-memory**, not persisted across Worker isolate restarts (`2026-07-17-consent-withdrawal-bearer-token-threat-posture.md:30`) | Cache write | TTL expiry (KV); isolate restart (in-memory) | Engineering | An explicit `deleteSubscriptionStatus` function exists (`kv.ts:74-79`) but is invalidation-on-mismatch only — **not confirmed wired to account deletion** (TODO, see G-7) |
-| 15 | Provider copies (LLM providers, Voyage AI, Clerk, RevenueCat/Stripe, Resend, Sentry, Inngest) | Processing by named sub-processors | **TODO for every provider** — per-provider retention is explicitly out of this document's scope per the task brief ("handled separately"); DPO Actions 7-9 are actively gathering DPA/evidence packs from OpenAI, Mistral, Anthropic, Cerebras, Voyage AI (`DPO exchanges/2026-07-26-action-register-tracker.md` rows 7-9, in flight as of 2026-07-26) | N/A | Explicit deletion calls exist for **Clerk** (`deleteClerkUser`, `apps/api/src/services/clerk-user.ts:251-321`, called from `account-deletion.ts:200-207`) and a **RevenueCat/Stripe teardown event** (`app/billing.subscription_store_teardown_requested`, dispatched `account-deletion.ts:178-192`, consumed by `billing-subscription-store-teardown.ts`) — both **best-effort, retried, with Sentry+log escalation on terminal failure but no durable dead-letter event** (`docs/runbooks/deletion-irreversible-boundary.md` §5) | Legal/DPO (provider DPAs) + Engineering (the two wired erasure calls) | See gap G-8 (no durable dead-letter for partial external-erasure failure) |
+| 15 | Provider copies (LLM providers, Voyage AI, Clerk, RevenueCat/Stripe, Resend, Sentry, Inngest) | Processing by named sub-processors | **TODO for every provider** — per-provider retention is explicitly out of this document's scope per the task brief ("handled separately"); DPO Actions 7-9 are actively gathering DPA/evidence packs from OpenAI, Mistral, Anthropic, Cerebras, Voyage AI (`DPO exchanges/2026-07-26-action-register-tracker.md` rows 7-9, in flight as of 2026-07-26) | N/A | Explicit deletion calls exist for **Clerk** (`deleteClerkUser`, `apps/api/src/services/clerk-user.ts:251-321`, called from `account-deletion.ts:200-207`) and a **RevenueCat/Stripe teardown event** (`app/billing.subscription_store_teardown_requested`, dispatched `account-deletion.ts:178-192`, consumed by `billing-subscription-store-teardown.ts`) — both are **best-effort and retried**; after retries exhaust, WI-2346 (PR #2792) added PII-minimized attempts to dispatch `app/account.deletion_teardown.failed` (`apps/api/src/inngest/functions/account-deletion.ts:85-102`) and `app/billing.subscription_store_teardown.failed` (`apps/api/src/inngest/functions/billing-subscription-store-teardown.ts:64-81`). Those attempts use `safeSend`, which logs and reports a rejected or two-second-timed-out dispatch but returns without a persisted retry (`apps/api/src/services/safe-non-core.ts:7-19,37-104`). Manual external-erasure remediation remains necessary, and real chat/pager delivery plus production-console routing are not proved here | Legal/DPO (provider DPAs) + Engineering (the two wired erasure calls) | See G-8: event construction and dispatch attempts are wired, but dispatch durability and external delivery/routing remain open under WI-1916 |
 
 ---
 
@@ -161,11 +161,15 @@ suggestion) or `TODO` (no basis found — needs a management/counsel decision).
   child (199-229) → `deletePersonIfConsentWithdrawnV2` (236-243, "FK cascades
   remove all associated data" per inline comment). No archive branch by design
   (comment 234-235).
-- Both have `onFailure` Sentry escalation; the managed-child path additionally
-  dispatches a durable `app/consent.revocation.failed` dead-letter event via
-  `safeSend` (`consent-revocation.ts:63-122`) — the email-parent path and
-  `account-deletion.ts` do **not** have an equivalent dead-letter event (gap
-  G-8, `docs/runbooks/deletion-irreversible-boundary.md` §5 "Known gap").
+- Both consent paths have `onFailure` Sentry escalation and best-effort
+  `safeSend` dispatches: `app/consent.revocation.failed`
+  (`consent-revocation.ts:63-122`) and
+  `app/consent.email-revocation.failed`
+  (`consent-email-revocation.ts:55-111`). WI-2346 added the equivalent
+  account-deletion and subscription-store teardown attempts named in G-8.
+  None of these `safeSend` calls is itself a persisted retry queue: rejection
+  or a two-second timeout is logged/reported and allowed to return
+  (`services/safe-non-core.ts:7-19,37-104`).
 
 ### 3.4 Archive-cleanup (COPPA-age archive branch terminus)
 
@@ -315,7 +319,7 @@ schedule needs a "raw webhook payload" row.
 | G-5 | Direct `deleteSubject` (`subject.ts:862-880`) is a hard DB delete, not archive-first, despite prior docs (`student-flow-access-inventory.md:73`) describing "archive-first delete" — the archive-first behavior appears to be client-side UX confirmation only, not a server soft-delete step | Learning state (§2 row 5) | Low-Medium — not a retention violation (deletion is more aggressive than the notice implies, not less), but a documentation/behavior mismatch worth flagging | None found — needs verification against `git log`/original PR if the distinction matters |
 | G-6 | `byok_waitlist` erasure-by-email-match is wired into the whole-org deletion path (`deletion-v2.ts:542-548`) but not confirmed for the person-scoped delete paths (consent-withdrawal, archive-cleanup) | Billing (§2 row 10) | Low — narrow field (email only), only matters if a managed child ever has a `byok_waitlist` entry independent of the org owner, which may not be a real scenario | TODO — verify |
 | G-7 | `deleteSubscriptionStatus` KV-invalidation function exists but wiring to account deletion not confirmed | Caches (§2 row 14) | Low — metadata cache, 24h TTL bounds exposure regardless | TODO — verify |
-| G-8 | No durable dead-letter event when the post-deletion Clerk-erasure or RevenueCat/Stripe-teardown leg exhausts retries — detection today depends entirely on someone querying Sentry/logs, no paging signal | Provider copies (§2 row 15) | Medium — this is a GDPR Art 17 "erasure half-completed and nobody notices" risk, explicitly named in the code's own Sentry hint text (`account-deletion.ts:59-76` per the runbook) | `docs/runbooks/deletion-irreversible-boundary.md` §5 "Known gap / TODO" — recommends the same `safeSend` dead-letter pattern already used by `consent-revocation.ts` |
+| G-8 | **Event construction and dispatch attempts landed in WI-2346 (PR #2792), but dispatch durability remains open:** exhausted Clerk and subscription-store teardown legs attempt `app/account.deletion_teardown.failed` and `app/billing.subscription_store_teardown.failed`, respectively (`apps/api/src/inngest/functions/account-deletion.ts:85-102`; `apps/api/src/inngest/functions/billing-subscription-store-teardown.ts:64-81`). Both use `safeSend`; rejection or a two-second timeout is logged/Sentry-reported and returns without persisting or retrying the failed dispatch (`apps/api/src/services/safe-non-core.ts:7-19,37-104`). The code-owned launch-health mapping is documented in `docs/runbooks/launch-health-alerts.md:268-280`. Manual provider remediation is still required; real chat/pager integrations and production-console rule routing remain parked under WI-1916 | Provider copies (§2 row 15) | Medium — the handler now attempts a PII-minimized failure signal, but an Inngest transport outage can still lose that signal; the GDPR Art 17 failure requires an operator to finish external erasure, and unproved production routing cannot be treated as a delivered page | WI-2346 closes event construction and best-effort dispatch wiring; WI-1916 owns durable external routing/remediation follow-through, including the residual dispatch gap |
 | G-9 | PITR restore can resurrect a deleted person/org and its deletion-evidence rows; the mitigation is a manual runbook procedure, not an automated safeguard, and (per this pass) has not been proven via the documented 3-case verification drill in production | Backups (§2 row 12) | Medium-High for audit-defensibility (deletion supremacy is a stated invariant but only manually enforced) | `WI-2056`, `WI-2057`, `WI-2390` (named in `neon-pitr-identity-recovery.md` §7) |
 | G-10 | Export table coverage (`export-v2.ts`) not traced against the full schema inventory in §1 — cannot yet state export/delete parity | Cross-cutting | Low for retention itself, but relevant to the DPO's "rights + authority-verification workflows" ask (Action 11) | TODO |
 | G-11 | Media/audio retention (§2 row 2) is a stated design intent in `docs/architecture.md`, not a verified code path this pass | Media | Medium — this is exactly the kind of claim that should not ship to a DPO without direct code verification | TODO — trace the voice-input handler before finalizing |
@@ -374,14 +378,22 @@ proposed plan, not evidence of a passing run.
 9. **Export/delete parity.** Run export → hard-delete → diff the exported
    payload's table coverage against the full §1 inventory; flag any table in
    §1 not represented in the export (closes G-10).
-10. **Partial-external-failure dead-letter drill.** Simulate a Clerk API
-    failure (expired `CLERK_SECRET_KEY` or forced network error) during
-    `delete-clerk-user` → confirm the DB-side cascade still committed
-    (`organizationExistsV2` false) → confirm the `account_deletion.terminal_failure`
-    structured log and Sentry exception fire, per
-    `docs/runbooks/deletion-irreversible-boundary.md` §5 — and confirm (or
-    document as still-open, G-8) that no durable dead-letter *event* exists
-    to page on this automatically.
+10. **Partial-external-failure dead-letter drill.** In an isolated test
+    environment, force the terminal Clerk-erasure and subscription-store
+    teardown paths after the DB-side cascade has committed
+    (`organizationExistsV2` false). Confirm the existing structured log and
+    Sentry exception, plus successful dispatch of the exact PII-minimized events
+    `app/account.deletion_teardown.failed` and
+    `app/billing.subscription_store_teardown.failed` documented by WI-2346 in
+    `docs/runbooks/deletion-irreversible-boundary.md` §5. Separately force the
+    `safeSend` rejection and timeout paths and record that they log/report but
+    do not persist or retry the failed event dispatch. Confirm the code-owned
+    launch-health mapping in `docs/runbooks/launch-health-alerts.md:268-280`,
+    but do not treat that as proof of chat/pager delivery or production-console
+    rule activation: those remain parked under WI-1916. Complete the manual
+    external-erasure remediation described by the runbook; this evidence drill
+    does not mutate provider consoles, alert rules, environments, or retention
+    clocks.
 11. **PITR restore-replay drill.** Execute the three named cases (Alice/Bob/
     Org-Carol) already specified in `docs/runbooks/neon-pitr-identity-recovery.md`
     §6 against a non-production branch; record pass/fail for all three. This
