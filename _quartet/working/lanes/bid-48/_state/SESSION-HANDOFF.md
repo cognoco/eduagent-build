@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 14:18 CEST
+Last reconciled: 2026-08-01 14:51 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,11 +19,11 @@ Last reconciled: 2026-08-01 14:18 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 30 Closed, 5 Executing, 6 Ready.
+- Live stage count at checkpoint: 30 Closed, 6 Executing, 5 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 14:18 CEST
+### Latest authoritative boundary — 2026-08-01 14:51 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -47,12 +47,13 @@ Last reconciled: 2026-08-01 14:18 CEST
   `3af8bce9-1f7c-812d-af48-001d851b5015` and
   `.workitem-artifacts/WI-2939/exact-once-recovery.json` preserve the result. No rerun
   or execute-complete occurred from that result. The operator has now selected one
-  full canonical rerun with durable redacted output. The guarded preflight refused
-  before Jest because Neon now maps the same branch/name/role to replacement database
-  ID `4884123`, created 2026-08-01T11:10:47Z, while authorized ID `4883605` no longer
-  exists. The one-run allowance is unconsumed. Durable refusal evidence is in
-  `.workitem-artifacts/WI-2939/full-canonical-rerun-preflight-refusal.json`; the
-  operator is deciding whether to authorize `4884123` as the successor target.
+  full canonical rerun with durable redacted output. Two guarded preflights refused
+  before Jest because Neon repeatedly recreated the same project/branch/endpoint/
+  database-name/owner-role target: ID `4883605` disappeared, successor `4884123` was
+  authorized, then live identity moved again to `4884446`. The one-run allowance is
+  unconsumed and neither refusal performed bootstrap, schema, or test mutation.
+  Durable receipts are in `.workitem-artifacts/WI-2939/`; the next operator ruling is
+  whether to authorize the exact logical disposable target despite numeric-ID churn.
 - WI-2826 local instrumentation is published in draft PR #2811 at `140c5233` with
   focused 4 suites/20 tests, mutation proof, typecheck/lint/format/change-class gates,
   and normal pre-push green. No hosted run occurred; its controlled seeded-account
@@ -66,9 +67,15 @@ Last reconciled: 2026-08-01 14:18 CEST
   production code or real credentials. Focused 4 suites/20 tests are green; normal
   push published exact PR #2718 head `938a041d`; all 14 exact-head checks passed,
   the sole automated thread was resolved with evidence, and fresh Claude reported
-  zero findings. The governed merge gate landed squash commit `8a26201b`. Its
-  ordinary main-branch push verification is now running with no failure observed;
-  execute-complete waits for that landed boundary. WI-2790 and WI-2939 remain
+  zero findings. The governed merge gate landed squash commit `8a26201b`; landed
+  verification passed and execute-complete moved the item to Reviewing. Independent
+  review bounced it because the local 4/4 Playwright and required mutation cycle were
+  not preserved in a tracked durable artifact; FO-2088 / `OCC-965BA3CB88AA` records
+  the factual evidence-integrity failure. It is now reclaimed on evidence-only branch
+  `WI-2921-evidence-r2`: a fresh real local run passed 4/4 with one worker and zero
+  retries, and the disconnected-source mutation produced the expected RED before an
+  exact restore returned GREEN. A tracked sanitized evidence artifact and draft PR
+  are being prepared without production-code changes. WI-2790 and WI-2939 remain
   dependency/authority-bound Executing items.
 - WI-2922 was live-reconciled Ready/Active/unclaimed, then properly claimed as
   `codex:wi2922-repository-executor:WI-2922` in isolated worktree `WI-2922`. Its
@@ -76,7 +83,15 @@ Last reconciled: 2026-08-01 14:18 CEST
   catalog/DDL/guard coverage passes 33/33; fast change-class passes four commands
   and 62 tests. Commit/push hooks passed and `execute pr-opened` recorded the PR.
   Shared development, staging, production, and secrets remain untouched; AC2's
-  explicit shared-dev mutation gate is not granted. Fresh CI/review is running.
+  explicit shared-dev mutation gate is not granted. All 14 exact-head checks are now
+  green; PR #2830 remains draft pending the later shared-development ruling.
+- WI-2643 is preserved in its isolated worktree while its executor prioritizes the
+  WI-2921 review bounce. Disposable local PostgreSQL evidence proves the first missing
+  capability is SET membership, and the captured full integration run passed 74
+  suites (610 passed, one skipped). No shared database was touched.
+- Same-owner lifecycle heartbeats renewed all claims approaching or beyond expiry:
+  WI-2643, WI-2790, WI-2826, WI-2922, and WI-2939. WI-2921's fresh reclaim already has
+  a future expiry. No claim was transferred to a different owner.
 - The operator clarified that the four-WIP figure is throughput guidance, not a
   reason to leave Ready work idle while executor capacity exists. Dependency/authority
   waits do not consume practical dispatch capacity.

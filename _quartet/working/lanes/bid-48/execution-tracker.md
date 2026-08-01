@@ -56,12 +56,12 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 14:18 CEST
+## Live reconciliation — 2026-08-01 14:51 CEST
 
 ### Latest authoritative boundary
 
-- Brief/relation parity remains 41 members. Live slice: 30 Closed, 5 Executing,
-  6 Ready.
+- Brief/relation parity remains 41 members. Live slice: 30 Closed, 6 Executing,
+  5 Ready.
 - WI-2936 is independently Closed/Done at `08d75f40` after evidence-only rework
   removed a non-durable local pointer and accurately recorded 13 successful checks
   plus one intentional skip.
@@ -75,9 +75,10 @@ Delivery Batch as `Done`.
   four failed and terminal detail was not retained. Exact-once recovery comment
   `3af8bce9-1f7c-812d-af48-001d851b5015` blocked a silent rerun. The operator has
   then authorized Option 2: one full canonical rerun with durable redacted output.
-  Its preflight refused before Jest because the same branch/name/role now resolves to
-  replacement Neon database ID `4884123`, not missing authorized ID `4883605`. The
-  allowance is unconsumed pending operator successor-target authority.
+  Two preflights refused before Jest as the otherwise-identical logical target moved
+  from missing ID `4883605` to `4884123` and then `4884446`. The allowance remains
+  unconsumed pending authority to follow the exact logical disposable target across
+  Neon numeric-ID recreation.
 - WI-2826 draft PR #2811 at `140c5233` contains only the locally verified eight-file
   instrumentation scope. Its hosted run is untouched. FO-2086 /
   `OCC-1B3E2CB142B3` records stale-local-main change-class over-selection.
@@ -87,13 +88,22 @@ Delivery Batch as `Done`.
   explicit remote mode and fake secret setup/teardown without production or real
   credential changes; focused 4 suites/20 tests pass. Exact PR #2718 head
   `938a041d` passed all 14 checks, automated-thread disposition, and fresh Claude.
-  The governed gate landed `8a26201b`; ordinary landed push verification is running
-  with no failure observed before execute-complete.
+  The governed gate landed `8a26201b` and execute-complete reached Reviewing, but
+  independent review bounced the item for non-durable local-run and mutation-cycle
+  evidence. FO-2088 / `OCC-965BA3CB88AA` records the occurrence. Fresh evidence-only
+  rework is reclaimed on `WI-2921-evidence-r2`; real local Playwright passed 4/4 and
+  an exact disconnected-source mutation produced RED before restore returned GREEN.
+  A tracked sanitized evidence artifact and draft PR are in preparation.
 - WI-2922 is properly claimed/Executing in isolated worktree `WI-2922` for only its
   repository guard and disposable-schema test frontier. Draft PR #2830 at `f8320a9d`
   has focused 33/33 and fast change-class 4 commands/62 tests green. No database or
   secret access occurred. Shared-development mutation remains explicitly ungranted;
-  staging and production are out of bounds. Fresh CI/review is running.
+  staging and production are out of bounds. All 14 exact-head checks are green.
+- WI-2643's isolated implementation and disposable local proof are preserved while
+  its executor handles WI-2921 first. The full local integration run passed 74 suites
+  (610 passed, one skipped); no shared database was touched.
+- Same-owner heartbeats renewed WI-2643, WI-2790, WI-2826, WI-2922, and WI-2939;
+  WI-2921's fresh reclaim is also live. No Executing member has an expired claim.
 - The four-WIP figure remains throughput guidance; blocked waits do not suppress
   otherwise safe dispatch.
 
