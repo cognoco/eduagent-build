@@ -55,6 +55,19 @@ The setup script sanitizes input and rejects invalid names — agents may pass s
 
 ## Step 2: Run the Setup Script
 
+**Windows PowerShell:**
+
+```powershell
+pwsh -NoProfile -File scripts/setup-worktree.ps1 <branch-name>
+```
+
+The PowerShell entry point locates and validates Git for Windows Bash before
+the shell helper can mutate Git state. Do not run bare `bash` on Windows: it
+may resolve to WSL Bash and create `/mnt/c/...` administration pointers that
+native Windows Git cannot read.
+
+**macOS / Linux:**
+
 ```bash
 bash scripts/setup-worktree.sh <branch-name>
 ```
@@ -65,7 +78,7 @@ The script:
 2. Verifies `.worktrees/` is gitignored.
 3. Verifies you are running from the main repo checkout (not a worktree).
 4. Fetches `origin/main`.
-5. Runs `git worktree add .worktrees/<branch-name> -b <branch-name> origin/main` (or reuses an existing worktree at that path on that branch).
+5. Runs `git worktree add .worktrees/<branch-name> -b <branch-name> origin/main`, reuses an existing matching worktree, or recovers a pristine partial branch only when it is unpublished, unregistered, has no upstream, and exactly matches `origin/main`.
 6. `cd`s into the new worktree.
 7. Runs `pnpm install`.
 8. Runs `pnpm env:sync` (Doppler — populates `.env.development.local`).
@@ -83,6 +96,9 @@ The script reports `Worktree ready at <full-path>`. All subsequent work happens 
 |---|---|---|
 | `.worktrees/ is not gitignored` | Someone removed the entry | Add `.worktrees/` to `.gitignore`, commit, retry |
 | `You are inside an existing worktree` | Script invoked from a worktree | `cd` to the main repo checkout and retry |
+| `WSL Bash is unsupported` | Bare `bash` resolved to WSL on Windows | From PowerShell run `pwsh -NoProfile -File scripts/setup-worktree.ps1 <branch-name>`; the refusal occurs before branch/worktree mutation |
+| Existing branch differs from `origin/main`, is published, registered, or has an upstream | State is not provably helper-owned partial creation | Preserve it and investigate ownership; never delete or reuse it automatically |
+| `Reusing pristine partial branch` | A prior helper run created the exact baseline branch but stopped before registering its worktree | Continue; the helper has positively validated the safe retry state |
 | `git worktree add` permission denied | Sandbox or filesystem restriction | Report to user; do not silently fall back to the main checkout |
 | `pnpm install` errors | Lockfile drift or network | Investigate; do not skip. Setup is incomplete without dependencies |
 | `pnpm env:sync` fails | Doppler not authenticated or no access | Confirm `doppler` is on PATH and the user is logged in. Setup is incomplete without secrets |
@@ -92,6 +108,7 @@ The script reports `Worktree ready at <full-path>`. All subsequent work happens 
 - **Using Claude Code's `EnterWorktree` tool.** Default path is `.claude/worktrees/`, not `.worktrees/`. Always use this skill.
 - **Using `superpowers:using-git-worktrees`.** Its directory cascade may pick `.worktrees/`, `worktrees/`, `~/.config/superpowers/worktrees/`, or trigger a native-tool fallback. Always use this skill.
 - **Running the script from inside a worktree.** Step 0's detection catches this; the script also rejects it. Do not skip Step 0.
+- **Running bare `bash scripts/setup-worktree.sh` from PowerShell.** On Windows this may select WSL. Use the PowerShell entry point, which selects Git for Windows Bash.
 - **Creating the worktree but committing back to the main checkout.** Once in the worktree, the worktree IS the workspace until you `cd` out.
 - **Skipping `pnpm install` or `pnpm env:sync` "because it's slow".** The skill exists to prevent this. A partial worktree is broken.
 
