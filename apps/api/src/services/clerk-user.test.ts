@@ -1,3 +1,8 @@
+const mockCaptureException = jest.fn();
+jest.mock('./sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import {
   clearVerifiedClerkEmailCacheForTest,
   deleteClerkUser,
@@ -40,6 +45,7 @@ function mockJsonFetch(payload: unknown, status = 200): typeof fetch {
 describe('resolveVerifiedClerkEmail', () => {
   beforeEach(() => {
     clearVerifiedClerkEmailCacheForTest();
+    mockCaptureException.mockClear();
   });
 
   it('uses the signed JWT fast path when email_verified is true', async () => {
@@ -147,6 +153,47 @@ describe('resolveVerifiedClerkEmail', () => {
       ok: false,
       reason: 'lookup-unavailable',
     });
+  });
+
+  it('[WI-2788] rate-limits graceful Clerk 404 warnings without attaching a user id', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchImpl = mockJsonFetch({}, 404);
+
+    try {
+      await resolveVerifiedClerkEmail({
+        userId: 'user_missing_a',
+        clerkSecretKey: 'sk_test_123',
+        fetchImpl,
+      });
+      await resolveVerifiedClerkEmail({
+        userId: 'user_missing_b',
+        clerkSecretKey: 'sk_test_123',
+        fetchImpl,
+      });
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenLastCalledWith(
+        expect.objectContaining({ message: 'Clerk lookup 404' }),
+        {
+          level: 'warning',
+          tags: { surface: 'clerk_lookup', reason: 'http_404' },
+        },
+      );
+
+      nowSpy.mockReturnValue(1_300_001);
+      await resolveVerifiedClerkEmail({
+        userId: 'user_missing_c',
+        clerkSecretKey: 'sk_test_123',
+        fetchImpl,
+      });
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain(
+        'user_missing',
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
 

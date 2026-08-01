@@ -1,30 +1,50 @@
 import { addBreadcrumb, captureException } from './sentry';
+import { unwrapDbError } from './db-errors';
 import { sleep } from './sleep';
 
 const TRANSIENT_DB_RETRY_ATTEMPTS = 3;
 const TRANSIENT_DB_RETRY_DELAY_MS = 300;
 
 export function isTransientDatabaseError(error: unknown): boolean {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-        ? error
+  const isTransientCandidate = (candidate: unknown): boolean => {
+    const message =
+      candidate instanceof Error
+        ? candidate.message
+        : typeof candidate === 'string'
+          ? candidate
+          : '';
+    const code =
+      typeof candidate === 'object' && candidate !== null && 'code' in candidate
+        ? String((candidate as { code?: unknown }).code)
         : '';
-  const code =
-    typeof error === 'object' && error !== null && 'code' in error
-      ? String((error as { code?: unknown }).code)
-      : '';
 
-  return (
-    code === 'ECONNRESET' ||
-    code === 'ECONNREFUSED' ||
-    code === 'ETIMEDOUT' ||
-    /connection terminated/i.test(message) ||
-    /connection closed/i.test(message) ||
-    /timeout exceeded when trying to connect/i.test(message) ||
-    /socket hang up/i.test(message)
-  );
+    return (
+      code === 'ECONNRESET' ||
+      code === 'ECONNREFUSED' ||
+      code === 'ETIMEDOUT' ||
+      /connection terminated/i.test(message) ||
+      /connection closed/i.test(message) ||
+      /timeout exceeded when trying to connect/i.test(message) ||
+      /socket hang up/i.test(message)
+    );
+  };
+
+  // Drizzle >=0.44 wraps driver failures. Prefer the shared DB unwrapping
+  // contract for code-bearing driver errors, then walk message-only causes so
+  // a wrapper cannot hide a transient signal that lacks a driver code.
+  if (isTransientCandidate(unwrapDbError(error))) return true;
+
+  let current = error;
+  for (let depth = 0; depth < 10; depth += 1) {
+    if (isTransientCandidate(current)) return true;
+    const cause =
+      typeof current === 'object' && current !== null
+        ? (current as { cause?: unknown }).cause
+        : undefined;
+    if (cause === undefined || cause === null || cause === current) break;
+    current = cause;
+  }
+  return false;
 }
 
 /**

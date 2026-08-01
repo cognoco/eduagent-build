@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import {
   isTransientDatabaseError,
   withTransientDatabaseRetry,
@@ -39,6 +40,33 @@ describe('isTransientDatabaseError', () => {
     [42, false],
   ])('classifies %p as transient=%p', (error, expected) => {
     expect(isTransientDatabaseError(error)).toBe(expected);
+  });
+
+  it('[WI-2788] classifies a transient driver error wrapped by Drizzle', () => {
+    const driverError = Object.assign(new Error('socket interrupted'), {
+      code: 'ECONNRESET',
+    });
+    const wrapped = new DrizzleQueryError(
+      'select * from profiles where id = $1',
+      ['profile-id'],
+      driverError,
+    );
+
+    expect(isTransientDatabaseError(wrapped)).toBe(true);
+  });
+
+  it('[WI-2788] leaves a wrapped foreign-key violation non-transient', () => {
+    const driverError = Object.assign(
+      new Error('insert or update violates foreign key constraint'),
+      { code: '23503' },
+    );
+    const wrapped = new DrizzleQueryError(
+      'insert into activation_events ...',
+      ['profile-id'],
+      driverError,
+    );
+
+    expect(isTransientDatabaseError(wrapped)).toBe(false);
   });
 });
 
