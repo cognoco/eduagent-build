@@ -56,8 +56,8 @@ describe('WI-2937 production EAS submit contract', () => {
     expect(runbook).toContain('spec section 13 S6');
     expect(runbook).toContain('Play internal');
     expect(runbook).toContain('TestFlight');
-    expect(runbook).toContain('--id <android-build-id>');
-    expect(runbook).toContain('--id <ios-build-id>');
+    expect(runbook).toContain('--id $androidBuildId');
+    expect(runbook).toContain('--id $iosBuildId');
     expect(runbook).not.toContain('--latest');
   });
 });
