@@ -95,9 +95,26 @@ rg -q -F '[ramtop-node22-seeded-signin-receipt.json](ramtop-node22-seeded-signin
 }
 jq -e \
   --arg pointer "$success_receipt" \
-  '.schema == "wi-2948.ramtop-seeded-signin-receipt.v1" and .artifactPointer == $pointer' \
+  '.schema == "wi-2948.ramtop-seeded-signin-receipt.v1"
+    and .artifactPointer == $pointer
+    and .configuredRetries == 0
+    and .configuredWorkers == 1
+    and .globalTeardownReset == "passed"
+    and .summary == {passed: 3, failed: 0, retriesObserved: 0}
+    and (.scenarios | length) == 3
+    and ([.scenarios[] | {seedScenario, storageState}] == [
+      {seedScenario: "onboarding-complete", storageState: "solo-learner"},
+      {seedScenario: "parent-multi-child", storageState: "owner-with-children"},
+      {seedScenario: "v2-account-non-owner-child", storageState: "non-owner-child"}
+    ])
+    and all(.scenarios[]; .outcome == "passed" and .attempts == 1 and .retryIndexes == [0])' \
   "$success_receipt" >/dev/null || {
-  print -u2 'tracked success receipt does not validate its schema and artifact pointer'
+  print -u2 'tracked success receipt does not validate its identity and successful outcomes'
+  exit 1
+}
+[[ "$(shasum -a 256 "$success_receipt" | cut -d' ' -f1)" == \
+  'eca82eb14a1edb2709477d99bc5067557ac83d4b6a8bc7730f05b07715bbc231' ]] || {
+  print -u2 'tracked success receipt hash differs from the reviewed durable evidence'
   exit 1
 }
 rg -q -F 'exactly `TEST_SEED_SECRET`, `CLERK_PUBLISHABLE_KEY`, and the aligned staging `CLERK_SECRET_KEY`' \

@@ -36,7 +36,13 @@ exit 0
 ```
 
 The contract requires the linked receipt to exist and validates its schema and
-stable artifact pointer. Its three synthetic source mutations remove, one at a
+stable artifact pointer. It also requires successful global teardown, zero
+configured and observed retries, and exactly three passing single-attempt setup
+scenarios. Temporarily changing the tracked teardown result to `failed` made the
+contract exit with `tracked success receipt does not validate its identity and
+successful outcomes`; restoring `passed` restored the complete contract to
+green. The guard also pins the reviewed receipt hash and the exact scenario to
+storage-state mapping. Its three synthetic source mutations remove, one at a
 time, the exact Doppler allowlist, the required backend-key presence guard, and
 the ambient testing-token refusal. Every variant fails the contract.
 
