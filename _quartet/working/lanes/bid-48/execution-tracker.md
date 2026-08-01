@@ -56,9 +56,38 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 17:22 CEST
+## Live reconciliation — 2026-08-01 19:27 CEST
 
 ### Latest authoritative boundary
+
+- WI-2939's exact logical disposable development target was recreated under the
+  bounded operator ruling after exact-name absence/deletion was verified. Failed
+  database ID `4886158` was replaced by `4886176` without changing project, branch,
+  endpoint, database name, owner, or the development-only boundary. The operator has
+  now granted standing authority for future equivalent replacement of this same class
+  of disposable target; shared development, staging, production, and changed logical
+  identities remain outside that standing authority.
+- Exact revision `c5cc41fe` reproduced the absent-relation historical-RLS replay
+  failure. Landed prerequisite `55eb79c4` (WI-2996) fixed that defect and bootstrapped
+  the recreated target green. The canonical API integration command then ran exactly
+  once and exited zero: 150 suites/1,141 tests passed, 6 suites/52 tests skipped, zero
+  failures. Evidence PR #2846 repaired one valid auditability finding, passed all 16
+  checks plus fresh zero-finding review, and governed-landed as `15bbb36f`.
+- Sanctioned execute-complete moved WI-2939 to Reviewing with `15bbb36f` as Fixed In,
+  cleared its claim, and preserved producer identity. After the unavailable automatic
+  adversarial route paused, distinct reviewer `codex:wi2939-independent-adversarial`
+  resumed/picked up the item. Independent QA passed 5/0 with all six ACs manually
+  proved, 43/43 fresh safe guards, exact evidence/archive equality, strict-green merge
+  ancestry, and live read-only target identity. Sanctioned independent review closed
+  the item Done; QA comment `3af8bce9-1f7c-81f2-8a5e-001d89972f58`, close comment
+  `3af8bce9-1f7c-81cc-8fe1-001d2d51f9d6`.
+- Live relation slice: 32 Closed, 5 Executing, 5 Ready across 42 rows. The 41-member
+  Brief slice is 32 Closed, 4 Executing, 5 Ready. WI-2958 remains the unadmitted extra
+  relation row pending formal disposition.
+- Same-owner claim renewal at 19:22 CEST gave WI-2643, WI-2790, WI-2826, and WI-2922
+  future expiry at 20:22 UTC without changing ownership or lifecycle position.
+
+### Previous authoritative boundary — 2026-08-01 17:22 CEST
 
 - WI-2922 review rework head `57dd317c` fixes two valid fail-closed gaps with
   mutation-sensitive RED 17/2 → GREEN 19/19, focused 35/35, and database package

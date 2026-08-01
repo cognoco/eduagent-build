@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 17:22 CEST
+Last reconciled: 2026-08-01 19:27 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -21,10 +21,45 @@ Last reconciled: 2026-08-01 17:22 CEST
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925. The live
   relation now also contains WI-2958 without a Brief amendment; formal membership
   disposition is pending and the item is not silently admitted or taken over.
-- Live relation slice at checkpoint: 31 Closed, 6 Executing, 5 Ready (42 related rows).
-  The 41 Brief-declared members comprise 31 Closed, 5 Executing, 5 Ready.
+- Live relation slice at checkpoint: 32 Closed, 5 Executing, 5 Ready (42 related
+  rows). The 41 Brief-declared members comprise 32 Closed, 4 Executing, 5 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
+
+### Latest authoritative boundary — 2026-08-01 19:27 CEST
+
+- WI-2939's same logical disposable development database and owner were recreated
+  under the operator's item-specific authority after exact-name deletion reduced the
+  branch inventory from nine databases to eight. Numeric database ID `4886176`
+  replaced failed ID `4886158`; project, branch, endpoint, database name, owner, and
+  development-only boundary remained unchanged. The operator subsequently granted
+  standing authority for equivalent replacement of this disposable target without a
+  repeated ruling; it does not extend to shared development, staging, production, or
+  changed logical identities.
+- The exact historical implementation revision `c5cc41fe` reproduced the bootstrap
+  defect: historical RLS replay targeted absent relations after schema push. The
+  independently landed prerequisite repair `55eb79c4` (WI-2996) skipped stale replay
+  targets, then bootstrapped the recreated target green. The canonical command
+  `corepack pnpm run test:api:integration` was invoked exactly once and exited zero:
+  150 suites passed, 6 skipped; 1,141 tests passed, 52 skipped; zero failures.
+- Evidence-only PR #2846 tracked six sanitized source receipts and terminal excerpts.
+  Its valid auditability review finding was repaired at exact head `1b360de1`; all 16
+  logical checks and fresh zero-finding review passed. The governed gate squash-landed
+  it as `15bbb36f`, verified on `origin/main`. Sanctioned execute-complete then moved
+  WI-2939 to Reviewing, set that exact commit as Fixed In, cleared its producer claim,
+  and preserved the producer identity. After the unavailable automatic adversarial
+  route paused, distinct reviewer `codex:wi2939-independent-adversarial` resumed and
+  picked up the item. Independent QA passed 5 mechanical claims with 0 failures and
+  manually proved all six ACs, the bug red/green chain, 43/43 fresh safe guards,
+  evidence equality/archive hash, exact live disposable identity, and strict-green
+  merge ancestry. Sanctioned review independently Closed/Done the item; QA comment
+  `3af8bce9-1f7c-81f2-8a5e-001d89972f58`, close comment
+  `3af8bce9-1f7c-81cc-8fe1-001d2d51f9d6`.
+- Direct Cosmo polling returns 42 related rows: 32 Closed, 5 Executing, and 5 Ready.
+  WI-2958 remains the extra, unadmitted relation row under an expired external claim.
+  The Brief still declares 41 authoritative members.
+- Same-owner heartbeats renewed WI-2643, WI-2790, WI-2826, and WI-2922 at 19:22 CEST.
+  The authoritative pages record future expiry at 20:22 UTC; no claim was transferred.
 
 ### Latest authoritative boundary — 2026-08-01 17:22 CEST
 
