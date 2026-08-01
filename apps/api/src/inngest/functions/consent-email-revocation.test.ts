@@ -66,6 +66,10 @@ jest.mock(
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn().mockResolvedValue(true);
 const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
 jest.mock('../../services/identity-v2/deletion-v2', () => {
   const actual = jest.requireActual(
     '../../services/identity-v2/deletion-v2',
@@ -76,6 +80,10 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
       mockDeletePersonIfConsentWithdrawnV2(...args),
     getPersonClerkUserIdsV2: (...args: unknown[]) =>
       mockGetPersonClerkUserIdsV2(...args),
+    ensurePendingClerkErasures: (...args: unknown[]) =>
+      mockEnsurePendingClerkErasures(...args),
+    markPendingClerkErasuresComplete: (...args: unknown[]) =>
+      mockMarkPendingClerkErasuresComplete(...args),
     getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
       personExists: true,
       personId: args[1] as string,

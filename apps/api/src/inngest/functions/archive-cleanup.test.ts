@@ -69,6 +69,10 @@ const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
 const mockGetPersonErasureSnapshotV2 = jest.fn();
 const mockAttemptArchivedPersonErasureV2 = jest.fn();
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
 jest.mock('../../services/identity-v2/consent-v2', () => {
   const actual = jest.requireActual(
     '../../services/identity-v2/consent-v2',
@@ -94,6 +98,10 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
       mockGetPersonErasureSnapshotV2(...args),
     attemptArchivedPersonErasureV2: (...args: unknown[]) =>
       mockAttemptArchivedPersonErasureV2(...args),
+    ensurePendingClerkErasures: (...args: unknown[]) =>
+      mockEnsurePendingClerkErasures(...args),
+    markPendingClerkErasuresComplete: (...args: unknown[]) =>
+      mockMarkPendingClerkErasuresComplete(...args),
   };
 });
 

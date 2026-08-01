@@ -10,6 +10,10 @@ const mockRefreshConsentTokenForRequestV2 = jest.fn().mockResolvedValue({
 const mockDeletePersonIfNoConsentV2 = jest.fn().mockResolvedValue(undefined);
 const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
 const mockSafeSend = jest.fn().mockResolvedValue(undefined);
 const mockSendEmail = jest.fn();
 const mockFormatConsentReminderEmail = jest.fn(
@@ -93,6 +97,10 @@ jest.mock(
         mockDeletePersonIfNoConsentV2(...args),
       getPersonClerkUserIdsV2: (...args: unknown[]) =>
         mockGetPersonClerkUserIdsV2(...args),
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
       getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
         personExists: true,
         personId: args[1] as string,

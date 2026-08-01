@@ -110,6 +110,10 @@ jest.mock(
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn();
 const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
 jest.mock(
   '../../services/identity-v2/deletion-v2' /* gc1-allow: deletePersonIfConsentWithdrawnV2 — runs a db.transaction (read consentGrant THEN delete person) that cannot execute against the mocked DB boundary. Twin: apps/api/src/services/identity-v2/consent-v2.integration.test.ts (5 references) */,
   () => {
@@ -122,6 +126,10 @@ jest.mock(
         mockDeletePersonIfConsentWithdrawnV2(...args),
       getPersonClerkUserIdsV2: (...args: unknown[]) =>
         mockGetPersonClerkUserIdsV2(...args),
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
       getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
         personExists: true,
         personId: args[1] as string,
