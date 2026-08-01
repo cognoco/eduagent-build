@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import {
   assessmentAnswerSchema,
   quickCheckRequestSchema,
@@ -32,6 +33,10 @@ import { notFound } from '../errors';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
+
+const quickCheckSessionParamSchema = z.object({
+  sessionId: z.string().uuid(),
+});
 
 // Extends the base RouteEnv with quota variables set by the metering
 // middleware. Typed here rather than in RouteEnv itself because these variables
@@ -254,10 +259,11 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Submit quick check response during session
   .post(
     '/sessions/:sessionId/quick-check',
+    zValidator('param', quickCheckSessionParamSchema),
     zValidator('json', quickCheckRequestSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
-      const sessionId = c.req.param('sessionId');
+      const { sessionId } = c.req.valid('param');
       const { answer } = c.req.valid('json');
 
       const session = await getSession(db, profileId, sessionId);
