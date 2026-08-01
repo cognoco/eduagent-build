@@ -117,6 +117,7 @@ Delivery Batch as `Done`.
     `d6d168b1` because the normal pre-push hook selects unrelated current-main API
     tests that reject the machine staging Doppler fallback. One `--no-verify` push is
     awaiting explicit operator disposition before fresh exact-head CI/reviews.
+    FO-2085 / `OCC-BE11C145C361` records the occurrence without creating a Work Item.
 - Finding Occurrences, not new Work Items, now preserve delivery observations:
   FO-2075 (`OCC-F968A7988008`) records the intake/scope correction; FO-2076
   (`OCC-B9142581EAF8`) records the WI-2755 completion/PR mismatch; FO-2077

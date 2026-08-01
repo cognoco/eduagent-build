@@ -143,7 +143,8 @@ Last reconciled: 2026-08-01 09:43 CEST
   makes the local hook select broad unrelated current-main API tests, whose setup
   rejects the machine's staging Doppler fallback. The remote branch remains
   `d6d168b1`; one explicitly authorized `--no-verify` push is awaiting operator
-  disposition before exact-head CI and both reviews are retriggered. FO-2080 /
+  disposition before exact-head CI and both reviews are retriggered. FO-2085 /
+  `OCC-BE11C145C361` records the occurrence without creating a Work Item. FO-2080 /
   `OCC-894322F2C99D` records the broader setup observation without creating a WI.
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
