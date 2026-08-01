@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import {
   learningSessions,
@@ -6,6 +6,7 @@ import {
   person,
   subjects,
   supporterFeedSurfaceState,
+  supportVisibilityContracts,
   supportership,
   type Database,
 } from '@eduagent/database';
@@ -21,6 +22,8 @@ type EdgeRow = {
   personId: string;
   displayName: string;
   credentialed: boolean;
+  contractId: string | null;
+  contractStatus: string | null;
 };
 
 async function hasLearningState(
@@ -88,9 +91,22 @@ export async function resolveSupporterColdStart(
       // EXISTS, not a join: login.person_id is indexed but not unique, so a
       // join could multiply edge rows.
       credentialed: sql<boolean>`exists (select 1 from ${login} where ${login.personId} = ${supportership.supporteePersonId})`,
+      contractId: supportVisibilityContracts.id,
+      contractStatus: supportVisibilityContracts.status,
     })
     .from(supportership)
     .leftJoin(person, eq(person.id, supportership.supporteePersonId))
+    .leftJoin(
+      supportVisibilityContracts,
+      and(
+        eq(supportVisibilityContracts.supportershipId, supportership.id),
+        inArray(supportVisibilityContracts.status, [
+          'pending',
+          'accepted',
+          'restamped',
+        ]),
+      ),
+    )
     .where(
       // [WI-2237 deferred-sweep] resolveSupporterColdStart is INTENTIONALLY
       // exempt from the accepted-visibility default-deny predicate applied to
@@ -132,6 +148,19 @@ export async function resolveSupporterColdStart(
 
   const cards: SupporterColdStartCard[] = [];
   for (const edge of edges) {
+    if (
+      edge.contractId &&
+      (edge.contractStatus === 'pending' || edge.contractStatus === 'restamped')
+    ) {
+      cards.push({
+        pendingLinkId: edge.contractId,
+        displayName: edge.displayName,
+        state: 'consent-pending',
+        anchor: 'approve',
+      });
+      continue;
+    }
+
     if (!edge.credentialed) {
       if (
         !supporterOrganizationId ||
@@ -148,6 +177,11 @@ export async function resolveSupporterColdStart(
       });
       continue;
     }
+
+    // A supportership edge alone never grants visibility. Credentialed family
+    // members without an active contract are intentionally absent until the
+    // opt-in path repairs or creates their bilateral agreement.
+    if (edge.contractStatus !== 'accepted') continue;
 
     if (await hasLearningState(db, edge.personId)) {
       continue;
@@ -169,8 +203,6 @@ export async function resolveSupporterColdStart(
     });
   }
 
-  // S4 has no pending-link/consent-request source for supporter approval cards.
-  // Do not synthesize consent-pending cards from active supportership rows.
   return supporterColdStartSchema.parse({
     variant: 'per-child',
     cards,
