@@ -33,6 +33,9 @@ const logger = createLogger();
  */
 export interface ProfileMeta {
   birthYear: number;
+  /** Null/absent preserves the legacy year-only age-gating fallback. */
+  birthMonth?: number | null;
+  birthDay?: number | null;
   location: 'EU' | 'US' | 'OTHER' | null;
   consentStatus:
     | 'PENDING'

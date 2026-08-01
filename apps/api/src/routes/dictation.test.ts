@@ -288,6 +288,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
 
     expect(prepareHomework).toHaveBeenCalledWith('Test sentence.', {
       conversationLanguage: 'en', // [WI-867] v2 personScope default
+      ageBracket: 'adult',
     });
   });
 
@@ -476,7 +477,10 @@ describe('POST /v1/dictation/generate', () => {
 
     expect(fetchGenerateContext).toHaveBeenCalledTimes(1);
     expect(generateDictation).toHaveBeenCalledTimes(1);
-    expect(generateDictation).toHaveBeenCalledWith(mockCtx);
+    expect(generateDictation).toHaveBeenCalledWith({
+      ...mockCtx,
+      ageBracket: 'adult',
+    });
   });
 
   // RF-01 / BUG-975: Missing X-Profile-Id header — proxy-guard fails closed
@@ -1004,6 +1008,45 @@ describe('POST /v1/dictation/review', () => {
     expect(body.correctCount).toBe(1);
     expect(body.mistakes).toHaveLength(1);
     expect(body.mistakes[0].error).toBe('spelling');
+  });
+
+  it('threads the exact profile birth date into review safety routing', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00Z'));
+    mockGetPersonScope.mockResolvedValueOnce(
+      personScope({
+        profileId: 'test-profile-id',
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      }),
+    );
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 2,
+      correctCount: 2,
+      mistakes: [],
+    });
+
+    try {
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(reviewDictation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ageYears: 18,
+          ageBracket: 'adolescent',
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).

@@ -46,12 +46,21 @@ describe('prepareHomework', () => {
 
     const result = await prepareHomework(
       'The dog, who was tired, lay down. It slept all night.',
+      { ageBracket: 'child' },
     );
 
     expect(result.sentences).toHaveLength(2);
     expect(result.sentences[0]!.text).toBe('The dog, who was tired, lay down.');
     expect(result.sentences[0]!.withPunctuation).toContain('comma');
     expect(result.language).toBe('en');
+    expect(mockRouteAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      expect.objectContaining({
+        flow: 'dictation.prepare-homework',
+        ageBracket: 'child',
+      }),
+    );
   });
 
   it('throws on empty LLM response', async () => {

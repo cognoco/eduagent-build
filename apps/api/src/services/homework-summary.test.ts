@@ -360,10 +360,19 @@ describe('extractHomeworkSummary', () => {
       createMockDb(),
       'profile-1',
       'session-1',
+      { ageBracket: 'child' },
     );
 
     expect(result.summary).toBe('2 problems, practiced linear equations.');
     expect(result.displayTitle).toBe('Math Homework');
+    expect(routeAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      2,
+      expect.objectContaining({
+        flow: 'homework.summary',
+        ageBracket: 'child',
+      }),
+    );
   });
 
   it('BC-08: passes profileId to subjects query for defense-in-depth', async () => {

@@ -1,6 +1,7 @@
 // @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { eq, and, isNull, count } from 'drizzle-orm';
 import { z } from 'zod';
+import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -184,6 +185,13 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
       const llmResult = await routeAndCall(messages, 1, {
         flow: 'post.session.suggestions',
         conversationLanguage,
+        ageBracket: ctx
+          ? computeAgeBracketFromDate(
+              ctx.birthYear,
+              ctx.birthMonth ?? undefined,
+              ctx.birthDay ?? undefined,
+            )
+          : undefined,
       });
 
       // [BUG-842 / F-SVC-009] Use canonical extractFirstJsonObject helper

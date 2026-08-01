@@ -17,6 +17,7 @@ import {
   curriculumBooks,
 } from '@eduagent/database';
 import type {
+  AgeBracket,
   BookSuggestion,
   BookSuggestionsTopupOutcome,
   ConversationLanguage,
@@ -183,6 +184,7 @@ export async function getUnpickedBookSuggestionsWithTopup(
   subjectId: string,
   options?: {
     conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
     deps?: {
       assertLlmConsent?: typeof assertLlmConsent;
       generateCategorizedBookSuggestions?: (typeof import('./book-suggestion-generation'))['generateCategorizedBookSuggestions'];
@@ -223,7 +225,10 @@ export async function getUnpickedBookSuggestionsWithTopup(
         db,
         profileId,
         subjectId,
-        { conversationLanguage: options?.conversationLanguage },
+        {
+          conversationLanguage: options?.conversationLanguage,
+          ageBracket: options?.ageBracket,
+        },
       );
       unpicked = await db
         .select()

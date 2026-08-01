@@ -1,5 +1,6 @@
 import { prepareHomeworkOutputSchema } from '@eduagent/schemas';
 import type {
+  AgeBracket,
   ConversationLanguage,
   PrepareHomeworkOutput,
 } from '@eduagent/schemas';
@@ -65,7 +66,10 @@ RESPOND WITH ONLY valid JSON in this exact format:
 
 export async function prepareHomework(
   text: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<PrepareHomeworkOutput> {
   // [PROMPT-INJECT-3] text is untrusted free-text homework content pasted
   // or captured by a parent/learner. Wrap in a named tag and entity-encode
@@ -82,6 +86,7 @@ export async function prepareHomework(
   const result = await routeAndCall(messages, 1, {
     flow: 'dictation.prepare-homework',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
 
   // [WI-1073 deferred] Two-stage captureException (no_json / parse+schema)

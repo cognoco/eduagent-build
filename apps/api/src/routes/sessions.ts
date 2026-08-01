@@ -20,6 +20,7 @@ import {
   RateLimitedError,
   recallBridgeResultSchema,
   retrySummaryFeedbackResultSchema,
+  computeAgeBracketFromDate,
   sessionAutoFileRequestedEventSchema,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
@@ -1062,6 +1063,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         conversationLanguage: parseConversationLanguage(
           profileMeta?.conversationLanguage,
         ),
+        ageBracket:
+          profileMeta == null
+            ? undefined
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
       });
 
       return c.json(retrySummaryFeedbackResultSchema.parse(result));
@@ -1089,6 +1098,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             summaryProfileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            summaryProfileMeta == null
+              ? undefined
+              : computeAgeBracketFromDate(
+                  summaryProfileMeta.birthYear,
+                  summaryProfileMeta.birthMonth ?? undefined,
+                  summaryProfileMeta.birthDay ?? undefined,
+                ),
         },
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.

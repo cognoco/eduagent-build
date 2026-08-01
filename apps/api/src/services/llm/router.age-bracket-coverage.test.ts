@@ -1,5 +1,5 @@
 /**
- * [WI-2432] Forward ratchet — every LEARNER_FACING_FLOWS `routeAndCall` /
+ * [WI-2432/WI-2520] Forward ratchet — every LEARNER_FACING_FLOWS `routeAndCall` /
  * `routeAndCallForQuiz` / `routeAndStream` site threads `ageBracket:`.
  *
  * Root cause (WI-1986/WI-1052 fixed the under-18 Gemini/Vertex vendor-exclusion
@@ -30,16 +30,15 @@
  * TEACH_BACK_GRADER_FLOW='teach-back.grader', JUDGE_SUITABILITY_FLOW=
  * 'judge.suitability' — none are in the set).
  *
- * DENYLIST — two categories, each requires a citation, per the WI's explicit
+ * DENYLIST — the remaining category requires a citation, per the WI's explicit
  * "add to an explicit denylist constant with a comment citing the open scope
  * question — do NOT expand this WI to fix them" instruction. AC-3 is a
  * FORWARD RATCHET, not a mandate to fix every LEARNER_FACING_FLOWS site —
  * the denylist deferral is the binding AC-3 interpretation (Option (a),
  * PM-ruled on the WI-2432 Cosmo page after the initial reviewer bounce).
- * Both categories below are now keyed to their REASON (not a bare Set) so
- * each entry is self-documenting on its own line, and both are covered by
- * the rot-check below (not just category 1's flow tags) — see that test's
- * comment for what "covered" means.
+ * The entries below are keyed to their REASON (not a bare Set) so each entry
+ * is self-documenting on its own line, and covered by the rot-check below —
+ * see that test's comment for what "covered" means.
  *
  *   1. Guardian-consumed / open scope question (§10.1): `monthly.report` and
  *      `progress-summary-generation` are LEARNER_FACING_FLOWS members that
@@ -60,29 +59,11 @@
  *      threaded). Neither call site's surrounding function computes or has
  *      an `ageBracket`/`computeAgeBracketFromDate` value in scope at all.
  *
- *   2. Deferred sweep, tracked (AGENTS.md > Fix Development Rules — "3+
- *      sibling locations ... document a deferred sweep with tracked ID"):
- *      building this scanner surfaced 11 MORE non-threading call sites
- *      across 9 files, discovered during the WI-2432 build but outside its
- *      ratified 4-site scope (book-generation.ts, assessments.ts,
- *      session-recap.ts, recall-bridge.ts only — BID-26 entry-gate
- *      ratification). Unlike category 1, these read as genuinely
- *      learner-facing (book suggestions, curriculum generation, dictation,
- *      homework/session summaries, post-session suggestions) — NOT assumed
- *      guardian-consumed. Captured as WI-2520 (sibling to WI-2432) for PM
- *      triage; full file:line list + rationale in
- *      _wip/mvp-roadmap-findings/2026-07-20-wi2432-additional-agebracket-
- *      nonthreading-callers.md.
- *
- * RED-GREEN (verified by hand 2026-07-20, per the WI's "guard demonstrated
- * red on a scratch non-threading caller, then reverted" evidence
- * requirement): added a scratch site
- *   `routeAndCall([], 1, { flow: 'book.generation' })`
- * (a LEARNER_FACING_FLOWS member, no ageBracket) to a temp file under
- * apps/api/src/services/ — `pnpm exec jest router.age-bracket-coverage` FAILED
- * with exactly one violation naming that file:line. Removed the scratch site
- * → suite returned to green (0 violations). No repo artifact retained — this
- * is a mechanism proof, not a fixture.
+ * RED-GREEN-REVERT: WI-2520 removed the 11 tracked deferred sites and exercised
+ * this ratchet against those exact production call sites: implementation red,
+ * candidate green, production-revert red naming all 11 sites, then checksum-
+ * exact restore green. Durable commands, exit codes, counts, and file hashes:
+ * `.workitem-artifacts/WI-2520/red-green-revert.md`.
  */
 
 import * as fs from 'fs';
@@ -125,41 +106,13 @@ if (!fs.existsSync(path.join(REPO_ROOT, 'apps/api'))) {
   );
 }
 
-// Category 1 — guardian-consumed / open §10.1 scope question. See file-header
+// Guardian-consumed / open §10.1 scope question. See file-header
 // citation above. Keyed by flow tag (both sites share the same open
 // question, not a per-file quirk) to its reason, so each entry documents
 // itself rather than relying on a shared comment above the collection.
 const OPEN_SCOPE_QUESTION_FLOWS: Readonly<Record<string, string>> = {
   'monthly.report': 'guardian-consumed, not learner-facing',
   'progress-summary-generation': 'guardian-consumed, not learner-facing',
-};
-
-// Category 2 — deferred sweep, tracked as WI-2520. Keyed by `file:line` (the
-// same siteKey shape findRouteAndCallSites produces) to its reason, so a
-// genuinely-fixed site naturally drops out and a NEW unrelated site at the
-// same line number in a denylisted file still gets caught by the ratchet.
-const WI_2520_DEFERRED_SITES: Readonly<Record<string, string>> = {
-  'apps/api/src/services/book-suggestion-generation.ts:114':
-    'deferred, tracked as WI-2520',
-  'apps/api/src/services/curriculum.ts:137': 'deferred, tracked as WI-2520',
-  'apps/api/src/services/curriculum.ts:212': 'deferred, tracked as WI-2520',
-  'apps/api/src/services/curriculum.ts:2982': 'deferred, tracked as WI-2520',
-  'apps/api/src/services/dictation/generate.ts:213':
-    'deferred, tracked as WI-2520',
-  'apps/api/src/services/dictation/prepare-homework.ts:82':
-    'deferred, tracked as WI-2520',
-  'apps/api/src/services/dictation/review.ts:220':
-    'deferred, tracked as WI-2520',
-  'apps/api/src/services/homework-summary.ts:310':
-    'deferred, tracked as WI-2520',
-  'apps/api/src/services/session-llm-summary.ts:317':
-    'deferred, tracked as WI-2520',
-  'apps/api/src/services/summaries.ts:160': 'deferred, tracked as WI-2520',
-  // [WI-2396] line shifted 182→184: an unrelated consent-gate call/comment
-  // (isLlmExchangeConsentAllowed swap) was inserted above this site; the
-  // deferred site itself (WI-2520 scope) is untouched.
-  'apps/api/src/inngest/functions/post-session-suggestions.ts:184':
-    'deferred, tracked as WI-2520',
 };
 
 interface CallSite {
@@ -368,8 +321,8 @@ interface ScannedSite {
 /**
  * Scans SCAN_ROOTS for every routeAndCall/routeAndCallForQuiz/routeAndStream
  * site whose `flow:` literal is a LEARNER_FACING_FLOWS member, denylisted or
- * not — the raw facts, before either denylist is applied. Shared by both the
- * ratchet test (which applies the denylists) and the rot-check test (which
+ * not — the raw facts, before the denylist is applied. Shared by both the
+ * ratchet test (which applies the denylist) and the rot-check test (which
  * needs the raw facts to tell whether a denylist entry is still accurate).
  */
 function scanLearnerFacingSites(): ScannedSite[] {
@@ -408,7 +361,7 @@ function scanLearnerFacingSites(): ScannedSite[] {
   return results;
 }
 
-describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI-2432 ratchet)', () => {
+describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI-2432/WI-2520 ratchet)', () => {
   it('every call site whose flow: literal is a LEARNER_FACING_FLOWS member threads ageBracket', () => {
     const sites = scanLearnerFacingSites();
     expect(sites.length).toBeGreaterThan(0);
@@ -416,7 +369,6 @@ describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI
     const violations: string[] = [];
     for (const site of sites) {
       if (site.flow in OPEN_SCOPE_QUESTION_FLOWS) continue;
-      if (site.siteKey in WI_2520_DEFERRED_SITES) continue;
       if (!site.hasAgeBracket) {
         violations.push(
           `${site.siteKey} — ${site.callName} flow='${site.flow}' without ageBracket`,
@@ -426,7 +378,7 @@ describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI
     expect(violations).toEqual([]);
   });
 
-  // Confirms all 13 denylist entries — both categories — still resolve to
+  // Confirms both denylist entries still resolve to
   // real, currently-true facts rather than rotting silently. If a denylisted
   // site is fixed, moved, or renamed (its ageBracket now threads, or its
   // file:line no longer matches a real non-threading call site), this test
@@ -435,29 +387,15 @@ describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI
   // test above only fails on a MISSING ageBracket at a NON-denylisted site;
   // it would happily pass even if every denylist entry were stale, which is
   // exactly the gap this test closes — reviewer finding, WI-2432 rework.)
-  it('all 13 denylist entries are genuinely current (no stale/rotted entries)', () => {
+  it('both denylist entries are genuinely current (no stale/rotted entries)', () => {
     const sites = scanLearnerFacingSites();
-    const nonThreadingSiteKeys = new Set(
-      sites.filter((s) => !s.hasAgeBracket).map((s) => s.siteKey),
-    );
     const nonThreadingFlows = new Set(
       sites.filter((s) => !s.hasAgeBracket).map((s) => s.flow),
     );
 
     const stale: string[] = [];
 
-    // Category 2 (11 site entries): each key must still name a real,
-    // currently non-threading call site. A fixed/moved/renamed site drops
-    // out of nonThreadingSiteKeys and is flagged here.
-    for (const [siteKey, reason] of Object.entries(WI_2520_DEFERRED_SITES)) {
-      if (!nonThreadingSiteKeys.has(siteKey)) {
-        stale.push(
-          `${siteKey} (${reason}) — no longer a non-threading LEARNER_FACING_FLOWS call site; remove from WI_2520_DEFERRED_SITES`,
-        );
-      }
-    }
-
-    // Category 1 (2 flow entries): each flow must still (a) be a real
+    // Each flow must still (a) be a real
     // LEARNER_FACING_FLOWS member and (b) have at least one current
     // non-threading call site — i.e. the underlying fact the denylist
     // documents ("this flow is exempt because it never threads

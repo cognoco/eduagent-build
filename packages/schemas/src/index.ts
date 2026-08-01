@@ -61,6 +61,9 @@ export * from './library-search';
 // Adaptive Memory (Epic 16)
 export * from './learning-profiles';
 
+// Persisted-learning-text safety gate (MMT-ADR-0036 §4 item 6)
+export * from './learning-text-safety';
+
 // Dictation (Practice)
 export * from './dictation';
 
