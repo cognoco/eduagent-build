@@ -380,11 +380,13 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
     'expected committed migration-only RLS SQL',
   );
   for (const table of new Set(migrationOnlyRlsTables)) {
+    const replay = plan.postPushStatements.find((statement) =>
+      statement.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`),
+    );
+    assert.ok(replay, `expected post-push RLS enablement for ${table}`);
     assert.ok(
-      plan.postPushStatements.some((statement) =>
-        statement.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`),
-      ),
-      `expected post-push RLS enablement for ${table}`,
+      replay.includes(`to_regclass('${table}') IS NOT NULL`),
+      `expected relation-existence guard for RLS replay on ${table}`,
     );
   }
   for (const policyName of [
@@ -393,8 +395,10 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
     'activation_events_profile_isolation',
   ]) {
     assert.ok(
-      plan.postPushStatements.some((statement) =>
-        statement.includes(`CREATE POLICY "${policyName}"`),
+      plan.postPushStatements.some(
+        (statement) =>
+          statement.includes(`CREATE POLICY "${policyName}"`) &&
+          /to_regclass\('[^']+'\) IS NOT NULL/.test(statement),
       ),
       `expected post-push policy replay for ${policyName}`,
     );

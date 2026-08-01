@@ -70,7 +70,12 @@ function buildPostPushStatements(statements) {
       'gi',
     ),
   )) {
-    rlsByTable.set(match[1].replace(/\s+/g, ''), match[0].trim());
+    const table = match[1].replace(/\s+/g, '');
+    const tableLiteral = table.replaceAll("'", "''");
+    rlsByTable.set(
+      table,
+      `DO $zdx_post_push$ BEGIN\nIF to_regclass('${tableLiteral}') IS NOT NULL THEN\n${match[0].trim()}\nEND IF;\nEND $zdx_post_push$;`,
+    );
   }
   postPushStatements.push(...rlsByTable.values());
 
@@ -82,10 +87,12 @@ function buildPostPushStatements(statements) {
     ),
   )) {
     const policySql = match[0].trim();
-    const identity = `${match[2].replace(/\s+/g, '')}.${match[1]}`;
+    const table = match[2].replace(/\s+/g, '');
+    const tableLiteral = table.replaceAll("'", "''");
+    const identity = `${table}.${match[1]}`;
     policiesByIdentity.set(
       identity,
-      `DO $zdx_post_push$ BEGIN\n${policySql}\nEXCEPTION WHEN duplicate_object THEN NULL;\nEND $zdx_post_push$;`,
+      `DO $zdx_post_push$ BEGIN\nIF to_regclass('${tableLiteral}') IS NOT NULL THEN\n${policySql}\nEND IF;\nEXCEPTION WHEN duplicate_object THEN NULL;\nEND $zdx_post_push$;`,
     );
   }
   postPushStatements.push(...policiesByIdentity.values());
