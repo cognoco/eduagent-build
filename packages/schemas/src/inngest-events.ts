@@ -355,6 +355,43 @@ export type BillingAliasMergeFailedEvent = z.infer<
   typeof billingAliasMergeFailedEventSchema
 >;
 
+// Consent terminal-failure events use a deliberately smaller error taxonomy
+// than Error.name. Error names are writable free-form strings and can contain
+// volunteered PII just as readily as Error.message.
+export const consentTerminalFailureErrorClassSchema = z.enum([
+  'error',
+  'non_error',
+]);
+
+const consentTerminalFailureEventBaseSchema = z
+  .object({
+    runId: z.string().min(1).nullable(),
+    errorClass: consentTerminalFailureErrorClassSchema,
+    timestamp: isoDateField,
+  })
+  .strict();
+
+export const consentRevocationFailedEventSchema =
+  consentTerminalFailureEventBaseSchema
+    .extend({
+      childProfileId: z.string().min(1).nullable(),
+      parentProfileId: z.string().min(1).nullable(),
+    })
+    .strict();
+export type ConsentRevocationFailedEvent = z.infer<
+  typeof consentRevocationFailedEventSchema
+>;
+
+export const consentEmailRevocationFailedEventSchema =
+  consentTerminalFailureEventBaseSchema
+    .extend({
+      chargePersonId: z.string().min(1).nullable(),
+    })
+    .strict();
+export type ConsentEmailRevocationFailedEvent = z.infer<
+  typeof consentEmailRevocationFailedEventSchema
+>;
+
 // ---------------------------------------------------------------------------
 // S5 visibility contract events
 // ---------------------------------------------------------------------------
