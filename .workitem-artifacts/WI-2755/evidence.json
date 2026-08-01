@@ -2,30 +2,25 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "Source-artifact QA reproduced the real failure after all four migration replay assertions passed: pg_stat_activity still reported one backend at the original ten-second deadline, so teardown threw before DROP and preserved the scratch database. The focused non-DB regression models that exact ten-second linger and was observed red against the original timeout before turning green with the extended bounded drain window.",
-      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:58"
+      "description": "A focused behavioral regression proves that a DATABASE_URL-only Neon pooled endpoint resolves to the corresponding direct endpoint. Deliberately restoring the pooled fallback makes this assertion fail, and restoring the fix makes it pass.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts"
     },
     {
       "acRef": "AC-2",
-      "description": "closePoolAndDropScratchDatabase ends the scratch pool, polls pg_stat_activity by the exact scratch database name until the backend count reaches zero, and only then issues a normal DROP DATABASE. A bounded timeout throws instead of escalating to FORCE.",
-      "pointer": "apps/api/src/db/scratch-database-teardown.ts:12"
+      "description": "The existing teardown closes the scratch pool, polls pg_stat_activity for the generated scratch database until all backends are gone, and then uses a normal DROP DATABASE; this rework does not add FORCE or backend termination.",
+      "pointer": "apps/api/src/db/scratch-database-teardown.ts"
     },
     {
       "acRef": "AC-2",
-      "description": "The profiles-dropped migration replay suite's afterAll now delegates teardown to the drain-aware helper; admin-pool shutdown and temporary migration-directory removal remain protected by finally blocks.",
-      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay.integration.test.ts:198"
+      "description": "The replay now avoids the PgBouncer backend retention observed in review by converting only a Neon -pooler hostname when no explicit DIRECT_URL is available.",
+      "pointer": "apps/api/src/db/scratch-database-url.ts"
     },
     {
       "acRef": "AC-3",
-      "description": "Scratch isolation remains database-name scoped: the helper queries pg_stat_activity with the generated scratch database name as a parameter and drops that same quoted identifier. The default bounded drain window is thirty seconds, allowing the observed ten-second socket linger to resolve safely. An explicit short timeout test proves a genuinely persistent connection still throws and leaves the database intact rather than force-killing it.",
-      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:17"
-    },
-    {
-      "acRef": "AC-3",
-      "description": "The existing CI workflow runs the co-located integration glob containing the profiles-dropped suite against two disposable pgvector Postgres services (the required main lane and the flag-on diagnostic lane), providing two isolated real-database executions for the PR without using the shared staging endpoint.",
-      "pointer": ".github/workflows/ci.yml:435"
+      "description": "Explicit DIRECT_URL values retain precedence and disposable local/CI URLs are unchanged, preserving the suite's isolated scratch-database execution path. Real-database replay and cleanup remain required exact-head PR CI evidence.",
+      "pointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts"
     }
   ],
   "noiseBaselineVersion": "2026-07-13",
-  "redGreenPointer": "apps/api/src/db/profiles-dropped-migrate-replay-teardown.test.ts:58"
+  "redGreenPointer": ".workitem-artifacts/WI-2755/red-green-rework.md"
 }
