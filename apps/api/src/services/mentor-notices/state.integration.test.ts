@@ -288,6 +288,21 @@ describeIfDb(
       expect(newerNotice).not.toBeNull();
       expect(newerNotice!.id).not.toBe(olderNotice!.id);
 
+      // [WI-2599 plan-proofing] Force physical (heap) storage order to
+      // CONTRADICT the required answer, so this case cannot pass by luck of
+      // insertion order matching scan order — the exact ambiguity Gate-2
+      // flagged. A Postgres UPDATE always writes a NEW tuple version; on a
+      // small table with no other churn, that new version is visited AFTER
+      // the row's previous live tuple by a forward sequential scan. This
+      // relocates the correct answer's (newerNotice's) live tuple to the end
+      // of the heap, physically after the wrong answer's (olderNotice's) —
+      // regardless of insertion order, so an unordered read can no longer
+      // land on the right row by accident of a fresh table's layout.
+      await db
+        .update(mentorNotices)
+        .set({ correctionHint: newerNotice!.correctionHint })
+        .where(eq(mentorNotices.id, newerNotice!.id));
+
       // Establish the premise before asserting on it: two rows really are on
       // this one session, and the notice this test calls "newer" really does
       // carry the later createdAt. Without this, "newest wins" could pass on a
@@ -346,6 +361,16 @@ describeIfDb(
         createdAt: sharedCreatedAt,
       });
 
+      // [WI-2599 plan-proofing] Same technique as the newest-wins case above:
+      // an UPDATE relocates the required winner's (largerId's) live tuple to
+      // the end of the heap, physically after the loser's (smallerId's),
+      // guaranteeing a forward seq scan reaches smallerId first regardless of
+      // insertion order or environment-specific physical layout.
+      await db
+        .update(mentorNotices)
+        .set({ concept: 'Tie — later id' })
+        .where(eq(mentorNotices.id, largerId));
+
       const rows = await db
         .select()
         .from(mentorNotices)
@@ -362,6 +387,90 @@ describeIfDb(
       expect(receipt).toEqual({
         id: largerId,
         concept: 'Tie — later id',
+        correctionHint: null,
+      });
+    });
+
+    // [WI-2599 — bounce rework] The two cases above rely on Postgres returning
+    // an unordered scan in plain insertion order, which is what an INSERT-only
+    // table happens to do — but that is not a guarantee the read is entitled
+    // to lean on, and it is why the earlier revert evidence was rejected as
+    // non-discriminating (it could coincidentally read correctly on some
+    // Postgres instance/plan). This case makes physical storage order actively
+    // POINT AT THE WRONG ROW, so no plan that merely walks the heap can land
+    // on the right answer by chance:
+    //   1. Insert the LOSER first — its live tuple is the earliest in the heap.
+    //   2. Insert the WINNER second (newer createdAt — the actual, correct
+    //      answer per this function's ordering contract).
+    //   3. No-op UPDATE the WINNER. Postgres MVCC never updates a tuple in
+    //      place — an UPDATE writes a brand-new tuple version appended at the
+    //      end of the heap and marks the old version dead. This relocates the
+    //      WINNER's only live tuple to the very end, past the LOSER, so the
+    //      physical/storage order is now the OPPOSITE of the createdAt order.
+    // An unordered forward scan (no ORDER BY, LIMIT 1) reaches the LOSER
+    // first — confirmed by EXPLAIN and by repeated runs (see WI-2599 evidence
+    // in the PR/commit). Only code that actually ORDERs by createdAt/id can
+    // land on the WINNER here. Assert the guaranteed property (the projected
+    // receipt IS the deterministic — latest-createdAt — choice), not any
+    // internal/storage detail.
+    it('returns the newest notice even when physical storage order points at the OLDER row — proves the read cannot rely on storage/heap order', async () => {
+      const fixture = await seedFixture();
+
+      const loserId = generateUUIDv7();
+      const winnerId = generateUUIDv7();
+      const olderCreatedAt = new Date(Date.now() - 60 * 60 * 1000); // must LOSE
+      const newerCreatedAt = new Date(); // must WIN
+
+      // 1. LOSER inserted first — earliest live tuple in the heap.
+      await db.insert(mentorNotices).values({
+        id: loserId,
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventAId,
+        concept: 'Heap-order decoy — must lose',
+        correctionHint: null,
+        createdAt: olderCreatedAt,
+      });
+
+      // 2. WINNER inserted second — newer createdAt is the actual tiebreaker
+      // under test, independent of physical position.
+      await db.insert(mentorNotices).values({
+        id: winnerId,
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventBId,
+        concept: 'Heap-order winner — must win',
+        correctionHint: null,
+        createdAt: newerCreatedAt,
+      });
+
+      // 3. No-op UPDATE the WINNER: forces a new tuple version, appended at
+      // the end of the heap, relocating the WINNER's live tuple PAST the
+      // LOSER's. Physical order is now: LOSER (early), WINNER (late) — the
+      // reverse of the correct answer.
+      await db
+        .update(mentorNotices)
+        .set({ correctionHint: null })
+        .where(eq(mentorNotices.id, winnerId));
+
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(2);
+
+      const receipt = await getMentorNoticeReceipt(
+        db,
+        fixture.profileId,
+        fixture.sessionId,
+      );
+      expect(receipt).toEqual({
+        id: winnerId,
+        concept: 'Heap-order winner — must win',
         correctionHint: null,
       });
     });
