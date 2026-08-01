@@ -2,8 +2,11 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  type QueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { useApiClient } from '../lib/api-client';
 import { shouldRetryApiError } from '../lib/api-errors';
@@ -18,9 +21,23 @@ import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 
+const refreshedProfileAuthorities = new WeakMap<QueryClient, Set<string>>();
+
 export function useProfiles(): UseQueryResult<Profile[]> {
-  const client = useApiClient();
-  const { isSignedIn, userId } = useAuth();
+  // Profile metadata is the authority refresh itself. This client omits the
+  // selected Person/proxy context only from its own requests, so a stale owner
+  // selection cannot block caller-bound recovery without mutating the shared
+  // identity used by concurrent profile-scoped requests.
+  const client = useApiClient({ profileContext: 'omit' });
+  const queryClient = useQueryClient();
+  const { isSignedIn, userId, sessionId } = useAuth();
+  const authorityKey = isSignedIn ? `${userId}:${sessionId}` : 'signed-out';
+  const previousAuthorityKeyRef = useRef<string | null>(null);
+  let refreshedAuthorities = refreshedProfileAuthorities.get(queryClient);
+  if (!refreshedAuthorities) {
+    refreshedAuthorities = new Set();
+    refreshedProfileAuthorities.set(queryClient, refreshedAuthorities);
+  }
 
   // Scope the cache by Clerk userId so a previous user's profiles list cannot
   // be served stale to the next signed-in user on a shared device. Without
@@ -32,7 +49,7 @@ export function useProfiles(): UseQueryResult<Profile[]> {
   // "We could not load your profile" error fallback in (app)/_layout.tsx.
   // Prefix-based invalidations (`queryKey: ['profiles']`) still match this
   // scoped key because TanStack invalidation is a prefix match by default.
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.profiles.list(userId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -40,13 +57,60 @@ export function useProfiles(): UseQueryResult<Profile[]> {
         const res = await client.profiles.$get({}, { init: { signal } });
         await assertOk(res);
         const data = await parseJson(res, profileListResponseSchema);
+        refreshedAuthorities.add(authorityKey);
         return data.profiles as Profile[];
       } finally {
         cleanup();
       }
     },
     enabled: !!isSignedIn,
+    // Profiles carry capability metadata. Refresh once per QueryClient/user
+    // session even when a same-subject cache entry exists, then reuse that
+    // authoritative result across route-driven provider remounts. Reconnect
+    // and native foreground boundaries still revalidate below.
+    staleTime: 0,
+    refetchOnMount: () => !refreshedAuthorities.has(authorityKey),
+    refetchOnReconnect: 'always',
   });
+  const { refetch } = query;
+
+  useEffect(() => {
+    const previousAuthorityKey = previousAuthorityKeyRef.current;
+    previousAuthorityKeyRef.current = authorityKey;
+    if (
+      !isSignedIn ||
+      previousAuthorityKey === null ||
+      previousAuthorityKey === authorityKey ||
+      refreshedAuthorities.has(authorityKey)
+    ) {
+      return;
+    }
+
+    void queryClient
+      .cancelQueries({ queryKey: queryKeys.profiles.list(userId) })
+      .then(() => refetch());
+  }, [
+    authorityKey,
+    isSignedIn,
+    queryClient,
+    refetch,
+    refreshedAuthorities,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || !isSignedIn) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refetch();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [isSignedIn, refetch]);
+
+  return query;
 }
 
 export function useUpdateProfileName() {

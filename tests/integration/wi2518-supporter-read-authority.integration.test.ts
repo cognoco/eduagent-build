@@ -192,6 +192,8 @@ describe('WI-2518: supporter reads bind authority to the authenticated caller', 
     for (const path of [
       `/v1/now?scope=person&personId=${supportee.personId}`,
       `/v1/now/overflow?scope=person&personId=${supportee.personId}`,
+      '/v1/now?scope=supporter-hub',
+      '/v1/now/overflow?scope=supporter-hub',
       `/v1/scopes/${supportee.personId}/subjects`,
     ]) {
       const response = await app.request(
@@ -200,18 +202,6 @@ describe('WI-2518: supporter reads bind authority to the authenticated caller', 
         TEST_ENV,
       );
       expect(response.status).toBe(403);
-      expect(await response.text()).not.toContain(marker);
-    }
-    for (const path of [
-      '/v1/now?scope=supporter-hub',
-      '/v1/now/overflow?scope=supporter-hub',
-    ]) {
-      const response = await app.request(
-        path,
-        { headers: borrowedHeaders },
-        TEST_ENV,
-      );
-      expect(response.status).toBe(200);
       expect(await response.text()).not.toContain(marker);
     }
 

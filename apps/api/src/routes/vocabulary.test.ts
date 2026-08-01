@@ -67,6 +67,25 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'a0000000-0000-4000-a000-000000000001',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
 jest.mock('../services/vocabulary', () => {
   const actual = jest.requireActual(
     '../services/vocabulary',

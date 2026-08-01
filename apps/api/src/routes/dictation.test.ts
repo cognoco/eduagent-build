@@ -324,8 +324,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
-  // RF-01: Missing X-Profile-Id header must return 400
-  it('returns 400 when X-Profile-Id header is missing [RF-01]', async () => {
+  it('[WI-2128] returns 403 when a profile write omits explicit X-Profile-Id selection', async () => {
     const res = await app.request(
       '/v1/dictation/prepare-homework',
       {
@@ -336,7 +335,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(prepareHomework).not.toHaveBeenCalled();
   });
 
@@ -868,8 +867,11 @@ describe('GET /v1/dictation/streak', () => {
     );
   });
 
-  // RF-01: Missing X-Profile-Id header must return 400
-  it('returns 400 when X-Profile-Id header is missing [RF-01]', async () => {
+  it('[WI-2128] auto-resolves the authenticated caller for a headerless streak read', async () => {
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 0,
+      lastDate: null,
+    });
     const res = await app.request(
       '/v1/dictation/streak',
       {
@@ -878,7 +880,7 @@ describe('GET /v1/dictation/streak', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('returns 401 without auth header', async () => {
@@ -935,14 +937,15 @@ describe('GET /v1/dictation/history', () => {
     );
   });
 
-  it('returns 400 when X-Profile-Id header is missing', async () => {
+  it('[WI-2128] auto-resolves the authenticated caller for a headerless history read', async () => {
+    (getDictationHistory as jest.Mock).mockResolvedValueOnce([]);
     const res = await app.request(
       '/v1/dictation/history',
       { headers: makeAuthHeaders() },
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('returns 401 without auth header', async () => {
@@ -1094,7 +1097,7 @@ describe('POST /v1/dictation/review', () => {
     });
   });
 
-  it('returns 400 when X-Profile-Id header is missing', async () => {
+  it('[WI-2128] returns 403 when a profile write omits explicit X-Profile-Id selection', async () => {
     const res = await app.request(
       '/v1/dictation/review',
       {
@@ -1105,7 +1108,7 @@ describe('POST /v1/dictation/review', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(reviewDictation).not.toHaveBeenCalled();
   });
 

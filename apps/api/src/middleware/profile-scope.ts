@@ -10,10 +10,7 @@ import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
-import {
-  findOwnerPersonScope,
-  getPersonScope,
-} from '../services/identity-v2/profile-v2';
+import { getPersonScope } from '../services/identity-v2/profile-v2';
 
 const logger = createLogger();
 
@@ -45,25 +42,20 @@ export interface ProfileMeta {
     | null;
   hasPremiumLlm: boolean;
   conversationLanguage?: string | null;
-  // [SEC-2 / BUG-718] Server-derived flag indicating whether the resolved
-  // X-Profile-Id is the owner profile for the authenticated account.
-  // assertNotProxyMode reads this instead of trusting the client-supplied
-  // X-Proxy-Mode header. A non-owner profile being accessed via a parent's
-  // account session is treated as a proxy session regardless of any header.
+  // Server-derived profile shape used by owner/admin capability gates.
+  // Proxy mode is separately derived from callerPersonId !== profileId;
+  // isOwner:false is also the normal shape for a credentialed learner acting
+  // as self.
   isOwner: boolean;
   // [Issue 901] How the profile identity was resolved by profileScopeMiddleware:
   //   - 'explicit-header': X-Profile-Id was supplied and verified to belong to
-  //     the authenticated account (the caller actively selected this profile).
+  //     the authenticated caller's operation set.
   //   - 'auto': no X-Profile-Id header was sent, so the middleware synthesized
-  //     the account OWNER profile as a convenience for learner-scoped reads.
+  //     the authenticated caller's own login-bound Person.
   //
-  // The owner-only gates (assertOwnerProfile / assertNotProxyMode) MUST reject
-  // 'auto' resolution: an authenticated NON-OWNER caller can simply omit
-  // X-Profile-Id to be auto-resolved to the owner profile (isOwner:true),
-  // bypassing owner gating (privilege escalation). Owner privileges therefore
-  // require an EXPLICITLY selected, verified owner profile — never a synthesized
-  // one. Learner/self routes that auto-resolve do not call the owner gates, so
-  // their behavior is unchanged.
+  // Owner-only gates still require an explicitly selected owner profile; an
+  // auto-resolved self is valid for learner/self reads but not an affirmative
+  // transition into owner capabilities.
   resolvedVia: 'auto' | 'explicit-header';
 }
 
@@ -71,6 +63,7 @@ export type ProfileScopeEnv = {
   Variables: {
     db: Database;
     account: Account;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
     /**
@@ -121,9 +114,9 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
   async (c, next) => {
     const profileIdHeader = c.req.header('X-Profile-Id');
 
-    // When X-Profile-Id is absent, auto-resolve to the owner profile.
-    // This prevents the broken `?? account.id` fallback in route handlers
-    // which silently returns empty results (account.id is not a valid profileId).
+    // When X-Profile-Id is absent, auto-resolve to the authenticated caller's
+    // own Person. Never substitute the organization's owner: Person authority
+    // comes from the server-resolved login binding, not family membership.
     //
     // Account-level routes (billing, account settings, profile list) are unaffected —
     // they read account.id directly and never call c.get('profileId').
@@ -136,36 +129,52 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     if (!profileIdHeader) {
       const db = c.get('db');
       const account = c.get('account');
-      if (db && account) {
+      const callerPersonId = c.get('callerPersonId');
+      if (db && account && callerPersonId) {
         try {
-          // [CUT-B1] v2: resolve the owner person scope (person.id =
-          // profiles.id, account.id = organization.id). The returned meta is
-          // byte-identical to the legacy ProfileMeta. NOTE: only the RESOLUTION
-          // runs inside this try — `next()` runs after it (the shared call
-          // below), so a downstream handler throwing is NOT mis-escalated as a
-          // profile-scope transient error, and a transient error HERE still
-          // hits the same catch (sets profileScopeError + 503).
-          const ownerScope = await findOwnerPersonScope(db, account.id);
-          if (ownerScope) {
-            c.set('profileId', ownerScope.profileId);
-            // [Issue 901] Auto-synthesized owner identity — mark it so the
-            // owner-only gates refuse it (see ProfileMeta.resolvedVia).
+          const callerScope = await getPersonScope(
+            db,
+            callerPersonId,
+            account.id,
+            callerPersonId,
+          );
+          if (callerScope) {
+            c.set('profileId', callerScope.profileId);
             c.set('profileMeta', {
-              ...ownerScope.meta,
+              ...callerScope.meta,
               resolvedVia: 'auto',
             });
+          } else {
+            // [WI-2128] An authenticated account with a login-bound caller but
+            // no operable caller scope is an identity-graph mismatch. Do not
+            // silently downgrade it to an account-level request: downstream
+            // routes could otherwise infer capability from organization
+            // membership. Emit categories only; Person/account identifiers are
+            // deliberately excluded.
+            logger.warn('profile_scope.authority_mismatch', {
+              resolutionPath: 'auto',
+              reason: 'caller-scope-not-operable',
+            });
+            return forbidden(c, 'Profile authority could not be resolved');
           }
           // fall through to the shared `await next()` below (outside try).
         } catch (err) {
           logger.error('profile_scope.auto_resolve_failed', {
-            accountId: account.id,
-            error: err instanceof Error ? err.message : String(err),
+            errorType: err instanceof Error ? err.name : 'unknown',
           });
-          captureException(err, {
+          const resolutionFailure = new Error(
+            'Profile scope auto-resolution failed',
+            {
+              cause:
+                err instanceof Error
+                  ? { errorType: err.name }
+                  : { errorType: 'unknown' },
+            },
+          );
+          captureException(resolutionFailure, {
             tags: { surface: 'profile_scope.auto_resolve_failure' },
             extra: {
-              context: 'profile-scope.auto_resolve_owner',
-              accountId: account.id,
+              context: 'profile-scope.auto_resolve_caller',
             },
           });
           // [BUG-487 / BUG-502] Distinguish "no owner profile exists" (legit —
@@ -206,13 +215,23 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
         401,
       );
     }
-    // [CUT-B1] v2: verify the person belongs to the org (membership) and
-    // build the byte-identical ProfileMeta. account.id = organization.id.
-    const scope = await getPersonScope(db, profileIdHeader, account.id);
+    const callerPersonId = c.get('callerPersonId');
+    if (!callerPersonId) {
+      return forbidden(c, 'Profile authority could not be resolved');
+    }
+    // Membership is visibility, not operation authority. The caller may
+    // install only self or an uncredentialed charge they actively guard as
+    // request context. Route-specific write/elevation gates remain additional
+    // constraints; they never widen this central operation boundary.
+    const scope = await getPersonScope(
+      db,
+      profileIdHeader,
+      account.id,
+      callerPersonId,
+    );
     if (!scope) {
       logger.warn('profile_scope.ownership_mismatch', {
-        accountId: account.id,
-        requestedProfileId: profileIdHeader,
+        reason: 'not-operable',
       });
       return forbidden(c, 'Profile does not belong to this account');
     }

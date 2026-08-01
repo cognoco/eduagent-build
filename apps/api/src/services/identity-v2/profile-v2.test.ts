@@ -152,15 +152,26 @@ describe('[WI-1556] listProfilesV2 — first-Mentor language launch hints', () =
   function listDb() {
     return {
       select: jest.fn((projection: Record<string, unknown>) => {
-        const rows = 'displayName' in projection ? [row] : [];
+        const rows =
+          'displayName' in projection
+            ? [row]
+            : 'personId' in projection
+              ? [{ personId }]
+              : [];
         const chain = {
           from: () => chain,
           innerJoin: () => chain,
           where: () => chain,
+          limit: () => Promise.resolve(rows),
           then: (resolve: (value: unknown[]) => void) => resolve(rows),
         };
         return chain;
       }),
+      query: {
+        guardianship: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      },
     } as never;
   }
 
@@ -175,13 +186,13 @@ describe('[WI-1556] listProfilesV2 — first-Mentor language launch hints', () =
     });
   });
 
-  it('does not describe a sibling target as the authenticated caller', async () => {
-    const [profile] = await listProfilesV2(
+  it('does not enumerate a sibling target as the authenticated caller', async () => {
+    const profiles = await listProfilesV2(
       listDb(),
       organizationId,
       '770e8400-e29b-41d4-a716-446655440000',
     );
 
-    expect(profile?.isCurrentUser).toBe(false);
+    expect(profiles).toEqual([]);
   });
 });

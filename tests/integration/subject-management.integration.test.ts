@@ -72,6 +72,7 @@ import {
   assessments,
   curriculumBooks,
   generateUUIDv7,
+  guardianship,
   learningSessions,
   practiceActivityEvents,
   quizRounds,
@@ -716,6 +717,14 @@ describe('Integration: DELETE /v1/subjects/:id', () => {
       clerkUserId: `${SUBJECT_AUTH_USER_ID}-proxy-child`,
       email: `proxy-child-${childProfileId}@integration.test`,
       isOwner: false,
+    });
+    // [WI-2128] Operation authority now requires an active guardianship edge,
+    // not just shared account membership — seed it so the parent genuinely
+    // holds proxy authority over the child (mirrors the guardian/charge
+    // fixtures in wi2128-family-join-identity.integration.test.ts).
+    await db.insert(guardianship).values({
+      guardianPersonId: ownerProfile.id,
+      chargePersonId: childProfileId,
     });
     const subject = await seedSubject(childProfileId, 'Proxy Math');
 

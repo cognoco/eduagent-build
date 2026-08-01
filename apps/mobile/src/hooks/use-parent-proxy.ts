@@ -27,10 +27,14 @@ export function useParentProxy(): ParentProxyState {
     [profiles],
   );
 
-  // isParentProxy is ONLY true when the explicit proxy flag is set.
-  // The child/non-owner profile switched to via plain switchProfile() is
-  // treated as a normal learner session, not a parent-viewing-child session.
-  const isParentProxy = isExplicitProxyMode;
+  // The explicit flag is necessary but not sufficient: restored state must
+  // still describe an owner viewing a non-owner profile in the current
+  // operation set. A learner-only response after family join cannot restore
+  // the former owner's proxy capability.
+  const isParentProxy =
+    isExplicitProxyMode &&
+    activeProfile?.isOwner === false &&
+    parentProfile !== null;
   const childProfile = isParentProxy ? activeProfile : null;
 
   return { isParentProxy, childProfile, parentProfile };

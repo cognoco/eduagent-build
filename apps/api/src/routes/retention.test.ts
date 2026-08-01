@@ -345,7 +345,7 @@ describe('retention routes', () => {
       expect(body.reviewDueCount).toBe(0);
     });
 
-    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+    it('[WI-2128] auto-resolves the authenticated caller when X-Profile-Id is absent', async () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/retention`,
         {
@@ -354,8 +354,8 @@ describe('retention routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
-      expect(getSubjectRetention).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(getSubjectRetention).toHaveBeenCalled();
     });
 
     it('returns 401 without auth header', async () => {
@@ -431,9 +431,9 @@ describe('retention routes', () => {
       );
     });
 
-    // Break test: aggregate route MUST require X-Profile-Id, otherwise it
-    // would leak retention rows across profiles. [Verified-by: 400 status]
-    it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
+    // Headerless reads are scoped to the login-bound caller Person, never the
+    // family owner or a shared organization aggregate.
+    it('[WI-2128] scopes a headerless aggregate read to the authenticated caller', async () => {
       const res = await app.request(
         '/v1/library/retention',
         {
@@ -442,8 +442,11 @@ describe('retention routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
-      expect(getAllSubjectsRetention).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(getAllSubjectsRetention).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
     });
 
     // Break test: aggregate route MUST require auth.
