@@ -1,4 +1,4 @@
-// @inngest-admin: no-db (calls Stripe + RevenueCat external APIs for subscription-store erasure; no database access)
+// @inngest-admin: cross-profile (provider teardown plus an unscoped terminal-failure outbox write)
 import {
   billingSubscriptionStoreTeardownFailedEventSchema,
   classifyTerminalFailureError,

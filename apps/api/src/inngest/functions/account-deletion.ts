@@ -1,4 +1,4 @@
-// @inngest-admin: event-profile (accountId from event; all deletion DB ops scoped to that account)
+// @inngest-admin: event-profile (account-scoped deletion plus an unscoped terminal-failure outbox write)
 import {
   accountDeletionTeardownFailedEventSchema,
   classifyTerminalFailureError,
