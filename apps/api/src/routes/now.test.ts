@@ -42,25 +42,11 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// [WI-2565] Call-order instrumentation only: the REAL resolver still runs
-// (jest.fn wraps the actual implementation, so every epoch/observation case
-// above keeps exercising real policy logic). The denial case asserts it is
-// NOT invoked for an unauthorized caller — the guard must sit BEFORE the
-// notice-policy read (AC-1), not merely before the feed builders.
-jest.mock('../services/mentor-notices', () => {
-  const actual = jest.requireActual(
-    '../services/mentor-notices',
-  ) as typeof import('../services/mentor-notices');
-  return {
-    ...actual,
-    resolveMentorNoticeVisibility: jest.fn(
-      actual.resolveMentorNoticeVisibility,
-    ),
-  };
-});
-
 import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
-import { resolveMentorNoticeVisibility } from '../services/mentor-notices';
+
+const mentorNotices = jest.requireActual<
+  typeof import('../services/mentor-notices/visibility')
+>('../services/mentor-notices/visibility');
 
 const mockVerifyPersonOwnershipV2 =
   verifyPersonOwnershipV2 as jest.MockedFunction<
@@ -111,8 +97,16 @@ function makeApp(
 }
 
 describe('now routes', () => {
+  let resolveMentorNoticeVisibilitySpy: jest.SpiedFunction<
+    typeof mentorNotices.resolveMentorNoticeVisibility
+  >;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    resolveMentorNoticeVisibilitySpy = jest.spyOn(
+      mentorNotices,
+      'resolveMentorNoticeVisibility',
+    );
     mockVerifyPersonOwnershipV2.mockReset().mockResolvedValue(undefined);
     jest.mocked(buildNowFeed).mockResolvedValue({
       scope: 'self',
@@ -124,6 +118,10 @@ describe('now routes', () => {
       scope: 'self',
       items: [],
     });
+  });
+
+  afterEach(() => {
+    resolveMentorNoticeVisibilitySpy.mockRestore();
   });
 
   it('returns 400 when person scope omits personId', async () => {
@@ -582,7 +580,7 @@ describe('now routes', () => {
         );
 
         expect(res.status).toBe(403);
-        expect(resolveMentorNoticeVisibility).not.toHaveBeenCalled();
+        expect(resolveMentorNoticeVisibilitySpy).not.toHaveBeenCalled();
         expect(build).not.toHaveBeenCalled();
       },
     );
