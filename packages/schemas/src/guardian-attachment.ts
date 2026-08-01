@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+export const guardianQualificationSchema = z.enum([
+  'biological_parent',
+  'adoptive_parent',
+  'stepparent',
+  'grandparent',
+  'court_appointed_guardian',
+  'foster_parent',
+  'kinship_caregiver',
+  'sibling_with_custody',
+  'other',
+]);
+export type GuardianQualification = z.infer<typeof guardianQualificationSchema>;
+
 export const guardianAttachmentInitiationRequestSchema = z
   .object({
     chargePersonId: z.string().uuid(),
