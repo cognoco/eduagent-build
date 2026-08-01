@@ -187,7 +187,10 @@ export async function resolveGuardianAttachmentContext(
   if (
     policy.launchDecision !== 'allowed' ||
     policy.consentDecision?.ageBand !== 'guardian_required_minor' ||
-    policy.consentDecision.consentStatus !== 'REQUIRED_PENDING'
+    policy.consentDecision.consentStatus !== 'REQUIRED_PENDING' ||
+    !policy.habitualResidence ||
+    !policy.policyVersion ||
+    !policy.authorizationForm
   ) {
     throw new GuardianAttachmentRejectedError();
   }
