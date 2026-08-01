@@ -4,7 +4,7 @@
     "landingPath": "pr",
     "repo": "cognoco/eduagent-build",
     "targetBase": "main",
-    "submittedCommit": "5cac081a9641e1656f5e78ab74dd5f1aa38a70ff",
+    "submittedCommit": "50a9547aed73731c2f9156ae260759e9e7e1f150",
     "attemptId": "WI-2994-step-send"
   },
   "redGreenDeclaration": {

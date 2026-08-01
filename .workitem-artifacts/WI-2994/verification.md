@@ -47,3 +47,18 @@ The two event data objects retain exactly the existing fields: `accountId`,
 event metadata, not a new payload field. No learner, provider, credential, or
 raw error content is added. WI-2994 owns dispatch durability; WI-1916 remains
 limited to downstream chat/pager delivery and production-console routing.
+
+## Post-prerequisite rebase verification
+
+The published branch was rebased without conflicts onto
+`b6f8965a74dbd401fdedc4f8e3e018a6b864153e`, which includes WI-3001's hosted
+V2 manual-homework subject-resolution repair. The rebased implementation commit
+is `50a9547aed73731c2f9156ae260759e9e7e1f150`.
+
+The focused two-suite command above was rerun on the rebased tree and exited
+`0`: 2 / 2 suites and 44 / 44 cases passed. `git diff --check
+origin/main...HEAD` also exited `0`. A routed `--fast` validation was started,
+but the repository's stale local `main` baseline inflated the detected delta to
+1,070 files; it was stopped during otherwise-green unrelated API suites rather
+than recorded as WI-2994 completion evidence. Hosted CI remains the full gate
+for the exact pushed head.
