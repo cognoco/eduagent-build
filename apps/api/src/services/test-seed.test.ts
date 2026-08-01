@@ -591,6 +591,7 @@ describe('seedScenario', () => {
       expect.objectContaining({
         id: result.profileId,
         displayName: 'Test Child',
+        conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
       }),
     );
     expect(insertedRows).toContainEqual(
@@ -627,6 +628,18 @@ describe('seedScenario', () => {
         id: result.ids.subjectId,
         profileId: result.profileId,
         name: 'Child Learning Data',
+      }),
+    );
+
+    const updateResult = (db.update as jest.Mock).mock.results[0]?.value as
+      | { set?: jest.Mock }
+      | undefined;
+    const updateValues =
+      updateResult?.set?.mock.calls.map(([values]) => values) ?? [];
+    expect(updateValues).toContainEqual(
+      expect.objectContaining({
+        loginId: expect.any(String),
+        conversationLanguageConfirmedAt: expect.any(Date),
       }),
     );
   });
@@ -2477,6 +2490,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
     expect(profileRow?.birthDate).toBe(
       `${new Date().getFullYear() - 13}-01-01`,
     );
+    expect(profileRow?.conversationLanguageConfirmedAt).toBeInstanceOf(Date);
   });
 
   it('family-at-profile-limit creates exactly maxProfiles family profiles', async () => {

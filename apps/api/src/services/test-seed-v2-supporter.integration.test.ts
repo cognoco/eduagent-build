@@ -383,15 +383,25 @@ function createIntegrationDb(): Database {
 
     it('[WI-2128 route boundary] authenticated GET /v1/profiles returns only the supporter because Supportership does not grant operate-as authority', async () => {
       const [
+        supporterPerson,
         supporterLogin,
+        managedChildPerson,
         managedChildLogin,
         managedChildMembership,
         managedChildEdge,
         managedChildContract,
       ] = await Promise.all([
+        db.query.person.findFirst({
+          where: eq(person.id, seeded.ids.supporterPersonId),
+          columns: { conversationLanguageConfirmedAt: true },
+        }),
         db.query.login.findFirst({
           where: eq(login.personId, seeded.ids.supporterPersonId),
           columns: { clerkUserId: true },
+        }),
+        db.query.person.findFirst({
+          where: eq(person.id, seeded.ids.managedChildPersonId),
+          columns: { conversationLanguageConfirmedAt: true },
         }),
         db.query.login.findFirst({
           where: eq(login.personId, seeded.ids.managedChildPersonId),
@@ -425,7 +435,11 @@ function createIntegrationDb(): Database {
         }),
       ]);
 
+      expect(supporterPerson?.conversationLanguageConfirmedAt).toBeInstanceOf(
+        Date,
+      );
       expect(supporterLogin).toBeDefined();
+      expect(managedChildPerson?.conversationLanguageConfirmedAt).toBeNull();
       expect(managedChildLogin).toBeUndefined();
       expect(managedChildMembership).toEqual({
         organizationId: seeded.ids.supporterOrganizationId,

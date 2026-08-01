@@ -819,6 +819,7 @@ async function createBaseProfile(
     clerkUserId?: string;
     defaultAppContext?: string;
     residenceJurisdiction?: string;
+    conversationLanguageConfirmed?: boolean;
   },
 ): Promise<string> {
   const profileId = generateUUIDv7();
@@ -829,7 +830,13 @@ async function createBaseProfile(
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
-    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
+    // [WI-1556] Owner seeds are existing credentialed learners and must clear
+    // the first-Mentor gate. Managed children have no credential yet, so they
+    // stay unconfirmed until a seed explicitly adds one.
+    conversationLanguageConfirmedAt:
+      (opts.conversationLanguageConfirmed ?? isOwner)
+        ? CONFIRMED_CONVERSATION_LANGUAGE_AT
+        : null,
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
@@ -1469,6 +1476,7 @@ async function seedV2AccountNonOwnerChild(
     displayName: 'Test Child',
     birthYear: LEARNER_BIRTH_YEAR,
     isOwner: false,
+    conversationLanguageConfirmed: true,
   });
 
   const loginId = generateUUIDv7();
@@ -1478,7 +1486,10 @@ async function seedV2AccountNonOwnerChild(
     clerkUserId,
     email,
   });
-  await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+  await db
+    .update(person)
+    .set({ loginId, conversationLanguageConfirmedAt: new Date() })
+    .where(eq(person.id, profileId));
 
   const { subjectId } = await createSubjectWithCurriculum(
     db,
@@ -5352,6 +5363,7 @@ function makeConsentThresholdSeeder(
       birthDate: `${new Date().getFullYear() - opts.ageYears}-01-01`,
       residenceJurisdiction:
         opts.location === 'US' ? 'US' : opts.location === 'EU' ? 'EU' : 'ROW',
+      conversationLanguageConfirmedAt: new Date(),
     });
     {
       const loginId = generateUUIDv7();

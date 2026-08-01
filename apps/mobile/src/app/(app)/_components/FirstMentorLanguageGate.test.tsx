@@ -1,5 +1,7 @@
 import i18next from 'i18next';
+import { Text } from 'react-native';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
+import type { ConversationLanguage } from '@eduagent/schemas';
 
 import {
   cleanupScreen,
@@ -44,6 +46,34 @@ jest.mock(
 
 const FirstMentorLanguageGate =
   require('./FirstMentorLanguageGate').FirstMentorLanguageGate;
+
+const {
+  shouldRequireFirstMentorLanguageConfirmation,
+} = require('../../../lib/first-mentor-language');
+const {
+  resolveLanguageVoiceLocale,
+} = require('../session/_view-models/session-derived-state');
+
+/**
+ * [WI-1556] Mirrors the branch `(app)/_layout.tsx` makes: mount the blocking
+ * gate when confirmation is required, otherwise let the app shell through.
+ * Rendering through this is what lets the journey assert the gate is ABSENT
+ * after relaunch, rather than only re-asserting the predicate.
+ */
+function GateHost({
+  profile,
+}: {
+  profile: ReturnType<typeof createTestProfile>;
+}) {
+  return shouldRequireFirstMentorLanguageConfirmation({
+    activeProfile: profile,
+    isExplicitProxyMode: false,
+  }) ? (
+    <FirstMentorLanguageGate />
+  ) : (
+    <Text testID="post-gate-app-shell">shell</Text>
+  );
+}
 
 const learner = createTestProfile({
   id: 'learner-1',
@@ -285,5 +315,139 @@ describe('FirstMentorLanguageGate', () => {
       active.result.getByTestId('first-mentor-language-option-es').props
         .accessibilityState.selected,
     ).toBe(true);
+  });
+
+  // [WI-1556 AC-5] Deterministic first-run journey. Walks one learner from an
+  // unconfirmed first run through a non-English choice, a relaunch that only
+  // sees what the server durably reported, and on to the first Mentor
+  // interaction — proving the choice both survives the relaunch and reaches
+  // the surfaces the first exchange is driven from. Deterministic: no timers,
+  // no network beyond the routed mock, no reliance on ordering between
+  // independent effects.
+  it('[WI-1556] first-run journey: a non-English choice survives relaunch and drives the first Mentor interaction', async () => {
+    // The only source of truth for what survives the relaunch. Nothing in the
+    // test writes these fields directly — the route handler below is the only
+    // writer, so if the confirmation never reaches the server the relaunch
+    // reads back an unconfirmed learner and the gate reappears.
+    const serverState: {
+      conversationLanguage: ConversationLanguage;
+      conversationLanguageConfirmedAt: string | null;
+    } = { conversationLanguage: 'en', conversationLanguageConfirmedAt: null };
+
+    const languageRoute = (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        const body = JSON.parse(String(init.body ?? '{}')) as {
+          conversationLanguage?: ConversationLanguage;
+          confirm?: boolean;
+        };
+        if (body.conversationLanguage) {
+          serverState.conversationLanguage = body.conversationLanguage;
+        }
+        if (body.confirm === true) {
+          serverState.conversationLanguageConfirmedAt =
+            '2026-01-01T00:00:00.000Z';
+        }
+      }
+      return { success: true };
+    };
+
+    // A profile as the client would load it from the server on launch.
+    const loadProfileFromServer = (id: string) =>
+      createTestProfile({
+        id,
+        isOwner: true,
+        isCurrentUser: true,
+        conversationLanguage: serverState.conversationLanguage,
+        conversationLanguageConfirmed:
+          serverState.conversationLanguageConfirmedAt !== null,
+      });
+
+    const journeyLearner = loadProfileFromServer('journey-learner');
+
+    // 1. First run: the learner is a self-created owner who has not confirmed,
+    //    so the blocking gate stands between them and any Mentor surface.
+    expect(
+      shouldRequireFirstMentorLanguageConfirmation({
+        activeProfile: journeyLearner,
+        isExplicitProxyMode: false,
+      }),
+    ).toBe(true);
+
+    active = renderScreen(<GateHost profile={journeyLearner} />, {
+      profile: journeyLearner,
+      routes: { '/onboarding/': languageRoute },
+    });
+    // The gate really is what stands in the way on first run.
+    expect(
+      active.result.getByTestId('first-mentor-language-gate'),
+    ).toBeTruthy();
+
+    // 2. They pick Czech — a conversation-only locale, so this cannot be
+    //    satisfied by the seven-locale UI shell falling back to English.
+    fireEvent.press(
+      active.result.getByTestId('first-mentor-language-option-cs'),
+    );
+    await act(async () => {
+      fireEvent.press(
+        active!.result.getByTestId('first-mentor-language-confirm'),
+      );
+      await Promise.resolve();
+    });
+
+    // 3. The write reaches the server as an explicit confirmation of cs.
+    await waitFor(() => {
+      const patches = fetchCallsMatching(
+        active!.routedFetch,
+        '/onboarding/language',
+      ).filter((call) => call.init?.method === 'PATCH');
+      expect(extractJsonBody(patches[patches.length - 1]?.init)).toEqual({
+        conversationLanguage: 'cs',
+        confirm: true,
+      });
+    });
+    // The UI shell language is untouched: this is the tutor-prose language.
+    expect(i18next.language).toBe('en');
+
+    // 4. Relaunch. Tear the render down completely, then load the profile from
+    //    what the server actually stored — not from anything this test wrote.
+    //    If the confirmation had not persisted, the reloaded learner would be
+    //    unconfirmed and the gate would mount again.
+    active.cleanup();
+    active = null;
+    cleanupScreen();
+
+    const afterRelaunch = loadProfileFromServer('journey-learner');
+    expect(afterRelaunch.conversationLanguage).toBe('cs');
+    expect(afterRelaunch.conversationLanguageConfirmed).toBe(true);
+
+    active = renderScreen(<GateHost profile={afterRelaunch} />, {
+      profile: afterRelaunch,
+      routes: { '/onboarding/': languageRoute },
+    });
+
+    // The gate is gone and the app shell is reachable — the assertion the
+    // whole journey exists for.
+    expect(
+      active.result.queryByTestId('first-mentor-language-gate'),
+    ).toBeNull();
+    expect(active.result.getByTestId('post-gate-app-shell')).toBeTruthy();
+
+    // 5. The first Mentor interaction consumes the surviving choice: the
+    //    Mentor input bar derives its voice locale from the learner's
+    //    conversation language (see mentor.tsx's voiceLocale prop), so a
+    //    non-English choice changes how the first exchange is spoken, not
+    //    merely what is stored.
+    expect(
+      resolveLanguageVoiceLocale({
+        activeSubject: undefined,
+        conversationLanguage: afterRelaunch.conversationLanguage,
+      }),
+    ).toBe('cs-CZ');
+    expect(
+      resolveLanguageVoiceLocale({
+        activeSubject: undefined,
+        conversationLanguage: 'en',
+      }),
+    ).toBe('en-US');
   });
 });

@@ -114,15 +114,20 @@ export async function seedChildIdentityV2(
     birthYear: number;
     personId?: string;
     residenceJurisdiction?: string;
+    conversationLanguageConfirmed?: boolean;
   },
 ): Promise<{ personId: string }> {
   const personId = opts.personId ?? generateUUIDv7();
+  const conversationLanguageConfirmed =
+    opts.conversationLanguageConfirmed ?? true;
   await db.insert(person).values({
     id: personId,
     displayName: opts.displayName,
     birthDate: `${opts.birthYear}-01-01`,
     residenceJurisdiction: opts.residenceJurisdiction ?? 'ROW',
-    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
+    conversationLanguageConfirmedAt: conversationLanguageConfirmed
+      ? CONFIRMED_CONVERSATION_LANGUAGE_AT
+      : null,
     // login_id stays null — managed child, no credential.
   });
   await db.insert(membership).values({
