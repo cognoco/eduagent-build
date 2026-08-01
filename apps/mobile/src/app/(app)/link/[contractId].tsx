@@ -117,7 +117,8 @@ export default function LinkContractScreen(): React.ReactElement {
 
   // Rendered when the invite cannot be acted on by the active profile: the
   // active profile matches neither contract party, or no profile is active
-  // yet (deep link before profile selection — the query stays disabled then).
+  // yet (deep link before profile selection); this fallback renders immediately
+  // regardless of the contract query's load state.
   const wrongProfileFallback = (
     <View className="flex-1 bg-background p-5">
       <ErrorFallback
