@@ -19,6 +19,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const SCRIPT = join(__dirname, 'setup-worktree.sh');
+const BASH =
+  process.platform === 'win32'
+    ? 'C:\\Program Files\\Git\\bin\\bash.exe'
+    : 'bash';
 
 /** Run a command, returning combined stdout+stderr. Throws on non-zero. */
 function run(cwd: string, cmd: string, args: string[]): string {
@@ -69,13 +73,18 @@ describe('setup-worktree.sh core.bare guard (WI-1268)', () => {
   });
 
   afterEach(() => {
-    rmSync(tmp, { recursive: true, force: true });
+    rmSync(tmp, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   });
 
   it('AC1: fails with an actionable message when core.bare=true, not the raw git error', () => {
     run(repoDir, 'git', ['config', 'core.bare', 'true']);
 
-    const out = expectToFail(repoDir, 'bash', [SCRIPT, 'WI-test']);
+    const out = expectToFail(repoDir, BASH, [SCRIPT, 'WI-test']);
 
     expect(out).toContain('core.bare=true');
     expect(out).toContain('git config core.bare false');
@@ -88,14 +97,14 @@ describe('setup-worktree.sh core.bare guard (WI-1268)', () => {
     const worktreeDir = join(tmp, 'wt');
     run(repoDir, 'git', ['worktree', 'add', worktreeDir, '-b', 'WI-other']);
 
-    const out = expectToFail(worktreeDir, 'bash', [SCRIPT, 'WI-test']);
+    const out = expectToFail(worktreeDir, BASH, [SCRIPT, 'WI-test']);
 
     expect(out).toMatch(/You are inside an existing git worktree/);
   });
 
   it('AC3: still BLOCKS when .worktrees/ is not gitignored (core.bare=false)', () => {
     // No .gitignore in this repo at all — the pre-existing refusal path.
-    const out = expectToFail(repoDir, 'bash', [SCRIPT, 'WI-test']);
+    const out = expectToFail(repoDir, BASH, [SCRIPT, 'WI-test']);
 
     expect(out).toMatch(/\.worktrees\/ is not in \.gitignore/);
   });
