@@ -16,11 +16,14 @@
 //   `disposition`    — what the CALLER must do: block | clear | refer.
 //
 // The fail-closed matrix is DETERMINISTIC and lives here, not in the judge.
-// Per §4.6, `refer` (the judge seam) is reachable ONLY for LLM-authored text
-// with a known producer vendor. User-authored ambiguity, migration/backfill
-// ambiguity, and missing producer identity all fail closed to `block` with
-// reason `unclear` — the judge never gets the chance to allow them, and the
-// protected text is never handed to another external service.
+// `refer` (the judge seam) is reachable for user-authored ambiguity (operator
+// ruling 2026-07-26, quoted at the matrix below: a learner describing
+// themselves is judged, not dropped) and for LLM-authored text with a known
+// producer vendor. Migration/backfill ambiguity and LLM text with a missing
+// producer identity fail closed to `block` with reason `unclear` — the judge
+// never gets the chance to allow them. (The pre-amendment §4.6 wording said
+// user ambiguity also blocked; the matrix at the bottom of this file is the
+// authority.)
 // ---------------------------------------------------------------------------
 
 import type { ConversationLanguage } from '@eduagent/schemas';
@@ -37,6 +40,32 @@ import {
 
 /** Who authored the text reaching the persistence boundary. */
 export type LearningTextProvenance = 'user' | 'llm' | 'migration';
+
+/**
+ * [WI-2952] Provenance and producer vendor, INSEPARABLE in the type.
+ *
+ * `ScanLearningTextInput` carries them as two independent fields, so
+ * `{provenance:'user', producerVendor:'anthropic'}` and
+ * `{provenance:'llm', producerVendor:null}` both compile. On a path whose only
+ * job is to keep a producing vendor out of the judge pool that is the wrong
+ * shape: the first is a category error (a learner is not a vendor) and the
+ * second is the exact fail-closed hole that silently drops learner text.
+ *
+ * This union makes both unrepresentable. A caller cannot declare `'llm'`
+ * without naming who produced it, and cannot attach a vendor to text a human
+ * typed.
+ *
+ * `producerVendor` is the VENDOR (`anthropic`), never the model id
+ * (`claude-sonnet-4-6`) — judge exclusion matches vendor names, so a model id
+ * excludes nothing and lets the producing vendor grade its own output. The type
+ * cannot catch that (both are `string`); only a test asserting the vendor is
+ * absent from the RESOLVED judge pool can.
+ *
+ * [WI-2952 Gate-1 SHOULD_FIX] Moved to `@eduagent/schemas` — it is returned by
+ * an exported service function and crosses the services/ → inngest/functions/
+ * boundary. Re-exported here so existing relative imports keep working.
+ */
+export type { LearningTextAuthor } from '@eduagent/schemas';
 
 /** The deterministic lexeme/grammar finding. */
 export type LearningTextClassification = 'block' | 'clear' | 'ambiguous';
