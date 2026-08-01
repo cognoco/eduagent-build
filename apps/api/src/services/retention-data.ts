@@ -84,6 +84,7 @@ import { captureException } from './sentry';
 import { createLogger } from './logger';
 import { inngest } from '../inngest/client';
 import { safeSend } from './safe-non-core';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 import {
   assertOwnedCurriculumTopic,
   findOwnedCurriculumTopic,
@@ -1216,6 +1217,43 @@ export async function processRecallTest(
     attemptMode === 'dont_remember'
       ? []
       : await getOpenTopicWeakConcepts(db, profileId, input.topicId);
+
+  if (attemptMode !== 'dont_remember') {
+    try {
+      await assertLlmConsent(db, profileId);
+    } catch (consentError) {
+      // Consent is checked at the final grader frontier, after this request
+      // acquired the cooldown claim. Release only that exact claim so a
+      // withdrawal cannot strand the learner in a synthetic cooldown. The
+      // release is best-effort: observability records a restore failure, while
+      // the original consent denial remains the user-visible response.
+      try {
+        const { updated: restored } = await applyRetentionUpdate({
+          db,
+          profileId,
+          cardId: effectiveCard.id,
+          set: { lastReviewedAt: priorLastReviewedAt },
+          guard: { kind: 'updatedAtEquals', updatedAt: claimNow },
+          updatedAt: new Date(),
+        });
+        if (!restored) {
+          throw new Error(
+            'Cooldown claim changed before consent-denial restoration',
+          );
+        }
+      } catch (restoreError) {
+        captureException(restoreError, {
+          tags: { area: 'recall', op: 'cooldown_restore' },
+          extra: { profileId, topicId: input.topicId },
+        });
+        logger.error(
+          '[recall] failed to release cooldown claim after consent denial',
+          { profileId, topicId: input.topicId },
+        );
+      }
+      throw consentError;
+    }
+  }
 
   const grade: RecallGrade =
     attemptMode === 'dont_remember'

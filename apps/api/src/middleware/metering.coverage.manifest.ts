@@ -117,6 +117,7 @@ export interface GranularLlmConsentServiceBoundary {
   serviceFile: string;
   serviceStartToken: string;
   serviceEndToken: string;
+  preConsentBranchTokens?: readonly string[];
   consentGateToken: string;
   llmDispatchToken: string;
   llmCallSiteFile: string;
@@ -246,15 +247,6 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
         'The validated classifier request directly invokes its LLM-backed service.',
     },
     {
-      id: 'retention.recall-test',
-      routeFile: 'apps/api/src/routes/retention.ts',
-      routeStartToken: "'/retention/recall-test'",
-      routeEndToken: "'/retention/relearn'",
-      classification: 'independent-mixed-residue',
-      rationale:
-        "The 'dont_remember' discriminant bypasses the gate, but standard cooldown and lost-claim returns still follow it.",
-    },
-    {
       id: 'assessments.quick-check',
       routeFile: 'apps/api/src/routes/assessments.ts',
       routeStartToken: "'/sessions/:sessionId/quick-check'",
@@ -380,6 +372,28 @@ export const GRANULAR_LLM_CONSENT_BOUNDARIES: readonly GranularLlmConsentBoundar
           consentGateToken: 'deps.assertLlmConsent(',
           llmDispatchToken: 'deps.evaluateAssessmentAnswer(',
           llmCallSiteFile: 'apps/api/src/services/assessments.ts',
+        },
+      ],
+    },
+    {
+      id: 'retention.recall-test',
+      routeFile: 'apps/api/src/routes/retention.ts',
+      routeStartToken: "'/retention/recall-test'",
+      routeEndToken: "'/retention/relearn'",
+      routeServiceCallTokens: ['processRecallTest('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/retention-data.ts',
+          serviceStartToken: 'export async function processRecallTest(',
+          serviceEndToken: 'export async function startRelearn(',
+          preConsentBranchTokens: [
+            'if (!canRetestTopic(state, lastTestAt)) {',
+            "if (attemptMode !== 'dont_remember') {",
+            'if (!claimed) {',
+          ],
+          consentGateToken: 'await assertLlmConsent(',
+          llmDispatchToken: 'await evaluateRecallQuality(',
+          llmCallSiteFile: 'apps/api/src/services/retention-data.ts',
         },
       ],
     },

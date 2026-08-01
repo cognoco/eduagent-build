@@ -238,6 +238,47 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it('[WI-2989] classifies recall consent after deterministic cooldown and claim exits', () => {
+    expect(
+      ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+        ({ id }) => id === 'retention.recall-test',
+      ),
+    ).toBeUndefined();
+
+    const routeBoundary = GRANULAR_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'retention.recall-test',
+    );
+    expect(routeBoundary).toBeDefined();
+    if (!routeBoundary) return;
+
+    expect(routeBoundary.routeServiceCallTokens).toContain(
+      'processRecallTest(',
+    );
+    const serviceBoundary = routeBoundary.serviceBoundaries[0] as
+      | ((typeof routeBoundary.serviceBoundaries)[number] & {
+          preConsentBranchTokens?: readonly string[];
+        })
+      | undefined;
+    expect(serviceBoundary).toBeDefined();
+    if (!serviceBoundary) return;
+
+    expect(serviceBoundary.preConsentBranchTokens).toEqual([
+      'if (!canRetestTopic(state, lastTestAt)) {',
+      "if (attemptMode !== 'dont_remember') {",
+      'if (!claimed) {',
+    ]);
+    const serviceSource = sliceBetweenTokens(
+      readRepoFile(serviceBoundary.serviceFile),
+      serviceBoundary.serviceStartToken,
+      serviceBoundary.serviceEndToken,
+    );
+    const gateIndex = serviceSource.indexOf(serviceBoundary.consentGateToken);
+    for (const token of serviceBoundary.preConsentBranchTokens ?? []) {
+      expect(serviceSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(serviceSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+  });
+
   it('requires an explicit rationale for every remaining route-entry gate', () => {
     for (const boundary of ROUTE_OWNED_LLM_CONSENT_BOUNDARIES) {
       expect({

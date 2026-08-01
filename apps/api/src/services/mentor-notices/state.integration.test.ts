@@ -288,6 +288,18 @@ describeIfDb(
       expect(newerNotice).not.toBeNull();
       expect(newerNotice!.id).not.toBe(olderNotice!.id);
 
+      // [WI-2599] A no-op UPDATE, retained only to perturb the row's physical
+      // position. It is NOT the discriminator, despite what an earlier version
+      // of this comment claimed: see the note above the third case for what
+      // actually makes these cases fail against an unordered read. It is kept
+      // because perturbing physical order costs nothing and removes one more
+      // way for a future planner change to line storage order up with the
+      // correct answer by coincidence. Do not describe it as the mechanism.
+      await db
+        .update(mentorNotices)
+        .set({ correctionHint: newerNotice!.correctionHint })
+        .where(eq(mentorNotices.id, newerNotice!.id));
+
       // Establish the premise before asserting on it: two rows really are on
       // this one session, and the notice this test calls "newer" really does
       // carry the later createdAt. Without this, "newest wins" could pass on a
@@ -346,6 +358,15 @@ describeIfDb(
         createdAt: sharedCreatedAt,
       });
 
+      // [WI-2599] As in the newest-wins case: a no-op UPDATE that perturbs
+      // physical position only. It is not the discriminator — an earlier
+      // comment here claimed it guaranteed a forward-seq-scan order, which
+      // does not hold. See the note above the third case.
+      await db
+        .update(mentorNotices)
+        .set({ concept: 'Tie — later id' })
+        .where(eq(mentorNotices.id, largerId));
+
       const rows = await db
         .select()
         .from(mentorNotices)
@@ -362,6 +383,97 @@ describeIfDb(
       expect(receipt).toEqual({
         id: largerId,
         concept: 'Tie — later id',
+        correctionHint: null,
+      });
+    });
+
+    // [WI-2599 — bounce rework, corrected per Codex finding on PR #2801] The
+    // two cases above rely on Postgres returning an unordered scan in plain
+    // insertion order, which is what an INSERT-only table happens to do —
+    // but that is not a guarantee the read is entitled to lean on, and it is
+    // why the earlier revert evidence was rejected as non-discriminating (it
+    // could coincidentally read correctly on some Postgres instance/plan). An
+    // earlier version of this case tried to force the discrimination via
+    // MVCC tuple relocation (a no-op UPDATE to push a row to the end of the
+    // heap) — investigation while addressing the Codex finding established
+    // that mechanism was never actually load-bearing: `getMentorNoticeReceipt`
+    // always filters by `profileId` (via the scoped repository), and on this
+    // table that predicate makes Postgres's planner choose an INDEX SCAN on
+    // `mentor_notices_profile_status_created_idx` (profile_id, status,
+    // created_at) rather than a sequential heap scan — confirmed by EXPLAIN
+    // (see WI-2599 evidence in the PR/commit). Both rows here share the same
+    // `status` ('open'), so the index degenerates to a plain ascending scan
+    // by `created_at`, and a `findFirst` with no ORDER BY reliably returns
+    // the OLDEST row — regardless of insertion order, and regardless of any
+    // heap-position trick. Stated at the level the evidence supports: BOTH
+    // plans have been observed for this query shape on different databases —
+    // a sequential scan on a near-empty one, this index scan on a populated
+    // one — because plan choice is cost-based and moves with table stats.
+    // So this is not a portable guarantee about the plan; it is a real,
+    // reproduced failure of the unordered read under the conditions this
+    // test creates, which is exactly why the fix must ORDER explicitly
+    // rather than rely on any plan. It needs no UPDATE:
+    //   1. Insert the LOSER first (older createdAt — must lose).
+    //   2. Insert the WINNER second (newer createdAt — the actual, correct
+    //      answer per this function's ordering contract; must win).
+    // Insertion order is irrelevant to this mechanism (unlike the two cases
+    // above) — the ordering comes from the index, not the heap — but LOSER
+    // is still inserted first here for continuity with the two cases above.
+    // Only code that actually ORDERs by createdAt/id can land on the WINNER;
+    // the pre-fix, unordered `findFirst` reliably returns the LOSER via this
+    // index, confirmed by 3 consecutive runs (see WI-2599 evidence in the
+    // PR/commit). Assert the guaranteed property (the projected receipt IS
+    // the deterministic — latest-createdAt — choice), not any internal plan
+    // detail.
+    it('returns the newest notice even when the query planner favors the OLDER row via the covering index — proves the read cannot rely on an unordered scan', async () => {
+      const fixture = await seedFixture();
+
+      const loserId = generateUUIDv7();
+      const winnerId = generateUUIDv7();
+      const olderCreatedAt = new Date(Date.now() - 60 * 60 * 1000); // must LOSE
+      const newerCreatedAt = new Date(); // must WIN
+
+      // 1. LOSER inserted first.
+      await db.insert(mentorNotices).values({
+        id: loserId,
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventAId,
+        concept: 'Index-order decoy — must lose',
+        correctionHint: null,
+        createdAt: olderCreatedAt,
+      });
+
+      // 2. WINNER inserted second — newer createdAt is the actual tiebreaker
+      // under test.
+      await db.insert(mentorNotices).values({
+        id: winnerId,
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: fixture.eventBId,
+        concept: 'Index-order winner — must win',
+        correctionHint: null,
+        createdAt: newerCreatedAt,
+      });
+
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(2);
+
+      const receipt = await getMentorNoticeReceipt(
+        db,
+        fixture.profileId,
+        fixture.sessionId,
+      );
+      expect(receipt).toEqual({
+        id: winnerId,
+        concept: 'Index-order winner — must win',
         correctionHint: null,
       });
     });
