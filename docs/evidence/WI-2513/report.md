@@ -2,17 +2,21 @@
 
 Date: 2026-08-02 (Europe/Berlin local publication date; GitHub's UTC
 timestamps may show Aug 1)
-Status: **Design only.** The operator ruling (2026-07-29) ratified Option C as
-the direction; **explicit architecture approval of this contract is still
-required before ANY implementation** (AC-3). No production code, schema,
-workflow, or test changes accompany this document.
+Status: **Design only.** Option C is this report's evidence-backed
+recommendation — no direction has been durably ratified on the Work Item
+(§9), and
+**selection of the direction, acceptance of every residual risk (§7), and
+explicit architecture approval of this contract are all still required before
+ANY implementation** (AC-3). No production code, schema, workflow, or test
+changes accompany this document.
 
 ## 1. Problem
 
 `reviewCalibrationGrade`
-(`apps/api/src/inngest/functions/review-calibration-grade.ts:476-484`) pays for
-one LLM grading call per calibration answer via `evaluateRecallQuality`
-(line 278). WI-2009 closed the committed-write/lost-ack replay using the
+(`apps/api/src/inngest/functions/review-calibration-grade.ts:476-484`) makes
+one paid application-level grading invocation per calibration answer via
+`evaluateRecallQuality` (line 278; the provider-level retry/fallback fan-out
+behind that invocation is quantified in §7). WI-2009 closed the committed-write/lost-ack replay using the
 committed `retrieval_events` row (PK `learnerMessageEventId`) as the receipt,
 and explicitly deferred one window: "Two simultaneous first executions may both
 miss before primary-key arbitration and both reach the paid boundary"
@@ -27,7 +31,7 @@ indistinguishable from a legitimate retry.
 
 ## 2. Option comparison (AC-1)
 
-| Dimension | A — first-party encrypted receipt store | B — idempotency + pg advisory lock | **C — concurrency key, limit 1 (ratified)** |
+| Dimension | A — first-party encrypted receipt store | B — idempotency + pg advisory lock | **C — concurrency key, limit 1 (recommended)** |
 | --- | --- | --- | --- |
 | Mechanism | Encrypted claim row (`profileId+sessionId+answerEventId`) written before the paid call, same txn as the cooldown claim; second execution sees claim, waits/reuses. A bare claim is NOT enough: if the claimant dies after paying but before publishing the result, a taker-over cannot know whether payment happened — waiting strands the answer, lease-expiry/steal can overlap a slow zombie. Honest A needs a full lease + takeover + result-publication + zombie-fencing protocol, or provider-side idempotency keys | Keep existing `idempotency` (line 480) + `pg_advisory_xact_lock` on a hash of the same triple, held across the paid call | `concurrency: { key: 'event.data.sessionId + "-" + event.data.topicId', limit: 1 }`; scheduler serializes step execution per key |
 | Retry semantics | Closes the two-live-executions race via DB arbitration; the pay-then-die window remains unless provider idempotency is added — same repay class as C, plus protocol failure modes of its own | Closes it only if the lock holds: xact-scoped lock means a transaction open across an LLM call, and Neon pooling makes lock/connection affinity a verification burden; a mis-hashed key fails open silently | Serializes scheduler-visible overlap; second execution then hits the WI-2009 receipt check and never pays (§4); key stable across retries (§5) |
@@ -78,14 +82,17 @@ references: the Cerebras Chat Completions reference
 (<https://inference-docs.cerebras.ai/api-reference/chat-completions>) and the
 Gemini `generateContent` request schema
 (<https://ai.google.dev/api/generate-content>) list no idempotency
-field/header. The fallback vendors likewise have no wiring here: the
-Anthropic Messages API documents only a *response* `request-id` header
-(<https://docs.anthropic.com/en/api/overview>), and the OpenAI chat
-completions API documents no `Idempotency-Key` request header (SDK "retries"
-are client-side re-sends, not server-side dedupe); the Mistral adapter sends
-none either. **Residual:** not selectable today without an external
-contract/routing change (route-wide support or provider pinning); revisit if
-the routed providers ship request idempotency.
+field/header. For the remaining routed vendors the claim is narrowed to what
+was verified: the OpenAI, Anthropic, and Mistral adapters send no idempotency
+parameter (in-repo verification of `apps/api/src/services/llm/providers/`),
+and the Anthropic API overview page
+(<https://docs.anthropic.com/en/api/overview>) documents a *response*
+`request-id` header with no request-idempotency mechanism on that page; no
+official-reference claim is made for OpenAI or Mistral. Conclusion: no
+qualifying design is implemented on the current route. **Residual:** not
+selectable today without an external contract/routing change (route-wide
+support or provider pinning); revisit if the routed providers ship request
+idempotency.
 
 ## 3. Recommended contract (AC-2)
 
@@ -173,9 +180,9 @@ operation (§3). For same-receipt E1, E2:
    nothing; when no attempt has yet committed, each new attempt may pay,
    within the §7 bounds.
 
-Concurrency alone does not dedupe — it converts the unratified *concurrent
-pre-commit* race into the *sequential post-commit* shape WI-2009 already
-ratified and RED→GREEN-verified. The pairing is established in-repo:
+Concurrency alone does not dedupe — it converts the *concurrent pre-commit*
+race into the *sequential post-commit* shape WI-2009 already covers and
+RED→GREEN-verified (`docs/evidence/WI-2009/report.md`). The pairing is established in-repo:
 `ask-silent-classify.ts:30-40` (BUG-845) documents idempotency-dedupes /
 concurrency-serializes and keeps `limit: 1` as defence-in-depth. The
 cooldown-claim re-entrancy hole (§1) becomes harmless: a same-payload
@@ -210,14 +217,22 @@ This design makes duplicate-payment exposure explicit at each level: it
 bounds a single attempt and a single run, but not aggregate cross-run
 exposure. Stated at each level:
 
-- **Per-attempt:** each execution attempt of the grade step makes at most
-  **one** paid call — `evaluateRecallQuality` has a single call site inside
-  the step closure (line 278) — and any attempt that begins after a prior
-  successful receipt commit pays **nothing** (§4).
-- **Per-run:** `retries: 2` (line 479) means initial attempt + 2 retries.
-  If every attempt of one run fails inside the window between the paid call
-  (line 278) and the commit (lines 294-307 / 341-357), that run pays up to
-  **3 times** (2 repayments) before exhausting retries.
+- **Per grade-step attempt:** one application-level grading invocation —
+  `evaluateRecallQuality` → `routeAndCall` has a single call site inside the
+  step closure (line 278) — but that invocation fans out at the provider
+  level: up to (1 initial + 3 primary retries) + (1 initial + 3 fallback
+  retries) = **8 provider HTTP requests** per attempt (`MAX_RETRIES = 3`,
+  "Up to 4 total attempts", `apps/api/src/services/llm/router.ts:1644`; retry
+  loop `:1677`; primary `withRetry` `:1812-1817`; one fallback config via
+  `getFallbackConfig` `:1144`, retried in `attemptProvider` `:1979-1984`). A
+  request whose response is lost after the provider executed may still have
+  been charged — failed requests cannot be assumed unpaid. An attempt that
+  begins after a prior successful receipt commit issues **no** provider
+  requests (§4).
+- **Per Inngest run:** (1 initial attempt + 2 retries) × 8 = up to **24
+  provider requests** per run (`retries: 2`, line 479), reached when every
+  attempt fails between the paid invocation (line 278) and the commit
+  (lines 294-307 / 341-357).
 - **Cross-run:** **no finite global bound.** A re-fire past the 24h
   idempotency window, a replay, or a new distinct operation starts a fresh
   run with its own per-run bound; if no attempt has ever committed the
@@ -228,13 +243,9 @@ exposure. Stated at each level:
   may then overlap the zombie pre-commit and both may pay — scheduler-level
   serialization cannot arbitrate an executor the scheduler no longer tracks.
 
-**Acceptance status (AC-3):** the operator ruling (2026-07-29, recorded in
-the Work Item) accepted only the narrow case — *a crash inside the narrow
-serialized pre-commit window re-pays one grading call*. The other residuals
-enumerated above — zombie-overlap double payment, per-run accumulation up to
-3 payments, and the absence of a finite cross-run bound — are **newly
-identified by this design work, NOT covered by that acceptance**, and require
-explicit architecture/operator ruling alongside the §9 approval.
+**Acceptance status (AC-3):** no residual acceptance is durably recorded on
+the Work Item. Every residual above is OPEN and listed in §9 with its
+decision owner.
 
 Row-level invariant in every case above: the deterministic
 `learnerMessageEventId` PK with `onConflictDoNothing` ensures at most one
@@ -243,10 +254,9 @@ row (lines 308-320, 358-370). No broader corruption-prevention claim is made
 for other fields, write paths, or external calls. Closing the
 zombie/pay-then-die windows would require a qualifying provider-side
 idempotency contract (Option D, §2 — none found) or Option A's full
-lease/takeover/fencing protocol — costs the ruling rejected or the platform
-does not offer. Not residuals: in-window duplicates (idempotency),
-executions after a successful receipt commit (WI-2009 receipt path),
-insert-conflict divergence (conflict reload).
+lease/takeover/fencing protocol (§2 records its cost). Not residuals:
+in-window duplicates (idempotency), executions after a successful receipt
+commit (WI-2009 receipt path), insert-conflict divergence (conflict reload).
 
 ## 8. C-3 / RR-9 preservation and external effects (AC-2, AC-3)
 
@@ -271,14 +281,24 @@ insert-conflict divergence (conflict reload).
   distinct receipt inside 24h is dropped by the pre-existing `idempotency`
   config, not by this design.
 
-## 9. Approval gate
+## 9. OPEN — pending ruling (approval gate)
 
-The ruling selected the direction; it did not waive the architecture gate.
-This document is the artifact submitted for explicit architecture approval;
-implementation (both §3 deliverables: the config field and the BUG-148-style
-opts-assertion test) is a separate, later item and must not begin before that
-approval. Two further rulings are needed with it: (a) whether AC-1's
-provider-supported-design requirement is satisfied by the Option D
-no-qualifying-design finding or needs a waiver (§2), and (b) acceptance of
-the newly identified residuals beyond the narrow pre-commit crash repayment
-(§7).
+Provenance note: no selection, acceptance, or waiver asserted anywhere in
+this report carries a durable Work Item record. The Work Item body's
+first-pass refinement leans Option B pending architect ratification, and
+Option C is challenger-proposed there (WI-2513 body, "Design options" block);
+Option C is this report's evidence-backed recommendation on the analysis
+above. Everything below is OPEN, with its decision owner:
+
+1. **Contract selection and approval** (owner: architecture): adopt Option C
+   as specified in §3 — both deliverables, the config field and the
+   BUG-148-style opts-assertion test. Implementation must not begin before
+   this ruling.
+2. **AC-1 provider-supported-design requirement** (owner: architecture):
+   accept the Option D no-qualifying-design finding as satisfying AC-1's
+   comparison requirement, or issue a waiver (§2).
+3. **Residual-risk acceptance** (owner: operator): every §7 residual —
+   narrow pre-commit crash repayment, zombie-overlap double payment,
+   per-attempt provider fan-out (up to 8 requests), per-run accumulation (up
+   to 24 requests), and the unbounded cross-run aggregate — none is recorded
+   as accepted in any durable source.
