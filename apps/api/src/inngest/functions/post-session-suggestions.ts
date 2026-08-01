@@ -173,7 +173,7 @@ export const postSessionSuggestions = inngest.createFunction(
             safeBookDescription
               ? ` (<book_description>${safeBookDescription}</book_description>)`
               : ''
-          } containing these topics: ${safeTopicList}
+          } containing these topics: <topic_list>${safeTopicList}</topic_list>
 
 The learner just completed a session on <completed_topic>${safeCompletedTopicTitle}</completed_topic>.
 

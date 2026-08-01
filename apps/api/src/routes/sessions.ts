@@ -33,7 +33,6 @@ import type { Account } from '../services/account';
 import { idempotencyPreflight } from '../middleware/idempotency';
 import { type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assertCanReadProfile } from '../services/family-access';
 import { withProfile } from '../route-utils/route-context';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
@@ -1058,10 +1057,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // retrySummaryFeedback -> evaluateSummary unconditionally dispatches
-      // the LLM.
-      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const profileMeta = c.get('profileMeta');
       const result = await retrySummaryFeedback(db, profileId, sessionId, {
@@ -1090,9 +1085,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // submitSummary -> evaluateSummary unconditionally dispatches the LLM.
-      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
       // i18n Phase 1 — thread conversation_language to summary evaluation.
@@ -1173,9 +1165,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // generateRecallBridge unconditionally dispatches the LLM.
-      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
 
       const session = await getSession(db, profileId, sessionId);
