@@ -1,7 +1,7 @@
 import type { Database } from '@eduagent/database';
 import { pendingNotices } from '@eduagent/database';
 
-import { recordPendingNotice } from './notices';
+import { deleteStalePreparedNotices, recordPendingNotice } from './notices';
 
 function makeInsertDb(rows: Array<{ id: string }>, existing?: { id: string }) {
   const returning = jest.fn().mockResolvedValue(rows);
@@ -105,5 +105,20 @@ describe('recordPendingNotice', () => {
         },
       }),
     );
+  });
+});
+
+describe('deleteStalePreparedNotices', () => {
+  it('returns the number of bounded-retention prepared rows removed', async () => {
+    const returning = jest
+      .fn()
+      .mockResolvedValue([{ id: 'notice-1' }, { id: 'notice-2' }]);
+    const where = jest.fn().mockReturnValue({ returning });
+    const deleteFn = jest.fn().mockReturnValue({ where });
+
+    await expect(
+      deleteStalePreparedNotices({ delete: deleteFn } as never),
+    ).resolves.toBe(2);
+    expect(where).toHaveBeenCalledTimes(1);
   });
 });

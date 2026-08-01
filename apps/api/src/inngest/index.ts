@@ -94,6 +94,7 @@ import {
 } from './functions/activation-events-retention-cron';
 import { retrievalEventsRetentionCron } from './functions/retrieval-events-retention-cron';
 import { clerkErasureFenceCleanup } from './functions/clerk-erasure-fence-cleanup';
+import { preparedNoticeCleanup } from './functions/prepared-notice-cleanup';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
@@ -204,6 +205,7 @@ export {
   transcriptPurgeHandlerOnFailure,
   retrievalEventsRetentionCron,
   clerkErasureFenceCleanup,
+  preparedNoticeCleanup,
   activationEventsRetentionCron,
   activationEventsRetentionOnFailure,
   memoryFactsBackfill,
@@ -308,6 +310,7 @@ export const functions = [
   transcriptPurgeHandlerOnFailure,
   retrievalEventsRetentionCron,
   clerkErasureFenceCleanup,
+  preparedNoticeCleanup,
   activationEventsRetentionCron,
   activationEventsRetentionOnFailure,
   memoryFactsBackfill,

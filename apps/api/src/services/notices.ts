@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 
 import { pendingNotices, type Database } from '@eduagent/database';
 import type { PendingNotice, PendingNoticeType } from '@eduagent/schemas';
@@ -95,6 +95,26 @@ export async function activatePendingNotice(
     )
     .returning({ id: pendingNotices.id });
   return rows.length > 0;
+}
+
+/**
+ * Bound retention for child-name payloads prepared by a run that exhausted
+ * retries before activation. Ready notices follow the normal seen/read path;
+ * recent prepared notices remain available for live Inngest retries.
+ */
+export async function deleteStalePreparedNotices(
+  db: Database,
+): Promise<number> {
+  const rows = await db
+    .delete(pendingNotices)
+    .where(
+      and(
+        isNull(pendingNotices.readyAt),
+        lte(pendingNotices.createdAt, sql`now() - interval '7 days'`),
+      ),
+    )
+    .returning({ id: pendingNotices.id });
+  return rows.length;
 }
 
 /**
