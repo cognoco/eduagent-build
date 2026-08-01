@@ -10,10 +10,16 @@
 const mockRouteAndCall = jest.fn();
 const mockFindOwnedCurriculumTopic = jest.fn();
 
-jest.mock('../../services/curriculum-topic-ownership', () => ({
-  findOwnedCurriculumTopic: (...args: unknown[]) =>
-    mockFindOwnedCurriculumTopic(...args),
-}));
+jest.mock('../../services/curriculum-topic-ownership', () => {
+  const actual = jest.requireActual(
+    '../../services/curriculum-topic-ownership',
+  ) as typeof import('../../services/curriculum-topic-ownership');
+  return {
+    ...actual,
+    findOwnedCurriculumTopic: (...args: unknown[]) =>
+      mockFindOwnedCurriculumTopic(...args),
+  };
+});
 
 jest.mock('../../services/llm', () => {
   const actual = jest.requireActual(
