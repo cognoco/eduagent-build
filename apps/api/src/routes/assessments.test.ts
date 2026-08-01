@@ -843,6 +843,19 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
     };
   }
 
+  it('returns 400 for a malformed session ID before database, consent, context, or LLM work', async () => {
+    const res = await makeApp().request(
+      '/v1/sessions/not-a-uuid/quick-check',
+      validQuickCheckBody(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(getSessionMock).not.toHaveBeenCalled();
+    expect(assertLlmConsentMock).not.toHaveBeenCalled();
+    expect(loadAssessmentTopicContextMock).not.toHaveBeenCalled();
+    expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
+  });
+
   it('returns 200 with feedback and dispatches once for a topic-scoped session', async () => {
     getSessionMock.mockResolvedValue(makeSessionRecord());
     loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
