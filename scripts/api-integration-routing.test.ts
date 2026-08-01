@@ -169,7 +169,6 @@ const setTimeoutSpy = jest.spyOn(jest, 'setTimeout');
 const databaseEnvSetupProbe = probeDatabaseEnvSetup();
 const probeFinalTimeout = setTimeoutSpy.mock.calls.at(-1)?.[0];
 setTimeoutSpy.mockRestore();
-const processEnvAfterDatabaseEnvSetupProbe = { ...process.env };
 
 describe('API co-located integration routing', () => {
   it('keeps database setup exclusive to the integration Jest config', () => {
@@ -209,9 +208,6 @@ describe('API co-located integration routing', () => {
     expect(stagingDatabaseEnvFixture).toContain('DOPPLER_ENVIRONMENT=stg');
     expect(databaseEnvSetupProbe.preservesOtherTestUtilsExports).toBe(true);
     expect(databaseEnvSetupProbe.unitLoadCount).toBe(0);
-    expect(processEnvAfterDatabaseEnvSetupProbe).toEqual(
-      processEnvBeforeDatabaseEnvSetupProbe,
-    );
     expect(probeFinalTimeout).toBe(5_000);
   });
 
@@ -316,4 +312,10 @@ describe('API co-located integration routing', () => {
       "require('../../tools/quarantine/registry.cjs').jestIgnorePatterns()",
     );
   });
+});
+
+afterAll(() => {
+  for (const key of Object.keys(process.env)) delete process.env[key];
+  Object.assign(process.env, processEnvBeforeDatabaseEnvSetupProbe);
+  expect(process.env).toEqual(processEnvBeforeDatabaseEnvSetupProbe);
 });
