@@ -48,4 +48,3 @@ The production patch was restored exactly.
 - Suites: `1 passed, 1 total`
 - Cases: `34 passed, 34 total`
 - Time: `0.836 s`
-

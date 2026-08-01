@@ -42,4 +42,3 @@ bash scripts/check-change-class.sh --run --fast
 The diff is limited to the two authorized route/test files plus lifecycle
 evidence. No schema, ownership policy, response schema, LLM routing, prompt,
 metering, secret, environment, or deployment changed.
-
