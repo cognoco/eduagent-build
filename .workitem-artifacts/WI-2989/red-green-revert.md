@@ -92,3 +92,10 @@ Before commit, `origin/main` advanced to `f75ef9aa9510a80079e9871ed7421f67beeeff
 The routed fast validator then completed on the same current-main tree with exit code `0`: five selected gates passed and one slow integration gate was intentionally skipped by fast mode. Its API unit leg completed 506 suites with 10,142 passing and 11 skipped cases; the TypeScript build, prompt-marker guard, no-Gemini-runtime ratchet, and test-only-export ratchet also passed.
 
 One final unrelated database-bootstrap commit advanced `origin/main` to `c5cc41fe64632b782f61fcb281bc05b41a1262b4`. The branch fast-forwarded cleanly again; the exact focused command remained green with all 196 cases passing in `5.497 s`.
+
+After the final restoration-guard regression was included, routed validation ran
+again on that exact base. It completed five selected gates with no failures and
+one sanctioned slow integration lane skipped. The API unit leg completed all 506
+suites with 10,144 successful cases, 9 skipped, and 3 successful snapshots; the
+TypeScript build, prompt-marker guard, no-Gemini-runtime ratchet, and
+test-only-export ratchet also remained green.
