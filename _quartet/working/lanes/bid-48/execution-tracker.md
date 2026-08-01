@@ -56,12 +56,12 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 15:02 CEST
+## Live reconciliation — 2026-08-01 15:10 CEST
 
 ### Latest authoritative boundary
 
-- Brief/relation parity remains 41 members. Live slice: 30 Closed, 6 Executing,
-  5 Ready.
+- Brief/relation parity remains 41 members. Live slice: 30 Closed, 5 Executing,
+  1 Reviewing, 5 Ready.
 - WI-2936 is independently Closed/Done at `08d75f40` after evidence-only rework
   removed a non-durable local pointer and accurately recorded 13 successful checks
   plus one intentional skip.
@@ -95,16 +95,19 @@ Delivery Batch as `Done`.
   an exact disconnected-source mutation produced RED before restore returned GREEN.
   Evidence-only PR #2832 exact head `99decc568` passed 14 required checks, zero
   automated threads, and fresh zero-finding Claude review; the governed gate
-  squash-landed it as `9a3415b5`. Landed checks and corrected execute-complete
-  artifacts are now in progress before independent re-review.
+  squash-landed it as `9a3415b5`. All 23 landed checks concluded green/skipped;
+  corrected completion artifacts passed validation and execute-complete returned the
+  item to Reviewing with durable tracked provenance and claim cleared. Independent
+  re-review is running under a distinct reviewer identity.
 - WI-2922 is properly claimed/Executing in isolated worktree `WI-2922` for only its
   repository guard and disposable-schema test frontier. Draft PR #2830 at `f8320a9d`
   has focused 33/33 and fast change-class 4 commands/62 tests green. No database or
   secret access occurred. Shared-development mutation remains explicitly ungranted;
   staging and production are out of bounds. All 14 exact-head checks are green.
-- WI-2643's isolated implementation and disposable local proof are preserved while
-  its executor handles WI-2921 first. The full local integration run passed 74 suites
-  (610 passed, one skipped); no shared database was touched.
+- WI-2643 draft PR #2833 exact head `033ce57e` contains the six-file fixed-role/setup/
+  check/rollback contract. Disposable local PostgreSQL passed 74/74 integration
+  suites (610 passed, one skipped), focused RLS 9/9, setup contract 5/5, and mutation
+  RED/restore GREEN. CI is running; no shared database or secret was touched.
 - Same-owner heartbeats renewed WI-2643, WI-2790, WI-2826, WI-2922, and WI-2939;
   WI-2921's fresh reclaim is also live. No Executing member has an expired claim.
 - The four-WIP figure remains throughput guidance; blocked waits do not suppress
