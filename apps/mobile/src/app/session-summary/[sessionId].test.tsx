@@ -792,6 +792,12 @@ describe('SessionSummaryScreen', () => {
     screen.getByTestId('submit-summary-button');
   });
 
+  it('renders the shared voice control next to the summary input (WI-2549)', () => {
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    screen.getByTestId('summary-reflection-mic');
+  });
+
   // [WI-2573] MMT-ADR-0036 §3.1 — the mentor-notice MVP is in-app only and
   // must show no mentor-notice-specific notification primer or permission
   // request. The generic post-session ask is unrelated to mentor notices and

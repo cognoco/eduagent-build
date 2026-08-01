@@ -107,6 +107,7 @@
   "scenarioOverrides": {
     "flows/account/learner-mentor-memory-populated.yaml": "mentor-memory-populated",
     "flows/account/learner-mentor-memory.yaml": "language-subject-active",
+    "flows/account/tell-mentor-voice-input.yaml": "language-subject-active",
     "flows/app-launch-devclient.yaml": null,
     "flows/app-launch.yaml": null,
     "flows/auth/deep-link-redirect-signed-in.yaml": "onboarding-complete",
