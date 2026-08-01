@@ -288,16 +288,13 @@ describeIfDb(
       expect(newerNotice).not.toBeNull();
       expect(newerNotice!.id).not.toBe(olderNotice!.id);
 
-      // [WI-2599 plan-proofing] Force physical (heap) storage order to
-      // CONTRADICT the required answer, so this case cannot pass by luck of
-      // insertion order matching scan order — the exact ambiguity Gate-2
-      // flagged. A Postgres UPDATE always writes a NEW tuple version; on a
-      // small table with no other churn, that new version is visited AFTER
-      // the row's previous live tuple by a forward sequential scan. This
-      // relocates the correct answer's (newerNotice's) live tuple to the end
-      // of the heap, physically after the wrong answer's (olderNotice's) —
-      // regardless of insertion order, so an unordered read can no longer
-      // land on the right row by accident of a fresh table's layout.
+      // [WI-2599] A no-op UPDATE, retained only to perturb the row's physical
+      // position. It is NOT the discriminator, despite what an earlier version
+      // of this comment claimed: see the note above the third case for what
+      // actually makes these cases fail against an unordered read. It is kept
+      // because perturbing physical order costs nothing and removes one more
+      // way for a future planner change to line storage order up with the
+      // correct answer by coincidence. Do not describe it as the mechanism.
       await db
         .update(mentorNotices)
         .set({ correctionHint: newerNotice!.correctionHint })
@@ -361,11 +358,10 @@ describeIfDb(
         createdAt: sharedCreatedAt,
       });
 
-      // [WI-2599 plan-proofing] Same technique as the newest-wins case above:
-      // an UPDATE relocates the required winner's (largerId's) live tuple to
-      // the end of the heap, physically after the loser's (smallerId's),
-      // guaranteeing a forward seq scan reaches smallerId first regardless of
-      // insertion order or environment-specific physical layout.
+      // [WI-2599] As in the newest-wins case: a no-op UPDATE that perturbs
+      // physical position only. It is not the discriminator — an earlier
+      // comment here claimed it guaranteed a forward-seq-scan order, which
+      // does not hold. See the note above the third case.
       await db
         .update(mentorNotices)
         .set({ concept: 'Tie — later id' })
@@ -409,8 +405,14 @@ describeIfDb(
     // `status` ('open'), so the index degenerates to a plain ascending scan
     // by `created_at`, and a `findFirst` with no ORDER BY reliably returns
     // the OLDEST row — regardless of insertion order, and regardless of any
-    // heap-position trick. That is a stronger, plan-driven, portable
-    // discriminator than heap order ever was, and it needs no UPDATE:
+    // heap-position trick. Stated at the level the evidence supports: BOTH
+    // plans have been observed for this query shape on different databases —
+    // a sequential scan on a near-empty one, this index scan on a populated
+    // one — because plan choice is cost-based and moves with table stats.
+    // So this is not a portable guarantee about the plan; it is a real,
+    // reproduced failure of the unordered read under the conditions this
+    // test creates, which is exactly why the fix must ORDER explicitly
+    // rather than rely on any plan. It needs no UPDATE:
     //   1. Insert the LOSER first (older createdAt — must lose).
     //   2. Insert the WINNER second (newer createdAt — the actual, correct
     //      answer per this function's ordering contract; must win).
