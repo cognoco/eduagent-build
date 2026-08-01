@@ -278,6 +278,28 @@ describe('MentorInputBar', () => {
     expect(onOpenHomework).toHaveBeenCalledTimes(1);
   });
 
+  it('can hold only the hosted homework handoff while its Subject is unresolved', () => {
+    const onOpenCamera = jest.fn();
+    const onOpenHomework = jest.fn();
+    const { getByTestId } = render(
+      <MentorInputBar
+        {...baseProps}
+        homeworkUnavailable
+        onOpenCamera={onOpenCamera}
+        onOpenHomework={onOpenHomework}
+      />,
+    );
+
+    fireEvent.press(getByTestId('mentor-bar-camera'));
+    fireEvent.press(getByTestId('mentor-bar-homework-chip'));
+
+    expect(onOpenCamera).toHaveBeenCalledTimes(1);
+    expect(onOpenHomework).not.toHaveBeenCalled();
+    expect(
+      getByTestId('mentor-bar-homework-chip').props.accessibilityState,
+    ).toEqual({ disabled: true });
+  });
+
   it('submits typed text without treating a mic press as a submission', async () => {
     const onSubmitText = jest.fn();
     const { getByTestId } = render(
