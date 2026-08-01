@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Redirect,
   useLocalSearchParams,
@@ -15,8 +15,10 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { useSubjects } from '../../../hooks/use-subjects';
+import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { createHomeworkProblem } from '../../../components/homework/problem-cards';
+import { formatApiError } from '../../../lib/format-api-error';
+import { platformAlert } from '../../../lib/platform-alert';
 import {
   buildHomeworkSessionParams,
   homeworkReturnHrefForReturnTo,
@@ -76,6 +78,7 @@ function ManualHomeworkEntry({
   const routeSubjectId = firstParam(params.subjectId);
   const routeSubjectName = firstParam(params.subjectName);
   const [problemText, setProblemText] = useState('');
+  const [subjectNameInput, setSubjectNameInput] = useState('');
   const [selectedSubject, setSelectedSubject] =
     useState<SelectedSubject | null>(
       routeSubjectId && routeSubjectName
@@ -83,22 +86,34 @@ function ManualHomeworkEntry({
         : null,
     );
   const subjects = useSubjects({ enabled: selectedSubject === null });
+  const createSubject = useCreateSubject();
+  const [subjectResolutionPending, setSubjectResolutionPending] =
+    useState(false);
+  const subjectResolutionLockedRef = useRef(false);
+  const subjectResolutionEpochRef = useRef(0);
   const activeSubjects =
     subjects.data?.filter((subject) => subject.status === 'active') ?? [];
-  const firstActiveSubject = activeSubjects[0];
+  const subjectsLoadFailed = subjects.isError && !subjects.data;
   const trimmedProblem = problemText.trim();
 
-  useEffect(() => {
-    if (!selectedSubject && firstActiveSubject) {
-      setSelectedSubject({
-        id: firstActiveSubject.id,
-        name: firstActiveSubject.name,
-      });
-    }
-  }, [firstActiveSubject, selectedSubject]);
-
   function cancel(): void {
+    subjectResolutionEpochRef.current += 1;
+    subjectResolutionLockedRef.current = true;
     router.replace(homeworkReturnHrefForReturnTo(params.returnTo));
+  }
+
+  function changeSubject(): void {
+    subjectResolutionEpochRef.current += 1;
+    subjectResolutionLockedRef.current = false;
+    setSubjectResolutionPending(false);
+    setSelectedSubject(null);
+  }
+
+  function selectExistingSubject(subject: SelectedSubject): void {
+    if (subjectResolutionPending) return;
+    subjectResolutionEpochRef.current += 1;
+    subjectResolutionLockedRef.current = true;
+    setSelectedSubject(subject);
   }
 
   function startSession(): void {
@@ -121,6 +136,53 @@ function ManualHomeworkEntry({
       pathname: '/(app)/session',
       params: sessionParams,
     } as Href);
+  }
+
+  async function resolveTypedSubject(): Promise<void> {
+    const typedName = subjectNameInput.trim();
+    if (!typedName || subjectResolutionLockedRef.current) return;
+    subjectResolutionLockedRef.current = true;
+    const resolutionEpoch = subjectResolutionEpochRef.current;
+
+    const existingSubject = activeSubjects.find(
+      (subject) =>
+        subject.name.trim().toLowerCase() === typedName.toLowerCase(),
+    );
+    if (existingSubject) {
+      setSelectedSubject({
+        id: existingSubject.id,
+        name: existingSubject.name,
+      });
+      return;
+    }
+
+    setSubjectResolutionPending(true);
+    try {
+      const result = await createSubject.mutateAsync({
+        name: typedName,
+        rawInput: typedName,
+      });
+      if (resolutionEpoch !== subjectResolutionEpochRef.current) return;
+      setSubjectResolutionPending(false);
+      setSelectedSubject({
+        id: result.subject.id,
+        name: result.subject.name,
+      });
+    } catch (error: unknown) {
+      if (resolutionEpoch !== subjectResolutionEpochRef.current) return;
+      try {
+        await subjects.refetch();
+      } catch {
+        // The original creation error remains the useful message for retry.
+      }
+      if (resolutionEpoch !== subjectResolutionEpochRef.current) return;
+      subjectResolutionLockedRef.current = false;
+      setSubjectResolutionPending(false);
+      platformAlert(
+        t('homework.createSubjectErrorTitle'),
+        formatApiError(error),
+      );
+    }
   }
 
   return (
@@ -192,36 +254,40 @@ function ManualHomeworkEntry({
                 {t('homework.loadingSubjects')}
               </Text>
             </View>
+          ) : subjectsLoadFailed ? (
+            <Pressable
+              testID="subject-picker-load-error-retry"
+              onPress={() => void subjects.refetch()}
+              className="min-h-[48px] justify-center rounded-button bg-surface px-4 py-3"
+              accessibilityLabel={t('subject.retryLoadSubjectsLabel')}
+              accessibilityRole="button"
+            >
+              <Text className="text-body-sm text-danger">
+                {t('subject.subjectsLoadError')}{' '}
+                <Text className="font-semibold text-primary">
+                  {t('subject.tapToRetry')}
+                </Text>
+              </Text>
+            </Pressable>
           ) : activeSubjects.length === 0 ? (
             <View className="py-3" testID="subject-picker-empty">
-              <Text className="text-body-sm text-text-secondary mb-3">
+              <Text className="text-body-sm text-text-secondary">
                 {t('homework.noSubjectsYet')}
               </Text>
-              <Pressable
-                testID="subject-picker-create"
-                onPress={() => router.push('/create-subject' as Href)}
-                className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
-                accessibilityLabel={t('homework.createNewSubjectLabel')}
-                accessibilityRole="button"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('homework.createSubject')}
-                </Text>
-              </Pressable>
             </View>
           ) : (
             activeSubjects.map((subject) => (
               <Pressable
                 key={subject.id}
                 testID={`subject-pick-${subject.id}`}
-                onPress={() =>
-                  setSelectedSubject({ id: subject.id, name: subject.name })
-                }
+                onPress={() => selectExistingSubject(subject)}
+                disabled={subjectResolutionPending}
                 className="mb-2 min-h-[48px] justify-center rounded-button bg-surface-elevated px-4 py-3"
                 accessibilityLabel={t('homework.selectSubjectLabel', {
                   name: subject.name,
                 })}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: subjectResolutionPending }}
               >
                 <Text className="text-body text-text-primary">
                   {subject.name}
@@ -229,11 +295,72 @@ function ManualHomeworkEntry({
               </Pressable>
             ))
           )}
+          {!subjects.isLoading && !subjectsLoadFailed ? (
+            <>
+              <Text className="mb-2 mt-4 text-body-sm text-text-secondary">
+                {t('homework.orTypeSubject')}
+              </Text>
+              <TextInput
+                testID="homework-subject-name-input"
+                value={subjectNameInput}
+                onChangeText={setSubjectNameInput}
+                editable={!subjectResolutionPending}
+                placeholder={t('homework.subjectInputPlaceholder')}
+                className="min-h-[48px] rounded-button border border-border bg-surface px-4 py-3 text-body text-text-primary"
+                accessibilityLabel={t('homework.typeSubjectLabel')}
+                autoCapitalize="words"
+              />
+              <Pressable
+                testID="homework-subject-resolve-button"
+                onPress={() => void resolveTypedSubject()}
+                disabled={!subjectNameInput.trim() || subjectResolutionPending}
+                className={`mt-3 min-h-[48px] items-center justify-center rounded-button px-4 py-3 ${
+                  subjectNameInput.trim() && !subjectResolutionPending
+                    ? 'bg-primary'
+                    : 'bg-surface-elevated'
+                }`}
+                accessibilityLabel={t('homework.continueWithSubjectLabel')}
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled:
+                    !subjectNameInput.trim() || subjectResolutionPending,
+                }}
+              >
+                <Text
+                  className={`text-body font-semibold ${
+                    subjectNameInput.trim() && !subjectResolutionPending
+                      ? 'text-text-inverse'
+                      : 'text-text-secondary'
+                  }`}
+                >
+                  {subjectResolutionPending
+                    ? t('homework.creatingSubject')
+                    : t('common.continue')}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       ) : (
-        <Text className="mt-6 text-body-sm text-text-secondary">
-          {selectedSubject.name}
-        </Text>
+        <View className="mt-6 flex-row items-center justify-between gap-3">
+          <Text
+            className="flex-1 text-body-sm text-text-secondary"
+            testID="homework-subject-resolution-name"
+          >
+            {selectedSubject.name}
+          </Text>
+          <Pressable
+            testID="homework-change-subject"
+            onPress={changeSubject}
+            className="min-h-[48px] justify-center px-2"
+            accessibilityLabel={t('subject.changeSubjectLabel')}
+            accessibilityRole="button"
+          >
+            <Text className="text-body-sm font-semibold text-primary">
+              {t('subject.changeSubject')}
+            </Text>
+          </Pressable>
+        </View>
       )}
 
       <Pressable
