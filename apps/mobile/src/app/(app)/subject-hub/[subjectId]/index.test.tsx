@@ -478,6 +478,11 @@ describe('SubjectHubRoute', () => {
   it('preserves the V0 due-review topic route without V2 return or book context', async () => {
     jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
     mockFetch.setRoute('/progress/resume-target', { target: null });
+    // Pure due-review state: clear the default in-progress session, which
+    // would otherwise (correctly, per WI-2853) win the hero as continue-now.
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}/sessions`, {
+      sessions: [],
+    });
     mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
       topics: [
         {

@@ -215,12 +215,37 @@ function buildChapters(input: {
 
 function buildNextUp(input: {
   resumeTarget: LearningResumeTarget | null | undefined;
+  continueTopicId: string | null;
   reviewTopicId: string | null;
   upNextTopic: CurriculumTopic | null;
   topicById: ReadonlyMap<string, CurriculumTopic>;
   topicBookIdByTopicId: ReadonlyMap<string, string>;
   preferDueReviewOverNextTopic: boolean;
 }): SubjectHubNextUpWithResume {
+  // buildChapters marks `continueTopicId` 'continue-now', so the hero must
+  // name the same topic — never 'All caught up' or a different (stale) server
+  // target. Attach the server resumeTarget only when it is that same topic;
+  // a synthesized continue navigates via openTopic, same as the chapter row.
+  if (input.continueTopicId) {
+    const serverTarget =
+      input.resumeTarget?.topicId === input.continueTopicId
+        ? input.resumeTarget
+        : null;
+    return {
+      kind: 'resume',
+      topicId: input.continueTopicId,
+      bookId: resolveTopicBookId(
+        input.continueTopicId,
+        input.topicBookIdByTopicId,
+      ),
+      topicTitle:
+        serverTarget?.topicTitle ??
+        input.topicById.get(input.continueTopicId)?.title ??
+        null,
+      ...(serverTarget ? { resumeTarget: serverTarget } : {}),
+    };
+  }
+
   if (
     input.resumeTarget?.topicId &&
     (!input.preferDueReviewOverNextTopic ||
@@ -370,6 +395,7 @@ export function buildSubjectHubData({
     },
     nextUp: buildNextUp({
       resumeTarget,
+      continueTopicId,
       reviewTopicId,
       upNextTopic,
       topicById,
