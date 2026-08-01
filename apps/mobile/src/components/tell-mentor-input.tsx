@@ -120,7 +120,7 @@ export function TellMentorInput({
           value={value}
           disabled={isPending}
           voiceLocale={voiceLocale}
-          testIDPrefix="tell-mentor"
+          testID="tell-mentor-mic"
           onTranscript={(finalTranscript) =>
             onChangeText(appendTranscript(value, finalTranscript))
           }

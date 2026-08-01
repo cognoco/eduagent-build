@@ -275,7 +275,7 @@ function FirstSessionWrapUpCard({
           value={value}
           disabled={isSubmitting || hasSubmitted}
           voiceLocale={voiceLocale}
-          testIDPrefix="first-session-reflection"
+          testID="first-session-reflection-mic"
           onTranscript={(finalTranscript) =>
             onChangeText(appendTranscript(value, finalTranscript))
           }

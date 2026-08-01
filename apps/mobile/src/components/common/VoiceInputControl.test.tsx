@@ -121,7 +121,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
         {...props}
       />,
     );
@@ -151,7 +151,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     speechInterim('half heard phr');
@@ -159,7 +159,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     await flushEffects();
@@ -175,7 +175,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     speechFinal('  the whole sentence  ');
@@ -183,7 +183,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     await flushEffects();
@@ -196,7 +196,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value="the whole sentence"
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     await flushEffects();
@@ -212,7 +212,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value="typed words"
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     // The learner clears the field while the engine still owes a final.
@@ -220,7 +220,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     speechFinal('late arriving sentence');
@@ -228,7 +228,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     await flushEffects();
@@ -244,14 +244,14 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     screen.rerender(
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
         disabled
       />,
     );
@@ -262,7 +262,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
         disabled
       />,
     );
@@ -303,7 +303,7 @@ describe('VoiceInputControl', () => {
       <VoiceInputControl
         value=""
         onTranscript={onTranscript}
-        testIDPrefix="probe"
+        testID="probe-mic"
       />,
     );
     fireEvent.press(screen.getByTestId('probe-mic'));
@@ -319,7 +319,7 @@ describe('VoiceInputControl', () => {
     speechError('Microphone permission is required for voice input');
     const screen = renderControl();
     await flushEffects();
-    const retry = screen.getByTestId('probe-voice-retry');
+    const retry = screen.getByTestId('probe-mic-retry');
     fireEvent.press(retry);
     await flushEffects();
     expect(mockSpeech.requestMicrophonePermission).toHaveBeenCalledTimes(1);
@@ -335,7 +335,7 @@ describe('VoiceInputControl', () => {
     speechError('Microphone permission is required for voice input');
     const screen = renderControl();
     await flushEffects();
-    fireEvent.press(screen.getByTestId('probe-voice-retry'));
+    fireEvent.press(screen.getByTestId('probe-mic-retry'));
     await flushEffects();
     expect(mockSpeech.requestMicrophonePermission).toHaveBeenCalledTimes(1);
     expect(mockSpeech.startListening).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('VoiceInputControl', () => {
     speechError('Speech recognition is not available on this device');
     const screen = renderControl();
     await flushEffects();
-    fireEvent.press(screen.getByTestId('probe-voice-retry'));
+    fireEvent.press(screen.getByTestId('probe-mic-retry'));
     await flushEffects();
     expect(mockSpeech.requestMicrophonePermission).not.toHaveBeenCalled();
     expect(mockSpeech.startListening).toHaveBeenCalledTimes(1);
@@ -354,6 +354,6 @@ describe('VoiceInputControl', () => {
   it('shows the listening indicator while capturing', () => {
     speechListening();
     const screen = renderControl();
-    expect(screen.getByTestId('probe-listening')).toBeTruthy();
+    expect(screen.getByTestId('probe-mic-listening')).toBeTruthy();
   });
 });

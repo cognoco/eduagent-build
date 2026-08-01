@@ -651,7 +651,7 @@ export default function ChildMentorMemoryScreen() {
                 voiceLocale={getVoiceLocaleForLanguage(
                   activeProfile?.conversationLanguage,
                 )}
-                testIDPrefix="correction"
+                testID="correction-mic"
                 onTranscript={(finalTranscript) =>
                   setCorrectionText((prev) =>
                     appendTranscript(prev, finalTranscript),

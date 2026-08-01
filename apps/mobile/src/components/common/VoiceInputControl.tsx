@@ -57,8 +57,14 @@ export interface VoiceInputControlProps {
   disabled?: boolean;
   /** BCP-47 voice locale resolved from the profile's conversation language. */
   voiceLocale?: string;
-  /** Prefix for testIDs: `<prefix>-mic`, `<prefix>-listening`, `<prefix>-voice-error`, `<prefix>-voice-retry`. */
-  testIDPrefix?: string;
+  /**
+   * Full LITERAL testID for the mic button, written out at the call site
+   * (e.g. `testID="tell-mentor-mic"`) so Maestro flows referencing it stay
+   * statically discoverable by the e2e-testid-integrity check — a
+   * template-built prefix id is invisible to that scan. Affordance testIDs
+   * derive from it: `<testID>-listening`, `<testID>-error`, `<testID>-retry`.
+   */
+  testID?: string;
 }
 
 export function VoiceInputControl({
@@ -66,7 +72,7 @@ export function VoiceInputControl({
   onTranscript,
   disabled = false,
   voiceLocale,
-  testIDPrefix = 'voice-input',
+  testID = 'voice-input-mic',
 }: VoiceInputControlProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -215,7 +221,7 @@ export function VoiceInputControl({
     <View>
       <View className="flex-row items-center">
         <Pressable
-          testID={`${testIDPrefix}-mic`}
+          testID={testID}
           accessibilityRole="button"
           accessibilityLabel={t(MIC_LABEL_KEYS[micState])}
           accessibilityState={{
@@ -238,7 +244,7 @@ export function VoiceInputControl({
         </Pressable>
         {micState === 'listening' ? (
           <Text
-            testID={`${testIDPrefix}-listening`}
+            testID={`${testID}-listening`}
             accessibilityLiveRegion="polite"
             className="text-xs text-text-secondary"
           >
@@ -247,7 +253,7 @@ export function VoiceInputControl({
         ) : null}
       </View>
       {micState === 'error' ? (
-        <View testID={`${testIDPrefix}-voice-error`} className="mt-1">
+        <View testID={`${testID}-error`} className="mt-1">
           <Text
             accessibilityLiveRegion="polite"
             className="text-xs text-text-secondary"
@@ -257,7 +263,7 @@ export function VoiceInputControl({
               : t('mentorHome.bar.voiceError')}
           </Text>
           <Pressable
-            testID={`${testIDPrefix}-voice-retry`}
+            testID={`${testID}-retry`}
             accessibilityRole="button"
             accessibilityLabel={recoveryLabel}
             onPress={handleVoiceRecovery}

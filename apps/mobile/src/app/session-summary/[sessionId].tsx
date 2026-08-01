@@ -1698,7 +1698,7 @@ export default function SessionSummaryScreen() {
                 voiceLocale={getVoiceLocaleForLanguage(
                   activeProfile?.conversationLanguage,
                 )}
-                testIDPrefix="summary-reflection"
+                testID="summary-reflection-mic"
                 onTranscript={(finalTranscript) =>
                   setSummaryText((prev) =>
                     appendTranscript(prev, finalTranscript),
