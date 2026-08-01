@@ -225,11 +225,14 @@ jobs:
           fi
           # Keep the canary, suite, and postflight in one Doppler boundary so
           # TEST_SEED_SECRET is exactly the value the staging API accepts.
-          doppler run -p mentomate -c stg --command "\
+          doppler run -p mentomate -c stg \
+            --preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+            --command "\
             export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
             export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
             set -eu; \
+            node scripts/check-clerk-key-alignment.mjs; \
             pnpm exec tsx scripts/playwright-seed-scenario-guard.ts \
               --project=v2-release \
               --project=smoke-auth \

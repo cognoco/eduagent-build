@@ -1,0 +1,56 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The exhaustive guard discovers every production route-entry consent assertion, requires exactly one classified owner, prevents route-over-gating on service-owned mixed routes, and preserves the under-gating gate-before-dispatch guard.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts:257"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The existing fail-closed control for an unknown future service discriminant remains in the focused regression set; none of the three sibling service contracts adds a discriminant.",
+      "pointer": "apps/api/src/services/subject.test.ts:1057"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The mutation record contains tests-before-code red, candidate green, production-revert red, exact restore green, repeated commands, case names, exit codes, and failure parity.",
+      "pointer": ".workitem-artifacts/WI-2543-r2/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Summary submission returns the saved idempotent result after withdrawal and rejects new evaluation before the LLM dependency.",
+      "pointer": "apps/api/src/services/session/session-summary.test.ts:571"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Summary retry returns available and no-claim deterministic outcomes after withdrawal, while an acquired claim rejects before evaluation and is released.",
+      "pointer": "apps/api/src/services/session/session-summary.test.ts:645"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Recall Bridge returns every named empty deterministic result after withdrawal and rejects the LLM-ready path before provider dispatch.",
+      "pointer": "apps/api/src/services/recall-bridge.test.ts:128"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The session route harness proves deterministic delegation without a route-entry gate and maps service-owned refusal to CONSENT_WITHDRAWN.",
+      "pointer": "apps/api/src/routes/sessions.test.ts:870"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The implementation plan accurately records the completed original and Rework 2 repository work and points to the Rework 2 evidence directory.",
+      "pointer": "docs/plans/2026-07-31-service-layer-granular-consent-gating.md:66"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The manifest explicitly classifies all remaining request-time route assertions, including four independently deliverable mixed-route residues, so a new or unowned route assertion fails the structural guard.",
+      "pointer": "apps/api/src/middleware/metering.coverage.manifest.ts:155"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The exact completion summary uses resolvable file and line pointers and records clean attributable standard verification plus bounded residue.",
+      "pointer": ".workitem-artifacts/WI-2543-r2/completion-summary.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-31-r2",
+  "redGreenPointer": ".workitem-artifacts/WI-2543-r2/red-green-revert.md"
+}

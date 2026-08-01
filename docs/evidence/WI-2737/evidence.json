@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The final router boundary filters learner-derived book and topic metadata in string and multipart system messages before the provider call.",
+      "pointer": "apps/api/src/services/llm/router.egress-filter.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The direct-identifier detector covers conventional lowercase postal addresses and retains the characterized educational cases.",
+      "pointer": "apps/api/src/services/minor-pii-echo-gate.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The regression asserts on the captured provider request body for the real async book-and-topic metadata shape.",
+      "pointer": "apps/api/src/services/llm/router.egress-filter.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Existing display-name and server-note protections remain covered alongside assistant-turn preservation.",
+      "pointer": "apps/api/src/services/learner-egress-filter.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Existing history-name, educational address, and sensitive-topic precision tests remain in the focused suite.",
+      "pointer": "apps/api/src/services/learner-egress-filter.test.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The DPIA distinguishes provider selection from role-aware and multipart egress filtering without claiming assistant text is filtered.",
+      "pointer": "docs/compliance/dpia.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The recipient matrix records the same filtered-content recipients and the conditional legacy Gemini path.",
+      "pointer": "docs/compliance/evidence/2026-07-26-recipient-matrix-draft.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-31",
+  "redGreenPointer": "docs/evidence/WI-2737/receipt.json"
+}

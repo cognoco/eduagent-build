@@ -86,10 +86,10 @@ const NAME_CUE_RE =
 const SCHOOL_RE =
   /\b((?:[A-Z][A-Za-z'&.-]+\s+){0,3}[A-Z][A-Za-z'&.-]+\s+(?:School|Academy|High|College|Elementary|Primary|Grammar|Institute|Gymnasium|Kindergarten))\b/g;
 
-// A street address: a house number then 1–4 capitalised tokens then a street
-// keyword ("12 Oakwood Street", "3 St Mary's Road").
+// A street address: a house number then 1–4 street-name tokens and a street
+// keyword ("12 Oakwood Street", "12 oakwood street", "3 St Mary's Road").
 const ADDRESS_RE =
-  /\b(\d{1,5}\s+(?:[A-Z][A-Za-z'&.-]+\s+){0,3}(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Court|Ct|Way|Close|Crescent|Terrace|Place|Pl))\b/g;
+  /\b(\d{1,5}\s+(?:[a-z][a-z'&.-]+\s+){1,4}(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Drive|Dr|Boulevard|Blvd|Court|Ct|Way|Close|Crescent|Terrace|Place|Pl))\b/gi;
 
 // Common words that a name-cue can accidentally capture ("I am tired", "I'm
 // done"). These are never treated as a volunteered name.

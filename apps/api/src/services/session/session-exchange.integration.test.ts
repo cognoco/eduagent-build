@@ -296,7 +296,15 @@ const GRADER_SYSTEM_MARKER = 'You are a precise grading assistant';
 const NOTICE_RECHECK_JUDGE_SYSTEM_MARKER =
   'You are an independent re-check judge for an educational mentor app';
 const FALLBACK_PROVIDER_IDS = ['gemini', 'anthropic', 'cerebras', 'openai'];
-type TutorStreamFailurePhase = 'setup' | 'pre-first-byte' | 'mid-stream';
+type TutorStreamFailurePhase =
+  | 'setup'
+  | 'pre-first-byte'
+  | 'mid-stream'
+  // [WI-2779] Fails ONLY the first tutor stream attempt, pre-first-byte, so the
+  // router's transparent fallback fires and the SECOND attempt — a different
+  // vendor — succeeds. The blanket 'pre-first-byte' above fails every attempt,
+  // which exercises exhaustion, not fallback.
+  | 'first-attempt-pre-first-byte';
 
 function isGraderMessages(messages: ChatMessage[]): boolean {
   return messages.some(
@@ -326,6 +334,10 @@ function createBranchingLlm() {
   let tutorChatCalls = 0;
   let tutorChatStreamCalls = 0;
   const calls: ChatMessage[][] = [];
+  // [WI-2779] Which provider served each tutor stream attempt, in order. Lets a
+  // test discover the primary/fallback pair the router actually chose instead of
+  // hard-coding a guess at routing policy.
+  const tutorStreamProviders: string[] = [];
 
   function respond(messages: ChatMessage[]): string {
     calls.push(messages);
@@ -356,7 +368,11 @@ function createBranchingLlm() {
     chatStream(messages: ChatMessage[], _config: ModelConfig) {
       const nonTutorCall =
         isGraderMessages(messages) || isNoticeRecheckJudgeMessages(messages);
-      if (!nonTutorCall) tutorChatStreamCalls++;
+      if (!nonTutorCall) {
+        tutorChatStreamCalls++;
+        tutorStreamProviders.push(id);
+      }
+      const attemptIndex = tutorChatStreamCalls;
       const content = respond(messages);
       const tutorStreamFailure = nonTutorCall ? undefined : streamFailurePhase;
       if (tutorStreamFailure === 'setup') {
@@ -370,6 +386,12 @@ function createBranchingLlm() {
         try {
           if (tutorStreamFailure === 'pre-first-byte') {
             throw new Error('injected pre-first-byte provider failure');
+          }
+          if (
+            tutorStreamFailure === 'first-attempt-pre-first-byte' &&
+            attemptIndex === 1
+          ) {
+            throw new Error('injected primary pre-first-byte provider failure');
           }
           if (tutorStreamFailure === 'mid-stream') {
             yield '{"reply":"partial visible reply';
@@ -414,6 +436,10 @@ function createBranchingLlm() {
     tutorChatStreamCallCount(): number {
       return tutorChatStreamCalls;
     },
+    // [WI-2779] Provider ids that actually served each tutor stream attempt.
+    tutorStreamProviders(): string[] {
+      return [...tutorStreamProviders];
+    },
     graderCallCount(): number {
       return calls.filter(isGraderMessages).length;
     },
@@ -439,6 +465,7 @@ function createBranchingLlm() {
       tutorChatCalls = 0;
       tutorChatStreamCalls = 0;
       calls.length = 0;
+      tutorStreamProviders.length = 0;
     },
     // Unregister ONLY our own provider ids — never _clearProviders(), which
     // would wipe providers other suites in the same worker depend on.
@@ -910,6 +937,69 @@ describeIfDb('session exchange production-path integration', () => {
       concept: 'multiplication',
     });
     await expectPersistedAnswerEvaluation(profileId, completed.aiEventId);
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2779] The JOINT: streamMessage persists the EFFECTIVE producer vendor.
+  //
+  // WI-2670 proved the effective vendor is returned post-drain at both getter
+  // layers (routeAndStream's StreamResult, streamExchange's return object) and
+  // proved the DB read path end-to-end. The link between them — session-exchange
+  // building `llmProvider: result.provider` for persistExchangeResult — rested on
+  // grep showing the read sits post-drain. A future edit hoisting it before the
+  // drain would persist the FAILED PRIMARY, and the Challenge Round grader would
+  // then exclude the wrong vendor, letting a model grade its own output.
+  //
+  // Only `streamMessage` is covered here, deliberately. The sibling write at
+  // `processMessage` reads from `processExchange` -> `routeAndCall`, which is
+  // NON-streaming: its RouteResult exposes `provider` as a plain property because
+  // there is no stream to drain and the fallback has already resolved by the time
+  // the call returns. There is no pre/post-drain ordering to get wrong there, so
+  // it is not this joint and is unreachable from streamMessage.
+  //
+  // The primary/fallback pair is DISCOVERED from what the router actually did,
+  // not hard-coded. The `expect(primary).not.toBe(fallback)` guard is AC-3 made
+  // executable: an under-18 bracket collapses both to the same approved-text
+  // vendor above the preference branches, which would make the vendor assertion
+  // `x === x` and pass against fully reverted getters. This fixture is adult
+  // (birthDate 2006-01-01) and that guard FAILS LOUDLY if it ever stops being.
+  it('[WI-2779] persists the FALLBACK vendor, not the attempted primary, after a transparent pre-first-byte fallback', async () => {
+    const { profileId, session } = await seedAnswerEvaluationTurn();
+    llm.setStreamFailurePhase('first-attempt-pre-first-byte');
+
+    const result = await streamMessage(
+      db,
+      profileId,
+      session.id,
+      { message: '42' },
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+    let visible = '';
+    for await (const chunk of result.stream) visible += chunk;
+    const completed = await result.onComplete();
+
+    // The transparent fallback really fired: two tutor stream attempts, and the
+    // learner still saw a clean reply.
+    const attempted = llm.tutorStreamProviders();
+    expect(attempted).toHaveLength(2);
+    expect(visible).toContain('The product is 42.');
+
+    const [primary, fallback] = attempted;
+    // AC-3 DISCRIMINATOR, asserted rather than assumed.
+    expect(primary).not.toBe(fallback);
+
+    // THE CRITERION: the persisted row names the vendor that actually produced
+    // the reply, not the one that failed.
+    const row = await readAiEventById(db, profileId, completed.aiEventId!);
+    expect(row).toBeDefined();
+    expect(row?.metadata.llmProvider).toBe(fallback);
+    expect(row?.metadata.llmProvider).not.toBe(primary);
+    // Corroborating, from the same write site: the turn is marked as having
+    // fallen back at all.
+    expect(row?.metadata.llmFallbackUsed).toBe(true);
   });
 
   it.each([

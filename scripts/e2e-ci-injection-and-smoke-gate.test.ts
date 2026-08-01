@@ -420,6 +420,13 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
 
     expect(v2Step).toBeDefined();
     expect(v2Step?.['continue-on-error']).not.toBe(true);
+    expect(v2Script).toContain('node scripts/check-clerk-key-alignment.mjs');
+    expect(v2Script).toContain(
+      '--preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"',
+    );
+    expect(
+      v2Script.indexOf('node scripts/check-clerk-key-alignment.mjs'),
+    ).toBeLessThan(v2Script.indexOf('playwright-seed-scenario-guard.ts'));
     expect(v2Script).toContain('pnpm run test:e2e:web:v2');
     expect(v2Script).not.toContain('pnpm run test:e2e:web:smoke');
     expect(v2Script).toContain('playwright-staging-gate.cjs --decide');
@@ -7342,6 +7349,70 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2231] gates first Mentor and waits for durable opener hydration', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-first-mentor-session.yaml'),
+      'utf8',
+    );
+    const commands = parseMaestroCommands(flow);
+
+    assertCommandsInOrder(commands, [
+      { tapOn: { id: 'create-profile-submit' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'first-mentor-language-gate' },
+          timeout: 30000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: { id: 'first-mentor-language-confirm' },
+          direction: 'DOWN',
+          timeout: 10000,
+          visibilityPercentage: 50,
+        },
+      },
+      { tapOn: { id: 'first-mentor-language-confirm' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-screen' },
+          timeout: 30000,
+        },
+      },
+      { tapOn: { id: 'mentor-bar-send' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'session-screen' },
+          timeout: 60000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'assistant-response-complete-.*' },
+          timeout: 60000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-opener-persisted-once' },
+          timeout: 30000,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'message-bubble-user-.*',
+            containsDescendants: [
+              { text: '^Teach me why leaves are green\\.$' },
+            ],
+          },
+          timeout: 30000,
+        },
+      },
+      { assertNotVisible: { id: 'mentor-opener-persisted-more-than-once' } },
+    ]);
   });
 
   it('[WI-2238] binds exact case properties to their ID-bearing owners', () => {

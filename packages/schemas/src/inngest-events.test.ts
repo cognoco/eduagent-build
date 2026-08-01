@@ -8,6 +8,7 @@ import {
   filingTimedOutEventSchema,
   orphanPersistFailedEventSchema,
   sessionSummaryFailedEventSchema,
+  sessionPurgeBacklogEventSchema,
   sessionTranscriptPurgedEventSchema,
   sessionPurgeDelayedEventSchema,
   summaryReconciliationRequeuedEventSchema,
@@ -20,6 +21,7 @@ import {
   mentorNoticeRecheckOutcomeEventSchema,
   mentorNoticeRecheckStartedEventSchema,
 } from './inngest-events.js';
+import * as inngestEventSchemas from './inngest-events.js';
 
 const validUuid = '00000000-0000-4000-8000-000000000001';
 
@@ -99,6 +101,101 @@ describe('billing alert delivery failure event schema', () => {
       }).success,
     ).toBe(false);
   });
+});
+
+describe('[WI-2346] durable terminal-failure event schemas', () => {
+  type RuntimeSchema = {
+    safeParse: (value: unknown) => {
+      success: boolean;
+      data?: Record<string, unknown>;
+    };
+  };
+  const schemas = inngestEventSchemas as unknown as Record<
+    string,
+    RuntimeSchema | undefined
+  >;
+  const timestamp = '2026-07-31T10:00:00.000Z';
+
+  it.each([
+    [
+      'accountDeletionTeardownFailedEventSchema',
+      {
+        accountId: validUuid,
+        runId: 'run-account',
+        errorName: 'Error',
+        timestamp,
+      },
+    ],
+    [
+      'billingSubscriptionStoreTeardownFailedEventSchema',
+      {
+        accountId: validUuid,
+        runId: 'run-store',
+        errorName: 'Error',
+        timestamp,
+      },
+    ],
+    [
+      'billingAliasMergeFailedEventSchema',
+      {
+        eventId: 'rc-event-id',
+        runId: 'run-alias',
+        errorName: 'Error',
+        timestamp,
+      },
+    ],
+  ])('exports and accepts the PII-minimized %s payload', (name, payload) => {
+    const schema = schemas[name];
+    expect(schema).toBeDefined();
+    expect(schema?.safeParse(payload).success).toBe(true);
+  });
+
+  it.each([
+    ['accountDeletionTeardownFailedEventSchema', { accountId: validUuid }],
+    [
+      'billingSubscriptionStoreTeardownFailedEventSchema',
+      { accountId: validUuid },
+    ],
+    ['billingAliasMergeFailedEventSchema', { eventId: 'rc-event-id' }],
+  ])('strips raw error text from %s', (name, identity) => {
+    const parsed = schemas[name]?.safeParse({
+      ...identity,
+      runId: 'run-private',
+      errorName: 'Error',
+      timestamp,
+      error: 'payer@example.test provider response body',
+    });
+
+    expect(parsed?.success).toBe(true);
+    expect(parsed?.data).not.toHaveProperty('error');
+    expect(JSON.stringify(parsed?.data)).not.toContain('payer@example.test');
+  });
+
+  it.each([
+    ['accountDeletionTeardownFailedEventSchema', { accountId: validUuid }],
+    [
+      'billingSubscriptionStoreTeardownFailedEventSchema',
+      { accountId: validUuid },
+    ],
+    ['billingAliasMergeFailedEventSchema', { eventId: 'rc-event-id' }],
+  ])(
+    'rejects arbitrary or overlong errorName values from %s',
+    (name, identity) => {
+      for (const errorName of [
+        'payer alice@example.test',
+        `payer alice@example.test ${'x'.repeat(160)}`,
+      ]) {
+        expect(
+          schemas[name]?.safeParse({
+            ...identity,
+            runId: 'run-private',
+            errorName,
+            timestamp,
+          }).success,
+        ).toBe(false);
+      }
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -386,14 +483,15 @@ describe('retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)', 
   });
 
   it('[BUG-993] accepts a valid sessionPurgeDelayedEvent payload', () => {
-    expect(() =>
+    expect(
       sessionPurgeDelayedEventSchema.parse({
         delayedCount: 3,
         sessionIds: [validUuid, validUuid],
         missingPreconditionCount: 3,
+        nullSummaryGeneratedAtCount: 2,
         timestamp: ts,
       }),
-    ).not.toThrow();
+    ).toEqual(expect.objectContaining({ nullSummaryGeneratedAtCount: 2 }));
   });
 
   it('[BUG-993] rejects sessionPurgeDelayedEvent with zero delayedCount', () => {
@@ -405,6 +503,46 @@ describe('retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)', 
         timestamp: ts,
       }),
     ).toThrow();
+  });
+
+  it('[WI-2739] accepts an internally consistent purge backlog lower bound', () => {
+    expect(() =>
+      sessionPurgeBacklogEventSchema.parse({
+        dailyCapacity: 100,
+        minimumEligibleCount: 101,
+        minimumDeferredCount: 1,
+        timestamp: ts,
+      }),
+    ).not.toThrow();
+  });
+
+  it('[WI-2739] rejects a backlog payload that does not exceed capacity', () => {
+    expect(() =>
+      sessionPurgeBacklogEventSchema.parse({
+        dailyCapacity: 100,
+        minimumEligibleCount: 100,
+        minimumDeferredCount: 0,
+        timestamp: ts,
+      }),
+    ).toThrow();
+  });
+
+  it('[WI-2739] rejects an inconsistent purge backlog deferred lower bound', () => {
+    const result = sessionPurgeBacklogEventSchema.safeParse({
+      dailyCapacity: 100,
+      minimumEligibleCount: 101,
+      minimumDeferredCount: 2,
+      timestamp: ts,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ['minimumDeferredCount'] }),
+        ]),
+      );
+    }
   });
 
   it('[BUG-994] accepts a valid summaryReconciliationRequeuedEvent payload', () => {

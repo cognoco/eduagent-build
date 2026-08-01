@@ -51,6 +51,7 @@ import {
 } from './language-curriculum';
 import { createLogger } from './logger';
 import { getPersonAge } from './identity-v2/helpers';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
 import { setNativeLanguage } from './retention-data';
 import { safeSend } from './safe-non-core';
 
@@ -536,6 +537,7 @@ export async function createSubjectWithStructure(
   input: SubjectCreateInput,
   options?: {
     conversationLanguage?: ConversationLanguage;
+    deps?: { assertLlmConsent?: typeof assertLlmConsent };
   },
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
@@ -694,6 +696,8 @@ export async function createSubjectWithStructure(
     };
   }
 
+  const consentGate = options?.deps?.assertLlmConsent ?? assertLlmConsent;
+  await consentGate(db, profileId);
   // [WI-867] v2 always: learner age from person.
   const learnerAge = await getPersonAge(db, profileId);
   const { detectSubjectType } = await import('./book-generation');

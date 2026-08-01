@@ -8,7 +8,11 @@ import {
   supporterScopeListSchema,
 } from '@eduagent/schemas';
 
-import { withProfile, type RouteEnv } from '../route-utils/route-context';
+import {
+  requireCallerPersonId,
+  withProfile,
+  type RouteEnv,
+} from '../route-utils/route-context';
 import { resolveScopesForPerson } from '../services/scope-resolution';
 import { resolveSupporterColdStart } from '../services/supporter-coldstart';
 import { readSupporteeStructuralSubjects } from '../services/supporter-structural-mask';
@@ -34,11 +38,12 @@ export const scopesRoutes = new Hono<RouteEnv>()
     '/scopes/:personId/subjects',
     zValidator('param', personIdParamSchema),
     async (c) => {
-      const { db, profileId } = withProfile(c);
+      const { db } = withProfile(c);
+      const callerPersonId = requireCallerPersonId(c);
       const { personId } = c.req.valid('param');
       const subjects = await readSupporteeStructuralSubjects(
         db,
-        profileId,
+        callerPersonId,
         personId,
       );
       return c.json(supporteeStructuralSubjectsResponseSchema.parse(subjects));
