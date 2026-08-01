@@ -38,7 +38,11 @@ export default async function globalSetup() {
     await clerkSetup();
     recordPreloadPhase('global-setup-completed');
   } catch (error) {
-    recordPreloadPhase('global-setup-failed');
+    try {
+      recordPreloadPhase('global-setup-failed');
+    } catch {
+      // A secondary marker failure must not replace the original setup error.
+    }
     throw error;
   }
 }

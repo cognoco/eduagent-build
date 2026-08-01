@@ -250,7 +250,11 @@ try {
     const events = await readFile(phaseFile, 'utf8');
     await writePrivate(mutantFile, mutateEvents(name, events));
     const mutant = await classify(rawJson, mutantFile);
-    if (!mutant.ok || mutant.failureClass === expected) {
+    if (!mutant.ok) {
+      fail(`${name}-mutation-classifier-error`);
+      continue;
+    }
+    if (mutant.failureClass === expected) {
       fail(`${name}-mutation-survived`);
       continue;
     }

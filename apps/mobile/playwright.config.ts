@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { defineConfig } from '@playwright/test';
+import { defineConfig, type ReporterDescription } from '@playwright/test';
 import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 // WI-536 flaky-test quarantine: exclude registered flaky web-e2e specs from the
@@ -49,6 +49,15 @@ if (artifactLane && !legacyArtifactLanes.has(artifactLane)) {
   );
 }
 const artifactSuffix = artifactLane ? '-' + artifactLane : '';
+const reporters: ReporterDescription[] = [['line']];
+if (process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE) {
+  const preloadPhaseReporter = path.join(
+    process.cwd(),
+    'scratchpad',
+    'wi2948-preload-phase-reporter.cjs',
+  );
+  reporters.push(['json'], [preloadPhaseReporter]);
+}
 
 // [BUG-325] Worker-count discriminator. We previously inferred "is this the
 // shared *.workers.dev staging API?" by substring-matching the API URL —
@@ -109,7 +118,7 @@ export default defineConfig({
   // payload that records Playwright fill-step values (including seeded
   // login credentials) in clear text — see WI-2593. 'line' remains as the
   // debuggable failure signal; its output survives in the CI job log.
-  reporter: [['line']],
+  reporter: reporters,
   timeout: 90_000,
   expect: {
     timeout: 15_000,
