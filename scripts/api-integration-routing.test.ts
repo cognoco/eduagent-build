@@ -1,9 +1,10 @@
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+
+import { loadDatabaseEnv } from '../packages/test-utils/src/lib/load-database-env';
 
 const repoRoot = join(__dirname, '..');
 const requireFromTest = createRequire(__filename);
@@ -63,6 +64,98 @@ function normalizeExpression(value: unknown): string {
     .trim();
 }
 
+const unitRuntimeConfig = requireFromTest(
+  join(repoRoot, 'apps/api/jest.config.cjs'),
+) as JestConfig;
+const integrationRuntimeConfig = requireFromTest(
+  join(repoRoot, 'apps/api/jest.integration.config.cjs'),
+) as JestConfig;
+const stagingDatabaseEnvFixture = [
+  'DATABASE_URL=postgresql://fake:fake@staging.invalid/fake_staging',
+  'DOPPLER_PROJECT=mentomate',
+  'DOPPLER_CONFIG=stg',
+  'DOPPLER_ENVIRONMENT=stg',
+  '',
+].join('\n');
+
+function probeDatabaseEnvSetup(): {
+  integrationError: Error | undefined;
+  integrationLoadCount: number;
+  loadDatabaseEnvProbe: jest.Mock;
+  unitLoadCount: number;
+} {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'wi-2806-env-fixture-'));
+  const envKeys = [
+    'DATABASE_URL',
+    'DOPPLER_PROJECT',
+    'DOPPLER_CONFIG',
+    'DOPPLER_ENVIRONMENT',
+    'NODE_ENV',
+  ] as const;
+  const previousEnv = new Map(
+    envKeys.map((key) => [key, process.env[key]] as const),
+  );
+  let resolveFixture = false;
+  const loadDatabaseEnvProbe = jest.fn(() => {
+    if (resolveFixture) loadDatabaseEnv(fixtureRoot);
+  });
+  let integrationError: Error | undefined;
+  let unitLoadCount = 0;
+  let integrationLoadCount = 0;
+
+  writeFileSync(
+    join(fixtureRoot, '.env.development.local'),
+    stagingDatabaseEnvFixture,
+  );
+
+  for (const key of envKeys) delete process.env[key];
+  process.env['NODE_ENV'] = 'test';
+
+  try {
+    jest.doMock('@eduagent/test-utils', () => ({
+      loadDatabaseEnv: loadDatabaseEnvProbe,
+    }));
+    jest.isolateModules(() => {
+      for (const setupFile of unitRuntimeConfig.setupFilesAfterEnv ?? []) {
+        void jest.requireActual<unknown>(setupFile);
+      }
+    });
+    unitLoadCount = loadDatabaseEnvProbe.mock.calls.length;
+
+    resolveFixture = true;
+    try {
+      jest.isolateModules(() => {
+        const databaseSetup = integrationRuntimeConfig.setupFilesAfterEnv?.[0];
+        if (!databaseSetup) {
+          throw new Error('Integration database setup not found');
+        }
+        void jest.requireActual<unknown>(databaseSetup);
+      });
+    } catch (error) {
+      integrationError =
+        error instanceof Error ? error : new Error(String(error));
+    }
+    integrationLoadCount =
+      loadDatabaseEnvProbe.mock.calls.length - unitLoadCount;
+  } finally {
+    jest.dontMock('@eduagent/test-utils');
+    for (const [key, value] of previousEnv) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+
+  return {
+    integrationError,
+    integrationLoadCount,
+    loadDatabaseEnvProbe,
+    unitLoadCount,
+  };
+}
+
+const databaseEnvSetupProbe = probeDatabaseEnvSetup();
+
 describe('API co-located integration routing', () => {
   it('keeps database setup exclusive to the integration Jest config', () => {
     const unitConfig = requireFromTest(
@@ -97,81 +190,19 @@ describe('API co-located integration routing', () => {
   });
 
   it('runs unit Jest without resolving an env:sync staging database file', () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), 'wi-2806-env-fixture-'));
-    const harnessRoot = mkdtempSync(join(tmpdir(), 'wi-2806-jest-harness-'));
-    const sentinelSetup = join(harnessRoot, 'database-env-sentinel.cjs');
-    const harnessConfig = join(harnessRoot, 'jest.config.cjs');
-    const childEnv = {
-      ...process.env,
-      DOPPLER_CLI: '/definitely/not/a/doppler',
-      WI_2806_FIXTURE_ROOT: fixtureRoot,
-    };
-    delete childEnv.DATABASE_URL;
-    delete childEnv.DOPPLER_PROJECT;
-    delete childEnv.DOPPLER_CONFIG;
-    delete childEnv.DOPPLER_ENVIRONMENT;
+    expect(stagingDatabaseEnvFixture).toContain('DOPPLER_CONFIG=stg');
+    expect(stagingDatabaseEnvFixture).toContain('DOPPLER_ENVIRONMENT=stg');
+    expect(databaseEnvSetupProbe.unitLoadCount).toBe(0);
+  });
 
-    writeFileSync(
-      join(fixtureRoot, '.env.development.local'),
-      [
-        'DATABASE_URL=postgresql://fake:fake@staging.invalid/fake_staging',
-        'CLERK_SECRET_KEY=fake-staging-clerk-secret',
-        'DOPPLER_PROJECT=mentomate',
-        'DOPPLER_CONFIG=stg',
-        'DOPPLER_ENVIRONMENT=stg',
-        '',
-      ].join('\n'),
+  it('loads the guarded database setup in integration Jest', () => {
+    expect(databaseEnvSetupProbe.integrationLoadCount).toBe(1);
+    expect(databaseEnvSetupProbe.loadDatabaseEnvProbe).toHaveBeenLastCalledWith(
+      repoRoot,
     );
-    writeFileSync(
-      sentinelSetup,
-      [
-        "jest.mock('@eduagent/test-utils', () => {",
-        "  const actual = jest.requireActual('@eduagent/test-utils');",
-        '  return {',
-        '    ...actual,',
-        '    loadDatabaseEnv: () =>',
-        '      actual.loadDatabaseEnv(process.env.WI_2806_FIXTURE_ROOT),',
-        '  };',
-        '});',
-        '',
-      ].join('\n'),
+    expect(databaseEnvSetupProbe.integrationError?.message).toContain(
+      'config=stg, environment=stg is shared/non-local',
     );
-    writeFileSync(
-      harnessConfig,
-      [
-        `const unitConfig = require(${JSON.stringify(join(repoRoot, 'apps/api/jest.config.cjs'))});`,
-        'module.exports = {',
-        '  ...unitConfig,',
-        `  rootDir: ${JSON.stringify(repoRoot)},`,
-        `  setupFilesAfterEnv: [${JSON.stringify(sentinelSetup)}, ...unitConfig.setupFilesAfterEnv],`,
-        '};',
-        '',
-      ].join('\n'),
-    );
-
-    try {
-      execFileSync(
-        process.execPath,
-        [
-          requireFromTest.resolve('jest/bin/jest'),
-          '--config',
-          harnessConfig,
-          'apps/api/src/config.test.ts',
-          '--runInBand',
-          '--no-coverage',
-          '--silent',
-        ],
-        {
-          cwd: repoRoot,
-          env: childEnv,
-          stdio: 'pipe',
-          timeout: 30_000,
-        },
-      );
-    } finally {
-      rmSync(fixtureRoot, { recursive: true, force: true });
-      rmSync(harnessRoot, { recursive: true, force: true });
-    }
   });
 
   it('maps the root API integration script through the guarded launcher', () => {
