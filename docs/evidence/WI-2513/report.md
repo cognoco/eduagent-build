@@ -206,8 +206,9 @@ concurrency:1"), the model for the opts-assertion test that is deliverable
 
 ## 7. Failure residuals (not exactly-once)
 
-This design bounds and prices duplicate payments — it does not eliminate them.
-Payment bounds, stated at each level:
+This design makes duplicate-payment exposure explicit at each level: it
+bounds a single attempt and a single run, but not aggregate cross-run
+exposure. Stated at each level:
 
 - **Per-attempt:** each execution attempt of the grade step makes at most
   **one** paid call — `evaluateRecallQuality` has a single call site inside
