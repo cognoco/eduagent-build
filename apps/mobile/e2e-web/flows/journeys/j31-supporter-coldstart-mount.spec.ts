@@ -15,9 +15,9 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
  * supportee expecting a `granted-idle` card, but that supportee: (a) is an
  * independent v2 owner in a DIFFERENT organization (cross-org — the
  * owner-gate suppresses it even if it were a managed candidate), and (b)
- * hasOwnAccount has no writer anywhere in the codebase (WI-2538) — the
- * `granted-idle`/`active` branches are currently unreachable in production,
- * so a journey asserting one is unproducible (reviewer bounce #2). Reuses
+ * the historical hasOwnAccount writer gap made the `granted-idle`/`active`
+ * branches unreachable at the time (WI-2538; repaired by WI-2895), so a
+ * journey asserting one was then unproducible (reviewer bounce #2). Reuses
  * `v2-supporter-managed` (test-seed-v2-supporter.ts's seedV2SupporterManaged)
  * instead: a same-org supporter + managed child with a real supportership
  * edge — the producible path the owner-gate actually renders a card for.
