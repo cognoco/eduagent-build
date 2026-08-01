@@ -1,0 +1,55 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The authenticated initiation route accepts only a learner id plus a single-use provider handle, redeems it over a configured server-to-server VPC boundary, validates an approved VPC_VERIFIED result against the server-resolved caller, learner, destination organization, jurisdiction and policy, then mints the only authority assertion the redemption route accepts.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment-verifier.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The domain-separated HMAC assertion is bound to guardian, learner and destination organization and carries jurisdiction, policy, method, tokenised evidence, qualification and learner assent. issuedAt/notBefore/expiresAt validation enforces a 15-minute hard maximum lifetime with 60-second clock skew; pending, denied, expired, future, overlong, malformed, tampered and wrong-secret tokens fail closed.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment-token.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Redemption uses the canonical consentPersonLockKey with hashtextextended, re-resolves current membership/country policy under that lock, gates age via computeAgeBracketFromDate, creates or confirms the global Guardianship edge, and writes both independently auditable purposes with organization, jurisdiction, policy, method, evidence, age and authorization-form stamps.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The same transaction requires the complete consent_request purpose set, atomically marks every row approved, binds the verified guardian, clears every email token/expiry and back-links each row to its matching stamped grant. Any incomplete/terminal/divergent set or forced post-edge failure rolls back authority, grants and request mutations.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Real PostgreSQL coverage proves PENDING-to-CONSENTED transition, terminal request back-links, stale email-token invalidation with no unstamped append, exact retry, rollback, no Supportership, Person/Login preservation, wrong adult, minor caller, residence drift, withdrawn/restored history, different guardian, organization move and denied verifier results.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The real authenticated Hono stack is exercised with signed JWT verification and only the external Clerk/VPC network boundaries intercepted. Route tests prove verifier-mint-redemption success, denied-provider rejection, organization-specific redemption, complete request terminalization/back-links and later stale-email 404.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Two database connections prove guardian attachment queues on the exact consentPersonLockKey/hashtextextended namespace shared with approval, withdrawal, restore, deletion and family join before writing.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The authenticated mobile callback screen is the production consumer of both verifier initiation and authority redemption. It sends only learner id plus opaque handles/tokens; real hooks, React Query, Hono client serialization, retry posture and post-success projection invalidation remain executable and covered.",
+      "pointer": "apps/mobile/src/app/(app)/guardian-attachment.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The callback is explicitly hidden from tab discovery and classified as a full-screen ceremony route, so V2 does not apply floating-chrome safe-area ownership to it. The focused navigation contract regression failed before that registration and passed 2/2 after it; the full layout suite passed 134/134.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fresh verification is green: token/config API unit 100/100; mobile hook 3/3 and callback 1/1; real-PostgreSQL integration 18/18 including retryable verifier recovery, joint assent, configuration classification, exact advisory-lock observation and wall-clock-safe route fixtures; API/schema/mobile typechecks; prepush; hardcoded-JSX ratchet; targeted changed-file lint with zero findings; repository-wide lint with zero errors and only its pre-existing warning baseline.",
+      "pointer": "pnpm prepush"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

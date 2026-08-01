@@ -134,8 +134,11 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
     // [P0 email-consent-withdrawal] withdrawal-token secret is prod-required.
     expect(missing).toContain('CONSENT_WITHDRAWAL_TOKEN_SECRET');
-    // 8 originals + 2 Inngest keys + analytics HMAC key + withdrawal secret = 12
-    expect(missing).toHaveLength(12);
+    expect(missing).toContain('GUARDIAN_AUTHORITY_TOKEN_SECRET');
+    expect(missing).toContain('GUARDIAN_AUTHORITY_VERIFIER_URL');
+    expect(missing).toContain('GUARDIAN_AUTHORITY_VERIFIER_KEY');
+    // 8 originals + 2 Inngest + analytics + token + verifier pair = 15
+    expect(missing).toHaveLength(15);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -156,6 +159,11 @@ describe('validateProductionKeys', () => {
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       CONSENT_WITHDRAWAL_TOKEN_SECRET: 'consent-withdrawal-secret-32-chars-min',
+      GUARDIAN_AUTHORITY_TOKEN_SECRET:
+        'guardian-authority-secret-32-chars-minimum',
+      GUARDIAN_AUTHORITY_VERIFIER_URL:
+        'https://guardian-verifier.example.com/v1/verify',
+      GUARDIAN_AUTHORITY_VERIFIER_KEY: 'guardian-verifier-key',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -201,6 +209,9 @@ describe('validateProductionKeys', () => {
       'REVENUECAT_WEBHOOK_SECRET',
       'ANALYTICS_HASH_KEY',
       'CONSENT_WITHDRAWAL_TOKEN_SECRET',
+      'GUARDIAN_AUTHORITY_TOKEN_SECRET',
+      'GUARDIAN_AUTHORITY_VERIFIER_URL',
+      'GUARDIAN_AUTHORITY_VERIFIER_KEY',
     ]);
   });
 
@@ -225,6 +236,11 @@ describe('validateProductionKeys', () => {
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       CONSENT_WITHDRAWAL_TOKEN_SECRET: 'consent-withdrawal-secret-32-chars-min',
+      GUARDIAN_AUTHORITY_TOKEN_SECRET:
+        'guardian-authority-secret-32-chars-minimum',
+      GUARDIAN_AUTHORITY_VERIFIER_URL:
+        'https://guardian-verifier.example.com/v1/verify',
+      GUARDIAN_AUTHORITY_VERIFIER_KEY: 'guardian-verifier-key',
     };
 
     it('V2 on: passes with Cerebras+Mistral+OpenAI and NO Gemini key', () => {
@@ -373,6 +389,11 @@ describe('validateEnv', () => {
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       CONSENT_WITHDRAWAL_TOKEN_SECRET: 'consent-withdrawal-secret-32-chars-min',
+      GUARDIAN_AUTHORITY_TOKEN_SECRET:
+        'guardian-authority-secret-32-chars-minimum',
+      GUARDIAN_AUTHORITY_VERIFIER_URL:
+        'https://guardian-verifier.example.com/v1/verify',
+      GUARDIAN_AUTHORITY_VERIFIER_KEY: 'guardian-verifier-key',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -404,6 +425,11 @@ describe('validateEnv', () => {
         RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
         API_ORIGIN: 'https://api.mentomate.com',
         REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+        GUARDIAN_AUTHORITY_TOKEN_SECRET:
+          'guardian-authority-secret-32-chars-minimum',
+        GUARDIAN_AUTHORITY_VERIFIER_URL:
+          'https://guardian-verifier.example.com/v1/verify',
+        GUARDIAN_AUTHORITY_VERIFIER_KEY: 'guardian-verifier-key',
         // ANALYTICS_HASH_KEY and CONSENT_WITHDRAWAL_TOKEN_SECRET intentionally omitted
       });
 

@@ -11,6 +11,7 @@ export * from './consent';
 // Habitual-residence country matrix + jurisdiction decision (WI-2690)
 export * from './country-policy';
 export * from './family-join';
+export * from './guardian-attachment';
 export * from './account';
 
 // Onboarding & Curriculum (Epic 1)

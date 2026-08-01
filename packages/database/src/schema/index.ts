@@ -1,4 +1,5 @@
 export * from './identity';
+export * from './guardian-authority-redemptions';
 export * from './activity-ledger';
 export * from './profiles';
 export * from './subjects';

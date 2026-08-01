@@ -23,6 +23,8 @@ import {
 } from '@eduagent/schemas';
 import { resolveCountryPolicy } from './country-policy';
 
+type CountryPolicyReader = Pick<Database, 'select'>;
+
 /**
  * jsonb round-trips dates as ISO strings, so the provenance timestamps arrive
  * as text and are revived before the record is validated. Anything else about
@@ -50,7 +52,7 @@ function reviveSourceProvenance(raw: unknown): unknown {
  * out-of-window rows to tell "not yet effective" apart from "expired" (AC6).
  */
 export async function loadCountryPolicies(
-  db: Database,
+  db: CountryPolicyReader,
   countryCode: string,
 ): Promise<CountryPolicyRecord[]> {
   const rows = await db
@@ -100,7 +102,7 @@ export interface ResolveJurisdictionInput {
  * decision shape a resolved country produces.
  */
 export async function resolveJurisdiction(
-  db: Database,
+  db: CountryPolicyReader,
   input: ResolveJurisdictionInput,
 ): Promise<CountryPolicyDecision> {
   const policies =
