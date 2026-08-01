@@ -3,6 +3,11 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { computeAgeBracket } from '@eduagent/schemas';
 
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from './common/VoiceInputControl';
+
 type TellMentorAudience = 'learner' | 'parent';
 
 interface TellMentorInputProps {
@@ -11,6 +16,8 @@ interface TellMentorInputProps {
   childName?: string;
   value: string;
   isPending?: boolean;
+  /** Voice locale resolved from the writing profile's conversation language. */
+  voiceLocale?: string;
   onChangeText: (text: string) => void;
   onSubmit: () => void;
 }
@@ -64,6 +71,7 @@ export function TellMentorInput({
   childName,
   value,
   isPending,
+  voiceLocale,
   onChangeText,
   onSubmit,
 }: TellMentorInputProps) {
@@ -107,6 +115,17 @@ export function TellMentorInput({
         testID="tell-mentor-input-field"
         className="bg-background rounded-card px-4 py-3 text-body text-text-primary min-h-[96px]"
       />
+      <View className="mt-2">
+        <VoiceInputControl
+          value={value}
+          disabled={isPending}
+          voiceLocale={voiceLocale}
+          testIDPrefix="tell-mentor"
+          onTranscript={(finalTranscript) =>
+            onChangeText(appendTranscript(value, finalTranscript))
+          }
+        />
+      </View>
       <Pressable
         onPress={onSubmit}
         disabled={disabled}

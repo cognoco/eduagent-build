@@ -10,6 +10,7 @@ import {
 } from 'expo-router';
 import type { InterestContext } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -504,6 +505,9 @@ export default function MentorMemoryScreen() {
             birthYear={activeProfile?.birthYear}
             value={draft}
             isPending={navigationContract.isParentProxy || tellMentor.isPending}
+            voiceLocale={getVoiceLocaleForLanguage(
+              activeProfile?.conversationLanguage,
+            )}
             onChangeText={setDraft}
             onSubmit={() => void handleTellMentor()}
           />

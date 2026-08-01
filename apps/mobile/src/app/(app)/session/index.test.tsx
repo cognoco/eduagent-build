@@ -4191,6 +4191,10 @@ describe('SessionScreen homework flow', () => {
 
       expect(mockCloseSession).toHaveBeenCalled();
       expect(testScreen.getByTestId('first-session-wrap-up')).toBeTruthy();
+      // WI-2549: the shared voice control renders with the reflection input.
+      expect(
+        testScreen.getByTestId('first-session-reflection-mic'),
+      ).toBeTruthy();
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: `/session-summary/${SESSION_ID}`,

@@ -1,0 +1,55 @@
+# Tell Mentor voice input — shared VoiceInputControl smoke (WI-2549)
+# Validates: the shared voice-transcription control renders on the Tell
+# Mentor memory surface (mic button present next to the free-text field).
+# Follows the voice-mode-controls precedent: visibility assertions only —
+# tapping the mic would raise a nondeterministic OS permission dialog.
+# Tags: nightly, account, voice
+# Seed: language-subject-active
+# Usage: ./scripts/seed-and-run.sh language-subject-active flows/account/tell-mentor-voice-input.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+  - voice
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- tapOn: "More"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-row-learning-preferences"
+    timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: "more-row-mentor-memory"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "more-row-mentor-memory"
+
+- extendedWaitUntil:
+    visible:
+      id: "memory-status-text"
+    timeout: 10000
+
+# The Tell Mentor field and its shared voice control render together below
+# the status card; scroll to the input first, then assert the mic.
+- scrollUntilVisible:
+    element:
+      id: "tell-mentor-input-field"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "tell-mentor-mic"
+
+- takeScreenshot: 01-tell-mentor-voice-control

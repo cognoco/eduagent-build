@@ -17,6 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../../components/common/VoiceInputControl';
+import { getVoiceLocaleForLanguage } from '../../../../lib/language-locales';
+import {
   CollapsibleMemorySection,
   InterestContextRow,
   MemoryRow,
@@ -58,7 +63,7 @@ export default function ChildMentorMemoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const client = useApiClient();
-  const { profiles } = useProfile();
+  const { profiles, activeProfile } = useProfile();
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const childProfileId = profileId as string | undefined;
   const { data: childConsentData } = useChildConsentStatus(childProfileId);
@@ -480,6 +485,9 @@ export default function ChildMentorMemoryScreen() {
             childName={child?.displayName}
             value={draft}
             isPending={tellMentor.isPending}
+            voiceLocale={getVoiceLocaleForLanguage(
+              activeProfile?.conversationLanguage,
+            )}
             onChangeText={setDraft}
             onSubmit={() => void handleTellMentor()}
           />
@@ -636,6 +644,21 @@ export default function ChildMentorMemoryScreen() {
               placeholder={t('parentView.mentorMemory.correctionPlaceholder')}
               className="border-border mb-3 rounded-lg border p-3 text-text-primary"
             />
+            <View className="mb-3">
+              <VoiceInputControl
+                value={correctionText}
+                disabled={tellMentor.isPending}
+                voiceLocale={getVoiceLocaleForLanguage(
+                  activeProfile?.conversationLanguage,
+                )}
+                testIDPrefix="correction"
+                onTranscript={(finalTranscript) =>
+                  setCorrectionText((prev) =>
+                    appendTranscript(prev, finalTranscript),
+                  )
+                }
+              />
+            </View>
             <View className="flex-row gap-2">
               <Pressable
                 onPress={() => {

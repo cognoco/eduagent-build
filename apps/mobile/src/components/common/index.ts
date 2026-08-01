@@ -27,3 +27,4 @@ export { ThemedMarkdown } from './ThemedMarkdown';
 export { TimeoutLoader } from './TimeoutLoader';
 export { TrackedView } from './TrackedView';
 export { UsageMeter } from './UsageMeter';
+export { VoiceInputControl, appendTranscript } from './VoiceInputControl';
