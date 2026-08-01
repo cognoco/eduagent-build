@@ -28,21 +28,27 @@ indistinguishable from a legitimate retry.
 
 | Dimension | A — first-party encrypted receipt store | B — idempotency + pg advisory lock | **C — concurrency key, limit 1 (ratified)** |
 | --- | --- | --- | --- |
-| Mechanism | Encrypted claim row (`profileId+sessionId+answerEventId`) written before the paid call, same txn as the cooldown claim; second execution sees claim, waits/reuses | Keep existing `idempotency` (line 480) + `pg_advisory_xact_lock` on a hash of the same triple, held across the paid call | `concurrency: { key: 'event.data.sessionId + "-" + event.data.topicId', limit: 1 }`; scheduler serializes step execution per key |
-| Retry semantics | Fully closes the race incl. zombie executors — DB arbitration is scheduler-independent | Closes it only if the lock holds: xact-scoped lock means a transaction open across an LLM call, and Neon pooling makes lock/connection affinity a verification burden; a mis-hashed key fails open silently | Serializes scheduler-visible overlap; second execution then hits the WI-2009 receipt check and never pays (§4); key stable across retries (§5) |
+| Mechanism | Encrypted claim row (`profileId+sessionId+answerEventId`) written before the paid call, same txn as the cooldown claim; second execution sees claim, waits/reuses. A bare claim is NOT enough: if the claimant dies after paying but before publishing the result, a taker-over cannot know whether payment happened — waiting strands the answer, lease-expiry/steal can overlap a slow zombie. Honest A needs a full lease + takeover + result-publication + zombie-fencing protocol, or provider-side idempotency keys | Keep existing `idempotency` (line 480) + `pg_advisory_xact_lock` on a hash of the same triple, held across the paid call | `concurrency: { key: 'event.data.sessionId + "-" + event.data.topicId', limit: 1 }`; scheduler serializes step execution per key |
+| Retry semantics | Closes the two-live-executions race via DB arbitration; the pay-then-die window remains unless provider idempotency is added — same repay class as C, plus protocol failure modes of its own | Closes it only if the lock holds: xact-scoped lock means a transaction open across an LLM call, and Neon pooling makes lock/connection affinity a verification burden; a mis-hashed key fails open silently | Serializes scheduler-visible overlap; second execution then hits the WI-2009 receipt check and never pays (§4); key stable across retries (§5) |
 | Retention / deletion / access | New PII table: retention cron, profile-deletion cascade, RLS scoping, DPIA treatment pre-launch | None | None |
 | PII | Transiently persists rationale/misconception in a second store (C-3 tension), encryption-at-rest required | None persisted | None — key evaluates over two opaque UUIDs already in the event (`packages/schemas/src/inngest-events.ts:427-433`) |
-| Cost | Migration + table + cron + DPIA sign-off; M | No migration; S, plus pooling verification and long-open txns | XS — one config line; 15+ in-repo precedents (§6) |
-| Failure residuals | None for the race; new modes (claim-row leak/GC) | Crash between lock and write re-pays (same as C); pooling defects void the lock with no signal | Crash/zombie in the serialized pre-commit window → **one** repaid call (§7, accepted) |
+| Cost | Migration + table + cron + DPIA sign-off, PLUS the lease/takeover/fencing protocol design and its tests; M-L | No migration; S, plus pooling verification and long-open txns | XS-S — one config field + one opts-assertion test; 15+ in-repo precedents (§6) |
+| Failure residuals | Repays on pay-then-die like C (absent provider idempotency); adds claim-row leak/GC and lease-steal-vs-zombie overlap | Crash between lock and write re-pays (same as C); pooling defects void the lock with no signal | Not exactly-once: bounded repayments on failed/zombie runs (§7, accepted) |
 
-A's marginal zombie coverage costs a new pre-launch PII surface; B's guarantee
-rests on advisory-lock-under-pooling semantics. C rests on scheduler semantics
-the repo already relies on in 15+ functions, with a documented prior fix of
-this exact failure mode (BUG-148).
+A does not fully close the zombie case with a pre-call claim alone — the
+marginal coverage it can buy requires a takeover/fencing protocol or provider
+idempotency on top of a new pre-launch PII surface. B's guarantee rests on
+advisory-lock-under-pooling semantics. C rests on scheduler semantics the repo
+already relies on in 15+ functions, with a documented prior fix of this exact
+failure mode (BUG-148).
 
 ## 3. Recommended contract (AC-2)
 
-The complete change — one config field, nothing else:
+The complete change is two deliverables: (a) the config field below, and
+(b) a BUG-148-style regression test asserting the declared opts on
+`reviewCalibrationGrade` — expected assertion:
+`concurrency: { key: 'event.data.sessionId + "-" + event.data.topicId', limit: 1 }`
+(model: `memory-facts-backfill.test.ts`, §6). Nothing else.
 
 ```ts
 export const reviewCalibrationGrade = inngest.createFunction(
@@ -126,19 +132,33 @@ not ordering.
 `archive-cleanup.ts:22`, `account-deletion.ts:34`, `consent-revocation.ts:62`
 (all under `apps/api/src/inngest/functions/`); prior fix of this exact
 double-execution mode: `memory-facts-backfill.test.ts:4` ("[BUG-148] …
-concurrency:1"), which also models the config-assertion test an
-implementation should carry.
+concurrency:1"), the model for the opts-assertion test that is deliverable
+(b) of the contract (§3).
 
-## 7. Failure residual (accepted)
+## 7. Failure residuals (accepted; not exactly-once)
 
-A crash — or a zombie executor the scheduler has written off (slow paid call
-past the attempt's write-off, slot freed while the worker still runs) — inside
-the serialized window between the paid call (line 278) and the commit
-(lines 294-307 / 341-357) re-pays **once**. Bounded by `retries: 2`
-(line 479); no data corruption: the insert is `onConflictDoNothing` on the
+This design bounds and prices duplicate payments — it does not eliminate them.
+Distinct residuals:
+
+- **Ordinary serialized operation:** at most **one** paid call across all
+  serialized executions (§4).
+- **Failed run:** `retries: 2` (line 479) means initial attempt + 2 retries.
+  If every attempt of one run fails inside the window between the paid call
+  (line 278) and the commit (lines 294-307 / 341-357), that run pays up to
+  **3 times** (2 repayments) before exhausting retries.
+- **Written-off zombie:** a slow paid call pushed past the attempt's write-off
+  frees the concurrency slot while the worker still runs; a retry may then
+  overlap the zombie pre-commit and both may pay — scheduler-level
+  serialization cannot arbitrate an executor the scheduler no longer tracks.
+- **Distinct runs outside the 24h idempotency window** (or other dedupe
+  misses) each carry their own retry budget; the serializer only guarantees
+  the first committed result stops later serialized executions from paying.
+
+No data corruption in any case: the insert is `onConflictDoNothing` on the
 deterministic PK, and a lost conflict reloads the canonical row
-(lines 308-320, 358-370). Only Option A's DB-level arbitration would close the
-zombie case, at the §2 cost the ruling rejected. **This is the
+(lines 308-320, 358-370). Closing the zombie/pay-then-die window would require
+provider-side idempotency or Option A's full lease/takeover/fencing protocol
+(§2) — costs the ruling rejected. **The bounded repayments above are the
 operator-accepted residual.** Not residuals: in-window duplicates
 (idempotency), lost-ack replays (WI-2009 receipt), insert-conflict divergence
 (conflict reload).
@@ -149,7 +169,7 @@ operator-accepted residual.** Not residuals: in-window duplicates
   UUIDs already in the event payload. No grader free text enters Inngest
   event/state; the step-return discipline (lines 128-134), PII-egress closure
   comment (lines 217-227), and payload posture
-  (`inngest-events.ts:438-444`) are untouched.
+  (`inngest-events.ts:419-426`) are untouched.
 - **RR-9:** `rubricRationale`/`misconception`/routing rung continue to be
   written only onto the committed `retrieval_events` row (lines 354-356;
   `retrieval-events.ts:102-105`) — no second home for grader content.
@@ -167,5 +187,6 @@ operator-accepted residual.** Not residuals: in-window duplicates
 
 The ruling selected the direction; it did not waive the architecture gate.
 This document is the artifact submitted for explicit architecture approval;
-implementation (config line + BUG-148-style opts-assertion test) is a
-separate, later item and must not begin before that approval.
+implementation (both §3 deliverables: the config field and the BUG-148-style
+opts-assertion test) is a separate, later item and must not begin before that
+approval.
