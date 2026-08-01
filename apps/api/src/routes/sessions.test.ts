@@ -98,9 +98,10 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
-// assertLlmConsent (called by /summary, /summary/retry-feedback, and
-// /recall-bridge — the pure request-time LLM routes outside the exchange
-// pipeline) runs
+// assertLlmConsent is mocked as a route-level tripwire for the mixed summary
+// and Recall Bridge routes. Their service boundaries own the real checks; a
+// rejecting mock here proves deterministic route branches do not over-gate.
+// The real helper runs
 // isLlmExchangeConsentAllowed, which reads db.query.membership /
 // consentGrant — real queries with no controllable behavior on this file's
 // mock DB. Defaults to allowed (resolves undefined = no throw); the
@@ -866,7 +867,10 @@ describe('session routes', () => {
     clearJWKSCache();
   });
   describe('POST /v1/sessions/:sessionId/recall-bridge mentor notice suppression', () => {
-    it('returns typed 409 before invoking the Recall Bridge generator', async () => {
+    it('returns typed 409 after consent withdrawal without invoking the Recall Bridge generator', async () => {
+      jest
+        .mocked(assertLlmConsent)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
       jest.mocked(getSession).mockResolvedValueOnce({
         sessionType: 'homework',
       } as never);
@@ -887,6 +891,7 @@ describe('session routes', () => {
         code: 'RECALL_BRIDGE_SUPPRESSED',
       });
       expect(generateRecallBridge).not.toHaveBeenCalled();
+      expect(assertLlmConsent).not.toHaveBeenCalled();
     });
   });
 
@@ -976,17 +981,19 @@ describe('session routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). generateRecallBridge unconditionally dispatches the LLM.
+  // [WI-2543 rework 2] The mixed route delegates to the Recall Bridge service;
+  // that service gates only its final LLM branch.
   // -------------------------------------------------------------------------
   describe('[WI-2396] recall-bridge consent-withdrawal gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls generateRecallBridge when consent is withdrawn', async () => {
-      // The consent gate runs before getSession, so no getSession fixture
-      // is needed here — a leftover mockResolvedValueOnce would never be
-      // consumed and would leak into a later, unrelated test.
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+    it('maps a service-boundary consent refusal to 403 CONSENT_WITHDRAWN', async () => {
+      jest.mocked(getSession).mockResolvedValueOnce({
+        sessionType: 'homework',
+      } as never);
+      jest
+        .mocked(generateRecallBridge)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/recall-bridge`,
@@ -997,10 +1004,11 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(generateRecallBridge).not.toHaveBeenCalled();
+      expect(generateRecallBridge).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('proceeds (LLM dispatched) when consent is active', async () => {
+    it('delegates the LLM-ready branch without a route-entry consent gate', async () => {
       jest.mocked(getSession).mockResolvedValueOnce({
         sessionType: 'homework',
       } as never);
@@ -1017,10 +1025,7 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(generateRecallBridge).toHaveBeenCalled();
     });
   });
@@ -2623,20 +2628,20 @@ describe('session routes', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). submitSummary / retrySummaryFeedback -> evaluateSummary
-  // unconditionally dispatch the LLM. Separate from the exchange pipeline's
-  // own [WI-2372] gate ([WI-2372] tests above, /messages and /stream).
+  // [WI-2543 rework 2] Summary routes delegate to service-owned granular
+  // gates. Separate from the exchange pipeline's own [WI-2372] gate.
   // ---------------------------------------------------------------------------
   describe('[WI-2396] summary consent-withdrawal gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
-    it('POST /sessions/:sessionId/summary refuses with 403 CONSENT_WITHDRAWN and never calls submitSummary when consent is withdrawn', async () => {
+    it('POST /sessions/:sessionId/summary maps a service-boundary refusal to 403 CONSENT_WITHDRAWN', async () => {
       // Clear call history from earlier describes' tests so
       // .not.toHaveBeenCalled() below asserts this request's behavior, not
       // an earlier test's leftover call count.
       jest.mocked(submitSummary).mockClear();
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      jest
+        .mocked(submitSummary)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
@@ -2654,10 +2659,12 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(submitSummary).not.toHaveBeenCalled();
+      expect(submitSummary).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('POST /sessions/:sessionId/summary proceeds (LLM dispatched) when consent is active', async () => {
+    it('POST /sessions/:sessionId/summary delegates a saved-summary result after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
         {
@@ -2672,19 +2679,18 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(submitSummary).toHaveBeenCalled();
     });
 
-    it('POST /sessions/:sessionId/summary/retry-feedback refuses with 403 CONSENT_WITHDRAWN and never calls retrySummaryFeedback when consent is withdrawn', async () => {
+    it('POST /sessions/:sessionId/summary/retry-feedback maps a service-boundary refusal to 403 CONSENT_WITHDRAWN', async () => {
       // Clear call history from earlier describes' tests so
       // .not.toHaveBeenCalled() below asserts this request's behavior, not
       // an earlier test's leftover call count.
       jest.mocked(retrySummaryFeedback).mockClear();
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+      jest
+        .mocked(retrySummaryFeedback)
+        .mockRejectedValueOnce(new ConsentWithdrawnError());
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
@@ -2695,10 +2701,12 @@ describe('session routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.code).toBe('CONSENT_WITHDRAWN');
-      expect(retrySummaryFeedback).not.toHaveBeenCalled();
+      expect(retrySummaryFeedback).toHaveBeenCalled();
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
     });
 
-    it('POST /sessions/:sessionId/summary/retry-feedback proceeds (LLM dispatched) when consent is active', async () => {
+    it('POST /sessions/:sessionId/summary/retry-feedback delegates a no-claim result after consent withdrawal', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
         { method: 'POST', headers: AUTH_HEADERS },
@@ -2706,10 +2714,7 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(retrySummaryFeedback).toHaveBeenCalled();
     });
   });
