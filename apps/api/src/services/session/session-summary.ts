@@ -33,8 +33,25 @@ import {
   type ExpiringCoordinationClaim,
 } from '../webhook-idempotency';
 import { getMentorNoticeReceipt } from '../mentor-notices';
+import { assertLlmConsent } from '../identity-v2/consent-status-v2';
 
 const logger = createLogger();
+
+export interface SummaryLlmDependencies {
+  assertLlmConsent: typeof assertLlmConsent;
+  evaluateSummary: typeof evaluateSummary;
+  claimSummaryFeedbackRetry: (
+    db: Database,
+    profileId: string,
+    sessionId: string,
+  ) => Promise<ExpiringCoordinationClaim | null>;
+  releaseCoordinationClaim: typeof releaseCoordinationClaim;
+}
+
+export interface SummaryLlmOptions {
+  conversationLanguage?: ConversationLanguage;
+  deps?: Partial<SummaryLlmDependencies>;
+}
 
 export async function getSessionSummary(
   db: Database,
@@ -141,7 +158,7 @@ export async function submitSummary(
   profileId: string,
   sessionId: string,
   input: SummarySubmitInput,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: SummaryLlmOptions,
 ): Promise<{
   summary: {
     id: string;
@@ -194,8 +211,11 @@ export async function submitSummary(
 
   const subject = await getSubject(db, profileId, session.subjectId);
 
-  // Evaluate summary via LLM
-  const evaluation = await evaluateSummary(
+  // Saved-summary idempotency and all other deterministic exits stay usable
+  // after withdrawal. Consent is checked at the last boundary before the LLM.
+  const deps = resolveSummaryLlmDependencies(options?.deps);
+  await deps.assertLlmConsent(db, profileId);
+  const evaluation = await deps.evaluateSummary(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     input.content,
@@ -387,6 +407,19 @@ async function claimSummaryFeedbackRetry(
   );
 }
 
+const summaryLlmDependencies: SummaryLlmDependencies = {
+  assertLlmConsent,
+  evaluateSummary,
+  claimSummaryFeedbackRetry,
+  releaseCoordinationClaim,
+};
+
+function resolveSummaryLlmDependencies(
+  overrides?: Partial<SummaryLlmDependencies>,
+): SummaryLlmDependencies {
+  return { ...summaryLlmDependencies, ...overrides };
+}
+
 async function completeSummaryFeedbackRetry(
   db: Database,
   profileId: string,
@@ -483,8 +516,9 @@ export async function retrySummaryFeedback(
   db: Database,
   profileId: string,
   sessionId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: SummaryLlmOptions,
 ): Promise<RetrySummaryFeedbackResult> {
+  const deps = resolveSummaryLlmDependencies(options?.deps);
   const session = await getSession(db, profileId, sessionId);
   if (!session) throw new NotFoundError('Session');
 
@@ -499,7 +533,7 @@ export async function retrySummaryFeedback(
     return toRetrySummaryResult(observed);
   }
 
-  const claim = await claimSummaryFeedbackRetry(db, profileId, sessionId);
+  const claim = await deps.claimSummaryFeedbackRetry(db, profileId, sessionId);
   if (!claim) {
     const current = await findSessionSummaryRow(db, profileId, sessionId);
     if (
@@ -531,7 +565,23 @@ export async function retrySummaryFeedback(
   }
 
   const subject = await getSubject(db, profileId, session.subjectId);
-  const evaluation = await evaluateSummary(
+  try {
+    await deps.assertLlmConsent(db, profileId);
+  } catch (consentError) {
+    try {
+      await deps.releaseCoordinationClaim(db, claim);
+    } catch (releaseError) {
+      captureException(releaseError, {
+        profileId,
+        extra: {
+          site: 'retrySummaryFeedback.consentClaimRelease',
+          sessionId,
+        },
+      });
+    }
+    throw consentError;
+  }
+  const evaluation = await deps.evaluateSummary(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
     reserved.content ?? '',

@@ -18,7 +18,9 @@
 // ---------------------------------------------------------------------------
 
 import {
+  billingAliasMergeFailedEventSchema,
   billingAliasReceivedEventSchema,
+  classifyTerminalFailureError,
   type BillingAliasMergeFailedEvent,
   summarizeRawPayload,
 } from '@eduagent/schemas';
@@ -54,7 +56,7 @@ export const billingAliasMerge = inngest.createFunction(
         (event.data.event?.data as { eventId?: string } | undefined)?.eventId ??
         null;
       const runId = event.data.run_id ?? null;
-      const errorName = error instanceof Error ? error.name : typeof error;
+      const errorName = classifyTerminalFailureError(error);
       const capturedError =
         error instanceof Error
           ? error
@@ -77,12 +79,13 @@ export const billingAliasMerge = inngest.createFunction(
         errorName,
       });
 
-      const failureEvent: BillingAliasMergeFailedEvent = {
-        eventId,
-        runId,
-        errorName,
-        timestamp: new Date().toISOString(),
-      };
+      const failureEvent: BillingAliasMergeFailedEvent =
+        billingAliasMergeFailedEventSchema.parse({
+          eventId,
+          runId,
+          errorName,
+          timestamp: new Date().toISOString(),
+        });
       await safeSend(
         () =>
           inngest.send({

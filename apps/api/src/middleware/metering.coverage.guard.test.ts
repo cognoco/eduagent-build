@@ -29,6 +29,7 @@ import {
   GRANULAR_LLM_CONSENT_BOUNDARIES,
   LLM_CALL_SITE_FILES,
   LLM_CALL_SITE_EXEMPT,
+  ROUTE_OWNED_LLM_CONSENT_BOUNDARIES,
 } from './metering.coverage.manifest';
 
 // Jest rootDir is the repo root. process.cwd() during jest execution may be
@@ -116,6 +117,46 @@ function sliceBetweenTokens(
   return source.slice(start, end);
 }
 
+function boundsBetweenTokens(
+  source: string,
+  startToken: string,
+  endToken: string,
+): { start: number; end: number } {
+  const start = source.indexOf(startToken);
+  if (start < 0) throw new Error(`Missing start token: ${startToken}`);
+  if (!endToken) return { start, end: source.length };
+  const end = source.indexOf(endToken, start + startToken.length);
+  if (end < 0) throw new Error(`Missing end token: ${endToken}`);
+  return { start, end };
+}
+
+interface RouteConsentAssertion {
+  file: string;
+  index: number;
+}
+
+function scanRouteConsentAssertions(): RouteConsentAssertion[] {
+  const routeFiles: string[] = [];
+  walk(join(SRC_ROOT, 'routes'), routeFiles);
+  const assertions: RouteConsentAssertion[] = [];
+  const assertionRegex = /\bawait\s+assertLlmConsent\s*\(/g;
+  for (const absolutePath of routeFiles) {
+    const source = readFileSync(absolutePath, 'utf8');
+    for (const match of source.matchAll(assertionRegex)) {
+      if (match.index === undefined) {
+        throw new Error(
+          `Consent assertion match had no index: ${absolutePath}`,
+        );
+      }
+      assertions.push({
+        file: relative(REPO_ROOT, absolutePath).replace(/\\/g, '/'),
+        index: match.index,
+      });
+    }
+  }
+  return assertions;
+}
+
 describe('[WI-132] LLM call-site coverage manifest', () => {
   const discovered = scanCallSites();
   const covered = new Set(LLM_CALL_SITE_FILES);
@@ -189,14 +230,72 @@ describe('[WI-132] LLM call-site coverage manifest', () => {
 });
 
 describe('[WI-2543] mixed-route granular consent boundaries', () => {
-  it('classifies exactly the five refined mixed routes', () => {
-    expect(GRANULAR_LLM_CONSENT_BOUNDARIES.map(({ id }) => id).sort()).toEqual([
-      'assessments.answer',
-      'book-suggestions.topup',
-      'books.generate-topics',
-      'sessions.first-curriculum',
-      'subjects.create',
-    ]);
+  it('uses unique IDs across the request-time consent classification', () => {
+    const ids = [
+      ...ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.map(({ id }) => id),
+      ...GRANULAR_LLM_CONSENT_BOUNDARIES.map(({ id }) => id),
+    ];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('requires an explicit rationale for every remaining route-entry gate', () => {
+    for (const boundary of ROUTE_OWNED_LLM_CONSENT_BOUNDARIES) {
+      expect({
+        id: boundary.id,
+        classification: boundary.classification,
+        hasRationale: boundary.rationale.trim().length > 0,
+      }).toEqual({
+        id: boundary.id,
+        classification: expect.stringMatching(
+          /^(route-owned|route-discriminant|independent-mixed-residue)$/,
+        ),
+        hasRationale: true,
+      });
+    }
+  });
+
+  it('classifies every production route-entry consent assertion exactly once', () => {
+    const assertions = scanRouteConsentAssertions();
+    const sources = new Map<string, string>();
+    const segmentBounds = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.map((boundary) => {
+      const source =
+        sources.get(boundary.routeFile) ?? readRepoFile(boundary.routeFile);
+      sources.set(boundary.routeFile, source);
+      return {
+        ...boundary,
+        ...boundsBetweenTokens(
+          source,
+          boundary.routeStartToken,
+          boundary.routeEndToken,
+        ),
+      };
+    });
+
+    const invalid = assertions.flatMap((assertion) => {
+      const owners = segmentBounds.filter(
+        (boundary) =>
+          boundary.routeFile === assertion.file &&
+          assertion.index >= boundary.start &&
+          assertion.index < boundary.end,
+      );
+      return owners.length === 1
+        ? []
+        : [`${assertion.file}@${assertion.index}: owners=${owners.length}`];
+    });
+    expect(invalid).toEqual([]);
+
+    for (const boundary of segmentBounds) {
+      const ownedCount = assertions.filter(
+        (assertion) =>
+          assertion.file === boundary.routeFile &&
+          assertion.index >= boundary.start &&
+          assertion.index < boundary.end,
+      ).length;
+      expect({ id: boundary.id, ownedCount }).toEqual({
+        id: boundary.id,
+        ownedCount: 1,
+      });
+    }
   });
 
   it.each(GRANULAR_LLM_CONSENT_BOUNDARIES)(

@@ -170,6 +170,32 @@ describe('[WI-2346] durable terminal-failure event schemas', () => {
     expect(parsed?.data).not.toHaveProperty('error');
     expect(JSON.stringify(parsed?.data)).not.toContain('payer@example.test');
   });
+
+  it.each([
+    ['accountDeletionTeardownFailedEventSchema', { accountId: validUuid }],
+    [
+      'billingSubscriptionStoreTeardownFailedEventSchema',
+      { accountId: validUuid },
+    ],
+    ['billingAliasMergeFailedEventSchema', { eventId: 'rc-event-id' }],
+  ])(
+    'rejects arbitrary or overlong errorName values from %s',
+    (name, identity) => {
+      for (const errorName of [
+        'payer alice@example.test',
+        `payer alice@example.test ${'x'.repeat(160)}`,
+      ]) {
+        expect(
+          schemas[name]?.safeParse({
+            ...identity,
+            runId: 'run-private',
+            errorName,
+            timestamp,
+          }).success,
+        ).toBe(false);
+      }
+    },
+  );
 });
 
 describe('[WI-2977] consent terminal-failure event schemas', () => {

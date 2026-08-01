@@ -299,9 +299,35 @@ export type BillingAliasReceivedEvent = z.infer<
 // messages can contain payer/account PII or secrets and must never ride here.
 // Account-level events legitimately omit profileId (AGENTS.md known exception).
 // ---------------------------------------------------------------------------
+export const terminalFailureErrorNameSchema = z.enum([
+  'Error',
+  'AggregateError',
+  'EvalError',
+  'RangeError',
+  'ReferenceError',
+  'SyntaxError',
+  'TypeError',
+  'URIError',
+  'AbortError',
+  'TimeoutError',
+  'NonError',
+]);
+export type TerminalFailureErrorName = z.infer<
+  typeof terminalFailureErrorNameSchema
+>;
+
+export function classifyTerminalFailureError(
+  error: unknown,
+): TerminalFailureErrorName {
+  if (!(error instanceof Error)) return 'NonError';
+
+  const parsed = terminalFailureErrorNameSchema.safeParse(error.name);
+  return parsed.success ? parsed.data : 'Error';
+}
+
 const terminalFailureEventBaseSchema = z.object({
   runId: z.string().min(1).nullable(),
-  errorName: z.string().min(1).max(128),
+  errorName: terminalFailureErrorNameSchema,
   timestamp: isoDateField,
 });
 

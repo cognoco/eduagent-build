@@ -29,6 +29,7 @@ import { generateRecallBridge } from './recall-bridge';
 
 const PROFILE_ID = 'profile-001';
 const SESSION_ID = 'session-001';
+const allowLlmConsent = jest.fn().mockResolvedValue(undefined);
 
 /**
  * [WI-2432] Mock provider whose chat() fails `failCount` times then succeeds
@@ -173,7 +174,9 @@ describe('[WI-2432] generateRecallBridge never routes an under-18 subject to Gem
       registerProvider(approvedProvider);
 
       const db = makeDb(birthDate);
-      const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+      const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+        deps: { assertLlmConsent: allowLlmConsent },
+      });
 
       expect(geminiSpy).not.toHaveBeenCalled();
       expect(result.questions.length).toBeGreaterThan(0);
@@ -183,7 +186,9 @@ describe('[WI-2432] generateRecallBridge never routes an under-18 subject to Gem
 
   it('an adult subject is unaffected (no regression) — Gemini remains eligible', async () => {
     const db = makeDb('1990-01-01');
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     expect(geminiSpy).toHaveBeenCalledTimes(1);
     expect(result.questions.length).toBeGreaterThan(0);
@@ -198,7 +203,9 @@ describe('[WI-2432] generateRecallBridge never routes an under-18 subject to Gem
     registerProvider(flakyCerebras);
 
     const db = makeDb('2015-01-01');
-    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID);
+    const result = await generateRecallBridge(db, PROFILE_ID, SESSION_ID, {
+      deps: { assertLlmConsent: allowLlmConsent },
+    });
 
     expect(geminiSpy).not.toHaveBeenCalled();
     expect(result.questions.length).toBeGreaterThan(0);
