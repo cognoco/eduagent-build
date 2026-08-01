@@ -74,6 +74,7 @@ const mockSessionCompletedDb = createTransactionalMockDb({
       findFirst: jest.fn().mockResolvedValue({
         displayName: 'Emma',
         conversationLanguage: 'en',
+        birthDate: '2010-01-01',
         birthYear: 2015,
         pronouns: null,
       }),
@@ -2279,6 +2280,7 @@ describe('sessionCompleted', () => {
           subjectId: SUBJECT_ID,
           topicId: TOPIC_ID,
           summaryId: 'summary-1',
+          ageBracket: 'adolescent',
         }),
       );
     });
@@ -2345,7 +2347,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SESSION_ID,
-        { conversationLanguage: 'en' },
+        { conversationLanguage: 'en', ageBracket: 'adolescent' },
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',
@@ -2378,7 +2380,11 @@ describe('sessionCompleted', () => {
               // Returns both legacy (accountId) and v2 (conversationLanguage)
               // fields so this mock works under both IDENTITY_V2_ENABLED states.
               return Promise.resolve([
-                { conversationLanguage: 'en', accountId: ACCOUNT_ID },
+                {
+                  conversationLanguage: 'en',
+                  birthDate: '2010-01-01',
+                  accountId: ACCOUNT_ID,
+                },
               ]);
             },
           }),
@@ -2421,7 +2427,12 @@ describe('sessionCompleted', () => {
         'sub-test-id',
         PROFILE_ID,
       );
-      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
+      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        SESSION_ID,
+        expect.objectContaining({ ageBracket: 'adolescent' }),
+      );
       // No refund — LLM succeeded.
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });

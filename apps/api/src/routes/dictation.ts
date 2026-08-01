@@ -345,6 +345,14 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         imageMimeType: input.imageMimeType,
         language: input.language,
         ageYears,
+        ageBracket:
+          profileMeta.birthYear == null
+            ? undefined
+            : computeAgeBracketFromDate(
+                profileMeta.birthYear,
+                profileMeta.birthMonth ?? undefined,
+                profileMeta.birthDay ?? undefined,
+              ),
         recentStruggles,
         // i18n Phase 1 — feedback prose follows the learner's UI locale.
         conversationLanguage: parseConversationLanguage(

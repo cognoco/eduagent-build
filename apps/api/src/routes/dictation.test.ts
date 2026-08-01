@@ -1010,6 +1010,45 @@ describe('POST /v1/dictation/review', () => {
     expect(body.mistakes[0].error).toBe('spelling');
   });
 
+  it('threads the exact profile birth date into review safety routing', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00Z'));
+    mockGetPersonScope.mockResolvedValueOnce(
+      personScope({
+        profileId: 'test-profile-id',
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      }),
+    );
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 2,
+      correctCount: 2,
+      mistakes: [],
+    });
+
+    try {
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(reviewDictation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ageYears: 18,
+          ageBracket: 'adolescent',
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
   describe('[WI-2396] consent-withdrawal gate', () => {
     it('refuses with 403 CONSENT_WITHDRAWN and never calls reviewDictation when consent is withdrawn', async () => {

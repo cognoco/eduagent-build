@@ -71,3 +71,32 @@ bash scripts/check-change-class.sh --branch --run --fast
   skipped. The API unit gate passed 506 suites / 10,100 tests (11 skipped), and
   the TypeScript, Inngest annotation, prompt-marker, no-Gemini-runtime, and
   test-only-export guards all passed.
+
+## Typed review rework (2026-08-01)
+
+- The mandatory review finding against `book-suggestions.test.ts` was checked
+  against the current GC1/GC6 contract. The four cited mocks already use the
+  canonical Pattern A (`jest.requireActual` plus targeted overrides), so no
+  `gc1-allow` sticker was added. The retained internal-mock inventory and the
+  bounded GC6 deferral are recorded precisely in the repair commit and PR body.
+- The session-completed paths now derive age brackets with
+  `birthYearFromDate` / `birthMonthDayFromDate`, preserving the repository's
+  `YYYY-01-01` year-only sentinel instead of treating it as a known January 1
+  birthday. Existing Inngest handler tests assert the resulting bracket at the
+  summary-generation boundary.
+- Dictation review now accepts an exact route-derived `ageBracket` when full
+  birth-date parts exist, while retaining the `ageYears` fallback for direct
+  service callers. A boundary test freezes time before an eighteenth birthday
+  and proves that `ageYears: 18` cannot override the exact `adolescent` bracket.
+- Focused post-rework verification: 6 suites passed, 222 tests passed,
+  0 snapshots. The set includes the two Inngest handlers, dictation route and
+  review service, book suggestions, and the learner-facing age-bracket ratchet.
+- Focused ESLint passed with 0 errors and one pre-existing unused-variable
+  warning in `session-completed.test.ts`.
+- The GC1 Pattern-A guard passed with zero violations.
+- Routed fast validation passed 6 gates with 0 failures and 2 sanctioned slow
+  gates skipped. Its API unit lane passed all 506 suites: 10,124 tests passed,
+  11 skipped, and 3 snapshots passed. TypeScript, Inngest admin (76 functions),
+  prompt-marker, no-Gemini-runtime, and test-only-export gates also passed.
+- The two slow routed gates remain intentionally skipped locally:
+  `pnpm test:llm:book-generation` and `pnpm test:api:integration`.

@@ -4,6 +4,7 @@ import {
   computeAgeBracketFromDate,
   dictationReviewPromptCharCount,
   dictationReviewResultSchema,
+  type AgeBracket,
   type ConversationLanguage,
   type DictationSentence,
   type DictationReviewResult,
@@ -151,6 +152,8 @@ export interface ReviewDictationInput {
   language: string;
   /** Learner's age in years — used to calibrate explanation complexity. Optional. */
   ageYears?: number;
+  /** Exact-date safety bracket supplied by callers that have profile context. */
+  ageBracket?: AgeBracket;
   /** Learner's preferred explanation styles — used to tune mistake explanations. Optional. */
   preferredExplanations?: string[];
   /**
@@ -171,6 +174,7 @@ export async function reviewDictation(
     imageMimeType,
     language,
     ageYears,
+    ageBracket,
     preferredExplanations,
     recentStruggles,
     conversationLanguage,
@@ -222,9 +226,10 @@ export async function reviewDictation(
     flow: 'dictation.review',
     conversationLanguage,
     ageBracket:
-      ageYears == null
+      ageBracket ??
+      (ageYears == null
         ? undefined
-        : computeAgeBracketFromDate(new Date().getUTCFullYear() - ageYears),
+        : computeAgeBracketFromDate(new Date().getUTCFullYear() - ageYears)),
   });
 
   if (!result.response || result.response.trim() === '') {

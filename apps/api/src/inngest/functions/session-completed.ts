@@ -9,6 +9,10 @@ import {
 import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import {
+  birthMonthDayFromDate,
+  birthYearFromDate,
+} from '../../services/identity-v2/profile-v2';
+import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
 } from '../../services/retention-data';
@@ -104,6 +108,16 @@ import {
 import { safeSend } from '../../services/safe-non-core';
 
 const logger = createLogger();
+
+function ageBracketFromBirthDate(birthDate: string | null | undefined) {
+  if (!birthDate) return undefined;
+  const { birthMonth, birthDay } = birthMonthDayFromDate(birthDate);
+  return computeAgeBracketFromDate(
+    birthYearFromDate(birthDate),
+    birthMonth ?? undefined,
+    birthDay ?? undefined,
+  );
+}
 
 // [PROFILE-SCOPE-GUARD] Verify ownership via the parent chain
 // (topics → books → subjects.profileId) before exposing the title.
@@ -1593,13 +1607,7 @@ export const sessionCompleted = inngest.createFunction(
             conversationLanguage: parseConversationLanguage(
               llmSummaryConversationLanguage,
             ),
-            ageBracket: llmSummaryProfile?.birthDate
-              ? computeAgeBracketFromDate(
-                  Number(llmSummaryProfile.birthDate.slice(0, 4)),
-                  Number(llmSummaryProfile.birthDate.slice(5, 7)),
-                  Number(llmSummaryProfile.birthDate.slice(8, 10)),
-                )
-              : undefined,
+            ageBracket: ageBracketFromBirthDate(llmSummaryProfile?.birthDate),
           });
 
           if (!summary) {
@@ -2291,13 +2299,7 @@ export const sessionCompleted = inngest.createFunction(
               conversationLanguage: parseConversationLanguage(
                 homeworkProfile?.conversationLanguage,
               ),
-              ageBracket: homeworkProfile?.birthDate
-                ? computeAgeBracketFromDate(
-                    Number(homeworkProfile.birthDate.slice(0, 4)),
-                    Number(homeworkProfile.birthDate.slice(5, 7)),
-                    Number(homeworkProfile.birthDate.slice(8, 10)),
-                  )
-                : undefined,
+              ageBracket: ageBracketFromBirthDate(homeworkProfile?.birthDate),
             });
           } catch (err) {
             // LLM call failed after quota was decremented — refund so
