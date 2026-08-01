@@ -183,6 +183,8 @@ describe('SubjectResolutionAccessory typed subject override', () => {
       />,
     );
 
+    // WI-2550: the shared transcription-only mic renders with the typed field.
+    getByTestId('subject-resolution-custom-mic');
     fireEvent.changeText(
       getByTestId('subject-resolution-custom-input'),
       'fysic',

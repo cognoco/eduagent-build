@@ -180,9 +180,9 @@ describe('TopicDetailSheet — writable notes (WI-1118)', () => {
     );
 
     const input = screen.getByTestId('subject-hub-notes-input');
-    // No voice handler is wired in the hub → the mic must be gated out, not shown
-    // as a dead button.
-    expect(screen.queryByTestId('notes-mic')).toBeNull();
+    // WI-2550: the shared transcription-only mic renders with the add row —
+    // it is real STT wired into the draft, not a handler-gated dead button.
+    screen.getByTestId('notes-mic');
     // The empty-state copy is the topic-context string, not the subject-level one
     // ("…about this topic", not "…about this subject") — the sheet shows a focused
     // topic, so the generic subject copy would be misleading here.

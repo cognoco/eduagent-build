@@ -4293,7 +4293,6 @@
     },
     "search": {
       "placeholder": "Themen suchen",
-      "micLabel": "Per Sprache suchen",
       "noResults": "Keine Themen entsprechen dieser Suche."
     },
     "notes": {
@@ -4301,7 +4300,6 @@
       "authorSelf": "Meine Notizen",
       "authorMentor": "Vom Mentor gespeichert",
       "addNote": "Notiz hinzufügen",
-      "micLabel": "Notiz per Sprache hinzufügen",
       "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest.",
       "saveErrorTitle": "Konnte Notiz nicht speichern",
       "emptyTopic": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."

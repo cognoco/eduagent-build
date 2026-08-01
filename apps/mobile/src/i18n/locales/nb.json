@@ -4257,7 +4257,6 @@
     },
     "search": {
       "placeholder": "Søk i temaer",
-      "micLabel": "Søk med stemmen",
       "noResults": "Ingen temaer samsvarer med søket."
     },
     "notes": {
@@ -4265,7 +4264,6 @@
       "authorSelf": "Mine notater",
       "authorMentor": "Lagret fra mentor",
       "addNote": "Legg til et notat",
-      "micLabel": "Legg til et notat med stemmen",
       "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget.",
       "saveErrorTitle": "Kunne ikke lagre notat",
       "emptyTopic": "Ingen notater ennå. Skriv ned en tanke om dette emnet."

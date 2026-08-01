@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
+import { VoiceInputControl, appendTranscript } from '../common';
 import {
   type ChatMessage,
   type QuickChipId,
@@ -177,6 +178,8 @@ export interface SubjectResolutionAccessoryProps {
     React.SetStateAction<PendingSubjectResolution | null>
   >;
   router: Router;
+  /** Voice locale for the typed-subject mic (WI-2550), resolved by the screen. */
+  voiceLocale?: string;
 }
 
 export function SubjectResolutionAccessory({
@@ -190,6 +193,7 @@ export function SubjectResolutionAccessory({
   handleTypeSubject,
   setPendingSubjectResolution,
   router,
+  voiceLocale,
 }: SubjectResolutionAccessoryProps) {
   const { t } = useTranslation();
   const [typedSubject, setTypedSubject] = useState('');
@@ -365,6 +369,15 @@ export function SubjectResolutionAccessory({
           accessibilityLabel={t('session.accessories.typeSubjectLabel')}
           returnKeyType="done"
           testID="subject-resolution-custom-input"
+        />
+        <VoiceInputControl
+          value={typedSubject}
+          disabled={typedSubjectDisabled}
+          voiceLocale={voiceLocale}
+          testID="subject-resolution-custom-mic"
+          onTranscript={(finalTranscript) =>
+            setTypedSubject((prev) => appendTranscript(prev, finalTranscript))
+          }
         />
         <Pressable
           onPress={submitTypedSubject}
@@ -699,6 +712,7 @@ export function SessionAccessory(props: SessionAccessoryProps) {
         handleTypeSubject={props.handleTypeSubject}
         setPendingSubjectResolution={props.setPendingSubjectResolution}
         router={props.router}
+        voiceLocale={props.voiceLocale}
       />
       <HomeworkModeChips
         effectiveMode={props.effectiveMode}

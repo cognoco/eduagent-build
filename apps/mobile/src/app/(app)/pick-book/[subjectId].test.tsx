@@ -51,6 +51,9 @@ jest.mock(
 jest.mock(
   '../../../components/common', // gc1-allow: native-boundary — animation components use react-native-reanimated unavailable in Jest
   () => ({
+    // The voice control and its helper are real — only the reanimated-backed
+    // animation components need stubbing.
+    ...jest.requireActual('../../../components/common/VoiceInputControl'),
     BookPageFlipAnimation: ({
       size,
       testID,
@@ -367,6 +370,8 @@ describe('PickBookScreen', () => {
     });
     fireEvent.press(result.getByText('Something else...'));
     result.getByTestId('pick-book-custom-input');
+    // WI-2550: the shared transcription-only mic renders with the custom field.
+    result.getByTestId('pick-book-custom-mic');
   });
 
   it('shows loading spinner when suggestions are loading', async () => {

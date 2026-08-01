@@ -12,6 +12,7 @@ import type { SubjectStatus } from '@eduagent/schemas';
 
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { ShimmerSkeleton } from '../common/ShimmerSkeleton';
+import { VoiceInputControl } from '../common';
 import {
   LibrarySearchResults,
   type EnrichedSubjectResult,
@@ -33,6 +34,8 @@ interface SubjectsBrowseProps {
     subjectId: string,
     topicId: string | null,
   ) => void;
+  /** Voice locale for the search mic (WI-2550), resolved by the screen. */
+  voiceLocale?: string;
 }
 
 // Render order for the status groups; empty groups are omitted at render time.
@@ -53,6 +56,7 @@ export function SubjectsBrowse({
   onTopicPress,
   onNotePress,
   onSessionPress,
+  voiceLocale,
 }: SubjectsBrowseProps): React.ReactElement {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -182,13 +186,23 @@ export function SubjectsBrowse({
         </View>
       ) : (
         <>
-          <TextInput
-            value={query}
-            onChangeText={handleSearchChange}
-            placeholder={t('subjectsBrowse.searchPlaceholder')}
-            className="mt-4 rounded-card border border-border bg-surface px-4 py-3 text-body text-text-primary"
-            testID="subjects-browse-search"
-          />
+          <View className="mt-4 flex-row items-center rounded-card border border-border bg-surface px-4">
+            <TextInput
+              value={query}
+              onChangeText={handleSearchChange}
+              placeholder={t('subjectsBrowse.searchPlaceholder')}
+              className="min-h-12 flex-1 py-3 text-body text-text-primary"
+              testID="subjects-browse-search"
+            />
+            {/* WI-2550: shared transcription-only mic; the final transcript
+                REPLACES the query through the same debounced path as typing. */}
+            <VoiceInputControl
+              value={query}
+              voiceLocale={voiceLocale}
+              testID="subjects-browse-search-mic"
+              onTranscript={handleSearchChange}
+            />
+          </View>
 
           {isSearching ? (
             /* ── Search-active branch: show cross-entity results ─────────── */

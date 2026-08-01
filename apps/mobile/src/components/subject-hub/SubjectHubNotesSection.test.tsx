@@ -113,31 +113,9 @@ describe('SubjectHubNotesSection', () => {
     });
   });
 
-  it('renders the add-note input + transcription-only mic when canStudy and add is wired', () => {
-    const onNoteVoice = jest.fn();
-    render(
-      <SubjectHubNotesSection
-        notes={[selfNote]}
-        canStudy
-        onAddNote={jest.fn()}
-        onNoteVoice={onNoteVoice}
-      />,
-    );
-
-    screen.getByTestId('subject-hub-notes-input');
-    fireEvent.press(screen.getByTestId('notes-mic'));
-    expect(onNoteVoice).toHaveBeenCalledWith({
-      kind: 'transcription',
-      source: 'subject-hub-notes',
-      analyzesTone: false,
-      analyzesEmotion: false,
-    });
-  });
-
-  it('renders the add input but NOT the mic when onAddNote is wired without onNoteVoice', () => {
-    // The hub wires note authoring without a voice handler (transcription is not
-    // wired in the hub). The text input must render, but the mic must be gated out
-    // rather than shown as a dead button that does nothing on press.
+  it('renders the add-note input + transcription-only mic when canStudy and add is wired (WI-2550)', () => {
+    // The mic is the shared VoiceInputControl wired directly into the draft —
+    // it renders whenever the add row does; no separate voice handler exists.
     render(
       <SubjectHubNotesSection
         notes={[selfNote]}
@@ -148,7 +126,7 @@ describe('SubjectHubNotesSection', () => {
 
     screen.getByTestId('subject-hub-notes-add-row');
     screen.getByTestId('subject-hub-notes-input');
-    expect(screen.queryByTestId('notes-mic')).toBeNull();
+    screen.getByTestId('notes-mic');
   });
 
   it('omits the add input, mic, and empty-add when canStudy but no persistence handler is wired', () => {
