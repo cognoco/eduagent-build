@@ -27,6 +27,15 @@ import {
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
 
+// The past-due grace deadline must stay in the FUTURE relative to the run:
+// once it passes, access correctly resolves to `free_fallback` instead of
+// `current` and the assertions below fail. This was pinned to a literal
+// 2026-08-01 and detonated repo-wide when that date arrived, reddening the
+// required `main` job on every API pull request. Derive it from the run clock
+// so the scenario means the same thing on every future date.
+const PERIOD_END_AT = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+const PERIOD_END_AT_ISO = PERIOD_END_AT.toISOString();
+
 (RUN ? describe : describe.skip)('payment-failed alert persistence', () => {
   let db: Database;
   const organizationId = generateUUIDv7();
@@ -91,7 +100,7 @@ const RUN = !!process.env.DATABASE_URL;
       payerPersonId,
       planTier: 'plus',
       status: 'past_due',
-      periodEndAt: new Date('2026-08-01T00:00:00.000Z'),
+      periodEndAt: PERIOD_END_AT,
     });
     previousResendApiKey = process.env['RESEND_API_KEY'];
     process.env['RESEND_API_KEY'] = 'resend-payment-failed-integration';
@@ -152,7 +161,7 @@ const RUN = !!process.env.DATABASE_URL;
       .update(subscription)
       .set({
         status: 'past_due',
-        periodEndAt: new Date('2026-08-01T00:00:00.000Z'),
+        periodEndAt: PERIOD_END_AT,
       })
       .where(eq(subscription.id, subscriptionId));
   });
@@ -259,7 +268,7 @@ const RUN = !!process.env.DATABASE_URL;
       params: {
         planTier: 'plus',
         accessState: 'current',
-        deadlineAt: '2026-08-01T00:00:00.000Z',
+        deadlineAt: PERIOD_END_AT_ISO,
       },
       deepLink: {
         route: 'billing.manage',
