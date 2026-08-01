@@ -37,6 +37,7 @@ Switzerland, and all unscreened jurisdictions remain unavailable at launch. See
 | [`rls-risk-acceptance-memo.md`](rls-risk-acceptance-memo.md) | Row-level-security risk decision. |
 | [`privacy-policy.html`](privacy-policy.html) | Adult-facing privacy notice draft. |
 | [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md) | Child-readable transparency draft. |
+| [`privacy-publication-manifest.md`](privacy-publication-manifest.md) | Privacy-notice publication package: claim-to-evidence map, publication checklist, OPQ-106/OPQ-107 handoff. |
 | [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md) | Historical engineering evidence still cited by the DPIA; re-verify at the final launch gate. |
 | [`2026-07-06-school-institutional-ai-act-tripwire.md`](2026-07-06-school-institutional-ai-act-tripwire.md) | Product/legal gate for school, LMS/SIS, formal-assessment, proctoring, and institutional use, plus the blocked-copy list. Decides no classification. |
 | [`2026-07-06-eu-ai-act-technical-file-qms-skeleton.md`](2026-07-06-eu-ai-act-technical-file-qms-skeleton.md) | High-risk-readiness technical-file and QMS index. A gap map, not evidence of compliance. |

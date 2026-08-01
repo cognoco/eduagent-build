@@ -1,10 +1,10 @@
 # Your privacy at MentoMate
 
-> **Draft for DPO review and testing with young people.** This is not the final published notice. The final version must be checked for comprehension, approved guardian-visibility wording, provider evidence, DPO contact details, and any required UK representative.
+> **Draft for DPO review and testing with young people — not legally reviewed, not published.** This is not the final published notice. Before publication it still needs (each blocked on its named gate — blocked, not forgotten): comprehension testing with young people and recorded results (external input — consultation evidence); approved guardian-visibility wording after the child-best-interests assessment (external input — controller/DPO); the reviewed provider list and transfer evidence (OPQ-110 vendor DPAs — Operator Queue, pending); the appointed DPO's contact details (OPQ-102 DPO appointment — Operator Queue, pending); UK-representative details if the UK is ever enabled (OPQ-107 UK representative — Operator Queue, pending); and counsel review and the publication act itself (OPQ-106 counsel review / final publication — Operator Queue, pending). Publication checklist: [`privacy-publication-manifest.md`](privacy-publication-manifest.md).
 
 ## The short version
 
-MentoMate is an AI tutor. It remembers what you are learning so it can help you over time. You must be at least 13 to use it.
+MentoMate is an AI tutor. It remembers what you are learning so it can help you over time. You must be at least 13 to use it, and it is only offered in countries where we have checked the rules that protect young people.
 
 ZWIZZLY AS is responsible for looking after your personal information.
 
@@ -14,7 +14,7 @@ We keep information you or your parent gives us, such as your name, date of birt
 
 We also keep information about your learning: subjects, messages, progress, review results, notes, and what you have mastered or may need to practise again.
 
-We do not collect your location, contacts, browsing history, or other photos from your device. We use a homework image only when you choose one. If you use the microphone, your device turns your voice into text; MentoMate does not receive or keep the audio recording.
+We do not collect your location, contacts, browsing history, or other photos from your device. We use a homework image only when you choose one. If you use the microphone, your device's speech service turns your voice into text; MentoMate only gets the words as text and never receives or keeps the audio recording.
 
 ## You are talking to AI
 
@@ -28,11 +28,11 @@ We use this memory for tutoring continuity—not advertising, marketing profiles
 
 ## Who receives information
 
-MentoMate uses specialist companies to provide sign-in, AI responses, embeddings, hosting, email, error monitoring, notifications, and subscriptions. Some are outside Norway, the EU/EEA, or the United Kingdom, including in the United States.
+MentoMate uses specialist companies to provide sign-in, AI responses, embeddings, hosting, email, error monitoring, background tasks (like reminders and scheduled clean-ups), notifications, and subscriptions. Some are outside Norway and the EU/EEA, including in the United States.
 
 When the learner is under 18, MentoMate removes their name and account identifiers before sending learning content to an AI model provider. The learning content and context needed to answer can still be sent.
 
-The final notice will link to the reviewed provider list and explain the legal safeguards used for international transfers.
+The final notice will link to the reviewed provider list and explain the legal safeguards used for international transfers (blocked on OPQ-110 vendor DPAs and transfer evidence — Operator Queue, pending).
 
 ## How long information stays
 
@@ -50,7 +50,7 @@ A parent or guardian may manage consent and see parts of a managed learner's pro
 
 You can ask what information MentoMate has about you, ask for inaccurate information to be corrected, object to some uses, withdraw consent, request a portable copy, or ask for deletion. Some account actions must be completed by the account owner or guardian.
 
-Use the privacy controls in the app or contact `support@mentomate.com`. The final version will also include the appointed DPO's confirmed contact details.
+Use the privacy controls in the app or contact `support@mentomate.com`. The final version will also include the appointed DPO's confirmed contact details (blocked on OPQ-102 DPO appointment — Operator Queue, pending).
 
 ## Comprehension prompts for consultation
 
