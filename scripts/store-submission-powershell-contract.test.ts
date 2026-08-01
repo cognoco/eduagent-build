@@ -10,20 +10,19 @@ const verifierPath = join(
   'scripts/verify-store-submission-powershell.ps1',
 );
 
-function verifyRunbook(path: string) {
-  return spawnSync(
-    'pwsh',
-    [
-      '-NoLogo',
-      '-NoProfile',
-      '-NonInteractive',
-      '-File',
-      verifierPath,
-      '-RunbookPath',
-      path,
-    ],
-    { encoding: 'utf8' },
-  );
+function verifyRunbook(path: string, executeCleanup = false) {
+  const args = [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-File',
+    verifierPath,
+    '-RunbookPath',
+    path,
+  ];
+  if (executeCleanup) args.push('-ExecuteCleanupContract');
+
+  return spawnSync('pwsh', args, { encoding: 'utf8' });
 }
 
 describe('WI-2937 store-submission PowerShell contract', () => {
@@ -34,6 +33,17 @@ describe('WI-2937 store-submission PowerShell contract', () => {
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/Parsed \d+ PowerShell block\(s\)/);
+  });
+
+  it('executes cleanup against an isolated target without exposing credential contents', () => {
+    const result = verifyRunbook(runbookPath, true);
+
+    expect(result.error).toBeUndefined();
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      'Executed cleanup contract against an isolated temporary path',
+    );
   });
 
   it('rejects the malformed credentialPath assignment from the review finding', () => {
