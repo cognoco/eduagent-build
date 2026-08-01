@@ -94,6 +94,9 @@ export async function findActiveLinkContract(
 /**
  * Canonical link initiation for callers that already own a transaction.
  * Repairs a pre-existing bare supportership by adding its missing contract.
+ * Callers must hold the outer transaction: the conflict-winner reads and
+ * conditional audit write preserve edge -> contract -> audit atomicity and
+ * crash recovery. Do not add a nested transaction around this body.
  */
 export async function initiateLinkInTransaction(
   db: Database,
