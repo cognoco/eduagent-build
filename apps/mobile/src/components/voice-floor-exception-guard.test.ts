@@ -209,6 +209,18 @@ const LEDGER: LedgerFile[] = [
   },
 ];
 
+// Until WI-3007 lands its sanctioned display-name mics, the two
+// mixed-disposition files carry no speech wiring AT ALL, so we enforce a
+// file-scoped ban here as defense in depth over the element-scoped floor
+// (an element check sees only the anchored input's opening tag, not a
+// sibling mic button wired to it). WI-3007 removes a file from this list in
+// the SAME PR that adds its sanctioned mics — at which point the
+// element-scoped VFX-3a checks remain the durable guard.
+const MIXED_FILES_CURRENTLY_FULLY_TYPED: string[] = [
+  'apps/mobile/src/app/create-profile.tsx',
+  'apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx',
+];
+
 const repoRoot = resolve(__dirname, '../../../..');
 
 function read(relPath: string): string {
@@ -293,19 +305,41 @@ describe('WI-2553 — voice-floor exception-ledger coverage guard', () => {
       }
     }
 
+    // Section-scoped: a Surfaces row is validated against the guard entries
+    // of the VFX section it sits under, so an anchor filed under the wrong
+    // entry (not merely a wrong file) also fails.
+    let currentEntry: string | undefined;
     for (const line of doc.split('\n')) {
+      const heading = line.match(/^### (VFX-\d+[ab]?)\b/);
+      if (heading) {
+        currentEntry = heading[1];
+        continue;
+      }
       const row = line.match(/^\|\s*`(apps\/[^`]+\.tsx)`\s*\|(.+)\|\s*$/);
       const file = row?.[1];
       const anchorsCell = row?.[2];
       if (file === undefined || anchorsCell === undefined) continue;
+      if (currentEntry === undefined) {
+        problems.push(`doc Surfaces row outside any VFX section: ${file}`);
+        continue;
+      }
+      const entryId = currentEntry;
       const guardedAnchors = new Set(
-        LEDGER.filter((e) => e.file === file).flatMap((e) => e.anchors),
+        LEDGER.filter(
+          (e) => e.file === file && e.entries.includes(entryId),
+        ).flatMap((e) => e.anchors),
       );
+      if (guardedAnchors.size === 0) {
+        problems.push(
+          `doc cites file the guard does not list under ${entryId}: ${file}`,
+        );
+        continue;
+      }
       for (const token of anchorsCell.matchAll(/`([^`]+)`/g)) {
         const anchor = token[1];
         if (anchor !== undefined && !guardedAnchors.has(anchor)) {
           problems.push(
-            `doc cites anchor the guard does not know: ${anchor} (${file})`,
+            `doc cites anchor the guard does not list under ${entryId}: ${anchor} (${file})`,
           );
         }
       }
@@ -339,6 +373,24 @@ describe('WI-2553 — voice-floor exception-ledger coverage guard', () => {
       if (SPEECH_WIRING.test(source)) {
         violations.push(
           `${entry.file} (${entry.entries.join(', ')}) contains speech-input wiring but is typed-only`,
+        );
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it('mixed-disposition files stay fully speech-free until WI-3007 lands (interim file-scoped ban)', () => {
+    // Defense in depth over the element-scoped floor below: an element check
+    // sees only the anchored input's opening tag, not a sibling mic button
+    // wired to it. Today neither mixed file has ANY sanctioned mic, so the
+    // whole file must be speech-free. WI-3007 removes a file from
+    // MIXED_FILES_CURRENTLY_FULLY_TYPED in the same PR that adds its
+    // sanctioned display-name mics.
+    const violations: string[] = [];
+    for (const file of MIXED_FILES_CURRENTLY_FULLY_TYPED) {
+      if (SPEECH_WIRING.test(read(file))) {
+        violations.push(
+          `${file} contains speech-input wiring; if this is WI-3007's sanctioned display-name mic, move the file out of MIXED_FILES_CURRENTLY_FULLY_TYPED in the same PR — anything else is a VFX-3a violation`,
         );
       }
     }
@@ -379,6 +431,7 @@ describe('WI-2553 — voice-floor exception-ledger coverage guard', () => {
       enclosingElement(createProfile, 'create-profile-birthdate-input'),
     ).toContain('<TextInput');
     for (const anchor of [
+      'save-basics-birth-year',
       'save-basics-parent-birth-year',
       'save-basics-child-birth-year',
     ]) {

@@ -210,8 +210,13 @@ All three are linked to WI-2553 (origin) and WI-1763 (audit) in Cosmo.
    date-of-birth / birth-year elements specifically must remain free of
    speech-input wiring, while VFX-3b display-name elements in the same files
    may gain it under WI-3007. The guard also asserts the web birthdate input
-   and both save-wizard birth-year inputs are `TextInput` elements — encoding
-   the corrected VFX-3a premise so it cannot silently regress to the
-   disproved "structurally a picker" rationale.
+   and all three save-wizard birth-year inputs are `TextInput` elements —
+   encoding the corrected VFX-3a premise so it cannot silently regress to the
+   disproved "structurally a picker" rationale. **Interim file-scoped ban:**
+   until WI-3007 lands, neither mixed file has any sanctioned mic, so the
+   guard additionally bans speech wiring across both files wholesale
+   (defense in depth — an element check cannot see a sibling mic button);
+   WI-3007 lifts that file-scope ban in the same PR that adds its mics, and
+   the element-scoped VFX-3a checks remain the durable guard.
 5. **No-dictation-target invariant** — `AdultSelfConsentGate.tsx` continues to
    contain no `TextInput` (the VFX-2 consent-half premise).
