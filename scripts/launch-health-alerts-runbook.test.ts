@@ -40,13 +40,10 @@ describe('launch-health durable terminal-failure surface', () => {
     expect(section).toContain('`app/billing.alias_merge.failed`');
     expect(section).toContain('`app/consent.email-revocation.failed`');
     expect(section).toMatch(
-      /three WI-2346 teardown payloads[\s\S]*opaque `accountId` or `eventId`[\s\S]*nullable Inngest `runId`[\s\S]*a bounded coarse[\s\S]*`errorName`[\s\S]*`timestamp`/,
+      /two consent events carry their opaque profile or\s+person identifiers, `runId`, a bounded `errorClass`/,
     );
     expect(section).toMatch(
-      /two pre-existing consent dead letters[\s\S]*raw `error` message text/,
-    );
-    expect(section).toMatch(
-      /WI-2977 \(Privacy-minimize\s+consent-revocation dead-letter payloads\)/,
+      /Account deletion and subscription-store teardown carry\s+`accountId`, `runId`, `errorName`, and `timestamp`; alias merge carries\s+`eventId`, `runId`, `errorName`, and `timestamp`/,
     );
   });
 });
