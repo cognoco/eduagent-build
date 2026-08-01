@@ -42,7 +42,25 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+// [WI-2565] Call-order instrumentation only: the REAL resolver still runs
+// (jest.fn wraps the actual implementation, so every epoch/observation case
+// above keeps exercising real policy logic). The denial case asserts it is
+// NOT invoked for an unauthorized caller — the guard must sit BEFORE the
+// notice-policy read (AC-1), not merely before the feed builders.
+jest.mock('../services/mentor-notices', () => {
+  const actual = jest.requireActual(
+    '../services/mentor-notices',
+  ) as typeof import('../services/mentor-notices');
+  return {
+    ...actual,
+    resolveMentorNoticeVisibility: jest.fn(
+      actual.resolveMentorNoticeVisibility,
+    ),
+  };
+});
+
 import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { resolveMentorNoticeVisibility } from '../services/mentor-notices';
 
 const mockVerifyPersonOwnershipV2 =
   verifyPersonOwnershipV2 as jest.MockedFunction<
@@ -550,17 +568,21 @@ describe('now routes', () => {
       ['/v1/now', buildNowFeed],
       ['/v1/now/overflow', buildNowOverflow],
     ] as const)(
-      '%s rejects an unrelated org member selecting another profile before the feed builder runs',
+      '%s rejects an unrelated org member selecting another profile before the notice-policy resolver and the feed builder run',
       async (path, build) => {
         mockVerifyPersonOwnershipV2.mockRejectedValueOnce(
           new Error('caller cannot read selected profile'),
         );
 
-        const res = await makeApp(false, CALLER_PERSON_ID).request(
+        // Rollout ON, so a resolver invocation here would be observable —
+        // proving the denial lands before the notice-policy read (AC-1),
+        // not merely before the feed build.
+        const res = await makeApp(true, CALLER_PERSON_ID).request(
           `${path}?scope=self`,
         );
 
         expect(res.status).toBe(403);
+        expect(resolveMentorNoticeVisibility).not.toHaveBeenCalled();
         expect(build).not.toHaveBeenCalled();
       },
     );
