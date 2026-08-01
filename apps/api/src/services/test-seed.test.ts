@@ -591,7 +591,7 @@ describe('seedScenario', () => {
       expect.objectContaining({
         id: result.profileId,
         displayName: 'Test Child',
-        conversationLanguageConfirmedAt: null,
+        conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
       }),
     );
     expect(insertedRows).toContainEqual(

@@ -819,6 +819,7 @@ async function createBaseProfile(
     clerkUserId?: string;
     defaultAppContext?: string;
     residenceJurisdiction?: string;
+    conversationLanguageConfirmed?: boolean;
   },
 ): Promise<string> {
   const profileId = generateUUIDv7();
@@ -832,9 +833,10 @@ async function createBaseProfile(
     // [WI-1556] Owner seeds are existing credentialed learners and must clear
     // the first-Mentor gate. Managed children have no credential yet, so they
     // stay unconfirmed until a seed explicitly adds one.
-    conversationLanguageConfirmedAt: isOwner
-      ? CONFIRMED_CONVERSATION_LANGUAGE_AT
-      : null,
+    conversationLanguageConfirmedAt:
+      (opts.conversationLanguageConfirmed ?? isOwner)
+        ? CONFIRMED_CONVERSATION_LANGUAGE_AT
+        : null,
     ...(opts.defaultAppContext
       ? { defaultAppContext: opts.defaultAppContext }
       : {}),
@@ -1474,6 +1476,7 @@ async function seedV2AccountNonOwnerChild(
     displayName: 'Test Child',
     birthYear: LEARNER_BIRTH_YEAR,
     isOwner: false,
+    conversationLanguageConfirmed: true,
   });
 
   const loginId = generateUUIDv7();
