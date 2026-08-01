@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 15:31 CEST
+Last reconciled: 2026-08-01 15:52 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -26,7 +26,27 @@ Last reconciled: 2026-08-01 15:31 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 15:31 CEST
+### Latest authoritative boundary — 2026-08-01 15:52 CEST
+
+- Direct Cosmo polling still returns 42 related rows: 31 Closed, 6 Executing,
+  and 5 Ready. BID-48 remains Running. The Brief/relation mismatch is unchanged:
+  WI-2958 is the extra related row and remains unadmitted under its expired external
+  claim.
+- WI-2939's newly authorized logical-target preflight passed project, branch,
+  endpoint, endpoint-to-branch, Doppler database-name, and owner checks, but the
+  named disposable database is now absent. The branch contains only the same eight
+  older databases that predate WI-2939; there is no successor database/owner pair.
+  The guard stopped before Jest, bootstrap, or any schema/test mutation, so the
+  one-run allowance remains unconsumed. Durable refusal evidence is
+  `.workitem-artifacts/WI-2939/full-canonical-rerun-logical-target-refusal.json`.
+  The operator is considering whether to recreate the same disposable development
+  database and owner on the already authorized stable project/branch/endpoint.
+- WI-2643 exact-head Flag-ON CI job `91374686708` is green, including local-role
+  provisioning and both integration-test steps. Main job `91374928424` is still
+  running after its own provisioning and database guard steps passed. The separate
+  staging smoke run failed one V2 homework readiness wait while its legacy run passed
+  24/24; FO-2091 / `OCC-547F9C3B9EAA` records the unrelated occurrence. A single
+  failed-job rerun is queued only after main concludes green; no code was changed.
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent

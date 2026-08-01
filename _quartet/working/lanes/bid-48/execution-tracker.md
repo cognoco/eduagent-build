@@ -56,9 +56,26 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 15:31 CEST
+## Live reconciliation — 2026-08-01 15:52 CEST
 
 ### Latest authoritative boundary
+
+- Fresh direct Cosmo polling leaves the live slice unchanged at 42 related rows:
+  31 Closed, 6 Executing, and 5 Ready; BID-48 remains Running. WI-2958 remains the
+  unadmitted extra relation under an expired external claim.
+- WI-2939's logical-target authorization was exercised only as a read-only guard.
+  Every stable identity facet matched until the database inventory: the named
+  disposable database has been deleted without replacement, leaving the same eight
+  older branch databases that predate it. No Jest/bootstrap/schema mutation began;
+  the one-run allowance remains unconsumed. Refusal evidence is
+  `.workitem-artifacts/WI-2939/full-canonical-rerun-logical-target-refusal.json`.
+  The current operator ruling is whether to recreate that same development-only
+  database and owner on the already authorized project/branch/endpoint.
+- WI-2643 exact-head Flag-ON job `91374686708` is green through provisioning and
+  both integration suites. Main job `91374928424` is still running after its own
+  provisioner and database guards passed. The separate staging smoke failure is an
+  unrelated V2 homework readiness timeout (legacy 24/24 green), recorded as FO-2091 /
+  `OCC-547F9C3B9EAA`; one failed-job rerun will follow only after main is green.
 
 - The Brief still declares 41 members, but the live relation now has 42 rows because
   WI-2958 was related without a Brief amendment. Relation slice: 31 Closed,
