@@ -188,9 +188,11 @@ consent-age self-takeover (`MMT-ADR-0010`).
   existing `person_id` through the named `migration-pending` interim. It is not
   a parent-created credential: no Clerk admin-write and no password handoff.
 - **Credentialed and consent-capable are independent facts.** Exact age ×
-  current residence-jurisdiction policy chooses either the learner's
-  self-consent path or the distinct authenticated-adult ceremony. Unknown or
-  contradictory policy inputs fail closed.
+  habitual-residence policy returns `self`, `guardian`,
+  `joint_child_guardian`, or no available authorization path. `self` uses the
+  learner path; the two guardian forms use the distinct authenticated-adult
+  ceremony. Unknown, blocked, null, stale, or contradictory policy inputs fail
+  closed and cannot be replaced by a guardian fallback.
 - **Consent-capable path:** the adult-first invitation may proceed to
   home-Organization reassignment. Add the family Membership before
   decommissioning the learner's empty Organization-of-one; never orphan the
@@ -198,10 +200,14 @@ consent-age self-takeover (`MMT-ADR-0010`).
   Supportership remains an optional, separate learner grant (inv 14/19).
 - **Consent-gated 13–16 path:** hold the join until an authenticated adult Person
   proves the claimed legal relationship/authority at the required assurance/VPC
-  level and accepts all destination-Organization purposes. One transaction
+  level and accepts all destination-Organization purposes. For
+  `joint_child_guardian`, the authenticated learner must accept the same
+  complete purpose set. One transaction
   under the canonical charge-Person consent lock creates or confirms the global
   guardian→charge edge and writes fresh Organization-, jurisdiction-, purpose-,
-  method-, policy-, evidence-, and time-bound grants. Existing global
+  authorization-form-, method-, policy-, evidence-, and time-bound grants.
+  Every actor required by the authorization form is bound in the evidence.
+  Existing global
   Guardianship may be confirmed idempotently; consent never carries across
   Organizations.
 - **No authority by invitation or email:** the learner may request or accept a

@@ -15,7 +15,7 @@
 
 Two v1 journeys share one identity move: a managed child can gain their own Login against the same Person, and an existing-account learner can join a family without losing history. Both attach a self-provisioned Login/Person to a family graph and reassign the home Organization without orphaning the Person.
 
-Login possession and consent capability are independent. A credentialed 13–16 learner may be below the digital-consent age resolved from exact age and current residence policy. The original decision covered only the consent-capable learner and deferred the guardian-required variant, leaving the launch family chain incomplete. The missing question is how an adult acquires authority without allowing a learner, invitation, email token, admin role, or Payer role to mint Guardianship.
+Login possession and consent capability are independent. A credentialed 13–16 learner may be below the digital-consent age resolved from exact age and habitual-residence policy. The policy result is not binary: its `authorizationForm` is `self`, `guardian`, or `joint_child_guardian`, while an unavailable or blocked decision exposes no usable authorization path. The original decision covered only the consent-capable learner and deferred the guardian-required variants, leaving the launch family chain incomplete. The missing question is how an adult acquires authority without allowing a learner, invitation, email token, admin role, or Payer role to mint Guardianship.
 
 ## Decision
 
@@ -27,19 +27,21 @@ Home-Organization reassignment is never-orphan: add the destination family Membe
 
 ### 2. Consent-capable credentialed learner
 
-When current age × residence policy resolves the learner as self-consenting, the learner may accept the adult-first invitation and the consolidation can proceed. The adult becomes the destination Organization's admin and/or Payer as applicable. Neither role creates Guardianship. Supportership is optional and must be granted separately by the learner; it is never implied by family Membership or payment.
+When exact age × habitual-residence policy returns `authorizationForm=self` and an allowed launch decision, the learner may accept the adult-first invitation and the consolidation can proceed. The adult becomes the destination Organization's admin and/or Payer as applicable. Neither role creates Guardianship. Supportership is optional and must be granted separately by the learner; it is never implied by family Membership or payment.
 
 ### 3. Consent-gated credentialed learner aged 13–16
 
-When policy requires guardian consent, the join enters a holding state and requires a **distinct authenticated-adult authority ceremony**:
+When an allowed policy decision returns `authorizationForm=guardian` or `joint_child_guardian`, the join enters a holding state and requires a **distinct authenticated-adult authority ceremony**:
 
 1. Authenticate the adult and resolve the adult Person server-side.
 2. Verify the claimed legal relationship or authority at the policy-required assurance/VPC level, bound to the learner and destination Organization.
-3. Re-read residence and effective policy and obtain the adult's acceptance of every required destination-Organization purpose.
+3. Re-read habitual residence and effective policy, including the resolved authorization form. Obtain the adult's acceptance of every required destination-Organization purpose and, for `joint_child_guardian`, bind the authenticated learner's acceptance of the same complete server-derived purpose set.
 4. In one transaction under the canonical charge-Person consent lock, create or confirm the global guardian→charge edge and write fresh grants for every required Organization/purpose, with policy, method, evidence, and time provenance.
 5. Terminalize and back-link corresponding consent requests and invalidate stale email tokens.
 
-Any missing, stale, withdrawn, denied, expired, partial, wrong-adult, moved-residence, changed-policy, replayed, or cross-Organization input fails closed. An existing global Guardianship edge can be confirmed idempotently, but grants never carry between Organizations. The edge and new grants commit together or not at all.
+For `guardian`, the verified adult acceptance is the required authorization act. For `joint_child_guardian`, neither actor's acceptance is sufficient alone: the authenticated learner acceptance, verified adult acceptance, edge, and complete grant set bind to the same tuple and commit together. If policy resolution is unavailable, blocked, or returns no authorization form, the join remains unavailable; the adult ceremony is not a fallback that can override policy.
+
+Any missing, stale, withdrawn, denied, expired, partial, wrong-adult, moved-residence, changed-policy, changed-authorization-form, replayed, or cross-Organization input fails closed. An existing global Guardianship edge can be confirmed idempotently, but grants never carry between Organizations. The edge and new grants commit together or not at all.
 
 The learner may request or accept a join but cannot nominate or mint their own consent authority. An ordinary email consent response may approve or withdraw an Organization- and purpose-scoped consent grant within the existing consent flow, but it does not prove the adult Person or legal relationship, cannot create Guardianship, and cannot satisfy or resume this family-join authority ceremony. Invitation, adulthood, family Membership, admin, and Payer status also confer no Guardianship.
 
@@ -47,7 +49,7 @@ Guardianship remains distinct from Supportership. Completing the adult ceremony 
 
 ### 4. Evidence and compatibility boundary
 
-The atomic operation records a named, versioned `GuardianAttachEvidenceV1` envelope sufficient to bind the adult, charge, destination Organization, verified qualification, verifier assertion reference, assurance method and level, residence/policy selection, complete purpose set, request correlation, idempotency identity, and relevant validity/completion times. Raw identity documents, biometrics, and provider secrets are prohibited. If existing storage cannot retain this contract, the schema must be extended rather than weakening or scattering the evidence.
+The atomic operation records a named, versioned `GuardianAttachEvidenceV1` envelope sufficient to bind the adult, charge, destination Organization, resolved authorization form, verified qualification, verifier assertion reference, assurance method and level, habitual-residence/policy selection, complete purpose set, each actor whose acceptance the authorization form requires, request correlation, idempotency identity, and relevant validity/completion times. Raw identity documents, biometrics, and provider secrets are prohibited. If existing storage cannot retain this contract, the schema must be extended rather than weakening or scattering the evidence.
 
 The existing ordinary email-consent path remains compatible: its approvals and withdrawals continue to affect only their scoped consent grants. Historical email-only grants are never upgraded to Guardianship, and historical grants retain their recorded jurisdiction and policy context.
 
@@ -58,7 +60,7 @@ A joining learner with an active store subscription joins immediately once all i
 ## Consequences
 
 - A Person and their learning history survive credential attachment and family consolidation unchanged.
-- Credentialed does not mean self-consenting; policy resolution determines the authority path.
+- Credentialed does not mean self-consenting; exact age × habitual-residence policy determines `self`, `guardian`, `joint_child_guardian`, or no available authority path.
 - The guardian-required path adds an adult authentication/verifier boundary, holding and retry states, a canonical-lock transaction, structured audit evidence, and fail-closed drift/replay behavior.
 - Existing Guardianship can be reused only as a global relationship fact; each destination Organization requires fresh purpose grants.
 - No join path creates Supportership or visibility automatically.

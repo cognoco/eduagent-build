@@ -452,17 +452,20 @@ age, edge-only); and the managed-adult "grandparent" (UC-1, §9). Copy to be aut
   joins the destination family Organization without losing their Person or
   learning history (inv 20/21). Add Membership before decommissioning the empty
   Organization-of-one through `migration-pending`; never orphan.
-- **Login is not consent authority.** Exact age × current
-  residence-jurisdiction policy selects the consent path. A consent-capable
-  learner may accept directly. A consent-gated learner aged 13–16 enters a
-  holding state and requires the distinct authenticated-adult ceremony in
-  `MMT-ADR-0010`.
+- **Login is not consent authority.** Exact age × habitual-residence policy
+  selects `self`, `guardian`, `joint_child_guardian`, or no available
+  authorization path. `self` may accept directly. The two guardian forms enter
+  a holding state and require the distinct authenticated-adult ceremony in
+  `MMT-ADR-0010`; a blocked/null decision cannot be replaced with either path.
 - The adult ceremony authenticates and resolves the adult Person, verifies the
   legal relationship/authority at the required assurance/VPC level, and obtains
-  every required destination-Organization purpose. One atomic operation creates
+  every required destination-Organization purpose. For
+  `joint_child_guardian`, the authenticated learner must accept the same
+  complete server-derived purpose set. One atomic operation creates
   or confirms the global guardian→charge edge and writes fresh
   Organization-/purpose-scoped grants with jurisdiction, policy, method,
-  evidence, and time provenance. A global edge may be confirmed idempotently;
+  authorization-form, evidence, required-actor acceptance, and time provenance.
+  A global edge may be confirmed idempotently;
   consent never carries across Organizations.
 - **No automatic authority or visibility.** The learner may request or accept a
   join but cannot nominate or mint Guardianship (inv 28/30). Invitation,

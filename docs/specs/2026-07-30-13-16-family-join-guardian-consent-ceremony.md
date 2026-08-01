@@ -24,7 +24,10 @@ The ceremony must prove all of the following:
 1. an authenticated adult session resolves to the adult's existing Person;
 2. the adult is legally qualified to consent for this specific learner at the
    assurance/VPC level required by the current policy;
-3. the adult accepts every required purpose for the destination Organization;
+3. the policy-selected authorization form is enforced: `guardian` requires the
+   adult's acceptance, while `joint_child_guardian` requires both the
+   authenticated learner and verified adult to accept the same complete
+   server-derived purpose set;
 4. one atomic operation creates or confirms the global guardian→charge edge
    and writes fresh, organization- and purpose-scoped consent grants.
 
@@ -55,11 +58,14 @@ is conservative; it does not redefine any jurisdiction's consent threshold.
 - **Supportership:** independent, learner-granted visibility edge. The ceremony
   neither creates nor widens it.
 
-The resolver first determines whether the learner can self-consent from exact
-age and current residence-jurisdiction policy. A `self` result bypasses this
-adult ceremony. A guardian-required result enters a holding state until the
-ceremony succeeds. Unknown, unsupported, or contradictory policy inputs fail
-closed; they never fall back to self-consent.
+The resolver first selects an authorization form from exact age and current
+habitual-residence policy. `self` bypasses this adult ceremony. `guardian`
+requires verified-adult acceptance. `joint_child_guardian` requires both the
+authenticated learner and verified adult to accept the same complete purpose
+set before the atomic attach. A null authorization form, blocked launch
+decision, or unknown, unsupported, stale, or contradictory policy input makes
+the join unavailable; it never falls back to self-consent or to an adult-only
+ceremony.
 
 ## 3. Trust boundaries and prohibited upgrades
 
@@ -95,8 +101,11 @@ containing:
 - assertion `issuedAt`, `notBefore`, `expiresAt`, and a single-use redemption
   handle or its server-side consumed record;
 - current residence jurisdiction and the selected country-policy record:
-  `countryCode`, `regimeKey`, `policyVersion`, and effective window;
+  `countryCode`, `regimeKey`, `policyVersion`, `authorizationForm`, launch
+  decision/reasons, and effective window;
 - the complete server-derived set of required consent purposes;
+- for `joint_child_guardian`, the authenticated learner's acceptance of that
+  exact purpose set, with actor, policy, and time provenance;
 - join/consent-request IDs, correlation ID, and idempotency key.
 
 The verifier result must be bound to the adult, learner, destination
@@ -117,11 +126,13 @@ clock-skew allowance. Assertions outside `notBefore`/`expiresAt`, from a stale
 policy window, or exceeding that maximum TTL fail closed even if the provider
 still labels them valid.
 
-Verification handles are single-use. After redemption, the server may issue a
-short-lived opaque authority token bound to the full command tuple so a safe
-retry does not require reusing the provider handle. The mobile client may keep
-that token only until success, terminal failure, or expiry; it must never store
-raw evidence.
+Verification handles are single-use. Redemption must durably record the
+consumed handle and issue a short-lived opaque authority token bound to the
+full command tuple in one atomic operation before returning success. After a
+response loss, the same redemption request must recover that already-issued
+bound token rather than reusing the provider handle or issuing a second
+authority. The mobile client may keep the token only until success, terminal
+failure, or expiry; it must never store raw evidence.
 
 An exact retry returns the original success only when adult, learner,
 Organization, purposes, relationship, residence, policy version, and evidence
@@ -138,9 +149,12 @@ Inside one database transaction it must:
 
 1. acquire the charge-Person lock;
 2. re-read the adult and charge Persons, destination Organization, current
-   residence, effective country-policy record, join request, consent requests,
-   verifier redemption, and required purpose set;
+   habitual residence, effective country-policy record and authorization form,
+   join request, consent requests, verifier redemption, and required purpose
+   set;
 3. re-evaluate consent authority and reject any drift from the asserted tuple;
+   for `joint_child_guardian`, also require the authenticated learner's bound
+   acceptance of the same complete purpose set;
 4. confirm an existing global guardian→charge edge or create it with the
    verified qualification;
 5. write a fresh grant for every required purpose, scoped to the destination
@@ -159,7 +173,8 @@ grants; the global edge is not consent portability.
 Each grant records the existing assurance token/method and a named, versioned
 `GuardianAttachEvidenceV1` envelope in `audit_fact` containing at least:
 
-- adult and charge Person IDs, verified qualification, and edge ID;
+- adult and charge Person IDs, resolved authorization form, verified
+  qualification, and edge ID;
 - destination Organization and purpose;
 - verifier/provider and opaque assertion reference — never raw identity
   documents, biometrics, or provider secrets;
@@ -167,6 +182,8 @@ Each grant records the existing assurance token/method and a named, versioned
 - residence country, jurisdiction, regime key, policy version, and policy
   effective window;
 - assertion issue/not-before/expiry, ceremony completion, and grant timestamps;
+- each required accepting actor and that actor's acceptance timestamp and
+  purpose-set identity;
 - join/consent-request IDs, correlation ID, and idempotency key.
 
 WI-2533 must prove that the present consent-grant columns plus this envelope
@@ -185,6 +202,8 @@ or weaken this contract.
 | `holding/residence-drift` | Residence changes after initiation. | “Your consent requirements changed” and a retry action. | Re-resolve policy and invalidate the old assertion and purpose acceptance. |
 | `holding/policy-drift` | Policy version or effective window changes. | “Consent requirements changed” and a retry action. | Re-resolve and require a fresh acceptance/evidence tuple. |
 | `holding/partial` | Purpose acceptance is incomplete or any transactional write fails. | No success; a retryable or terminal error matching the underlying failure. | Roll back every new edge/grant/request/audit write; retry the whole atomic command when safe. |
+| `holding/joint-acceptance-incomplete` | `joint_child_guardian` applies but either the authenticated learner or verified adult has not accepted the same complete purpose set. | A non-enumerating “Both approvals are required” holding state. | Preserve no partial authority; collect the missing bound acceptance and re-evaluate policy before attachment. |
+| `terminal/policy-unavailable` | Policy is blocked, unavailable, stale, contradictory, or returns no authorization form. | An unavailable-in-your-region state with safe exit. | Do not offer self or guardian fallback; resume only after a fresh allowed policy decision. |
 | `completed` | A valid global Guardianship edge already exists and all destination grants can be written. | Normal success without duplicate-edge language. | Confirm the edge under the lock and create fresh destination grants. |
 | `holding/cross-organization` | A grant from another Organization is offered as proof. | Generic verification failure. | Obtain fresh grants for the destination Organization; never copy the old grant. |
 | `completed` | An exact retry matches an already committed result. | The original success state. | Return the committed result without duplicate edge, grant, or request rows. |
@@ -203,11 +222,12 @@ and callback surfaces must be rate-limited and anti-enumerating; no response may
 reveal whether an unrelated adult, learner, email, or family exists.
 
 Mobile must provide plain-language screens for: why adult help is required,
-handoff/initiation, provider return, pending/holding, success, denial,
-expiry/stale-policy, and retry. Relaunch/resume must recover only opaque
-server-issued continuation state. After the verifier handle is consumed, a
-network retry must use the bound authority token from §5 rather than restart an
-unsafe or impossible provider redemption.
+handoff/initiation, the learner's joint acceptance when policy requires it,
+provider return, pending/holding, success, denial, expiry/stale-policy, and
+retry. Relaunch/resume must recover only opaque server-issued continuation
+state. After the verifier handle is consumed, a network retry must recover or
+use the bound authority token from §5 rather than restart an unsafe or
+impossible provider redemption.
 
 The successful ceremony resumes the join operation. It does not silently
 create Supportership; any visibility grant remains its own explicit learner
@@ -229,12 +249,18 @@ strict-green evidence is available.
 
 ## 11. WI-2533 implementation and regression handoff
 
-WI-2533 owns implementation. Its API/integration coverage must include adult
-authentication, server-resolved Person binding, Organization binding, complete
-purpose-set enforcement, request terminalization/back-links, stale email-token
-invalidation, residence/policy drift, TTL and clock skew, exact and mutated
-replay, wrong adult/charge, existing edge confirmation, two-connection lock
-contention, idempotent retry, and full rollback on every partial-write fault.
+WI-2533 owns implementation through dedicated shared
+`@eduagent/schemas` initiation, verifier-redemption, authority-token, and
+attachment contracts; those contracts must remain separate from the ordinary
+family-join invitation/acceptance schemas. Its API/integration coverage must
+include adult authentication, server-resolved Person binding, Organization
+binding, all three authorization forms, unavailable/null policy outcomes,
+complete and joint purpose-set enforcement, atomic verifier-handle consumption
+and token issuance, response-loss token recovery, request
+terminalization/back-links, stale email-token invalidation, residence/policy/
+authorization-form drift, TTL and clock skew, exact and mutated replay, wrong
+adult/charge, existing edge confirmation, two-connection lock contention,
+idempotent retry, and full rollback on every partial-write fault.
 
 Its mobile regressions must cover initiation and provider return, holding-state
 resume after relaunch, authority-token retry after a consumed verifier handle,
