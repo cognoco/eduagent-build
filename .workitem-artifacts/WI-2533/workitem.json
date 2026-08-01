@@ -1,0 +1,18 @@
+{
+  "pageId": "3a38bce9-1f7c-818f-b805-f9159b4736a7",
+  "id": "WI-2533",
+  "name": "Implement guardian attachment and jurisdictional consent for credentialed learners",
+  "description": "A learner may own and operate a login from age 13 while still requiring guardian consent in their residence jurisdiction, but the existing email consent approval records a grant without creating the canonical Guardianship edge and the 13-16 family-join posture is design-only.",
+  "acceptanceCriteria": "Implement the reviewed outcome of WI-2037 for any credentialed 13+ learner whose AgeConsentDecision requires guardian consent. The learner keeps and operates their own Login/Person throughout. The flow verifies the consenting adult's authority and required assurance/VPC method, then atomically creates or confirms the global Guardianship edge and records the jurisdiction-, purpose-, method-, policy-, and evidence-stamped consent grant; failure leaves neither partial authority nor processing access. The inviting adult is not assumed to be the guardian, a minor cannot nominate consent authority, and Guardianship creates no ambient supporter visibility. Pending, denied, expired, withdrawn, restored, residence-change, retry, wrong-adult, and existing-valid-guardian states fail closed and are covered by integration and mobile tests. Learning processing remains blocked until the resolved consent decision is satisfied.",
+  "riskImpact": "P1 legal/privacy boundary: a credentialed learner can require guardian consent while no implemented canonical ceremony attaches the verified guardian and lawful-basis record without conflating login, family membership, or visibility.",
+  "type": "Feature",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}
