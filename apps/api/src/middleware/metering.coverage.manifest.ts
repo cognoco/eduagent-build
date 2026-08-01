@@ -146,6 +146,9 @@ export interface RouteOwnedLlmConsentBoundary {
     | 'route-discriminant'
     | 'independent-mixed-residue';
   rationale: string;
+  preConsentBranchTokens?: readonly string[];
+  consentGateToken?: string;
+  llmDispatchToken?: string;
 }
 
 /**
@@ -182,9 +185,16 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
       routeFile: 'apps/api/src/routes/dictation.ts',
       routeStartToken: "'/dictation/review'",
       routeEndToken: '',
-      classification: 'independent-mixed-residue',
+      classification: 'route-owned',
       rationale:
-        'Rate-limit and payload-size branches still follow the route gate.',
+        'Validated, rate-eligible, in-budget requests gate immediately before the review LLM path.',
+      preConsentBranchTokens: [
+        'const rateLimited = await checkAndLogRateLimit(',
+        'if (rateLimited) {',
+        'if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchToken: 'const result = await reviewDictation({',
     },
     {
       id: 'curriculum.topic-preview',

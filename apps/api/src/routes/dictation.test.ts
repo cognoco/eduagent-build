@@ -221,6 +221,10 @@ afterAll(() => {
 beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
+  // Tests that prove deterministic exits intentionally leave a queued
+  // rejection unconsumed because the consent gate must not run. Reset the
+  // implementation as well as call history so that queue cannot leak.
+  (assertLlmConsent as jest.Mock).mockReset().mockResolvedValue(undefined);
   meteringFixture.reset();
   // [WI-774] Default: delegate to the REAL checkAndLogRateLimit so the existing
   // rate-limit tests (driven by meteringFixture) are unchanged. The flag-on
@@ -1054,6 +1058,59 @@ describe('POST /v1/dictation/review', () => {
 
   // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
   describe('[WI-2396] consent-withdrawal gate', () => {
+    it('[WI-2987] preserves the rate-limit 429 before withdrawn consent', async () => {
+      meteringFixture.setNotificationLogCount(10);
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(429);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('RATE_LIMITED');
+      expect(assertLlmConsent).not.toHaveBeenCalled();
+      expect(reviewDictation).not.toHaveBeenCalled();
+    });
+
+    it('[WI-2987] preserves the aggregate prompt-budget 413 before withdrawn consent', async () => {
+      const aggregateOversized = Array.from({ length: 50 }, () => ({
+        text: 'a'.repeat(125),
+        withPunctuation: 'b'.repeat(125),
+        wordCount: 25,
+      }));
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            ...REVIEW_BODY,
+            sentences: aggregateOversized,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(413);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('PAYLOAD_TOO_LARGE');
+      expect(assertLlmConsent).not.toHaveBeenCalled();
+      expect(reviewDictation).not.toHaveBeenCalled();
+    });
+
     it('refuses with 403 CONSENT_WITHDRAWN and never calls reviewDictation when consent is withdrawn', async () => {
       (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
         new ConsentWithdrawnError(),
@@ -1072,6 +1129,7 @@ describe('POST /v1/dictation/review', () => {
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(mockCheckAndLogRateLimit).toHaveBeenCalledTimes(1);
       expect(reviewDictation).not.toHaveBeenCalled();
     });
 

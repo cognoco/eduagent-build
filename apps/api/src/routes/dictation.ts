@@ -252,9 +252,6 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       const db = c.get('db');
       const input = c.req.valid('json');
 
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      await assertLlmConsent(db, profileId);
-
       // [CR-4] Per-profile rate limit: 10 requests per minute.
       // Placed after validation so invalid input gets 400, not a DB hit.
       // Placed before the LLM call so the expensive operation is gated.
@@ -299,6 +296,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
           `Dictation review payload too large: ${promptCharCount} prompt chars exceeds limit of ${DICTATION_REVIEW_MAX_PROMPT_CHARS}.`,
         );
       }
+
+      // [WI-2396/WI-2987] Consent-withdrawal gate after deterministic request
+      // exits and before every path that can reach the LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
 
       // Derive ageYears from profileMeta birthYear (same pattern as generate route).
       const profileMeta = c.get('profileMeta');

@@ -1,0 +1,26 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The route preserves schema 400, withdrawn-consent 429 and 413 deterministic exits, LLM-ready 403/no-dispatch, and active-consent single dispatch semantics.",
+      "pointer": "apps/api/src/routes/dictation.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The manifest and guard classify dictation review as route-owned and enforce rate and aggregate-budget tokens before consent and consent before provider dispatch.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Focused red, candidate green, production-only revert red, exact restore green, current-main green, and routed validation evidence are preserved.",
+      "pointer": ".workitem-artifacts/WI-2987/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The code diff is limited to the four authorized collision files; no schema, migration, prompt, model, provider routing, payload, rate-limit, metering, consent policy, secret, environment, or deployment change was made.",
+      "pointer": ".workitem-artifacts/WI-2987/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-01",
+  "redGreenPointer": ".workitem-artifacts/WI-2987/red-green-revert.md"
+}
