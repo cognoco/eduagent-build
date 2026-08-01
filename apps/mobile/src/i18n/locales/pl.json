@@ -4750,7 +4750,10 @@
       "existingTeenInviteSending": "Wysyłanie…",
       "existingTeenInviteSentTitle": "Zaproszenie wysłane",
       "existingTeenInviteSentMessage": "Jeśli ten e-mail jest powiązany z kontem MentoMate, wysłaliśmy zaproszenie. Poproś o otwarcie MentoMate i zaakceptowanie go.",
-      "existingTeenInviteErrorTitle": "Nie udało się wysłać zaproszenia"
+      "existingTeenInviteErrorTitle": "Nie udało się wysłać zaproszenia",
+      "wrongProfileTitle": "To zaproszenie jest dla innego profilu",
+      "wrongProfileMessage": "Profil, którego używasz, nie jest częścią tego zaproszenia. Przełącz się na profil, na który wysłano zaproszenie, a następnie otwórz je ponownie.",
+      "wrongProfileSwitch": "Zmień profil"
     }
   },
   "supporterColdStart": {

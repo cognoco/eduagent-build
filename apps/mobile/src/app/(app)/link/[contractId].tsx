@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, Text, View, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,6 +115,30 @@ export default function LinkContractScreen(): React.ReactElement {
     },
   });
 
+  // Rendered when the invite cannot be acted on by the active profile: the
+  // active profile matches neither contract party, or no profile is active
+  // yet (deep link before profile selection — the query stays disabled then).
+  const wrongProfileFallback = (
+    <View className="flex-1 bg-background p-5">
+      <ErrorFallback
+        variant="centered"
+        title={t('visibility.link.wrongProfileTitle')}
+        message={t('visibility.link.wrongProfileMessage')}
+        primaryAction={{
+          label: t('visibility.link.wrongProfileSwitch'),
+          onPress: () => router.push('/profiles' as Href),
+          testID: 'visibility-link-wrong-profile-switch',
+        }}
+        secondaryAction={{
+          label: t('common.goBack'),
+          onPress: () => goBackOrReplace(router, '/(app)/mentor'),
+          testID: 'visibility-link-wrong-profile-back',
+        }}
+        testID="visibility-link-wrong-profile"
+      />
+    </View>
+  );
+
   if (!contractId) {
     return (
       <View className="flex-1 bg-background p-5">
@@ -131,6 +155,10 @@ export default function LinkContractScreen(): React.ReactElement {
         />
       </View>
     );
+  }
+
+  if (!activeProfile) {
+    return wrongProfileFallback;
   }
 
   if (contractQuery.isLoading) {
@@ -177,6 +205,13 @@ export default function LinkContractScreen(): React.ReactElement {
 
   const contract = contractQuery.data;
   const audience = deriveAudience(contract, activeProfile?.id);
+  const acceptancePending =
+    contract.status === 'pending' || contract.status === 'restamped';
+
+  if (audience === 'unknown' && acceptancePending) {
+    return wrongProfileFallback;
+  }
+
   const actionableAudience: RenderAudience | undefined =
     audience === 'unknown' ? undefined : audience;
   const cardAudience: RenderAudience =

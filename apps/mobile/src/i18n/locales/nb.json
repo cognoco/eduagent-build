@@ -4580,7 +4580,10 @@
       "existingTeenInviteSending": "Sender …",
       "existingTeenInviteSentTitle": "Invitasjon er på vei",
       "existingTeenInviteSentMessage": "Hvis e-postadressen tilhører en MentoMate-konto, har vi sendt dem en invitasjon. Be dem om å åpne MentoMate og godta den.",
-      "existingTeenInviteErrorTitle": "Kunne ikke sende invitasjon"
+      "existingTeenInviteErrorTitle": "Kunne ikke sende invitasjon",
+      "wrongProfileTitle": "Denne invitasjonen er for en annen profil",
+      "wrongProfileMessage": "Profilen du bruker, er ikke en del av denne invitasjonen. Bytt til profilen invitasjonen ble sendt til, og åpne den på nytt.",
+      "wrongProfileSwitch": "Bytt profil"
     }
   },
   "supporterColdStart": {

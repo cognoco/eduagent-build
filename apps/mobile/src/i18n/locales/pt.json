@@ -4580,7 +4580,10 @@
       "existingTeenInviteSending": "A enviar…",
       "existingTeenInviteSentTitle": "Convite a caminho",
       "existingTeenInviteSentMessage": "Se esse e-mail pertencer a uma conta MentoMate, enviámos um convite. Peça-lhe para abrir o MentoMate e aceitá-lo.",
-      "existingTeenInviteErrorTitle": "Não foi possível enviar o convite"
+      "existingTeenInviteErrorTitle": "Não foi possível enviar o convite",
+      "wrongProfileTitle": "Este convite é para um perfil diferente",
+      "wrongProfileMessage": "O perfil que está a usar não faz parte deste convite. Mude para o perfil para o qual o convite foi enviado e abra-o novamente.",
+      "wrongProfileSwitch": "Mudar de perfil"
     }
   },
   "supporterColdStart": {

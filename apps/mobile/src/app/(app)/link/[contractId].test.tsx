@@ -19,9 +19,11 @@ jest.mock(
 );
 
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
-let mockActiveProfileId = '00000000-0000-4000-8000-000000000003';
+let mockActiveProfileId: string | undefined =
+  '00000000-0000-4000-8000-000000000003';
 const mockParams: Record<string, string> = {
   contractId: '00000000-0000-4000-8000-000000000001',
   supporteeName: 'Emma',
@@ -33,6 +35,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     canGoBack: mockCanGoBack,
+    push: mockPush,
     replace: mockReplace,
   }),
 }));
@@ -42,7 +45,9 @@ jest.mock(
   '../../../lib/profile',
   () => ({
     useProfile: () => ({
-      activeProfile: { id: mockActiveProfileId },
+      activeProfile: mockActiveProfileId
+        ? { id: mockActiveProfileId }
+        : undefined,
     }),
   }),
 );
@@ -207,6 +212,79 @@ describe('LinkContractScreen', () => {
 
     expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
     expect(screen.queryByTestId('visibility-contract-revoke')).toBeNull();
+  });
+
+  it('explains a pending supporter invite opened with the wrong profile and offers a profile switch', async () => {
+    mockActiveProfileId = '00000000-0000-4000-8000-000000000099';
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) {
+        return {
+          ...CONTRACT,
+          supporteeAcceptedAt: '2026-06-20T12:01:00.000Z',
+        };
+      }
+      return {};
+    });
+
+    renderScreen();
+
+    await screen.findByTestId('visibility-link-wrong-profile');
+    screen.getByText('This invite is for a different profile');
+    expect(screen.queryByTestId('visibility-contract-card')).toBeNull();
+    expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+    expect(screen.queryByTestId('visibility-link-review')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-switch'));
+    expect(mockPush).toHaveBeenCalledWith('/profiles');
+
+    fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-back'));
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('explains a restamped supportee invite opened with the wrong profile instead of a view-only card', async () => {
+    mockActiveProfileId = '00000000-0000-4000-8000-000000000099';
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) {
+        return {
+          ...CONTRACT,
+          status: 'restamped',
+          contractVersion: 2,
+          supporterAcceptedAt: '2026-06-20T12:01:00.000Z',
+          supporteeAcceptedAt: null,
+        };
+      }
+      return {};
+    });
+
+    renderScreen();
+
+    await screen.findByTestId('visibility-link-wrong-profile');
+    expect(screen.queryByTestId('visibility-contract-card')).toBeNull();
+    expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+    expect(screen.queryByTestId('visibility-link-review')).toBeNull();
+    expect(
+      screen.getByTestId('visibility-link-wrong-profile-switch'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('visibility-link-wrong-profile-back'),
+    ).toBeTruthy();
+  });
+
+  it('explains a pending invite opened with no active profile and offers a profile switch', async () => {
+    mockActiveProfileId = undefined;
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) return CONTRACT;
+      return {};
+    });
+
+    renderScreen();
+
+    await screen.findByTestId('visibility-link-wrong-profile');
+    expect(screen.queryByTestId('visibility-contract-card')).toBeNull();
+    expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-switch'));
+    expect(mockPush).toHaveBeenCalledWith('/profiles');
   });
 
   it('returns a historyless contract deep link to the V2 Mentor root', async () => {

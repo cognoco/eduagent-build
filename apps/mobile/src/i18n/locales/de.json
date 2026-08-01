@@ -4616,7 +4616,10 @@
       "existingTeenInviteSending": "Senden …",
       "existingTeenInviteSentTitle": "Einladung unterwegs",
       "existingTeenInviteSentMessage": "Wenn diese E-Mail zu einem MentoMate-Konto gehört, haben wir eine Einladung gesendet. Bitte sie, MentoMate zu öffnen und die Einladung anzunehmen.",
-      "existingTeenInviteErrorTitle": "Einladung nicht gesendet"
+      "existingTeenInviteErrorTitle": "Einladung nicht gesendet",
+      "wrongProfileTitle": "Diese Einladung ist für ein anderes Profil",
+      "wrongProfileMessage": "Das Profil, das du verwendest, ist nicht Teil dieser Einladung. Wechsle zu dem Profil, an das die Einladung gesendet wurde, und öffne sie dann erneut.",
+      "wrongProfileSwitch": "Profil wechseln"
     }
   },
   "supporterColdStart": {

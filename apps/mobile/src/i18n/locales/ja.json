@@ -4580,7 +4580,10 @@
       "existingTeenInviteSending": "送信中…",
       "existingTeenInviteSentTitle": "招待を送信しました",
       "existingTeenInviteSentMessage": "そのメールアドレスがMentoMateアカウントに登録されている場合、招待を送信しました。お子様にMentoMateを開いて招待を承認するようお伝えください。",
-      "existingTeenInviteErrorTitle": "招待を送信できませんでした"
+      "existingTeenInviteErrorTitle": "招待を送信できませんでした",
+      "wrongProfileTitle": "この招待は別のプロフィール宛てです",
+      "wrongProfileMessage": "現在使用中のプロフィールはこの招待の対象ではありません。招待が送られたプロフィールに切り替えてから、もう一度開いてください。",
+      "wrongProfileSwitch": "プロフィールを切り替える"
     }
   },
   "supporterColdStart": {
