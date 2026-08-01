@@ -189,8 +189,15 @@ Record `emittedAt`, then open Sentry → Explore → Logs for the production API
 project, set a narrow time window around that timestamp, and run:
 
 ```text
-message:"llm.volume.daily_threshold_exceeded" provider:"synthetic-operator-probe" environment:"production" count:1 threshold:1
+message:"llm.volume.daily_threshold_exceeded" provider:"synthetic-operator-probe" environment:"production" tags[count,number]:1 tags[threshold,number]:1
 ```
+
+`count` and `threshold` are typed numeric user attributes. Sentry's Explore
+table API can resolve their bare names as unrelated built-in fields and return
+`null` even when the log contains both values. API evidence must therefore
+project them as `tags[count,number]` and `tags[threshold,number]`; use the same
+typed selectors in the query above. The displayed custom-attribute names remain
+`count` and `threshold`.
 
 Confirm one row in that invocation window. Its custom-attribute set must be
 exactly these seven values (Sentry-owned timestamp, SDK, release, and trace
