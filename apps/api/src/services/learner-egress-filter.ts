@@ -16,7 +16,7 @@ const EDUCATIONAL_CONTEXT_RE =
   /\b(?:studying|learning about|lesson about|homework about|researching|writing about|question about|explain|translate|example sentence)\b/i;
 
 const LEARNER_DATA_BLOCK_RE =
-  /<((?:learner|user|transcript|session_transcript|homework|ocr|candidate|last_message|preceding_learner|input|resume_context|subject_text)[a-z0-9_-]*)(\s[^>]*)?>([\s\S]*?)<\/\1>/gi;
+  /<((?:learner|user|transcript|session_transcript|homework|ocr|candidate|last_message|preceding_learner|input|resume_context|subject_text|book_title|book_description|topic_list|completed_topic)[a-z0-9_-]*)(\s[^>]*)?>([\s\S]*?)<\/\1>/gi;
 const LEARNER_ROLE_LINE_RE = /^(\s*(?:LEARNER|USER|STUDENT)\s*:\s*)(.*)$/gim;
 
 function escapeRegExp(value: string): string {
@@ -100,13 +100,21 @@ export function filterLearnerAuthoredMessagesForEgress(
   messages: ChatMessage[],
 ): ChatMessage[] {
   return messages.map((message) => {
+    // Assistant turns are provider-authored context, not learner-authored
+    // input. The normalized ChatMessage contract has no tool-result role, so
+    // preserving assistant messages also avoids reclassifying any tool-mediated
+    // context that a caller has already normalized into an assistant turn.
+    if (message.role === 'assistant') return message;
+
+    const filterText =
+      message.role === 'system'
+        ? filterLearnerRegionsInTrustedPrompt
+        : filterLearnerAuthoredTextForEgress;
+
     if (typeof message.content === 'string') {
       return {
         ...message,
-        content:
-          message.role === 'system'
-            ? filterLearnerRegionsInTrustedPrompt(message.content)
-            : filterLearnerAuthoredTextForEgress(message.content),
+        content: filterText(message.content),
       };
     }
     return {
@@ -115,7 +123,7 @@ export function filterLearnerAuthoredMessagesForEgress(
         part.type === 'text'
           ? {
               ...part,
-              text: filterLearnerAuthoredTextForEgress(part.text),
+              text: filterText(part.text),
             }
           : part,
       ),
