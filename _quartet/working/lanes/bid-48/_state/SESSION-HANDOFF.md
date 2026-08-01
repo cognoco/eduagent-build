@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 15:52 CEST
+Last reconciled: 2026-08-01 16:31 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -26,7 +26,22 @@ Last reconciled: 2026-08-01 15:52 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 15:52 CEST
+### Latest authoritative boundary — 2026-08-01 16:31 CEST
+
+- WI-2643 is repository-landed through the governed merge gate. Exact head
+  `fc2de822` passed all 14 checks after the single failed-job rerun cleared the
+  unrelated staging smoke timeout; fresh ready-state Claude review again reported
+  zero findings. The gate verified zero automated-review threads and squash-merged
+  PR #2833 as `695634b3`, now on `origin/main`. The separately gated shared Neon role
+  setup has not occurred, so the item correctly remains Executing and is not
+  execute-complete.
+- WI-2922 PR #2830 remains draft at `f8320a9d`; a fresh governed dry-run reports
+  `would MERGE` with its exact-head checks, thread disposition, and Claude approval
+  satisfied. No merge or shared-development database mutation occurred.
+- Same-owner heartbeats renewed WI-2643, WI-2790, WI-2826, WI-2922, and WI-2939 at
+  16:30 CEST. Direct re-read confirms all five remain Executing/Active with unchanged
+  claimant identities and `Claim Expired=false`; WI-2958's unrelated external claim
+  remains expired and untouched.
 
 - Direct Cosmo polling still returns 42 related rows: 31 Closed, 6 Executing,
   and 5 Ready. BID-48 remains Running. The Brief/relation mismatch is unchanged:

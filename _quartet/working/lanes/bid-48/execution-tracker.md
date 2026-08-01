@@ -56,9 +56,21 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 15:52 CEST
+## Live reconciliation — 2026-08-01 16:31 CEST
 
 ### Latest authoritative boundary
+
+- WI-2643 exact head `fc2de822` is fully strict-green: all 14 checks passed after
+  one bounded failed-job rerun cleared the unrelated staging smoke timeout. A fresh
+  ready-state Claude review again reported zero findings, and the governed gate
+  verified zero automated-review threads before squash-merging PR #2833 as
+  `695634b3`. The shared Neon role setup remains an explicit operator gate, so the
+  item remains Executing and has not been execute-completed.
+- WI-2922 PR #2830 at `f8320a9d` passes a fresh governed merge dry-run but remains
+  draft; neither landing nor shared-development mutation occurred.
+- Same-owner heartbeats at 16:30 CEST renewed WI-2643, WI-2790, WI-2826, WI-2922,
+  and WI-2939 without changing ownership or lifecycle position. Direct re-read shows
+  all five claims live; WI-2958's external expired claim remains untouched.
 
 - Fresh direct Cosmo polling leaves the live slice unchanged at 42 related rows:
   31 Closed, 6 Executing, and 5 Ready; BID-48 remains Running. WI-2958 remains the
