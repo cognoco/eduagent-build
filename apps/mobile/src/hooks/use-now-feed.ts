@@ -180,7 +180,20 @@ export function useNowFeed(): NowFeedQueryResult {
   const cacheBindingRef = useRef(cacheBinding);
   cacheBindingRef.current = cacheBinding;
   const noticesVisible = !navigationContract.isParentProxy;
-  const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
+  // [WI-2933 re-open] The projection and the pair it was populated FOR are
+  // written in one `setState`, never separately — see the effect below. This
+  // makes "a feed exists whose `pair` doesn't match who cached it" a type
+  // that cannot be constructed, not a sequencing rule two writes have to
+  // honour. The previous shape (`fallbackFeed` state + a `fallbackPairRef`
+  // reassigned during render from `cacheBinding`) is exactly what Gate-2
+  // rejected: the ref tracked "whatever pair is bound RIGHT NOW", which can
+  // legitimately be a DIFFERENT pair than the one that populated the still-
+  // retained `fallbackFeed`, for one render, on a bound A -> B transition
+  // (React commits before the cleanup effect clears A's retained feed).
+  const [fallbackEntry, setFallbackEntry] = useState<{
+    feed: NowResponse;
+    pair: NonNullable<typeof cacheBinding>;
+  } | null>(null);
   const [isSlowFallback, setIsSlowFallback] = useState(false);
   // [WI-2504 bounce 2] The epoch `fallbackFeed` was last populated (or
   // cleared) for — lets the effect below tell "still the same pending fetch"
@@ -260,7 +273,7 @@ export function useNowFeed(): NowFeedQueryResult {
     if (!cacheBinding || !query.isFetching || query.data) {
       setIsSlowFallback(false);
       if (!query.isError) {
-        setFallbackFeed(null);
+        setFallbackEntry(null);
       }
       fallbackEpochRef.current = null;
       return undefined;
@@ -275,18 +288,26 @@ export function useNowFeed(): NowFeedQueryResult {
     // notice-bearing) cached feed until — or unless — this fetch's own cache
     // read lands.
     if (fallbackEpochRef.current !== cacheBinding.policyEpoch) {
-      setFallbackFeed(null);
+      setFallbackEntry(null);
       setIsSlowFallback(false);
       fallbackEpochRef.current = cacheBinding.policyEpoch ?? null;
     }
 
+    // [WI-2933 re-open] `cacheBinding` is captured by this closure at the
+    // moment the effect ran (it is the effect's own dependency), so it is
+    // GUARANTEED to be the same pair `readCachedNowFeed` below reads for —
+    // there is no later render that can move it out from under this
+    // callback. Writing `{ feed, pair: cacheBinding }` in the SAME
+    // `setFallbackEntry` call is what makes the two agree by construction:
+    // there is no second write (a ref reassigned during render, elsewhere)
+    // that can race ahead of or fall behind this one.
     let cancelled = false;
     const timer = setTimeout(() => {
       void readCachedNowFeed(cacheBinding, Date.now(), {
         noticesVisible,
       }).then((cached) => {
         if (cancelled || !cached) return;
-        setFallbackFeed(cached);
+        setFallbackEntry({ feed: cached, pair: cacheBinding });
         setIsSlowFallback(true);
       });
     }, NOW_FEED_SLOW_FALLBACK_MS);
@@ -309,9 +330,10 @@ export function useNowFeed(): NowFeedQueryResult {
   //     that left the server at revision 6 landing after the client learned
   //     revision 7 carries pre-rollback cards; the fold correctly ignores its
   //     observation and does nothing about its cards);
-  //   - `fallbackFeed` — the persisted projection, which carries NO observation
-  //     of its own, so it is suppressed purely on stored policy state. This is
-  //     the cached-resurrection case the store exists for;
+  //   - `fallbackEntry.feed` — the persisted projection, which carries NO
+  //     observation of its own, so it is suppressed purely on stored policy
+  //     state for the pair it was CACHED FOR. This is the cached-resurrection
+  //     case the store exists for;
   //   - and both re-evaluate on any store change, because a sibling surface
   //     observing a disable must blank this one too.
   const noticeSafeData = useMemo(() => {
@@ -324,59 +346,49 @@ export function useNowFeed(): NowFeedQueryResult {
   // [WI-2933] Judge the persisted projection against the floor of the pair it
   // was CACHED FOR, not against whatever pair happens to be bound at render.
   //
-  // `fallbackFeed` can only ever be populated while BOUND — the effect above
-  // returns early without a `cacheBinding`. Whether it SURVIVES the pair going
-  // unbound (sign-out, auth teardown, profile cleared) is CONDITIONAL, and that
-  // condition is the whole reachability question: the same early-return branch
-  // clears it unless `query.isError`, so retention past an unbind requires the
-  // query to be in an error state. Measured (WI-2933 reachability run): forcing
-  // a real re-render with a null user gives `fallbackFeed = null,
-  // isError = false` — with no error the projection does not survive.
+  // `fallbackEntry` can only ever be populated while BOUND — the effect above
+  // returns early without a `cacheBinding`, and the write that populates it
+  // always carries the pair alongside the feed (see the effect). Whether it
+  // SURVIVES the pair going unbound (sign-out, auth teardown, profile
+  // cleared) is CONDITIONAL, and that condition is the whole reachability
+  // question: the same early-return branch clears it unless `query.isError`,
+  // so retention past an unbind requires the query to be in an error state.
+  // Measured (WI-2933 reachability run): forcing a real re-render with a null
+  // user gives `fallbackEntry = null, isError = false` — with no error the
+  // projection does not survive.
   //
-  // What the unbound branch would do if reached: `policy.suppressed(undefined)`
-  // takes the unbound branch, which has no storage key, therefore no Entry,
-  // therefore no stored disable floor — a projection for a pair whose durable
-  // floor forbids notices would be judged with nothing to judge it against.
-  // NO SUCH EXPOSURE HAS BEEN DEMONSTRATED. The `isError: true` AND unbound
-  // combination is unmeasured: once the pair is unbound the query stops
-  // fetching, so the harness could not drive it into an error state afterwards.
+  // Because `fallbackEntry.pair` is written atomically with `.feed`, "a
+  // retained feed judged against a DIFFERENT pair's floor" is not a state
+  // this hook can be in — there is no code path that can update one half
+  // without the other, so `fallbackPair ? ... : policy.suppressed(undefined)`
+  // (a defensive branch for "feed present but its pair unknown") no longer
+  // has a reachable `else`: whenever `fallbackEntry` exists, `.pair` exists
+  // with it, by construction. The `isError: true` AND unbound combination is
+  // still unmeasured (once the pair is unbound the query stops fetching, so
+  // the harness could not drive it into an error state afterwards) — but on
+  // that combination `fallbackEntry.pair` is still the pair that ACTUALLY
+  // populated the retained feed, so the floor it is judged against is correct
+  // by construction rather than merely plausible.
   //
-  // That combination also got HARDER to reach while this branch was open:
-  // #2752 (WI-2949) removed the mentor-notice call from `useApiQuery`'s
-  // `onParseError` seam — the one route that produced `isError` and a stored
-  // disable floor in the same event. No production caller passes that option
-  // now.
-  //
-  // Remembering the populating pair is what would make the floor reachable if
-  // that combination ever occurs — hardening, not a fix for a demonstrated
-  // exposure. It is
-  // also the ONLY defensible answer to "what is the safe default when the pair
-  // is unknowable": for this payload the pair is not unknowable — the payload
-  // exists *because* a pair was bound. A device that has NEVER been bound has no
-  // cached projection to paint and no floor to consult, so it keeps today's
+  // A device that has NEVER been bound has no cached projection to paint and
+  // no floor to consult (`fallbackEntry` is `null`), so it keeps today's
   // permissive default and nothing is blanked fleet-wide (AC-2).
-  // Stores the already-memoised `cacheBinding` rather than a fresh
-  // `{actorId, profileId}` literal — matching `cacheBindingRef` above. A new
-  // literal here would change identity on every bound render, and this ref
-  // feeds `noticeSafeFallback`'s dep array, so the memo would re-run every
-  // render for a value that only changes when the binding does.
-  const fallbackPairRef = useRef<typeof cacheBinding>(null);
-  if (cacheBinding) {
-    fallbackPairRef.current = cacheBinding;
-  }
-  const fallbackPair = fallbackPairRef.current;
-
   const noticeSafeFallback = useMemo(() => {
-    if (!fallbackFeed) return fallbackFeed;
-    const suppressed = fallbackPair
-      ? mentorNoticePolicySuppressesPayloadFor(
-          fallbackPair.actorId,
-          fallbackPair.profileId,
-          undefined,
-        )
-      : policy.suppressed(undefined);
-    return suppressed ? stripNoticeCards(fallbackFeed) : fallbackFeed;
-  }, [fallbackFeed, policy, fallbackPair]);
+    if (!fallbackEntry) return null;
+    const { feed, pair } = fallbackEntry;
+    const suppressed = mentorNoticePolicySuppressesPayloadFor(
+      pair.actorId,
+      pair.profileId,
+      undefined,
+    );
+    return suppressed ? stripNoticeCards(feed) : feed;
+    // `policy` is not read in the body — `mentorNoticePolicySuppressesPayloadFor`
+    // reads the store directly for `pair` — but it must stay a dependency: it is
+    // the reactivity signal that ANY pair's store entry changed (a sibling
+    // surface observing a disable), which this memo must re-run on to blank a
+    // stale retained projection. See the `[WI-2627]` comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fallbackEntry, policy]);
 
   // The cast is the `UseQueryResult` discriminated union, not a type escape:
   // overriding `data` on a spread widens it to `NowResponse | undefined`, which
