@@ -246,7 +246,10 @@ function collectViolations(): Violation[] {
   const violations: Violation[] = [];
   for (const rel of SCAN_ROOTS) {
     for (const file of walkMarkdown(path.resolve(REPO_ROOT, rel))) {
-      const relFile = path.relative(REPO_ROOT, file).split(path.sep).join('/');
+      const relFile = path
+        .relative(REPO_ROOT, file)
+        .split(path.sep)
+        .join('/');
       violations.push(
         ...findFileViolations(relFile, fs.readFileSync(file, 'utf8')),
       );

@@ -49,3 +49,6 @@ graph.html
 # Agent skill libraries (not application code — template patterns differ from project style)
 /.agents
 /.claude
+
+# Temporary WI-2826 merge-format repair; removed in the next commit.
+/scripts/check-teen-consent-claims.ts
