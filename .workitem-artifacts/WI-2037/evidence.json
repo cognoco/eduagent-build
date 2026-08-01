@@ -1,0 +1,30 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The provisionally approved ADR and implementation contract define a distinct adult authority ceremony while preserving ordinary email-grant behavior and prohibiting email-to-Guardianship escalation.",
+      "pointer": "docs/adr/MMT-ADR-0010-family-join-consolidation-primitive.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The contract binds the authenticated adult Person, verified legal authority and assurance/VPC result, atomic edge-plus-grant transaction, and versioned evidence envelope.",
+      "pointer": "docs/specs/2026-07-30-13-16-family-join-guardian-consent-ceremony.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The four-column failure-mode matrix explicitly covers missing, stale, withdrawn, denied, wrong-authority, residence/policy drift, expired, partial, replay, concurrency, and provider failure states.",
+      "pointer": "docs/specs/2026-07-30-13-16-family-join-guardian-consent-ceremony.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The spec maps API, mobile, identity, Supportership, audit, retry/idempotency, migration, and compatibility consequences.",
+      "pointer": "docs/specs/2026-07-30-13-16-family-join-guardian-consent-ceremony.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The operational handoff assigns implementation and API/integration/mobile regressions to WI-2533 and keeps WI-1753 at 17+ until that implementation lands.",
+      "pointer": "docs/specs/2026-07-30-13-16-family-join-guardian-consent-ceremony.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-01"
+}

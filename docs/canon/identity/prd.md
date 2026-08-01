@@ -447,22 +447,45 @@ age, edge-only); and the managed-adult "grandparent" (UC-1, §9). Copy to be aut
   add-child). Must still serve an **admin-only** operator (learner-optional).
 
 **Join-my-family (v1).**
-- A minimal **"join my family" ships in v1:** a parent buys Family, invites their **existing-account,
-  self-consenting teen**, the teen accepts → the teen **joins the parent's family org** (shares the Family
-  quota seat); the parent becomes **admin + Payer**; and the **teen grants the parent an opt-in
-  Supportership** — **no auto-Guardianship** (the teen self-consents, inv 14/19).
-- The teen's **Person + learning history are preserved** (inv 20/21); the teen's existing subscription is
-  reconciled (inv 18); the sequence **never orphans** — add the Membership *before* decommissioning the
-  teen's now-empty org-of-one, via a named `migration-pending` interim (inv 21, 25).
-- **Billing = option B (join-with-disclaimer):** the joining teen with an active store sub joins
-  immediately (covered by family quota) and keeps paying their own store sub until they self-cancel
-  (store-delegated billing rules out a server-side refund), with an explicit **double-charge warning** + a
+- A minimal **"join my family" ships in v1:** an adult invites an
+  existing-account credentialed learner, the learner accepts, and the learner
+  joins the destination family Organization without losing their Person or
+  learning history (inv 20/21). Add Membership before decommissioning the empty
+  Organization-of-one through `migration-pending`; never orphan.
+- **Login is not consent authority.** Exact age × habitual-residence policy
+  selects `self`, `guardian`, `joint_child_guardian`, or no available
+  authorization path. `self` may accept directly. The two guardian forms enter
+  a holding state and require the distinct authenticated-adult ceremony in
+  `MMT-ADR-0010`; a blocked/null decision cannot be replaced with either path.
+- The adult ceremony authenticates and resolves the adult Person, verifies the
+  legal relationship/authority at the required assurance/VPC level, and obtains
+  every required destination-Organization purpose. For
+  `joint_child_guardian`, the authenticated learner must accept the same
+  complete server-derived purpose set. One atomic operation creates
+  or confirms the global guardian→charge edge and writes fresh
+  Organization-/purpose-scoped grants with jurisdiction, policy, method,
+  authorization-form, evidence, required-actor acceptance, and time provenance.
+  A global edge may be confirmed idempotently;
+  consent never carries across Organizations.
+- **No automatic authority or visibility.** The learner may request or accept a
+  join but cannot nominate or mint Guardianship (inv 28/30). Invitation,
+  adulthood, family Membership, admin, Payer, Supportership, and ordinary email
+  consent responses confer no Guardianship. Ordinary email approval and
+  withdrawal retain their narrow Organization-/purpose-scoped grant behavior,
+  but cannot satisfy or resume the family-join authority ceremony.
+  Guardianship creates no Supportership; visibility remains a separate learner
+  grant capped by the supporter contract (inv 14/19).
+- Missing, stale, withdrawn, denied, expired, partial, wrong-adult,
+  moved-residence, changed-policy, replayed, and cross-Organization inputs fail
+  closed. The edge, complete grant set, consent-request terminalization, and
+  audit evidence commit together or not at all.
+- **v1 remains adult-first.** A learner request may wait for an independently
+  authenticated adult, but child-initiated delivery is outside v1 and a minor
+  can never mint Guardianship (inv 28/30).
+- **Billing = join-with-disclaimer:** after identity and consent gates pass, a
+  learner with an active store subscription joins immediately, keeps paying
+  until self-cancellation, and receives an explicit double-charge warning and
   follow-up nudge.
-- **Ban minor-initiated Guardianship** — a minor may not nominate their own consent authority (fails inv
-  28/30). The legitimate "minor reaches out first" path is a **request to join** (authority always flows
-  adult-side; the adult accepts + provides VPC, mirroring inv 15/16). v1 = **parent-initiated invite,
-  consent-capable teen**; the below-consent-age teen variant (needs guardianship + VPC via R13) and
-  child-initiated request-to-join stay deferred (ROADMAP).
 
 **Separated parents.**
 - The **one-Person model is kept reachable** (Person ≠ Login + global consent edge + multi-org
