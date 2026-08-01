@@ -56,12 +56,12 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 13:41 CEST
+## Live reconciliation — 2026-08-01 14:12 CEST
 
 ### Latest authoritative boundary
 
-- Brief/relation parity remains 41 members. Live slice: 30 Closed, 4 Executing,
-  7 Ready.
+- Brief/relation parity remains 41 members. Live slice: 30 Closed, 5 Executing,
+  6 Ready.
 - WI-2936 is independently Closed/Done at `08d75f40` after evidence-only rework
   removed a non-durable local pointer and accurately recorded 13 successful checks
   plus one intentional skip.
@@ -85,9 +85,15 @@ Delivery Batch as `Done`.
   tests lacked the stricter contract's explicit fake secret. FO-2087 /
   `OCC-D2E82DA0564A` records the occurrence. Test-only repair `938a041d` restores
   explicit remote mode and fake secret setup/teardown without production or real
-  credential changes; focused 4 suites/20 tests pass. Exact PR #2718 head is now
-  `938a041d` with fresh gates running. The four-WIP figure remains throughput
-  guidance; blocked waits do not suppress otherwise safe dispatch.
+  credential changes; focused 4 suites/20 tests pass. Exact PR #2718 head
+  `938a041d` passed all 14 checks, automated-thread disposition, and fresh Claude.
+  The governed gate landed `8a26201b`; ordinary landed push verification is running
+  with no failure observed before execute-complete.
+- WI-2922 is properly claimed/Executing in isolated worktree `WI-2922` for only its
+  repository guard and disposable-schema test frontier. Shared-development mutation
+  remains explicitly ungranted; staging and production are out of bounds.
+- The four-WIP figure remains throughput guidance; blocked waits do not suppress
+  otherwise safe dispatch.
 
 - The live Brief and membership relation agree on 41 authoritative members.
   The operator retracted WI-2941 from BID-48 and routed it to Nexus / Cosmo

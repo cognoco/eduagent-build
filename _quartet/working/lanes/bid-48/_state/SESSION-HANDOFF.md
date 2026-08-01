@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 13:41 CEST
+Last reconciled: 2026-08-01 14:12 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,11 +19,11 @@ Last reconciled: 2026-08-01 13:41 CEST
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
   Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 30 Closed, 4 Executing, 7 Ready.
+- Live stage count at checkpoint: 30 Closed, 5 Executing, 6 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 13:41 CEST
+### Latest authoritative boundary — 2026-08-01 14:12 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -64,8 +64,17 @@ Last reconciled: 2026-08-01 13:41 CEST
   Bounded test-only repair `938a041d` now declares remote helper mode and an explicit
   fake test-process secret, restores both variables after each case, and touches no
   production code or real credentials. Focused 4 suites/20 tests are green; normal
-  push published exact PR #2718 head `938a041d` and fresh CI/review is running.
-  WI-2790 and WI-2939 remain dependency/authority-bound Executing items.
+  push published exact PR #2718 head `938a041d`; all 14 exact-head checks passed,
+  the sole automated thread was resolved with evidence, and fresh Claude reported
+  zero findings. The governed merge gate landed squash commit `8a26201b`. Its
+  ordinary main-branch push verification is now running with no failure observed;
+  execute-complete waits for that landed boundary. WI-2790 and WI-2939 remain
+  dependency/authority-bound Executing items.
+- WI-2922 was live-reconciled Ready/Active/unclaimed, then properly claimed as
+  `codex:wi2922-repository-executor:WI-2922` in isolated worktree `WI-2922`. Its
+  executor is building only repository guards and disposable-schema tests. Shared
+  development, staging, and production remain untouched; AC2's explicit shared-dev
+  mutation gate is not granted.
 - The operator clarified that the four-WIP figure is throughput guidance, not a
   reason to leave Ready work idle while executor capacity exists. Dependency/authority
   waits do not consume practical dispatch capacity.
