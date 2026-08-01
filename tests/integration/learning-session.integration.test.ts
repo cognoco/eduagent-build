@@ -12,6 +12,7 @@
 
 import * as React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { and, asc, eq } from 'drizzle-orm';
 import {
   login,
@@ -406,6 +407,12 @@ async function renderRealMobileSession(input: {
   let currentHook: ReturnType<typeof useSessionStreaming> | null = null;
   let currentSessionId = input.activeSessionId ?? null;
   let messageId = 0;
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
+  });
   const silenceTimerRef: React.MutableRefObject<ReturnType<
     typeof setTimeout
   > | null> = { current: null };
@@ -518,7 +525,13 @@ async function renderRealMobileSession(input: {
 
   let mounted!: { unmount: () => void };
   await renderer.act(async () => {
-    mounted = renderer.create(React.createElement(Harness));
+    mounted = renderer.create(
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        React.createElement(Harness),
+      ),
+    );
   });
 
   return {

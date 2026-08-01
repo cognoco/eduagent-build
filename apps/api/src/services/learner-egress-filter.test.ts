@@ -137,4 +137,72 @@ describe('filterLearnerAuthoredMessagesForEgress [WI-2737]', () => {
       'Classify this transcript:\nLEARNER: My email is [personal information removed].',
     );
   });
+
+  it('filters learner-derived book metadata in string and multipart system prompts', () => {
+    const filtered = filterLearnerAuthoredMessagesForEgress([
+      {
+        role: 'system',
+        content:
+          'Book: <book_title>Contact other@example.com</book_title> ' +
+          '(<book_description>i live at 12 oakwood street</book_description>). ' +
+          'Topics: <topic_list>email topic@example.com</topic_list>. ' +
+          'Completed: <completed_topic>call +1 415 555 2671</completed_topic>',
+      },
+      {
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            text:
+              'Trusted example: teacher@example.com. ' +
+              '<book_title>Contact multipart@example.com</book_title>',
+          },
+          {
+            type: 'inline_data',
+            mimeType: 'image/png',
+            data: 'exact-system-image-base64',
+          },
+        ],
+      },
+    ]);
+
+    expect(filtered).toEqual([
+      {
+        role: 'system',
+        content:
+          'Book: <book_title>Contact [personal information removed]</book_title> ' +
+          '(<book_description>i live at [personal information removed]</book_description>). ' +
+          'Topics: <topic_list>email [personal information removed]</topic_list>. ' +
+          'Completed: <completed_topic>call [personal information removed]</completed_topic>',
+      },
+      {
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            text:
+              'Trusted example: teacher@example.com. ' +
+              '<book_title>Contact [personal information removed]</book_title>',
+          },
+          {
+            type: 'inline_data',
+            mimeType: 'image/png',
+            data: 'exact-system-image-base64',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('preserves assistant-authored turns exactly', () => {
+    const assistantMessage = {
+      role: 'assistant' as const,
+      content:
+        'The worked example uses teacher@example.com and 12 Oakwood Street.',
+    };
+
+    expect(filterLearnerAuthoredMessagesForEgress([assistantMessage])).toEqual([
+      assistantMessage,
+    ]);
+  });
 });

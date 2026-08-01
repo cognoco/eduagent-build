@@ -6,7 +6,7 @@ import {
   type Database,
 } from '@eduagent/database';
 
-import { getTimeZoneOffsetMs } from '../billing/timezone';
+import { getInstantForLocalDateTime } from '../billing/timezone';
 
 export const LEARNING_DAY_SHIFT_HOURS = 4;
 
@@ -19,7 +19,6 @@ function safeTimeZone(timeZone: string | null | undefined): string {
   }
 }
 
-const SECOND_MS = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function localDateTimeParts(instant: Date, timeZone: string) {
@@ -44,65 +43,6 @@ function localDateTimeParts(instant: Date, timeZone: string) {
   };
 }
 
-// Smallest instant in (before, after] whose offset differs from the offset at
-// `before` — i.e. the transition instant itself. Only reachable for a civil
-// time that a forward transition skipped; AC clause 2 requires the boundary to
-// be the first representable instant AFTER the gap, which the two-pass offset
-// correction used elsewhere cannot produce (it lands an offset-delta later).
-function findTransitionInstant(
-  before: number,
-  after: number,
-  timeZone: string,
-): number {
-  const offsetBefore = getTimeZoneOffsetMs(new Date(before), timeZone);
-  let low = before;
-  let high = after;
-  // Second granularity: getTimeZoneOffsetMs resolves the local clock only to
-  // whole seconds, so probing a sub-second instant reports a skewed offset.
-  // Offset transitions are minute-aligned, so this still lands exactly.
-  while (high - low > SECOND_MS) {
-    const mid = low + Math.floor((high - low) / (2 * SECOND_MS)) * SECOND_MS;
-    if (getTimeZoneOffsetMs(new Date(mid), timeZone) === offsetBefore) {
-      low = mid;
-    } else {
-      high = mid;
-    }
-  }
-  return high;
-}
-
-// The instant representing a civil local date-time in `timeZone`. Normal case:
-// one match. Folded (backward transition): the earlier of the two matches.
-// Skipped (forward transition): the transition instant.
-function localDateTimeToUtc(
-  parts: { year: number; month: number; day: number; hour: number },
-  timeZone: string,
-): Date {
-  const localAsUtc = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-  );
-  const candidates = [
-    localAsUtc - getTimeZoneOffsetMs(new Date(localAsUtc - DAY_MS), timeZone),
-    localAsUtc - getTimeZoneOffsetMs(new Date(localAsUtc + DAY_MS), timeZone),
-  ];
-  const matches = candidates.filter(
-    (candidate) =>
-      getTimeZoneOffsetMs(new Date(candidate), timeZone) ===
-      localAsUtc - candidate,
-  );
-  if (matches.length > 0) return new Date(Math.min(...matches));
-  return new Date(
-    findTransitionInstant(
-      Math.min(...candidates),
-      Math.max(...candidates),
-      timeZone,
-    ),
-  );
-}
-
 export function getLearningDayStart(
   instant: Date,
   requestedTimeZone: string | null | undefined,
@@ -119,7 +59,7 @@ export function getLearningDayStart(
       ? civilDateAsUtc - DAY_MS
       : civilDateAsUtc,
   );
-  return localDateTimeToUtc(
+  return getInstantForLocalDateTime(
     {
       year: target.getUTCFullYear(),
       month: target.getUTCMonth() + 1,

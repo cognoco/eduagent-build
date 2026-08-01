@@ -31,7 +31,7 @@ Out of scope:
 - [x] T2: Gate E2E and staging deploy on the invariant — done when workflow contract tests prove both workflows invoke the checker before using or synchronizing Clerk credentials.
 - [x] T3: Validate and recover the intended staging backend secret — a newly issued multi-key Secret Key was stored directly in Doppler `stg`, then authenticated against Clerk's live Domains API to prove it targets `whole-iguana-9.clerk.accounts.dev` without exposing plaintext.
 - [x] T4: Synchronize and verify staging — Doppler `stg` synchronized and verified 33 filtered secrets on `mentomate-api-stg` through `pnpm secrets:sync stg`; unrestricted Ramtop Node 22 Playwright setup seeded and signed in all three storage-state scenarios, and PR #2748's E2E Web run 30623742315 passed.
-- [ ] T5: Prove repository delivery is restored — the recovery-only workflow code is removed and PR #2748's permanent checks are green. PR #2740 E2E Web rerun 30608972409 remains red on an unrelated response-body retrieval failure in `returning-learner-resume.spec.ts:157`; its three setup sign-ins and 21 other V2 cases passed.
+- [x] T5: Prove repository delivery is restored — the recovery-only workflow code is removed and PR #2748's permanent checks are green. After merged WI-2961 PR #2772 fixed the response-body retrieval race, PR #2740 E2E Web run 30628084286 passed the strict V2 release gate (22/22) and required-stable legacy smoke (24/24), and PR #2740 merged.
 
 ## Operator-safe repair runbook
 
