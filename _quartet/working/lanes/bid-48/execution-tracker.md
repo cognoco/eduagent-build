@@ -56,12 +56,16 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 15:13 CEST
+## Live reconciliation — 2026-08-01 15:25 CEST
 
 ### Latest authoritative boundary
 
-- Brief/relation parity remains 41 members. Live slice: 31 Closed, 5 Executing,
-  5 Ready.
+- The Brief still declares 41 members, but the live relation now has 42 rows because
+  WI-2958 was related without a Brief amendment. Relation slice: 31 Closed,
+  6 Executing, 5 Ready; Brief-declared slice: 31 Closed, 5 Executing, 5 Ready.
+  FO-2090 / `OCC-BC2AC6B99167` records the mismatch. WI-2958 has an expired external
+  claim, no PR, and no tracked worktree delta; it remains unchanged pending formal
+  admission/exclusion and is not silently taken over.
 - WI-2936 is independently Closed/Done at `08d75f40` after evidence-only rework
   removed a non-durable local pointer and accurately recorded 13 successful checks
   plus one intentional skip.

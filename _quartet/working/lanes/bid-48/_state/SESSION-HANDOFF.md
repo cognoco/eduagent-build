@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 15:13 CEST
+Last reconciled: 2026-08-01 15:25 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -14,16 +14,19 @@ Last reconciled: 2026-08-01 15:13 CEST
   WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818, WI-2819,
   WI-2822, WI-2826, WI-2833, WI-2921, WI-2922, WI-2923, WI-2924, WI-2925,
   WI-2931, WI-2936, WI-2939.
-- Brief/relation parity: live-verified at 41 after the 2026-07-31 operator ruling
+- Brief/relation parity: currently divergent. The Brief remains at 41 after the 2026-07-31 operator ruling
   retracted WI-2941's admission. WI-2941 is Backlog/Active in Nexus / Cosmo
   Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
   in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
-  Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live stage count at checkpoint: 31 Closed, 5 Executing, 5 Ready.
+  Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925. The live
+  relation now also contains WI-2958 without a Brief amendment; formal membership
+  disposition is pending and the item is not silently admitted or taken over.
+- Live relation slice at checkpoint: 31 Closed, 6 Executing, 5 Ready (42 related rows).
+  The 41 Brief-declared members comprise 31 Closed, 5 Executing, 5 Ready.
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 15:13 CEST
+### Latest authoritative boundary — 2026-08-01 15:25 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -102,6 +105,12 @@ Last reconciled: 2026-08-01 15:13 CEST
 - Same-owner lifecycle heartbeats renewed all claims approaching or beyond expiry:
   WI-2643, WI-2790, WI-2826, WI-2922, and WI-2939. WI-2921's fresh reclaim already has
   a future expiry. No claim was transferred to a different owner.
+- WI-2958 appeared in the live BID-48 relation without a matching Brief amendment,
+  increasing related rows from 41 to 42. Its external `shepherd:codex:smoke-cure`
+  claim expired at 12:32 CEST; the detached worktree contains no tracked delta and no
+  PR. The item overlaps and is blocked by WI-2939. FO-2090 /
+  `OCC-BC2AC6B99167` records the exact governance drift. The item remains unchanged
+  pending formal admission/exclusion; no silent takeover or execution occurred.
 - The operator clarified that the four-WIP figure is throughput guidance, not a
   reason to leave Ready work idle while executor capacity exists. Dependency/authority
   waits do not consume practical dispatch capacity.
