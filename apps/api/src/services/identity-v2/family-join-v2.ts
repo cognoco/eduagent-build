@@ -38,16 +38,16 @@
 // two-tx variant, which is out of scope here.
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   consentGrant,
   membership,
   organization,
   person,
   subscription,
-  supportership,
   type Database,
 } from '@eduagent/database';
+import type { VisibilityContract } from '@eduagent/schemas';
 
 import { BadRequestError, ConflictError, ForbiddenError } from '../../errors';
 import { inngest } from '../../inngest/client';
@@ -63,6 +63,7 @@ import {
 } from './deletion-v2';
 import { getChargePersonIds, getGuardianPersonIds } from './guardianship';
 import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
+import { initiateLinkInTransaction } from '../linking-ceremony';
 
 /**
  * v1 gate (TODO(WI-1753 Fork 2 / OPQ-75: teen age eligibility — pending Zuzka
@@ -121,6 +122,46 @@ export interface AcceptFamilyJoinResult {
    * the UI can also show the accept-time double-charge warning.
    */
   storeCancelNudge: { originalAppUserId: string } | null;
+  /** The resumable, bilateral visibility agreement created on explicit opt-in. */
+  visibilityContract: VisibilityContract | null;
+}
+
+async function assertSelfDirectedFamilyJoiner(
+  db: Database,
+  teenPersonId: string,
+): Promise<void> {
+  const [charges, guardians] = await Promise.all([
+    getChargePersonIds(db, teenPersonId),
+    getGuardianPersonIds(db, teenPersonId),
+  ]);
+  if (charges.length > 0) {
+    throw new ForbiddenError(
+      'Accepting account is a guardian and cannot join as a learner.',
+    );
+  }
+  if (guardians.length > 0) {
+    throw new ForbiddenError(
+      'Accepting account is a managed child and cannot self-join.',
+    );
+  }
+
+  const teenPerson = await db.query.person.findFirst({
+    where: eq(person.id, teenPersonId),
+  });
+  if (!teenPerson) {
+    throw new BadRequestError('Accepting person not found.');
+  }
+  const { birthMonth, birthDay } = birthMonthDayFromDate(teenPerson.birthDate);
+  const consentCheck = checkConsentRequiredFromDate(
+    birthYearFromDate(teenPerson.birthDate),
+    birthMonth ?? undefined,
+    birthDay ?? undefined,
+  );
+  if (ACCEPT_REQUIRES_SELF_CONSENT_CAPABLE && consentCheck.required) {
+    throw new ForbiddenError(
+      'Accepting teen is not self-consent-capable by age.',
+    );
+  }
 }
 
 /**
@@ -207,11 +248,25 @@ export async function acceptFamilyJoin(
 
       // Idempotent double-accept: already in the family org → nothing to do.
       if (teenMembership.organizationId === familyOrgId) {
+        if (optInSupportership) {
+          await assertSelfDirectedFamilyJoiner(tx, teenPersonId);
+        }
+        const visibilityContract = optInSupportership
+          ? await initiateLinkInTransaction(tx, {
+              supporterPersonId: parentPersonId,
+              supporteePersonId: teenPersonId,
+              relation: 'parent',
+              managedTier: false,
+              managedTierActive: false,
+              initiatedByPersonId: teenPersonId,
+            })
+          : null;
         return {
           familyOrgId,
           teenPersonId,
           alreadyMember: true,
           storeCancelNudge: null,
+          visibilityContract,
         } satisfies AcceptFamilyJoinResult;
       }
 
@@ -231,41 +286,7 @@ export async function acceptFamilyJoin(
       // (3) Precondition: the teen is on NO guardianship edge in either direction.
       // A guardian (has charges) or a managed child (has a guardian) is not a solo
       // owner and must not be silently restructured.
-      const [charges, guardians] = await Promise.all([
-        getChargePersonIds(tx, teenPersonId),
-        getGuardianPersonIds(tx, teenPersonId),
-      ]);
-      if (charges.length > 0) {
-        throw new ForbiddenError(
-          'Accepting account is a guardian and cannot join as a learner.',
-        );
-      }
-      if (guardians.length > 0) {
-        throw new ForbiddenError(
-          'Accepting account is a managed child and cannot self-join.',
-        );
-      }
-
-      // (4) Precondition: self-consent-capable by age (Fork 2 gate).
-      const teenPerson = await tx.query.person.findFirst({
-        where: eq(person.id, teenPersonId),
-      });
-      if (!teenPerson) {
-        throw new BadRequestError('Accepting person not found.');
-      }
-      const { birthMonth, birthDay } = birthMonthDayFromDate(
-        teenPerson.birthDate,
-      );
-      const consentCheck = checkConsentRequiredFromDate(
-        birthYearFromDate(teenPerson.birthDate),
-        birthMonth ?? undefined,
-        birthDay ?? undefined,
-      );
-      if (ACCEPT_REQUIRES_SELF_CONSENT_CAPABLE && consentCheck.required) {
-        throw new ForbiddenError(
-          'Accepting teen is not self-consent-capable by age.',
-        );
-      }
+      await assertSelfDirectedFamilyJoiner(tx, teenPersonId);
 
       // (5) Precondition: the family plan must have a SEAT for the teen.
       // A subscription row existing is not that precondition — it proves nothing
@@ -373,25 +394,19 @@ export async function acceptFamilyJoin(
       // consent grants → no inbound RESTRICT rows remain).
       await tx.delete(organization).where(eq(organization.id, orgOfOneId));
 
-      // (11) AC-3: NEVER a guardianship row. Supportership ONLY on explicit opt-in.
-      // A bare supportership edge (visibility is governed separately by
-      // support_visibility_contracts, out of scope for v1 opt-in). Guarded insert
-      // keeps the append idempotent under the active-unique partial index.
-      if (optInSupportership) {
-        const existing = await tx.query.supportership.findFirst({
-          where: and(
-            eq(supportership.supporterPersonId, parentPersonId),
-            eq(supportership.supporteePersonId, teenPersonId),
-            isNull(supportership.revokedAt),
-          ),
-        });
-        if (!existing) {
-          await tx.insert(supportership).values({
+      // (11) AC-3: NEVER a guardianship row. Explicit opt-in creates (or
+      // repairs) the canonical supportership + bilateral visibility contract
+      // inside this same transaction. Opt-out creates neither.
+      const visibilityContract = optInSupportership
+        ? await initiateLinkInTransaction(tx, {
             supporterPersonId: parentPersonId,
             supporteePersonId: teenPersonId,
-          });
-        }
-      }
+            relation: 'parent',
+            managedTier: false,
+            managedTierActive: false,
+            initiatedByPersonId: teenPersonId,
+          })
+        : null;
 
       // (12) No marker to clear — see step (6). The join is fully committed atomically.
       return {
@@ -399,6 +414,7 @@ export async function acceptFamilyJoin(
         teenPersonId,
         alreadyMember: false,
         storeCancelNudge,
+        visibilityContract,
       } satisfies AcceptFamilyJoinResult;
     })
     .then(async (result) => {

@@ -51,6 +51,8 @@ import {
   quotaPools,
   subscription,
   subscriptionPayers,
+  supportVisibilityAuditEvents,
+  supportVisibilityContracts,
   supportership,
   type Database,
 } from '@eduagent/database';
@@ -411,7 +413,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       displayName: 'Teen',
     });
 
-    await acceptFamilyJoin(db, {
+    const result = await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
       ...(await seedInvite({
         inviterPersonId: family.personId,
@@ -422,6 +424,15 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       optInSupportership: true,
     });
 
+    expect(result.visibilityContract).toMatchObject({
+      supporterPersonId: family.personId,
+      supporteePersonId: teen.personId,
+      relation: 'parent',
+      status: 'pending',
+      supporterAcceptedAt: null,
+      supporteeAcceptedAt: null,
+    });
+
     const edge = await db.query.supportership.findFirst({
       where: and(
         eq(supportership.supporterPersonId, family.personId),
@@ -430,6 +441,22 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     });
     expect(edge).toBeDefined();
     expect(edge?.revokedAt).toBeNull();
+    const contracts = await db.query.supportVisibilityContracts.findMany({
+      where: eq(supportVisibilityContracts.supportershipId, edge!.id),
+    });
+    expect(contracts).toHaveLength(1);
+    expect(contracts[0]).toMatchObject({
+      id: result.visibilityContract?.id,
+      status: 'pending',
+      relation: 'parent',
+    });
+    await expect(
+      db.query.supportVisibilityAuditEvents.findMany({
+        where: eq(supportVisibilityAuditEvents.contractId, contracts[0]!.id),
+      }),
+    ).resolves.toMatchObject([
+      { actorPersonId: teen.personId, eventType: 'contract_initiated' },
+    ]);
   });
 
   itGraph('writes no supportership edge when opt-in is false', async () => {
@@ -439,7 +466,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       displayName: 'Teen',
     });
 
-    await acceptFamilyJoin(db, {
+    const result = await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
       ...(await seedInvite({
         inviterPersonId: family.personId,
@@ -454,7 +481,65 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       where: eq(supportership.supporteePersonId, teen.personId),
     });
     expect(edge).toBeUndefined();
+    expect(result.visibilityContract).toBeNull();
+    await expect(
+      db.query.supportVisibilityContracts.findMany({
+        where: eq(supportVisibilityContracts.supporteePersonId, teen.personId),
+      }),
+    ).resolves.toEqual([]);
   });
+
+  itGraph(
+    'repairs one existing bare family-join edge into one resumable contract',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const teen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen',
+      });
+      const [bareEdge] = await db
+        .insert(supportership)
+        .values({
+          supporterPersonId: family.personId,
+          supporteePersonId: teen.personId,
+        })
+        .returning();
+      const repairInvite = await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      });
+
+      const repaired = await acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        ...repairInvite,
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: true,
+      });
+
+      expect(repaired.alreadyMember).toBe(false);
+      expect(repaired.visibilityContract).toMatchObject({
+        supportershipId: bareEdge!.id,
+        status: 'pending',
+      });
+      await expect(
+        db.query.supportVisibilityContracts.findMany({
+          where: eq(supportVisibilityContracts.supportershipId, bareEdge!.id),
+        }),
+      ).resolves.toHaveLength(1);
+      await expect(
+        db.query.supportVisibilityAuditEvents.findMany({
+          where: eq(
+            supportVisibilityAuditEvents.contractId,
+            repaired.visibilityContract!.id,
+          ),
+        }),
+      ).resolves.toHaveLength(1);
+    },
+  );
 
   // AC-6: an ACTIVE store sub on the org-of-one is captured for the self-cancel
   // nudge BEFORE the subscription row is torn down.
@@ -537,12 +622,17 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
         familyOrgId: family.orgId,
       })),
       familyOrgId: family.orgId,
-      parentPersonId: family.personId,
-      optInSupportership: false,
+      parentPersonId: otherParent.personId,
+      optInSupportership: true,
     });
 
     expect(second.alreadyMember).toBe(true);
     expect(second.storeCancelNudge).toBeNull();
+    expect(second.visibilityContract).toMatchObject({
+      supporterPersonId: otherParent.personId,
+      supporteePersonId: teen.personId,
+      status: 'pending',
+    });
     expect(await readMembershipOrg(teen.personId)).toBe(family.orgId);
   });
 

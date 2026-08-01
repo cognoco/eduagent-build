@@ -24,6 +24,7 @@ import {
   membership,
   organization,
   person,
+  supportership,
   type Database,
 } from '@eduagent/database';
 
@@ -289,6 +290,63 @@ function createIntegrationDb(): Database {
         contractVersion: initiated.contractVersion,
       });
     }
+
+    it('[pending contract → minimal consent card] exposes only the resumable contract id and display name', async () => {
+      const supporter = await seedPerson({
+        displayName: 'Pending Contract Supporter',
+        isOwner: true,
+        credentialed: false,
+      });
+      const supportee = await seedPerson({
+        displayName: 'Pending Contract Supportee',
+        isOwner: true,
+        credentialed: true,
+      });
+      const contract = await initiateLink(db, {
+        supporterPersonId: supporter.personId,
+        supporteePersonId: supportee.personId,
+        relation: 'parent',
+        managedTier: false,
+        managedTierActive: false,
+      });
+
+      const result = await resolveSupporterColdStart(db, supporter.personId);
+
+      expect(result).toMatchObject({
+        variant: 'per-child',
+        cards: [
+          {
+            pendingLinkId: contract.id,
+            displayName: 'Pending Contract Supportee',
+            state: 'consent-pending',
+            anchor: 'approve',
+          },
+        ],
+      });
+      expect(result.cards[0]).not.toHaveProperty('personId');
+      expect(result.cards[0]).not.toHaveProperty('edgeId');
+    });
+
+    it('[bare credentialed edge → no card] never treats an uncontracted family link as granted visibility', async () => {
+      const supporter = await seedPerson({
+        displayName: 'Bare Edge Supporter',
+        isOwner: true,
+        credentialed: false,
+      });
+      const supportee = await seedPerson({
+        displayName: 'Bare Edge Supportee',
+        isOwner: true,
+        credentialed: true,
+      });
+      await db.insert(supportership).values({
+        supporterPersonId: supporter.personId,
+        supporteePersonId: supportee.personId,
+      });
+
+      const result = await resolveSupporterColdStart(db, supporter.personId);
+
+      expect(result).toMatchObject({ variant: 'per-child', cards: [] });
+    });
 
     it('[credentialed + no learning-state + cross-org → granted-idle] renders the granted-idle card the pre-fix hasOwnAccount predicate suppressed (the reported cross-organization bug)', async () => {
       const supporter = await seedPerson({

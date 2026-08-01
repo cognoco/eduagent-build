@@ -53,6 +53,25 @@ export async function initiateLink(
     managedTierActive?: boolean;
     now?: Date;
     contractVersion?: number;
+    initiatedByPersonId?: string;
+  },
+): Promise<VisibilityContract> {
+  return await db.transaction(async (tx) =>
+    initiateLinkInTransaction(tx as unknown as Database, input),
+  );
+}
+
+/**
+ * Canonical link initiation for callers that already own a transaction.
+ * Repairs a pre-existing bare supportership by adding its missing contract.
+ */
+export async function initiateLinkInTransaction(
+  db: Database,
+  input: VisibilityLinkInitiate & {
+    managedTierActive?: boolean;
+    now?: Date;
+    contractVersion?: number;
+    initiatedByPersonId?: string;
   },
 ): Promise<VisibilityContract> {
   if (input.managedTier && !input.managedTierActive) {
@@ -62,89 +81,107 @@ export async function initiateLink(
     throw new BadRequestError('A supporter cannot support themself.');
   }
 
-  // [WI-1060] Wrap all three writes in a transaction so a mid-sequence crash
-  // cannot leave an orphaned supportership row without its visibility contract
-  // or audit trail.
   const now = input.now ?? new Date();
-  return await db.transaction(async (tx) => {
-    const txDb = tx as unknown as Database;
+  const edgeRows = await db
+    .insert(supportership)
+    .values({
+      supporterPersonId: input.supporterPersonId,
+      supporteePersonId: input.supporteePersonId,
+      grantedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({
+      target: [
+        supportership.supporterPersonId,
+        supportership.supporteePersonId,
+      ],
+      where: isNull(supportership.revokedAt),
+    })
+    .returning();
+  let edge = edgeRows[0];
+  if (!edge) {
+    const existingEdgeRows = await db
+      .select()
+      .from(supportership)
+      .where(
+        and(
+          eq(supportership.supporterPersonId, input.supporterPersonId),
+          eq(supportership.supporteePersonId, input.supporteePersonId),
+          isNull(supportership.revokedAt),
+        ),
+      )
+      .limit(1);
+    edge = existingEdgeRows[0];
+  }
+  if (!edge) throw new ConflictError('An active support link already exists.');
 
-    const edgeRows = await tx
-      .insert(supportership)
-      .values({
-        supporterPersonId: input.supporterPersonId,
-        supporteePersonId: input.supporteePersonId,
-        grantedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoNothing({
-        target: [
-          supportership.supporterPersonId,
-          supportership.supporteePersonId,
-        ],
-        where: isNull(supportership.revokedAt),
-      })
-      .returning();
-    const edge = edgeRows[0];
-    if (!edge) {
-      // The active-pair unique index is the atomic idempotency arbiter. A
-      // concurrent request waits for the winning transaction, then reaches
-      // this branch without inserting. Return the winner's current active
-      // contract rather than surfacing a unique-constraint error or writing a
-      // duplicate initiation audit event.
-      const existingRows = await tx
-        .select({ contract: supportVisibilityContracts })
-        .from(supportVisibilityContracts)
-        .innerJoin(
-          supportership,
-          eq(supportVisibilityContracts.supportershipId, supportership.id),
-        )
-        .where(
-          and(
-            eq(supportership.supporterPersonId, input.supporterPersonId),
-            eq(supportership.supporteePersonId, input.supporteePersonId),
-            isNull(supportership.revokedAt),
-            inArray(supportVisibilityContracts.status, [
-              'pending',
-              'accepted',
-              'restamped',
-            ]),
-          ),
-        )
-        .limit(1);
-      const existing = existingRows[0]?.contract;
-      if (existing) return mapContract(existing);
-      throw new ConflictError('An active support link already exists.');
-    }
+  const existingRows = await db
+    .select()
+    .from(supportVisibilityContracts)
+    .where(
+      and(
+        eq(supportVisibilityContracts.supportershipId, edge.id),
+        inArray(supportVisibilityContracts.status, [
+          'pending',
+          'accepted',
+          'restamped',
+        ]),
+      ),
+    )
+    .limit(1);
+  const existing = existingRows[0];
+  if (existing) return mapContract(existing);
 
-    const contractRows = await tx
-      .insert(supportVisibilityContracts)
-      .values({
-        supportershipId: edge.id,
-        supporterPersonId: input.supporterPersonId,
-        supporteePersonId: input.supporteePersonId,
-        relation: input.relation,
-        status: input.managedTier ? 'accepted' : 'pending',
-        contractVersion: input.contractVersion ?? 1,
-        reportableKinds: REPORTABLE_KINDS,
-        artifactWall: true,
-        renderEquivalence: true,
-        safetyException: true,
-        supporterAcceptedAt: input.managedTier ? now : null,
-        supporteeAcceptedAt: input.managedTier ? now : null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
-    const contract = contractRows[0];
-    if (!contract)
-      throw new Error('Visibility contract insert returned no row');
+  const contractRows = await db
+    .insert(supportVisibilityContracts)
+    .values({
+      supportershipId: edge.id,
+      supporterPersonId: input.supporterPersonId,
+      supporteePersonId: input.supporteePersonId,
+      relation: input.relation,
+      status: input.managedTier ? 'accepted' : 'pending',
+      contractVersion: input.contractVersion ?? 1,
+      reportableKinds: REPORTABLE_KINDS,
+      artifactWall: true,
+      renderEquivalence: true,
+      safetyException: true,
+      supporterAcceptedAt: input.managedTier ? now : null,
+      supporteeAcceptedAt: input.managedTier ? now : null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({
+      target: supportVisibilityContracts.supportershipId,
+      where: sql`${supportVisibilityContracts.status} IN ('pending','accepted','restamped')`,
+    })
+    .returning();
+  let contract = contractRows[0];
+  if (!contract) {
+    const winnerRows = await db
+      .select()
+      .from(supportVisibilityContracts)
+      .where(
+        and(
+          eq(supportVisibilityContracts.supportershipId, edge.id),
+          inArray(supportVisibilityContracts.status, [
+            'pending',
+            'accepted',
+            'restamped',
+          ]),
+        ),
+      )
+      .limit(1);
+    contract = winnerRows[0];
+  }
+  if (!contract)
+    throw new ConflictError('An active support link already exists.');
 
-    await writeVisibilityAuditEvent(txDb, {
+  if (contractRows[0]) {
+    await writeVisibilityAuditEvent(db, {
       supportershipId: edge.id,
       contractId: contract.id,
-      actorPersonId: input.supporterPersonId,
+      actorPersonId: input.initiatedByPersonId ?? input.supporterPersonId,
       eventType: 'contract_initiated',
       payload: {
         relation: input.relation,
@@ -152,9 +189,9 @@ export async function initiateLink(
         reportableKinds: REPORTABLE_KINDS,
       },
     });
+  }
 
-    return mapContract(contract);
-  });
+  return mapContract(contract);
 }
 
 export async function acceptLink(
