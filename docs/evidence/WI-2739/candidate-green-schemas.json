@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "wi-2739-jest-phase.v1",
+  "phase": "candidate-green",
+  "command": "rtk pnpm exec jest --config packages/schemas/jest.config.cjs --runInBand --no-coverage packages/schemas/src/inngest-events.test.ts --json --outputFile=<phase-schema-output>",
+  "exitCode": 0,
+  "productionSourceCommit": "2e84f0b6bae9958c7faeaae1f80c97744dd06c0a",
+  "retainedTestsCommit": "2e84f0b6bae9958c7faeaae1f80c97744dd06c0a",
+  "rawOutputSha256": "a670c5cb59a5d65b17373b7ddd36ea9d71a1033a34a360d0321187df6c3abd0b",
+  "result": {
+    "success": true,
+    "numFailedTestSuites": 0,
+    "numPassedTestSuites": 1,
+    "numTotalTestSuites": 1,
+    "numFailedTests": 0,
+    "numPassedTests": 51,
+    "numPendingTests": 0,
+    "numTotalTests": 51,
+    "startTimeUnixMs": 1785511555916,
+    "testResults": [
+      {
+        "testFile": "packages/schemas/src/inngest-events.test.ts",
+        "status": "passed",
+        "assertionCounts": {
+          "passed": 51,
+          "failed": 0,
+          "pending": 0
+        },
+        "failedAssertions": []
+      }
+    ]
+  }
+}

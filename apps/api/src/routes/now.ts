@@ -7,7 +7,11 @@ import {
   nowResponseSchema,
 } from '@eduagent/schemas';
 
-import { withProfile, type RouteEnv } from '../route-utils/route-context';
+import {
+  requireCallerPersonId,
+  withProfile,
+  type RouteEnv,
+} from '../route-utils/route-context';
 import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 import { resolveMentorNoticeVisibility } from '../services/mentor-notices';
 
@@ -32,6 +36,10 @@ export const nowRoutes = new Hono<NowRouteEnv>()
   .get('/now', zValidator('query', nowQuerySchema), async (c) => {
     const { db, profileId } = withProfile(c);
     const query = c.req.valid('query');
+    const callerPersonId =
+      query.scope === 'self'
+        ? c.get('callerPersonId')
+        : requireCallerPersonId(c);
     // [WI-2498] V — rollout ∧ caller-is-subject ∧ subject consent. Replaces a
     // bare isMentorNoticeEnabled(env) read, which gated notice evidence on
     // the rollout flag alone and so leaked it into guardian selected-child
@@ -48,6 +56,7 @@ export const nowRoutes = new Hono<NowRouteEnv>()
       c.env?.MENTOR_NOTICE_POLICY_REVISION,
     );
     const feed = await buildNowFeed(db, profileId, query, {
+      callerPersonId,
       mentorNoticeEnabled: policy.visible,
     });
     return c.json(
@@ -65,6 +74,10 @@ export const nowRoutes = new Hono<NowRouteEnv>()
   .get('/now/overflow', zValidator('query', nowQuerySchema), async (c) => {
     const { db, profileId } = withProfile(c);
     const query = c.req.valid('query');
+    const callerPersonId =
+      query.scope === 'self'
+        ? c.get('callerPersonId')
+        : requireCallerPersonId(c);
     // [WI-2498] Same predicate as `/now` — overflow is the second page of the
     // same projection and carries the same notice-bearing card kinds.
     // [WI-2504] …and therefore the same epoch, so an overflow read observed
@@ -78,6 +91,7 @@ export const nowRoutes = new Hono<NowRouteEnv>()
       c.env?.MENTOR_NOTICE_POLICY_REVISION,
     );
     const overflow = await buildNowOverflow(db, profileId, query, {
+      callerPersonId,
       mentorNoticeEnabled: policy.visible,
     });
     return c.json(

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   InputMode,
   PendingCelebration,
@@ -24,6 +25,7 @@ import {
 } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
+import { queryKeys } from '../../lib/query-keys';
 import { Sentry } from '../../lib/sentry';
 import { writeSessionRecoveryMarker } from '../../lib/session-recovery';
 import {
@@ -237,6 +239,7 @@ export interface UseSessionStreamingOptions {
 }
 
 export function useSessionStreaming(opts: UseSessionStreamingOptions) {
+  const queryClient = useQueryClient();
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -969,6 +972,16 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               return;
             }
 
+            if (activeProfileId) {
+              void queryClient.invalidateQueries({
+                predicate: (query) =>
+                  queryKeys.sessions.matchTranscriptAnyMode(
+                    sid,
+                    activeProfileId,
+                  )(query.queryKey),
+              });
+            }
+
             if (activeProfileId && outboxEntry) {
               await markConfirmed(activeProfileId, 'session', outboxEntry.id);
             }
@@ -1229,6 +1242,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       lastRetryPayloadRef,
       messages,
       notePromptOffered,
+      queryClient,
       rawInput,
       scheduleSilencePrompt,
       setExchangeCount,

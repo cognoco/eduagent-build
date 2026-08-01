@@ -273,10 +273,15 @@ contract groups `app/consent.revocation.failed`,
 `app/account.deletion_teardown.failed`,
 `app/billing.subscription_store_teardown.failed`, and
 `app/billing.alias_merge.failed` under the same immediate-page threshold and
-Inngest dashboard query. Their payloads contain only opaque account/event and
-Inngest run IDs, a coarse error class, and a timestamp. Creating or changing the
-production-console rule remains operator-owned as stated at the top of this
-runbook.
+Inngest dashboard query. The three WI-2346 teardown payloads contain only an
+opaque `accountId` or `eventId`, nullable Inngest `runId`, a bounded coarse
+`errorName`, and `timestamp`. The two pre-existing consent dead letters,
+`app/consent.revocation.failed` and `app/consent.email-revocation.failed`, still
+carry raw `error` message text and do not yet share that privacy-minimized
+shape. Their separately admitted hardening is WI-2977 (Privacy-minimize
+consent-revocation dead-letter payloads); it is not implemented here. Creating
+or changing the production-console rule remains operator-owned as stated at
+the top of this runbook.
 
 Sentry filters:
 

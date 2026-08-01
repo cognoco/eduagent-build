@@ -19,6 +19,22 @@ import type {
 import { routeAndCall, type ChatMessage, type EscalationRung } from './llm';
 import { sanitizeXmlValue } from './llm/sanitize';
 import { getPersonAgeBracket } from './identity-v2/helpers';
+import { assertLlmConsent } from './identity-v2/consent-status-v2';
+
+export interface RecallBridgeDependencies {
+  assertLlmConsent: typeof assertLlmConsent;
+  routeAndCall: typeof routeAndCall;
+}
+
+export interface RecallBridgeOptions {
+  conversationLanguage?: ConversationLanguage;
+  deps?: Partial<RecallBridgeDependencies>;
+}
+
+const recallBridgeDependencies: RecallBridgeDependencies = {
+  assertLlmConsent,
+  routeAndCall,
+};
 
 // ---------------------------------------------------------------------------
 // Core function
@@ -39,8 +55,9 @@ export async function generateRecallBridge(
   db: Database,
   profileId: string,
   sessionId: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: RecallBridgeOptions,
 ): Promise<RecallBridgeResult> {
+  const deps = { ...recallBridgeDependencies, ...options?.deps };
   const repo = createScopedRepository(db, profileId);
   const session = await repo.sessions.findFirst(
     eq(learningSessions.id, sessionId),
@@ -96,7 +113,8 @@ export async function generateRecallBridge(
   // scope. Without this, the router's under-18 Gemini/Vertex vendor
   // exclusion can't fire for this flow on the legacy routing path.
   const ageBracket = await getPersonAgeBracket(db, profileId);
-  const result = await routeAndCall(messages, rung, {
+  await deps.assertLlmConsent(db, profileId);
+  const result = await deps.routeAndCall(messages, rung, {
     flow: 'recall.bridge',
     sessionId,
     conversationLanguage: options?.conversationLanguage,

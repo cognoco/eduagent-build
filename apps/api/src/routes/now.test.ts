@@ -1,10 +1,14 @@
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
+import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 
 import { nowRoutes } from './now';
 import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
+// gc1-allow: route unit isolation; now-feed has direct service coverage and
+// requires real database query support that this route harness does not expose.
 jest.mock('../services/now-feed', () => ({
   ...jest.requireActual('../services/now-feed'),
   buildNowFeed: jest.fn(),
@@ -24,6 +28,7 @@ jest.mock('../services/identity-v2/consent-status-v2', () => ({
 
 const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
+const CALLER_PERSON_ID = '00000000-0000-4000-8000-000000000102';
 
 // [WI-2498] `callerPersonId` is the server-resolved caller identity the
 // mentor-notice visibility predicate compares against the selected profile.
@@ -49,6 +54,13 @@ function makeApp(
     await next();
   });
   app.route('/v1', nowRoutes);
+  app.onError((err, c) => {
+    if (err instanceof HTTPException) return err.getResponse();
+    if (err instanceof ForbiddenError) {
+      return c.json({ code: ERROR_CODES.FORBIDDEN, message: err.message }, 403);
+    }
+    throw err;
+  });
   return app;
 }
 
@@ -94,7 +106,7 @@ describe('now routes', () => {
         scope: 'person',
         personId: CHILD_ID,
       },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: false },
     );
   });
 
@@ -115,9 +127,44 @@ describe('now routes', () => {
       {
         scope: 'supporter-hub',
       },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: false },
     );
   });
+
+  it.each([
+    ['/v1/now', buildNowFeed],
+    ['/v1/now/overflow', buildNowOverflow],
+  ] as const)(
+    '[WI-2518][RGR] %s binds supporter person reads to callerPersonId, not selected profileId',
+    async (path, build) => {
+      jest.mocked(build).mockImplementation((async (...args: unknown[]) => {
+        const options = args.at(-1) as { callerPersonId?: string };
+        if (options.callerPersonId === CALLER_PERSON_ID) {
+          throw new ForbiddenError('Caller has no accepted edge');
+        }
+        return path.endsWith('/overflow')
+          ? { scope: 'person', items: [] }
+          : {
+              scope: 'person',
+              cards: [],
+              overflowCount: 0,
+              generatedAt: '2026-06-20T00:00:00.000Z',
+            };
+      }) as never);
+
+      const response = await makeApp(false, CALLER_PERSON_ID).request(
+        `${path}?scope=person&personId=${CHILD_ID}`,
+      );
+
+      expect(response.status).toBe(403);
+      expect(build).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        { scope: 'person', personId: CHILD_ID },
+        expect.objectContaining({ callerPersonId: CALLER_PERSON_ID }),
+      );
+    },
+  );
 
   it('returns 400 from overflow when person scope omits personId', async () => {
     const res = await makeApp().request('/v1/now/overflow?scope=person');
@@ -163,7 +210,7 @@ describe('now routes', () => {
         scope: 'person',
         personId: CHILD_ID,
       },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: false },
     );
     await expect(res.json()).resolves.toMatchObject({
       scope: 'person',
@@ -187,7 +234,7 @@ describe('now routes', () => {
       expect.anything(),
       PROFILE_ID,
       { scope: 'self' },
-      { mentorNoticeEnabled: true },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: true },
     );
   });
 
@@ -205,7 +252,7 @@ describe('now routes', () => {
       expect.anything(),
       PROFILE_ID,
       { scope: 'self' },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: CHILD_ID, mentorNoticeEnabled: false },
     );
   });
 
@@ -222,7 +269,7 @@ describe('now routes', () => {
       expect.anything(),
       PROFILE_ID,
       { scope: 'self' },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: false },
     );
   });
 
@@ -241,7 +288,7 @@ describe('now routes', () => {
       {
         scope: 'supporter-hub',
       },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: false },
     );
   });
 
@@ -275,7 +322,7 @@ describe('now routes', () => {
       expect.anything(),
       PROFILE_ID,
       { scope: 'self' },
-      { mentorNoticeEnabled: true },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: true },
     );
   });
 
@@ -287,7 +334,7 @@ describe('now routes', () => {
       expect.anything(),
       PROFILE_ID,
       { scope: 'self' },
-      { mentorNoticeEnabled: false },
+      { callerPersonId: PROFILE_ID, mentorNoticeEnabled: false },
     );
   });
 

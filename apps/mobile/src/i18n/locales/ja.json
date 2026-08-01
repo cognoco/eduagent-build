@@ -4674,7 +4674,8 @@
         "learningTime_one": "{{count}}時間学習",
         "learningTime_other": "{{count}}時間学習",
         "cefrLevelUp": "語学レベルがアップ",
-        "topicsExplored": "{{subject}}で{{count}}個のトピックを学習"
+        "topicsExplored_one": "{{subject}}で{{count}}個のトピックを学習",
+        "topicsExplored_other": "{{subject}}で{{count}}個のトピックを学習"
       }
     }
   }

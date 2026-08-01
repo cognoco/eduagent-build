@@ -58,6 +58,22 @@ describe('extractVolunteeredPii', () => {
     );
   });
 
+  it('extracts a conventional lowercase volunteered street address', () => {
+    expect(extractVolunteeredPii('i live at 12 oakwood street')).toContain(
+      '12 oakwood street',
+    );
+  });
+
+  it('does NOT accept a street suffix without a street-name token', () => {
+    expect(extractVolunteeredPii('i live at 12 road')).not.toContain('12 road');
+  });
+
+  it('extracts a volunteered street address with four name tokens', () => {
+    expect(
+      extractVolunteeredPii('i live at 12 martin luther king junior boulevard'),
+    ).toContain('12 martin luther king junior boulevard');
+  });
+
   it('does NOT treat a common word after "I am" as a name', () => {
     expect(extractVolunteeredPii('I am tired and confused')).toEqual([]);
   });

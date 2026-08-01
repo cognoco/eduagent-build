@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "wi-2739-jest-phase.v1",
+  "phase": "production-revert",
+  "command": "rtk pnpm exec jest --config packages/schemas/jest.config.cjs --runInBand --no-coverage packages/schemas/src/inngest-events.test.ts --json --outputFile=<phase-schema-output>",
+  "exitCode": 1,
+  "productionSourceCommit": "af603521d92fe03d1512a258f32aa8ffa297cf08",
+  "retainedTestsCommit": "2e84f0b6bae9958c7faeaae1f80c97744dd06c0a",
+  "rawOutputSha256": "edaa519ee08d1b24c1e55cc56666475da19cb51e47f954d5e38db9cdc7577c03",
+  "result": {
+    "success": false,
+    "numFailedTestSuites": 1,
+    "numPassedTestSuites": 0,
+    "numTotalTestSuites": 1,
+    "numFailedTests": 3,
+    "numPassedTests": 48,
+    "numPendingTests": 0,
+    "numTotalTests": 51,
+    "startTimeUnixMs": 1785511600090,
+    "testResults": [
+      {
+        "testFile": "packages/schemas/src/inngest-events.test.ts",
+        "status": "failed",
+        "assertionCounts": {
+          "passed": 48,
+          "failed": 3,
+          "pending": 0
+        },
+        "failedAssertions": [
+          {
+            "ancestorTitles": [
+              "retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)"
+            ],
+            "title": "[BUG-993] accepts a valid sessionPurgeDelayedEvent payload",
+            "fullName": "retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994) [BUG-993] accepts a valid sessionPurgeDelayedEvent payload",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)"
+            ],
+            "title": "[WI-2739] accepts an internally consistent purge backlog lower bound",
+            "fullName": "retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994) [WI-2739] accepts an internally consistent purge backlog lower bound",
+            "status": "failed"
+          },
+          {
+            "ancestorTitles": [
+              "retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994)"
+            ],
+            "title": "[WI-2739] rejects an inconsistent purge backlog deferred lower bound",
+            "fullName": "retention SLO event schemas (BUG-991 / BUG-992 / BUG-993 / BUG-994) [WI-2739] rejects an inconsistent purge backlog deferred lower bound",
+            "status": "failed"
+          }
+        ]
+      }
+    ]
+  }
+}

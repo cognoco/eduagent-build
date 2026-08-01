@@ -1,5 +1,6 @@
 import type { Database } from '@eduagent/database';
 import { generateExport, serializeDates } from './export';
+import { generateExportV2 } from './identity-v2/export-v2';
 import { recitationSetupClaimMetadataKey } from './session/session-recitation-setup';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -323,6 +324,144 @@ function mockMentorActivityLedgerRow(overrides: Row = {}): Row {
   };
 }
 
+function mockLearningProfileRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(20),
+    profileId: fixtureUuid(100),
+    learningStyle: null,
+    interests: [],
+    strengths: [],
+    struggles: [],
+    communicationNotes: ['Prefers concise explanations.'],
+    suppressedInferences: [],
+    interestTimestamps: {},
+    effectivenessSessionCount: 3,
+    memoryEnabled: true,
+    memoryConsentStatus: 'granted',
+    consentPromptDismissedAt: NOW,
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+    accommodationMode: 'none',
+    celebrationLevel: 'big_only',
+    recentlyResolvedTopics: ['linear-equations'],
+    memoryFactsBackfilledAt: null,
+    memoryFactsAnalysedAt: null,
+    version: 2,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockNeedsDeepeningTopicRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(21),
+    profileId: fixtureUuid(100),
+    subjectId: fixtureUuid(1),
+    topicId: fixtureUuid(3),
+    status: 'active',
+    consecutiveSuccessCount: 1,
+    source: 'challenge_round',
+    concept: 'Linear equations',
+    misconception: 'Moves terms without balancing both sides.',
+    correction: 'Apply the same operation to both sides.',
+    pendingExpiresAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockTopUpCreditRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(22),
+    subscriptionId: fixtureUuid(23),
+    profileId: fixtureUuid(100),
+    amount: 25,
+    remaining: 17,
+    purchasedAt: NOW,
+    expiresAt: new Date('2026-01-15T10:00:00.000Z'),
+    revenuecatTransactionId: 'rc-transaction-1',
+    createdAt: NOW,
+    ...overrides,
+  };
+}
+
+function createMockTopUpExportV2Db(topUpCreditRow: Row): {
+  db: Database;
+  organizationId: string;
+} {
+  const organizationId = fixtureUuid(24);
+  const subscriptionRow = {
+    id: topUpCreditRow['subscriptionId'],
+    organizationId,
+    planTier: 'plus',
+    status: 'active',
+    pastDueAt: null,
+    payerPersonId: fixtureUuid(25),
+    storeProductId: null,
+    storePlatform: null,
+    periodStartAt: NOW,
+    periodEndAt: new Date('2025-02-15T10:00:00.000Z'),
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    lastStripeEventId: null,
+    lastStripeEventTimestamp: null,
+    revenuecatOriginalAppUserId: null,
+    lastRevenuecatEventId: null,
+    lastRevenuecatEventTimestampMs: null,
+    trialEndsAt: null,
+    cancelledAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  const db = createMockDb({
+    topUpCredits: [topUpCreditRow],
+  }) as unknown as {
+    query: Record<string, unknown>;
+    select: jest.Mock;
+  };
+  db.query['organization'] = {
+    findFirst: jest.fn().mockResolvedValue({
+      id: organizationId,
+      createdAt: NOW,
+    }),
+  };
+  db.query['subscription'] = {
+    findMany: jest.fn().mockResolvedValue([subscriptionRow]),
+  };
+
+  let selectCall = 0;
+  db.select = jest.fn().mockImplementation(() => {
+    selectCall += 1;
+    if (selectCall === 1) {
+      return {
+        from: jest.fn().mockReturnValue({
+          innerJoin: jest.fn().mockReturnValue({
+            innerJoin: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest
+                  .fn()
+                  .mockResolvedValue([{ email: 'owner@example.com' }]),
+              }),
+            }),
+          }),
+        }),
+      };
+    }
+    if (selectCall === 2) {
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      };
+    }
+    throw new Error(`Unexpected select call ${selectCall}`);
+  });
+
+  return { db: db as unknown as Database, organizationId };
+}
+
 function mockConceptRow(overrides: Row = {}): Row {
   return {
     id: fixtureUuid(16),
@@ -573,7 +712,7 @@ describe('generateExport', () => {
   // overrides those sections; generateExport returns empty placeholders (covered
   // by the [WI-809] learningOnlyProfileIds branch block below).
 
-  it('includes GDPR Article 15 tables when data is present', async () => {
+  it('[WI-2738 AC-4] includes every learning-data inventory category when synthetic data is present', async () => {
     const profileRow = mockProfileRow('p1', 'Alice');
     const subjectRow = mockSubjectRow();
     const curriculumRow = mockCurriculumRow();
@@ -605,6 +744,10 @@ describe('generateExport', () => {
     const modeRow = mockLearningModeRow();
     const teachRow = mockTeachingPreferenceRow();
     const parkingRow = mockParkingLotItemRow();
+    const embeddingRow = mockSessionEmbeddingRow();
+    const needsDeepeningRow = mockNeedsDeepeningTopicRow();
+    const learningProfileRow = mockLearningProfileRow();
+    const mentorActivityRow = mockMentorActivityLedgerRow();
     const conceptRow = mockConceptRow();
     const conceptMasteryRow = mockConceptMasteryRow();
     const topicNoteRow = mockTopicNoteRow();
@@ -626,6 +769,10 @@ describe('generateExport', () => {
       learningModes: [modeRow],
       teachingPreferences: [teachRow],
       parkingLotItems: [parkingRow],
+      sessionEmbeddings: [embeddingRow],
+      needsDeepeningTopics: [needsDeepeningRow],
+      learningProfiles: [learningProfileRow],
+      mentorActivityLedger: [mentorActivityRow],
       concepts: [conceptRow],
       conceptMastery: [conceptMasteryRow],
       topicNotes: [topicNoteRow],
@@ -651,6 +798,23 @@ describe('generateExport', () => {
     expect(result.teachingPreferences).toHaveLength(1);
     expect(result.parkingLotItems).toHaveLength(1);
     const completeResult = result as unknown as Record<string, Row[]>;
+    expect(completeResult['sessionEmbeddings']).toEqual([
+      serializeDates(embeddingRow),
+    ]);
+    expect(completeResult['needsDeepeningTopics']).toEqual([
+      serializeDates(needsDeepeningRow),
+    ]);
+    expect(completeResult['learningProfiles']).toEqual([
+      {
+        ...learningProfileRow,
+        consentPromptDismissedAt: NOW.toISOString(),
+        createdAt: NOW.toISOString(),
+        updatedAt: NOW.toISOString(),
+      },
+    ]);
+    expect(completeResult['mentorActivityLedger']).toEqual([
+      serializeDates(mentorActivityRow),
+    ]);
     expect(completeResult['concepts']).toEqual([serializeDates(conceptRow)]);
     expect(completeResult['conceptMastery']).toEqual([
       serializeDates(conceptMasteryRow),
@@ -661,6 +825,15 @@ describe('generateExport', () => {
     expect(completeResult['mentorNotices']).toEqual([
       serializeDates(mentorNoticeRow),
     ]);
+  });
+
+  it('[WI-2738 AC-4] serializes profile-scoped top-up credits through the final v2 export', async () => {
+    const topUpCreditRow = mockTopUpCreditRow();
+    const { db, organizationId } = createMockTopUpExportV2Db(topUpCreditRow);
+
+    const result = await generateExportV2(db, organizationId);
+
+    expect(result.topUpCredits).toEqual([serializeDates(topUpCreditRow)]);
   });
 
   // Break test [BUG-934] — GDPR export is user-visible. ai_response rows
