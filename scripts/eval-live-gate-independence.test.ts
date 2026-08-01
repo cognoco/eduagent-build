@@ -36,6 +36,7 @@ interface WorkflowStep {
   if?: string | boolean;
   run?: string;
   'continue-on-error'?: boolean;
+  with?: { script?: string };
 }
 
 const repoRoot = join(__dirname, '..');
@@ -106,6 +107,24 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       expect(condition).toContain('!cancelled()');
       expect(condition).toContain("steps.doppler.outcome == 'success'");
     }
+  });
+
+  test('scheduled-failure copy distinguishes execution/judge-unavailable reds from pedagogical failures', () => {
+    // The teaching gate fails CLOSED (WI-2461 AC-3): an absent or unusable
+    // judge verdict (no-verdict / judge-unavailable) and failed live calls are
+    // error-class, so a teaching red no longer implies the judge found a
+    // pedagogical failure. The auto-filed issue's triage copy must say so, or
+    // an operator will misread an infrastructure failure as a real tutoring
+    // regression.
+    const notifyStep = steps.find(
+      (s) => s.name === 'Notify on scheduled failure',
+    );
+    expect(notifyStep).toBeDefined();
+    const script = notifyStep!.with?.script ?? '';
+    expect(script).toContain('transfer-failed');
+    expect(script).toContain('no-verdict');
+    expect(script).toContain('judge-unavailable');
+    expect(script).toContain('fails closed');
   });
 
   test('the setup guard the gate if-conditions reference actually exists', () => {

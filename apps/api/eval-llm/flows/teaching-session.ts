@@ -309,19 +309,23 @@ export function evaluateTeachingVerdict(
   const parsed = parseFirstJsonObject<TeachingRunLiveResult>(liveResponse);
   const verdict = parsed?.verdict;
 
+  // Fail CLOSED on an unjudged transcript [WI-2461 AC-3]: these are errors,
+  // not warnings, because a warning never increments summary.qualityFailures —
+  // pre-fix, a run where the judge was down (or returned unparseable output)
+  // for every scenario exited 0 and the weekly gate read green.
   if (!verdict) {
     return [
-      qualityWarning(
+      qualityError(
         `${input.scenarioId}.no-verdict`,
-        'Run produced no judge verdict — rerun before drawing conclusions.',
+        'Run produced no judge verdict — transcript NOT judged; failing closed. Rerun before drawing conclusions.',
       ),
     ];
   }
   if ('error' in verdict && verdict.error) {
     return [
-      qualityWarning(
+      qualityError(
         `${input.scenarioId}.judge-unavailable`,
-        `Judge did not return a usable verdict (${String(verdict.error)}) — transcript NOT judged.`,
+        `Judge did not return a usable verdict (${String(verdict.error)}) — transcript NOT judged; failing closed.`,
       ),
     ];
   }

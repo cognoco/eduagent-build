@@ -127,6 +127,11 @@ jobs:
       # ≈ 85 calls total. A scenario-count change must retune this number in
       # the same PR — enforced by scripts/eval-live-gate-independence.test.ts.
       # A transfer-failed verdict is a qualityError → exit 1 → this step fails.
+      # The gate also fails CLOSED (WI-2461 AC-3): an absent/unusable judge
+      # verdict (no-verdict / judge-unavailable) is error-class too, and the
+      # harness exits 1 whenever any live call failed to execute
+      # (summary.liveCallsFailed > 0, eval-llm/runner/gates.ts) — so a judge
+      # outage or provider failure can never read as a green teaching run.
       # Runs even if the envelope gate failed (`!cancelled()`), but not when
       # setup itself broke (`steps.doppler.outcome`). Scope caveat: the
       # scenario set is PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo).
@@ -212,12 +217,17 @@ jobs:
                 `intentional, re-baseline with`,
                 `\`doppler run -- pnpm eval:llm -- --live --update-baseline\` and commit.`,
                 ``,
-                `If the failing step was the **Teaching-session live gate**, the`,
-                `judge found a transfer/teaching-quality failure (the simulated`,
-                `learner could not apply the concept after teaching). There is no`,
-                `baseline to re-seed — read the run's quality-issue output, re-run`,
-                `once to rule out provider flakiness, and treat a reproduced`,
-                `transfer failure as a real tutoring regression.`,
+                `If the failing step was the **Teaching-session live gate**, read the`,
+                `quality-issue codes in the run output first — the gate fails closed,`,
+                `so red does NOT always mean the judge found a pedagogical failure.`,
+                `A \`transfer-failed\` code means it did (the simulated learner could`,
+                `not apply the concept after teaching): re-run once to rule out`,
+                `provider flakiness and treat a reproduced transfer failure as a real`,
+                `tutoring regression. \`no-verdict\` / \`judge-unavailable\` codes, or`,
+                `a nonzero "Live calls failed" count, mean the run itself broke`,
+                `(judge or provider failure) and say nothing about teaching quality —`,
+                `fix or wait out the provider issue and re-run. There is no baseline`,
+                `to re-seed for this gate.`,
                 ``,
                 `If the failing step was the **Mastery-simulation gate** (over-credit`,
                 `ceiling / simulation-baseline.json drift), it is a DIFFERENT baseline —`,

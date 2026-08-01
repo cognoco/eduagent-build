@@ -190,31 +190,33 @@ describe('evaluateTeachingVerdict — soft dimensions (warnings only)', () => {
 // Missing / error verdict cases
 // ---------------------------------------------------------------------------
 
-describe('evaluateTeachingVerdict — missing or error verdict', () => {
-  it('missing verdict → one no-verdict warning, zero errors', () => {
+describe('evaluateTeachingVerdict — missing or error verdict (fail closed, WI-2461 AC-3)', () => {
+  // An unjudged transcript must FAIL the gate, not warn: a warning-only issue
+  // never increments summary.qualityFailures, so pre-fix an entirely unjudged
+  // teaching run (judge down, unparseable verdict) exited 0 and read as green.
+
+  it('missing verdict → one no-verdict ERROR', () => {
     const issues = evaluateTeachingVerdict(DUMMY_INPUT, makeResponse(null));
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.severity).toBe('error');
     expect(issues[0]!.code).toContain('no-verdict');
-    expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
   });
 
-  it('judge error → one judge-unavailable warning, zero errors', () => {
+  it('judge error → one judge-unavailable ERROR', () => {
     const issues = evaluateTeachingVerdict(
       DUMMY_INPUT,
       makeResponse({ error: 'timeout after 30s' }),
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.severity).toBe('error');
     expect(issues[0]!.code).toContain('judge-unavailable');
-    expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
   });
 
-  it('unparseable liveResponse → no-verdict warning', () => {
+  it('unparseable liveResponse → no-verdict ERROR', () => {
     // Non-JSON string: parseFirstJsonObject returns null → verdict undefined
     const issues = evaluateTeachingVerdict(DUMMY_INPUT, 'not json at all');
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.severity).toBe('error');
     expect(issues[0]!.code).toContain('no-verdict');
   });
 });

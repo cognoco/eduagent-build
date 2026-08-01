@@ -61,6 +61,11 @@ export async function evaluateGates(
 ): Promise<GateResult> {
   const messages: GateMessage[] = [];
   const qualityFailed = summary.qualityFailures > 0;
+  // [WI-2461 AC-3] Execution gate: runner.ts increments liveCallsFailed when a
+  // flow's runLive throws (provider/runtime error). Such a run produced no
+  // judgeable output for those calls, so it can never be trusted green — the
+  // pre-fix gate ignored this counter and a genuine execution failure exited 0.
+  const executionFailed = summary.liveCallsFailed > 0;
 
   if (qualityFailed) {
     messages.push({
@@ -69,15 +74,22 @@ export async function evaluateGates(
     });
   }
 
+  if (executionFailed) {
+    messages.push({
+      level: 'error',
+      text: `Execution gate: ${summary.liveCallsFailed} live call(s) failed to execute (provider/runtime errors). Open the snapshots with "Error" lines under their live-response section.`,
+    });
+  }
+
   // --update-baseline seed path: the baseline was already written by the caller
   // (it includes the failed samples by design, WI-556). Never compare against a
-  // baseline we just wrote. Quality failures still fail the run so an operator
-  // inspects them before committing the seed.
+  // baseline we just wrote. Quality and execution failures still fail the run
+  // so an operator inspects them before committing the seed.
   if (options.updateBaseline) {
-    if (qualityFailed) {
+    if (qualityFailed || executionFailed) {
       messages.push({
         level: 'error',
-        text: 'NOTE: baseline.json WAS written (signal distributions include the failed samples). Triage the quality failures above before committing it.',
+        text: 'NOTE: baseline.json WAS written (signal distributions include the failed samples). Triage the quality/live-call execution failures above before committing it.',
       });
       return { exitCode: 1, driftEvaluated: false, messages };
     }
@@ -122,9 +134,10 @@ export async function evaluateGates(
     }
   }
 
-  if (qualityFailed || driftExceeded) {
+  if (qualityFailed || executionFailed || driftExceeded) {
     const reasons = [
       qualityFailed ? 'scenario-quality failures' : null,
+      executionFailed ? 'live-call execution failures' : null,
       driftExceeded ? 'baseline signal drift' : null,
     ].filter((r): r is string => r !== null);
     messages.push({
