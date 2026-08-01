@@ -11,13 +11,19 @@ doc.**
 > is canon for what we are building — it is **not** a description of shipped behaviour. As of the
 > verification commit:
 >
-> - **Schema shipped, data absent.** `person.residence_jurisdiction` and the `regimes` /
->   `policy_cells` tables exist (migration `0108_identity_foundation_baseline.sql`), but
->   `policy_cells` is **unpopulated** (the C2-B compliance-population workstream fills it).
-> - **The resolver is a fail-closed scaffold.** `evaluatePolicyCell`
->   (`apps/api/src/services/policy-engine/engine.ts:51-60`) returns `consentRequired: true` for
->   **all** inputs — known or unknown — and has **no consumers** outside the policy-engine barrel.
->   Nothing in production reads `residence_jurisdiction` to make a consent decision.
+> - **Schema shipped; two policy-data paths, one seeded.** `person.residence_jurisdiction` and the
+>   `regimes` / `policy_cells` tables exist (migration `0108_identity_foundation_baseline.sql`), but
+>   `policy_cells` is **unpopulated**. A newer DB-mastered path, `country_policy_registry`, **is**
+>   seeded (31 EEA+UK rows; migrations `0157`/`0158`, WI-2690).
+> - **Resolvers exist but are unconsumed.** The older `evaluatePolicyCell`
+>   (`apps/api/src/services/policy-engine/engine.ts:51-60`) is a fail-closed scaffold returning
+>   `consentRequired: true` for **all** inputs, with no consumers outside the policy-engine barrel.
+>   The newer `resolveCountryPolicy` / `resolveJurisdiction`
+>   (`apps/api/src/services/identity-v2/country-policy.ts`, `country-policy-loader.ts` — WI-2690's
+>   self-described canonical habitual-residence resolver) computes a real per-country
+>   `AgeConsentDecision` over the seeded registry — but **neither resolver has any production
+>   consumer**. Nothing in the wired consent flows reads `residence_jurisdiction` to make a consent
+>   decision.
 > - **The live consent gate is jurisdiction-blind.** What the wired flows actually import is the flat
 >   age threshold in `apps/api/src/services/consent.ts` — `checkConsentRequired` /
 >   `checkConsentRequiredFromDate` (`age <= 16` → GDPR consent required; lines 163/207 — the
@@ -25,11 +31,12 @@ doc.**
 >   `apps/api/src/middleware/consent.ts` and the `identity-v2` services.
 >
 > **Refiners and executors: treat this model as *resolution-unbuilt*.** Acceptance criteria for
-> consent-cluster items must scope **building** the jurisdiction resolution (populating policy cells,
-> wiring the resolver, migrating consumers) — never **consuming** it as if it were live. Do not write
-> ACs that call a jurisdiction-aware resolver until the owning resolver and consumer-wiring work has
-> landed and been verified. This banner labels current reality; it does not amend the target model,
-> which stands exactly as written below.
+> consent-cluster items must scope **building out** the jurisdiction resolution — the owning resolver
+> and consumer-wiring work — never **consuming** it as if it were live. Do not write ACs that call a
+> jurisdiction-aware resolver until that work has landed and been verified; and do not scope a *new*
+> resolver without reconciling against the WI-2690 resolver that already exists unconsumed. This
+> banner labels current reality; it does not amend the target model, which stands exactly as written
+> below.
 
 **What this is.** The single *structural* terminus for the identity foundation: the entities, their
 one-line definitions, the relationships between them, and the invariants that bind them — in one
