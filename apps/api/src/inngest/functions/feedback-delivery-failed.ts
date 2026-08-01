@@ -183,6 +183,11 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             profileId,
             reason: result.reason,
           });
+          // The provider rejected this payload permanently (or delivery is
+          // disabled), so the free-text row has no remaining consumer. Erase
+          // it now instead of retaining purposeless user content until the
+          // seven-day sweeper.
+          await deleteFeedbackRetry(db, profileId, retryId);
           return {
             status: 'not_sent' as const,
             reason: result.reason,

@@ -130,21 +130,72 @@ export type DeletionReason =
   | 'guardian_initiated'
   | 'abandonment';
 
+export interface PersonErasureSnapshotV2 {
+  personExists: boolean;
+  personId: string;
+  organizationId: string | null;
+  clerkUserIds: string[];
+  loginEmails: string[];
+  organizationPersonIds: string[];
+  subscriptionStoreTeardownTargets: SubscriptionStoreTeardownTarget[];
+}
+
+export type PersonErasureAttemptResultV2 = {
+  status:
+    | 'deleted'
+    | 'already_deleted'
+    | 'admin_transfer_required'
+    | 'not_eligible'
+    | 'snapshot_changed';
+  clerkUserIds: string[];
+  organizationId: string | null;
+  organizationDeleted: boolean;
+  subscriptionStoreTeardownTargets: SubscriptionStoreTeardownTarget[];
+};
+
 /**
- * Capture every external Clerk identity before a person-scoped erasure
- * cascades the login rows. A person may have more than one login binding, so
- * callers must delete every returned Clerk user after the database transaction
- * commits.
+ * Capture every external identity/provider target before a person-scoped
+ * erasure. The durable workflow memoizes this snapshot; the delete transaction
+ * locks and verifies the same rows before mutating anything. That combination
+ * closes both failure windows: a changed binding aborts without deletion, while
+ * a lost step receipt can replay using the still-memoized external identifiers.
  */
-export async function getPersonClerkUserIdsV2(
+export async function getPersonErasureSnapshotV2(
   db: Database,
   personId: string,
-): Promise<string[]> {
-  const rows = await db.query.login.findMany({
-    where: eq(login.personId, personId),
-    columns: { clerkUserId: true },
+): Promise<PersonErasureSnapshotV2> {
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, personId),
+    columns: { id: true },
   });
-  return rows.map(({ clerkUserId }) => clerkUserId);
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, personId),
+    columns: { organizationId: true },
+  });
+  const loginRows = await db.query.login.findMany({
+    where: eq(login.personId, personId),
+    columns: { clerkUserId: true, email: true },
+  });
+  const organizationId = membershipRow?.organizationId ?? null;
+  const organizationMemberships = organizationId
+    ? await db.query.membership.findMany({
+        where: eq(membership.organizationId, organizationId),
+        columns: { personId: true },
+      })
+    : [];
+  return {
+    personExists: !!personRow,
+    personId,
+    organizationId,
+    clerkUserIds: loginRows.map(({ clerkUserId }) => clerkUserId).sort(),
+    loginEmails: loginRows.map(({ email }) => email).sort(),
+    organizationPersonIds: organizationMemberships
+      .map(({ personId: memberPersonId }) => memberPersonId)
+      .sort(),
+    subscriptionStoreTeardownTargets: organizationId
+      ? await getSubscriptionStoreTeardownTargetsV2(db, organizationId)
+      : [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -594,20 +645,27 @@ export async function deletePersonV2(
     // unique constraint to absorb them. The lock serializes the two; the loser
     // sees the committed delete and bails before writing anything.
     await acquirePersonLockTx(tx, personId);
-    if (!(await personExistsTx(tx, personId))) return;
-    await assertPersonDeletionPreservesAdminTx(tx, personId);
-    await rehomeGrantsTx(tx, personId);
-    await writeFinancialRecordsForPersonTx(tx, personId);
-    await tx.insert(deletionAudit).values({
+    const prepared = await preparePersonErasureTx(tx, personId);
+    if (!prepared.ready) {
+      if (prepared.result.status === 'admin_transfer_required') {
+        throw new ConflictError(
+          'Cannot delete the last administrator while other organization members remain',
+        );
+      }
+      return;
+    }
+    if (prepared.context.adminTransferRequired) {
+      throw new ConflictError(
+        'Cannot delete the last administrator while other organization members remain',
+      );
+    }
+    await erasePreparedPersonTx(
+      tx,
       personId,
-      deletedBy,
+      prepared.context,
       reason,
-      retentionPeriod: null,
-    });
-    // WI-1985 — sever incident guardianship/supportership edges before the drop
-    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
-    await tearDownPersonEdgesTx(tx, personId);
-    await tx.delete(person).where(eq(person.id, personId));
+      deletedBy,
+    );
   });
 }
 
@@ -622,13 +680,35 @@ export async function deletePersonIfConsentWithdrawnV2(
   personId: string,
   withdrawnAt?: Date | string,
 ): Promise<boolean> {
+  const result = await attemptPersonIfConsentWithdrawnErasureV2(
+    db,
+    personId,
+    undefined,
+    withdrawnAt,
+  );
+  if (result.status === 'admin_transfer_required') {
+    throw new ConflictError(
+      'Cannot delete the last administrator while other organization members remain',
+    );
+  }
+  return result.status === 'deleted';
+}
+
+export async function attemptPersonIfConsentWithdrawnErasureV2(
+  db: Database,
+  personId: string,
+  expectedSnapshot: PersonErasureSnapshotV2 | undefined,
+  withdrawnAt?: Date | string,
+): Promise<PersonErasureAttemptResultV2> {
   const withdrawnAtDate =
     withdrawnAt instanceof Date
       ? withdrawnAt
       : withdrawnAt
         ? new Date(withdrawnAt)
         : undefined;
-  if (withdrawnAtDate && Number.isNaN(withdrawnAtDate.getTime())) return false;
+  if (withdrawnAtDate && Number.isNaN(withdrawnAtDate.getTime())) {
+    return notEligiblePersonErasureResult();
+  }
 
   return db.transaction(async (tx) => {
     // WI-583 race guard: serialize against a concurrent restoreConsentV2 (which
@@ -639,45 +719,46 @@ export async function deletePersonIfConsentWithdrawnV2(
     // under READ COMMITTED a restore committing between this read and the
     // re-home/delete would let the delete remove a just-restored person.
     await acquirePersonLockTx(tx, personId);
+    const prepared = await preparePersonErasureTx(
+      tx,
+      personId,
+      expectedSnapshot,
+    );
+    if (!prepared.ready) return prepared.result;
     // Re-check current GDPR grant under the lock and verify it is withdrawn
     // (optionally at the given timestamp). currentGrant windowing:
     // max(granted_at), tiebreak id.
     const current = await currentGdprGrantSetTx(tx, personId);
     if (current.length === 0 || current.some((grant) => !grant.withdrawnAt)) {
-      return false;
+      return notEligiblePersonErasureResult(prepared.context.organizationId);
     }
     if (
       withdrawnAtDate &&
       current.some(
-        (grant) => grant.withdrawnAt!.getTime() !== withdrawnAtDate.getTime(),
+        (grant) => grant.withdrawnAt?.getTime() !== withdrawnAtDate.getTime(),
       )
     ) {
-      return false;
+      return notEligiblePersonErasureResult(prepared.context.organizationId);
+    }
+    if (prepared.context.adminTransferRequired) {
+      return adminTransferRequiredPersonErasureResult(
+        prepared.context.organizationId,
+      );
     }
     // WI-723 P2: the lock above already serializes same-person runs, and the
     // winner's rehomeGrantsTx deletes the consent_grant so the loser's
     // current-grant read returns nothing → it bails on the `!current` guard.
     // That loser-guard is incidental (grant-gone ⇒ person-gone coupling), so we
-    // add an explicit person-existence re-check to guarantee no duplicate
-    // retain records even if that coupling ever changes.
-    if (!(await personExistsTx(tx, personId))) return false;
-    await assertPersonDeletionPreservesAdminTx(tx, personId);
-    await rehomeGrantsTx(tx, personId);
-    await writeFinancialRecordsForPersonTx(tx, personId);
-    await tx.insert(deletionAudit).values({
+    // preparePersonErasureTx already performed the explicit locked existence
+    // re-check, so no duplicate retain records can be written if that coupling
+    // changes.
+    return erasePreparedPersonTx(
+      tx,
       personId,
-      deletedBy: null,
-      reason: 'guardian_initiated',
-      retentionPeriod: null,
-    });
-    // WI-1985 — sever incident guardianship/supportership edges before the drop
-    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
-    await tearDownPersonEdgesTx(tx, personId);
-    const deleted = await tx
-      .delete(person)
-      .where(eq(person.id, personId))
-      .returning({ id: person.id });
-    return deleted.length > 0;
+      prepared.context,
+      'guardian_initiated',
+      null,
+    );
   });
 }
 
@@ -702,6 +783,26 @@ export async function deletePersonIfNoConsentV2(
   personId: string,
   requestedAt?: Date,
 ): Promise<boolean> {
+  const result = await attemptPersonIfNoConsentErasureV2(
+    db,
+    personId,
+    undefined,
+    requestedAt,
+  );
+  if (result.status === 'admin_transfer_required') {
+    throw new ConflictError(
+      'Cannot delete the last administrator while other organization members remain',
+    );
+  }
+  return result.status === 'deleted';
+}
+
+export async function attemptPersonIfNoConsentErasureV2(
+  db: Database,
+  personId: string,
+  expectedSnapshot: PersonErasureSnapshotV2 | undefined,
+  requestedAt?: Date,
+): Promise<PersonErasureAttemptResultV2> {
   // [requestedAt, requestedAt+1ms) window pins exactly one generation (the
   // +1ms upper bound tolerates the ms-granularity of the requested_at column).
   // Mirrors legacy deleteProfileIfNoConsent's requestGenerationPredicate.
@@ -712,21 +813,27 @@ export async function deletePersonIfNoConsentV2(
   return db.transaction(async (tx) => {
     // WI-723 race guard: take the per-person advisory lock FIRST, before the
     // predicate reads. This serializes two concurrent same-person day-30 runs;
-    // the loser blocks until the winner commits, then its reads (incl. the
-    // person-existence re-check below) see the committed delete. Without the
+    // the loser blocks until the winner commits, then the locked preparation
+    // reads see the committed delete. Without the
     // lock, both runs pass the consent/open-request pre-checks, both commit
     // their side-writes (financial_record + deletion_audit), and only one
     // RETURNING delete wins — the loser leaves duplicate retain records (no
     // unique constraint, no person FK on financial_record), so the dupes
     // persist. Mirrors deletePersonIfConsentWithdrawnV2 / the archived sibling.
     await acquirePersonLockTx(tx, personId);
+    const prepared = await preparePersonErasureTx(
+      tx,
+      personId,
+      expectedSnapshot,
+    );
+    if (!prepared.ready) return prepared.result;
 
     const current = await currentGdprGrantSetTx(tx, personId);
     // Any active recorded purpose is valid historical consent and therefore
     // blocks destructive abandonment. A missing newer purpose remains
     // fail-closed for processing, but must not erase the earlier grant.
     if (current.some((grant) => !grant.withdrawnAt)) {
-      return false;
+      return notEligiblePersonErasureResult(prepared.context.organizationId);
     }
 
     // Request-generation guard: if this is a generation-scoped run, only delete
@@ -745,36 +852,26 @@ export async function deletePersonIfNoConsentV2(
         ),
         columns: { id: true },
       });
-      if (!openRequestOfGeneration) return false;
+      if (!openRequestOfGeneration) {
+        return notEligiblePersonErasureResult(prepared.context.organizationId);
+      }
+    }
+    if (prepared.context.adminTransferRequired) {
+      return adminTransferRequiredPersonErasureResult(
+        prepared.context.organizationId,
+      );
     }
 
-    // Post-lock person-existence re-check (WI-723 P2): the open-request
-    // predicate above can match for BOTH concurrent runs (each read its OPEN
-    // request before either delete cascaded it away), so it is not on its own a
-    // sufficient loser-guard. The winner's person delete cascades the request
-    // away, but only after this read can have already passed for the loser.
-    // Gating the side-writes on the person still existing under the lock makes
-    // the loser write nothing.
-    if (!(await personExistsTx(tx, personId))) return false;
-
-    await assertPersonDeletionPreservesAdminTx(tx, personId);
-
-    await rehomeGrantsTx(tx, personId);
-    await writeFinancialRecordsForPersonTx(tx, personId);
-    await tx.insert(deletionAudit).values({
+    // preparePersonErasureTx's locked existence check is the loser guard: a
+    // concurrent winner leaves the second run with `already_deleted` before
+    // any retain-tier write.
+    return erasePreparedPersonTx(
+      tx,
       personId,
-      deletedBy: null,
-      reason: 'abandonment',
-      retentionPeriod: null,
-    });
-    // WI-1985 — sever incident guardianship/supportership edges before the drop
-    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
-    await tearDownPersonEdgesTx(tx, personId);
-    const deleted = await tx
-      .delete(person)
-      .where(eq(person.id, personId))
-      .returning({ id: person.id });
-    return deleted.length > 0;
+      prepared.context,
+      'abandonment',
+      null,
+    );
   });
 }
 
@@ -790,6 +887,26 @@ export async function deleteArchivedPersonIfStillEligibleV2(
   personId: string,
   retentionCutoff: Date,
 ): Promise<boolean> {
+  const result = await attemptArchivedPersonErasureV2(
+    db,
+    personId,
+    undefined,
+    retentionCutoff,
+  );
+  if (result.status === 'admin_transfer_required') {
+    throw new ConflictError(
+      'Cannot delete the last administrator while other organization members remain',
+    );
+  }
+  return result.status === 'deleted';
+}
+
+export async function attemptArchivedPersonErasureV2(
+  db: Database,
+  personId: string,
+  expectedSnapshot: PersonErasureSnapshotV2 | undefined,
+  retentionCutoff: Date,
+): Promise<PersonErasureAttemptResultV2> {
   return db.transaction(async (tx) => {
     // WI-583 race guard: restoreConsentV2 BOTH clears archived_at AND appends a
     // granted grant. Take the per-person advisory lock FIRST so the archived_at
@@ -797,6 +914,12 @@ export async function deleteArchivedPersonIfStillEligibleV2(
     // restore that wins the lock un-archives the person (first predicate fails)
     // and re-grants (second predicate fails), and the delete is a no-op.
     await acquirePersonLockTx(tx, personId);
+    const prepared = await preparePersonErasureTx(
+      tx,
+      personId,
+      expectedSnapshot,
+    );
+    if (!prepared.ready) return prepared.result;
     // The personRow read below also IS the WI-723 P2 existence re-check: a
     // concurrent-delete winner leaves personRow undefined → the guard returns
     // false before any side-write, so no duplicate retain records.
@@ -808,29 +931,24 @@ export async function deleteArchivedPersonIfStillEligibleV2(
       !personRow?.archivedAt ||
       personRow.archivedAt.getTime() > retentionCutoff.getTime()
     ) {
-      return false;
+      return notEligiblePersonErasureResult(prepared.context.organizationId);
     }
     const current = await currentGdprGrantSetTx(tx, personId);
     if (current.some((grant) => !grant.withdrawnAt)) {
-      return false;
+      return notEligiblePersonErasureResult(prepared.context.organizationId);
     }
-    await assertPersonDeletionPreservesAdminTx(tx, personId);
-    await rehomeGrantsTx(tx, personId);
-    await writeFinancialRecordsForPersonTx(tx, personId);
-    await tx.insert(deletionAudit).values({
+    if (prepared.context.adminTransferRequired) {
+      return adminTransferRequiredPersonErasureResult(
+        prepared.context.organizationId,
+      );
+    }
+    return erasePreparedPersonTx(
+      tx,
       personId,
-      deletedBy: null,
-      reason: 'abandonment',
-      retentionPeriod: null,
-    });
-    // WI-1985 — sever incident guardianship/supportership edges before the drop
-    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
-    await tearDownPersonEdgesTx(tx, personId);
-    const deleted = await tx
-      .delete(person)
-      .where(eq(person.id, personId))
-      .returning({ id: person.id });
-    return deleted.length > 0;
+      prepared.context,
+      'abandonment',
+      null,
+    );
   });
 }
 
@@ -930,64 +1048,355 @@ async function acquirePersonLockTx(
   );
 }
 
-/**
- * Does the person still exist? Used as the post-lock re-check that prevents a
- * concurrent-delete loser from committing duplicate retain records (WI-723 P2):
- * after the lock serializes the runs, the loser sees the winner's committed
- * delete and bails BEFORE writing any financial_record / deletion_audit row.
- */
-async function personExistsTx(
-  tx: DeletionTx,
-  personId: string,
-): Promise<boolean> {
-  const row = await tx.query.person.findFirst({
-    where: eq(person.id, personId),
-    columns: { id: true },
-  });
-  return !!row;
+type PreparedPersonErasureV2 = {
+  organizationId: string;
+  deleteOrganization: boolean;
+  adminTransferRequired: boolean;
+  clerkUserIds: string[];
+  loginEmails: string[];
+  subscriptions: SubscriptionSnapshot[];
+  subscriptionStoreTeardownTargets: SubscriptionStoreTeardownTarget[];
+};
+
+type PreparePersonErasureResultV2 =
+  | { ready: true; context: PreparedPersonErasureV2 }
+  | { ready: false; result: PersonErasureAttemptResultV2 };
+
+function notEligiblePersonErasureResult(
+  organizationId: string | null = null,
+): PersonErasureAttemptResultV2 {
+  return {
+    status: 'not_eligible',
+    clerkUserIds: [],
+    organizationId,
+    organizationDeleted: false,
+    subscriptionStoreTeardownTargets: [],
+  };
+}
+
+function adminTransferRequiredPersonErasureResult(
+  organizationId: string,
+): PersonErasureAttemptResultV2 {
+  return {
+    status: 'admin_transfer_required',
+    clerkUserIds: [],
+    organizationId,
+    organizationDeleted: false,
+    subscriptionStoreTeardownTargets: [],
+  };
+}
+
+function canonicalStringArray(values: readonly string[]): string[] {
+  return [...values].sort();
+}
+
+function sameStringArray(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    JSON.stringify(canonicalStringArray(left)) ===
+    JSON.stringify(canonicalStringArray(right))
+  );
+}
+
+function sameSubscriptionTargets(
+  left: readonly SubscriptionStoreTeardownTarget[],
+  right: readonly SubscriptionStoreTeardownTarget[],
+): boolean {
+  const canonicalize = (values: readonly SubscriptionStoreTeardownTarget[]) =>
+    [...values].sort((a, b) =>
+      a.subscriptionId.localeCompare(b.subscriptionId),
+    );
+  return (
+    JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right))
+  );
 }
 
 /**
- * Preserve the organization-admin invariant for every person-scoped delete.
- *
- * The initial membership read identifies which organization row to lock. The
- * membership set is then re-read only AFTER that row lock is held. Two
- * concurrent deletes of different admins therefore serialize on the same org:
- * the winner may remove one admin, while the loser observes the committed
- * membership set and refuses to remove the last remaining admin.
+ * Lock and verify every row that determines a person erasure's external work.
+ * Organization is locked before person to match executeDeletionV2's lock order
+ * and avoid a person↔organization deadlock with whole-org deletion.
  */
-async function assertPersonDeletionPreservesAdminTx(
+async function preparePersonErasureTx(
   tx: DeletionTx,
   personId: string,
-): Promise<void> {
+  expectedSnapshot?: PersonErasureSnapshotV2,
+): Promise<PreparePersonErasureResultV2> {
   const initialMembership = await tx.query.membership.findFirst({
     where: eq(membership.personId, personId),
     columns: { organizationId: true },
   });
-  if (!initialMembership) return;
+
+  if (!initialMembership) {
+    const [lockedPerson] = await tx
+      .select({ id: person.id })
+      .from(person)
+      .where(eq(person.id, personId))
+      .for('update');
+    if (lockedPerson) {
+      throw new Error(
+        `preparePersonErasureTx: orphaned person ${personId} — no organization membership resolved`,
+      );
+    }
+    const organizationStillExists = expectedSnapshot?.organizationId
+      ? !!(await tx.query.organization.findFirst({
+          where: eq(organization.id, expectedSnapshot.organizationId),
+          columns: { id: true },
+        }))
+      : false;
+    return {
+      ready: false,
+      result: {
+        status: 'already_deleted',
+        clerkUserIds: expectedSnapshot?.clerkUserIds ?? [],
+        organizationId: expectedSnapshot?.organizationId ?? null,
+        organizationDeleted:
+          !!expectedSnapshot?.organizationId && !organizationStillExists,
+        subscriptionStoreTeardownTargets:
+          expectedSnapshot?.organizationId && !organizationStillExists
+            ? expectedSnapshot.subscriptionStoreTeardownTargets
+            : [],
+      },
+    };
+  }
 
   const [lockedOrganization] = await tx
     .select({ id: organization.id })
     .from(organization)
     .where(eq(organization.id, initialMembership.organizationId))
     .for('update');
-  if (!lockedOrganization) return;
+  if (!lockedOrganization) {
+    return {
+      ready: false,
+      result: {
+        status: 'snapshot_changed',
+        clerkUserIds: [],
+        organizationId: null,
+        organizationDeleted: false,
+        subscriptionStoreTeardownTargets: [],
+      },
+    };
+  }
 
-  const memberships = await tx.query.membership.findMany({
-    where: eq(membership.organizationId, lockedOrganization.id),
-    columns: { personId: true, roles: true },
-  });
+  const [lockedPerson] = await tx
+    .select({ id: person.id })
+    .from(person)
+    .where(eq(person.id, personId))
+    .for('update');
+  if (!lockedPerson) {
+    return {
+      ready: false,
+      result: {
+        status: 'already_deleted',
+        clerkUserIds: expectedSnapshot?.clerkUserIds ?? [],
+        organizationId: expectedSnapshot?.organizationId ?? null,
+        organizationDeleted: false,
+        subscriptionStoreTeardownTargets: [],
+      },
+    };
+  }
+
+  const memberships = await tx
+    .select({ personId: membership.personId, roles: membership.roles })
+    .from(membership)
+    .where(eq(membership.organizationId, lockedOrganization.id))
+    .for('update');
   const target = memberships.find((row) => row.personId === personId);
-  if (!target?.roles.includes('admin')) return;
+  if (!target) {
+    return {
+      ready: false,
+      result: {
+        status: 'snapshot_changed',
+        clerkUserIds: [],
+        organizationId: null,
+        organizationDeleted: false,
+        subscriptionStoreTeardownTargets: [],
+      },
+    };
+  }
+
+  const loginRows = await tx
+    .select({ clerkUserId: login.clerkUserId, email: login.email })
+    .from(login)
+    .where(eq(login.personId, personId))
+    .for('update');
+  const clerkUserIds = canonicalStringArray(
+    loginRows.map((row) => row.clerkUserId),
+  );
+  const loginEmails = canonicalStringArray(loginRows.map((row) => row.email));
+  const organizationPersonIds = canonicalStringArray(
+    memberships.map((row) => row.personId),
+  );
+
+  if (
+    expectedSnapshot &&
+    (expectedSnapshot.personId !== personId ||
+      !expectedSnapshot.personExists ||
+      expectedSnapshot.organizationId !== lockedOrganization.id ||
+      !sameStringArray(expectedSnapshot.clerkUserIds, clerkUserIds) ||
+      !sameStringArray(expectedSnapshot.loginEmails, loginEmails) ||
+      !sameStringArray(
+        expectedSnapshot.organizationPersonIds,
+        organizationPersonIds,
+      ))
+  ) {
+    return {
+      ready: false,
+      result: {
+        status: 'snapshot_changed',
+        clerkUserIds: [],
+        organizationId: null,
+        organizationDeleted: false,
+        subscriptionStoreTeardownTargets: [],
+      },
+    };
+  }
 
   const anotherAdminExists = memberships.some(
     (row) => row.personId !== personId && row.roles.includes('admin'),
   );
-  if (!anotherAdminExists) {
-    throw new ConflictError(
-      'Cannot delete the last administrator of an organization',
+  const adminTransferRequired =
+    target.roles.includes('admin') &&
+    !anotherAdminExists &&
+    memberships.length > 1;
+
+  const deleteOrganization = memberships.length === 1;
+  const lockedSubscriptions = deleteOrganization
+    ? await tx
+        .select({
+          id: subscription.id,
+          planTier: subscription.planTier,
+          status: subscription.status,
+          stripeCustomerId: subscription.stripeCustomerId,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+          revenuecatOriginalAppUserId: subscription.revenuecatOriginalAppUserId,
+          storeProductId: subscription.storeProductId,
+          storePlatform: subscription.storePlatform,
+        })
+        .from(subscription)
+        .where(eq(subscription.organizationId, lockedOrganization.id))
+        .for('update')
+    : await tx.query.subscription.findMany({
+        where: eq(subscription.organizationId, lockedOrganization.id),
+        columns: {
+          id: true,
+          planTier: true,
+          status: true,
+          stripeCustomerId: true,
+          stripeSubscriptionId: true,
+          revenuecatOriginalAppUserId: true,
+          storeProductId: true,
+          storePlatform: true,
+        },
+      });
+  const subscriptionStoreTeardownTargets = lockedSubscriptions
+    .map((row) => ({
+      subscriptionId: row.id,
+      planTier: row.planTier,
+      status: row.status,
+      stripe: {
+        customerId: row.stripeCustomerId,
+        subscriptionId: row.stripeSubscriptionId,
+      },
+      revenueCat: {
+        originalAppUserId: row.revenuecatOriginalAppUserId,
+        storeProductId: row.storeProductId,
+        storePlatform: row.storePlatform,
+      },
+    }))
+    .sort((left, right) =>
+      left.subscriptionId.localeCompare(right.subscriptionId),
     );
+
+  if (
+    expectedSnapshot &&
+    deleteOrganization &&
+    !sameSubscriptionTargets(
+      expectedSnapshot.subscriptionStoreTeardownTargets,
+      subscriptionStoreTeardownTargets,
+    )
+  ) {
+    return {
+      ready: false,
+      result: {
+        status: 'snapshot_changed',
+        clerkUserIds: [],
+        organizationId: null,
+        organizationDeleted: false,
+        subscriptionStoreTeardownTargets: [],
+      },
+    };
   }
+
+  return {
+    ready: true,
+    context: {
+      organizationId: lockedOrganization.id,
+      deleteOrganization,
+      adminTransferRequired,
+      clerkUserIds,
+      loginEmails,
+      subscriptions: lockedSubscriptions.map((row) => ({
+        id: row.id,
+        planTier: row.planTier,
+        status: row.status,
+        stripeCustomerId: row.stripeCustomerId,
+        stripeSubscriptionId: row.stripeSubscriptionId,
+      })),
+      subscriptionStoreTeardownTargets,
+    },
+  };
+}
+
+async function erasePreparedPersonTx(
+  tx: DeletionTx,
+  personId: string,
+  context: PreparedPersonErasureV2,
+  reason: DeletionReason,
+  deletedBy: string | null,
+): Promise<PersonErasureAttemptResultV2> {
+  if (context.deleteOrganization && context.subscriptions.length > 0) {
+    await tx
+      .delete(subscription)
+      .where(eq(subscription.organizationId, context.organizationId));
+  }
+  await rehomeGrantsTx(tx, personId);
+  await writeFinancialRecordsTx(
+    tx,
+    personId,
+    context.organizationId,
+    context.subscriptions,
+  );
+  await tx.insert(deletionAudit).values({
+    personId,
+    deletedBy,
+    reason,
+    retentionPeriod: null,
+  });
+  await tearDownPersonEdgesTx(tx, personId);
+  await tx.delete(person).where(eq(person.id, personId));
+
+  if (context.deleteOrganization) {
+    await tx
+      .delete(organization)
+      .where(eq(organization.id, context.organizationId));
+  }
+  if (context.loginEmails.length > 0) {
+    await tx
+      .delete(byokWaitlist)
+      .where(inArray(byokWaitlist.email, context.loginEmails));
+  }
+
+  return {
+    status: 'deleted',
+    clerkUserIds: context.clerkUserIds,
+    organizationId: context.organizationId,
+    organizationDeleted: context.deleteOrganization,
+    subscriptionStoreTeardownTargets: context.deleteOrganization
+      ? context.subscriptionStoreTeardownTargets
+      : [],
+  };
 }
 
 /**
@@ -1081,6 +1490,13 @@ export async function getSubscriptionStoreTeardownTargetsV2(
   db: Database,
   organizationId: string,
 ): Promise<SubscriptionStoreTeardownTarget[]> {
+  return readSubscriptionStoreTeardownTargetsTx(db, organizationId);
+}
+
+async function readSubscriptionStoreTeardownTargetsTx(
+  db: Pick<Database, 'query'>,
+  organizationId: string,
+): Promise<SubscriptionStoreTeardownTarget[]> {
   const rows = await db.query.subscription.findMany({
     where: eq(subscription.organizationId, organizationId),
     columns: {
@@ -1095,20 +1511,24 @@ export async function getSubscriptionStoreTeardownTargetsV2(
     },
   });
 
-  return rows.map((row) => ({
-    subscriptionId: row.id,
-    planTier: row.planTier,
-    status: row.status,
-    stripe: {
-      customerId: row.stripeCustomerId,
-      subscriptionId: row.stripeSubscriptionId,
-    },
-    revenueCat: {
-      originalAppUserId: row.revenuecatOriginalAppUserId,
-      storeProductId: row.storeProductId,
-      storePlatform: row.storePlatform,
-    },
-  }));
+  return rows
+    .map((row) => ({
+      subscriptionId: row.id,
+      planTier: row.planTier,
+      status: row.status,
+      stripe: {
+        customerId: row.stripeCustomerId,
+        subscriptionId: row.stripeSubscriptionId,
+      },
+      revenueCat: {
+        originalAppUserId: row.revenuecatOriginalAppUserId,
+        storeProductId: row.storeProductId,
+        storePlatform: row.storePlatform,
+      },
+    }))
+    .sort((left, right) =>
+      left.subscriptionId.localeCompare(right.subscriptionId),
+    );
 }
 
 /**
@@ -1157,64 +1577,4 @@ export async function writeFinancialRecordsTx(
       retentionPeriod: null,
     },
   ]);
-}
-
-/**
- * The org a person belongs to (via membership) — the financial_record's
- * organization key for the single-person delete paths, which take a personId
- * but not an organizationId. Returns null when the person has no membership.
- */
-async function personOrganizationIdTx(
-  tx: DeletionTx,
-  personId: string,
-): Promise<string | null> {
-  const row = await tx.query.membership.findFirst({
-    where: eq(membership.personId, personId),
-    columns: { organizationId: true },
-  });
-  return row?.organizationId ?? null;
-}
-
-/**
- * Write a person's retain-tier financial_record rows inside the deletion
- * transaction, resolving the org via membership and snapshotting its
- * subscriptions. Used by the single-person delete paths (deletePersonV2 and the
- * consent-gated sweeps), which have only a personId.
- *
- * FAIL-CLOSED on no org (§6.1 compliance-critical; AGENTS.md billing-domain
- * "no silent recovery") — but only for a GENUINE anomaly. If no organization
- * resolves for the person we CANNOT write the §6.1 financial_record
- * (`organization_id` is NOT NULL — no sentinel row is possible), and a person
- * must never be deleted without its retain records. So we THROW, aborting the
- * whole deletion transaction (person NOT deleted, no partial state) rather than
- * silently skip. The throw IS the required escalation — it propagates to the
- * Inngest/route boundary and is captured in Sentry.
- *
- * Anomaly vs. benign race (recheck existence before throwing). A no-org result
- * has two causes: (a) a true orphaned-person anomaly — the person STILL exists
- * but has no resolvable org; (b) a benign concurrent-deletion race — a
- * person-scoped delete passed its earlier existence check, then
- * `executeDeletionV2` (org-level; does NOT take the per-person advisory lock)
- * won the same-org delete and cascaded this membership away. In case (b) the
- * deletion is already accomplished and idempotent, so throwing would turn it
- * into a spurious failure → Inngest retry → escalation. We therefore re-check
- * person existence first: if the person is already gone, return a clean no-op;
- * only fail-closed when the person still exists with no org (true corruption).
- */
-async function writeFinancialRecordsForPersonTx(
-  tx: DeletionTx,
-  personId: string,
-): Promise<void> {
-  const organizationId = await personOrganizationIdTx(tx, personId);
-  if (!organizationId) {
-    // Benign concurrent-deletion race: the person is already gone (e.g.
-    // executeDeletionV2 won and cascaded the membership). Idempotent no-op.
-    if (!(await personExistsTx(tx, personId))) return;
-    // Genuine anomaly: the person still exists but no org resolves. Fail closed.
-    throw new Error(
-      `writeFinancialRecordsForPersonTx: orphaned person ${personId} — still exists but no organization resolved; cannot write the §6.1 financial_record retain rows; aborting the deletion (fail-closed, no silent skip).`,
-    );
-  }
-  const subscriptions = await readOrgSubscriptionsTx(tx, organizationId);
-  await writeFinancialRecordsTx(tx, personId, organizationId, subscriptions);
 }

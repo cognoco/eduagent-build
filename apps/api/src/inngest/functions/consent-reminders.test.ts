@@ -10,6 +10,7 @@ const mockRefreshConsentTokenForRequestV2 = jest.fn().mockResolvedValue({
 const mockDeletePersonIfNoConsentV2 = jest.fn().mockResolvedValue(undefined);
 const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockSafeSend = jest.fn().mockResolvedValue(undefined);
 const mockSendEmail = jest.fn();
 const mockFormatConsentReminderEmail = jest.fn(
   (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
@@ -19,6 +20,16 @@ const mockFormatConsentReminderEmail = jest.fn(
     type: 'consent_reminder' as const,
   }),
 );
+
+jest.mock('../../services/safe-non-core', () => {
+  const actual = jest.requireActual(
+    '../../services/safe-non-core',
+  ) as typeof import('../../services/safe-non-core');
+  return {
+    ...actual,
+    safeSend: (...args: unknown[]) => mockSafeSend(...args),
+  };
+});
 
 // Shared seeded DB — getStepDatabase returns this; seedConsentState patches its
 // db.query so the REAL resolveOrgIdForPerson (membership.findFirst) +
@@ -82,6 +93,36 @@ jest.mock(
         mockDeletePersonIfNoConsentV2(...args),
       getPersonClerkUserIdsV2: (...args: unknown[]) =>
         mockGetPersonClerkUserIdsV2(...args),
+      getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
+        personExists: true,
+        personId: args[1] as string,
+        organizationId: 'org-test',
+        clerkUserIds: await mockGetPersonClerkUserIdsV2(...args),
+        loginEmails: [],
+        organizationPersonIds: [args[1] as string],
+        subscriptionStoreTeardownTargets: [],
+      }),
+      attemptPersonIfNoConsentErasureV2: async (
+        db: unknown,
+        personId: unknown,
+        snapshot: { clerkUserIds: string[] },
+        requestedAt: unknown,
+      ) =>
+        (await mockDeletePersonIfNoConsentV2(db, personId, requestedAt))
+          ? {
+              status: 'deleted',
+              clerkUserIds: snapshot.clerkUserIds,
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            }
+          : {
+              status: 'not_eligible',
+              clerkUserIds: [],
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            },
     };
   },
 );
@@ -313,6 +354,35 @@ describe('consentReminder', () => {
   it('should be defined as an Inngest function with the expected id', () => {
     expect((consentReminder as { opts?: { id?: string } }).opts?.id).toBe(
       'consent-reminder',
+    );
+  });
+
+  it('declares and emits a sanitized terminal erasure signal', async () => {
+    const onFailure = (consentReminder as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<void>;
+
+    expect(typeof onFailure).toBe('function');
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { profileId: 'profile-terminal' } },
+          run_id: 'run-terminal',
+        },
+      },
+      error: new Error('provider detail must not be forwarded'),
+    });
+
+    expect(captureMessageSpy).toHaveBeenCalledWith(
+      'consent-reminder: all retries exhausted during consent expiry',
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'consent-reminder.terminal_failure',
+          profileId: 'profile-terminal',
+          errorClass: 'error',
+        }),
+      }),
     );
   });
 

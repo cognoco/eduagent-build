@@ -122,6 +122,36 @@ jest.mock(
         mockDeletePersonIfConsentWithdrawnV2(...args),
       getPersonClerkUserIdsV2: (...args: unknown[]) =>
         mockGetPersonClerkUserIdsV2(...args),
+      getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
+        personExists: true,
+        personId: args[1] as string,
+        organizationId: 'org-test',
+        clerkUserIds: await mockGetPersonClerkUserIdsV2(...args),
+        loginEmails: [],
+        organizationPersonIds: [args[1] as string],
+        subscriptionStoreTeardownTargets: [],
+      }),
+      attemptPersonIfConsentWithdrawnErasureV2: async (
+        db: unknown,
+        personId: unknown,
+        snapshot: { clerkUserIds: string[] },
+        withdrawnAt: unknown,
+      ) =>
+        (await mockDeletePersonIfConsentWithdrawnV2(db, personId, withdrawnAt))
+          ? {
+              status: 'deleted',
+              clerkUserIds: snapshot.clerkUserIds,
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            }
+          : {
+              status: 'not_eligible',
+              clerkUserIds: [],
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            },
     };
   },
 );
@@ -165,6 +195,7 @@ jest.mock('../../services/settings', () => {
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue('notice-001');
 const mockGetPendingNoticeChildName = jest.fn().mockResolvedValue('Emma');
+const mockDeletePendingNotice = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/notices', () => {
   const actual = jest.requireActual(
     '../../services/notices',
@@ -175,6 +206,8 @@ jest.mock('../../services/notices', () => {
       mockRecordPendingNotice(...args),
     getPendingNoticeChildName: (...args: unknown[]) =>
       mockGetPendingNoticeChildName(...args),
+    deletePendingNotice: (...args: unknown[]) =>
+      mockDeletePendingNotice(...args),
   };
 });
 
@@ -519,7 +552,7 @@ describe('consentRevocation', () => {
         { bypassPreferenceCheck: true },
       );
 
-      // Step ordering: notify-child before delete-child-profile before notify-parent.
+      // Step ordering: notify-child before durable erasure before notify-parent.
       expect(runner.runNames()).toEqual([
         'clear-unread-nudges',
         'send-warning-push',
@@ -527,8 +560,9 @@ describe('consentRevocation', () => {
         'load-child-profile',
         'choose-final-action',
         'notify-child',
-        'capture-child-clerk-user-ids',
-        'delete-child-profile',
+        'prepare-child-deletion-notice',
+        'child-revocation-person-erasure-capture-1',
+        'child-revocation-person-erasure-database-1',
         'notify-parent',
       ]);
     });
@@ -554,9 +588,9 @@ describe('consentRevocation', () => {
       );
       expect(runner.runNames()).toEqual(
         expect.arrayContaining([
-          'capture-child-clerk-user-ids',
-          'delete-child-profile',
-          'delete-child-clerk-users',
+          'child-revocation-person-erasure-capture-1',
+          'child-revocation-person-erasure-database-1',
+          'child-revocation-person-erasure-clerk-users',
         ]),
       );
     });

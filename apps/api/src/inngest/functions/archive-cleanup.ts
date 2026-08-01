@@ -1,14 +1,16 @@
 // @inngest-admin: event-profile (profileId from event; consent check + hard delete scoped by that profileId)
 import { inngest } from '../client';
-import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
-import { resolveLatestConsentSetStatusAnyBasis } from '../../services/identity-v2/consent-status-v2';
-import { getPersonForConsentRevocationV2 } from '../../services/identity-v2/consent-v2';
+import { getStepDatabase } from '../helpers';
 import {
-  deleteArchivedPersonIfStillEligibleV2,
-  getPersonClerkUserIdsV2,
+  attemptArchivedPersonErasureV2,
+  getPersonErasureSnapshotV2,
 } from '../../services/identity-v2/deletion-v2';
-import { deleteClerkUser } from '../../services/clerk-user';
-import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
+import { captureMessage } from '../../services/sentry';
+import { safeSend } from '../../services/safe-non-core';
+import {
+  completePersonErasureExternalWork,
+  runStablePersonErasure,
+} from './person-erasure-steps';
 
 const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -24,6 +26,38 @@ export const archiveCleanup = inngest.createFunction(
     // before Inngest can deduplicate them.
     idempotency: 'event.data.profileId',
     concurrency: { key: 'event.data.profileId', limit: 1 },
+    onFailure: async ({ event, error }) => {
+      const profileId = (
+        event.data.event?.data as { profileId?: string } | undefined
+      )?.profileId;
+      captureMessage(
+        'archive-cleanup: all retries exhausted during person erasure',
+        {
+          level: 'error',
+          extra: {
+            surface: 'archive-cleanup.terminal_failure',
+            profileId: profileId ?? null,
+            runId: event.data.run_id ?? null,
+            errorClass: error instanceof Error ? 'error' : 'non_error',
+          },
+        },
+      );
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: observability-only erasure dead-letter signal.
+            name: 'app/profile.archive_cleanup.failed',
+            data: {
+              profileId: profileId ?? null,
+              runId: event.data.run_id ?? null,
+              errorClass: error instanceof Error ? 'error' : 'non_error',
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'archive-cleanup.terminal_failure',
+        { profileId: profileId ?? null },
+      );
+    },
   },
   { event: 'app/profile.archived' },
   async ({ event, step }) => {
@@ -31,67 +65,31 @@ export const archiveCleanup = inngest.createFunction(
 
     await step.sleep('archive-window', '30d');
 
-    const clerkUserIds = await step.run(
-      'capture-archived-person-clerk-user-ids',
-      () => getPersonClerkUserIdsV2(getStepDatabase(), profileId),
-    );
-
-    const deletionResult = await step.run(
-      'hard-delete-archived-profile',
-      async () => {
-        const db = getStepDatabase();
-
-        // Cheap early-outs for observability (these read-then-return reasons let
-        // the dashboard distinguish WHY a run was a no-op). They do NOT guard the
-        // delete on their own — a restoreConsent() landing after these reads but
-        // before the delete is the F-122 TOCTOU.
-
-        // [CUT-B2] Dispatch to v2 consent model when flag is enabled.
-        const orgId = await resolveOrgIdForPerson(db, profileId);
-        if (orgId !== null) {
-          const consentStatus = await resolveLatestConsentSetStatusAnyBasis(
-            db,
-            profileId,
-            orgId,
-          );
-          if (consentStatus === 'CONSENTED') {
-            return { deleted: false, reason: 'consent_restored' };
-          }
-        }
-
-        const person = await getPersonForConsentRevocationV2(db, profileId);
-        if (!person?.archivedAt) {
-          return { deleted: false, reason: 'not_archived' };
-        }
-        if (Date.now() - person.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
-          return { deleted: false, reason: 'retention_window_not_elapsed' };
-        }
-
-        const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
-        const deleted = await deleteArchivedPersonIfStillEligibleV2(
-          db,
+    const deletionResult = await runStablePersonErasure({
+      step,
+      stepPrefix: 'archive-person-erasure',
+      capture: () => getPersonErasureSnapshotV2(getStepDatabase(), profileId),
+      erase: (snapshot) =>
+        attemptArchivedPersonErasureV2(
+          getStepDatabase(),
           profileId,
-          retentionCutoff,
-        );
-        return deleted
-          ? { deleted: true }
-          : { deleted: false, reason: 'consent_restored_or_unarchived' };
-      },
-    );
-
-    if (deletionResult.deleted && clerkUserIds.length > 0) {
-      await step.run('delete-archived-person-clerk-users', () =>
-        Promise.all(
-          clerkUserIds.map((userId) =>
-            deleteClerkUser({
-              userId,
-              clerkSecretKey: getStepClerkSecretKey(),
-            }),
-          ),
+          snapshot,
+          new Date(Date.now() - ARCHIVE_RETENTION_MS),
         ),
-      );
+    });
+    if (deletionResult.status === 'admin_transfer_required') {
+      return {
+        status: 'reroute_required',
+        reason: 'admin_transfer_required',
+        profileId,
+      };
     }
+    await completePersonErasureExternalWork({
+      step,
+      stepPrefix: 'archive-person-erasure',
+      result: deletionResult,
+    });
 
-    return { status: 'complete', profileId };
+    return { status: deletionResult.status, profileId };
   },
 );

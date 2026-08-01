@@ -2,7 +2,7 @@
 import { NonRetriableError } from 'inngest';
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
+import { getStepDatabase } from '../helpers';
 // [WI-367] calculateAgeFromParts (not calculateAge): the v2-only revocation path
 // now reads birthMonth/birthDay via getPersonForConsentRevocationV2 and computes
 // the COPPA hard-delete boundary on exact age, falling back to year-only when the
@@ -16,10 +16,9 @@ import {
 } from '../../services/identity-v2/consent-v2';
 import { getFamilyOwnerPersonIdV2 } from '../../services/identity-v2/family-v2';
 import {
-  deletePersonIfConsentWithdrawnV2,
-  getPersonClerkUserIdsV2,
+  attemptPersonIfConsentWithdrawnErasureV2,
+  getPersonErasureSnapshotV2,
 } from '../../services/identity-v2/deletion-v2';
-import { deleteClerkUser } from '../../services/clerk-user';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import {
@@ -27,11 +26,16 @@ import {
   getWithdrawalArchivePreference,
 } from '../../services/settings';
 import {
+  deletePendingNotice,
   getPendingNoticeChildName,
   recordPendingNotice,
 } from '../../services/notices';
-import { captureException, captureMessage } from '../../services/sentry';
+import { captureMessage } from '../../services/sentry';
 import { safeSend } from '../../services/safe-non-core';
+import {
+  completePersonErasureExternalWork,
+  runStablePersonErasure,
+} from './person-erasure-steps';
 
 // [WI-973] Schema for the app/consent.revoked event payload.
 // Both childProfileId and revokedAt are required — a missing revokedAt
@@ -407,70 +411,62 @@ export const consentRevocation = inngest.createFunction(
     // getFamilyOwnerProfileId would fall back to the event-sender
     // parentProfileId and could land the notice on the wrong account in
     // multi-parent families.
-    const clerkUserIds = await step.run('capture-child-clerk-user-ids', () =>
-      getPersonClerkUserIdsV2(getStepDatabase(), childProfileId),
-    );
-    const deleteResult = await step.run('delete-child-profile', async () => {
-      const db = getStepDatabase();
-      const childName = (await childDisplayName(db)) ?? 'Your child';
-      const deleted = await deletePersonIfConsentWithdrawnV2(
-        db,
-        childProfileId,
-        revocationRespondedAt,
-      );
-      if (!deleted) {
-        return { deleted: false as const, noticeId: null };
-      }
-      // The delete has already happened; a notice-insert failure must NOT
-      // throw, or the step retry would re-run the (now no-op) delete, read
-      // `deleted: false`, and mislabel the run as `restored` — silently
-      // dropping the parent's completion push. Escalate and degrade to the
-      // name-less fallback copy instead.
-      let noticeId: string | null = null;
-      try {
-        noticeId = await recordPendingNotice(db, {
+    const deleteNoticeId = await step.run(
+      'prepare-child-deletion-notice',
+      async () => {
+        const db = getStepDatabase();
+        const childName = (await childDisplayName(db)) ?? 'Your child';
+        return recordPendingNotice(db, {
           ownerProfileId: archiveDecision.ownerProfileId,
           type: 'consent_deleted',
           childName,
           sourceId: pendingNoticeSourceId,
         });
-      } catch (err) {
-        captureException(err, {
-          extra: {
-            childProfileId,
-            ownerProfileId: archiveDecision.ownerProfileId,
-            context: 'consent-revocation-delete-notice',
-          },
-        });
-      }
-      return { deleted: true as const, noticeId };
+      },
+    );
+    const deletionResult = await runStablePersonErasure({
+      step,
+      stepPrefix: 'child-revocation-person-erasure',
+      capture: () =>
+        getPersonErasureSnapshotV2(getStepDatabase(), childProfileId),
+      erase: (snapshot) =>
+        attemptPersonIfConsentWithdrawnErasureV2(
+          getStepDatabase(),
+          childProfileId,
+          snapshot,
+          revocationRespondedAt,
+        ),
     });
-    // Tolerate the pre-restructure memoized shape (a bare boolean) for runs
-    // that were in flight across the deploy — this function sleeps for days.
-    const deleted =
-      typeof deleteResult === 'object' && deleteResult !== null
-        ? deleteResult.deleted
-        : Boolean(deleteResult);
-    const deleteNoticeId =
-      typeof deleteResult === 'object' && deleteResult !== null
-        ? deleteResult.noticeId
-        : null;
-    if (!deleted) {
+    if (
+      deletionResult.status === 'not_eligible' ||
+      deletionResult.status === 'admin_transfer_required'
+    ) {
+      await step.run('discard-child-deletion-notice', () =>
+        deletePendingNotice(
+          getStepDatabase(),
+          archiveDecision.ownerProfileId,
+          deleteNoticeId,
+        ),
+      );
+      if (deletionResult.status === 'admin_transfer_required') {
+        return {
+          status: 'reroute_required',
+          reason: 'admin_transfer_required',
+          childProfileId,
+        };
+      }
       return { status: 'restored', childProfileId };
     }
 
-    if (clerkUserIds.length > 0) {
-      await step.run('delete-child-clerk-users', () =>
-        Promise.all(
-          clerkUserIds.map((userId) =>
-            deleteClerkUser({
-              userId,
-              clerkSecretKey: getStepClerkSecretKey(),
-            }),
-          ),
-        ),
-      );
-    }
+    await completePersonErasureExternalWork({
+      step,
+      stepPrefix: 'child-revocation-person-erasure',
+      result: deletionResult,
+    });
+
+    // The notice was written before deletion and carries only an opaque id in
+    // step state. A lost deletion-step receipt therefore cannot lose the
+    // child's display name needed by the completion notification.
 
     // Notify parent of completion. [BUG-699-FOLLOWUP] same 24h dedup as the
     // child-side notify above — duplicate revocation events would otherwise

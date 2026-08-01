@@ -97,6 +97,22 @@ export async function getPendingNoticeChildName(
   return row ? parsePayload(row.payloadJson).childName : null;
 }
 
+/** Remove a prepared notice when its guarded deletion does not proceed. */
+export async function deletePendingNotice(
+  db: Database,
+  ownerProfileId: string,
+  noticeId: string,
+): Promise<void> {
+  await db
+    .delete(pendingNotices)
+    .where(
+      and(
+        eq(pendingNotices.id, noticeId),
+        eq(pendingNotices.ownerProfileId, ownerProfileId),
+      ),
+    );
+}
+
 export async function listPendingNotices(
   db: Database,
   ownerProfileId: string,

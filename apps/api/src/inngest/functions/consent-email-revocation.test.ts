@@ -76,6 +76,36 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
       mockDeletePersonIfConsentWithdrawnV2(...args),
     getPersonClerkUserIdsV2: (...args: unknown[]) =>
       mockGetPersonClerkUserIdsV2(...args),
+    getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
+      personExists: true,
+      personId: args[1] as string,
+      organizationId: 'org-test',
+      clerkUserIds: await mockGetPersonClerkUserIdsV2(...args),
+      loginEmails: [],
+      organizationPersonIds: [args[1] as string],
+      subscriptionStoreTeardownTargets: [],
+    }),
+    attemptPersonIfConsentWithdrawnErasureV2: async (
+      db: unknown,
+      personId: unknown,
+      snapshot: { clerkUserIds: string[] },
+      withdrawnAt: unknown,
+    ) =>
+      (await mockDeletePersonIfConsentWithdrawnV2(db, personId, withdrawnAt))
+        ? {
+            status: 'deleted',
+            clerkUserIds: snapshot.clerkUserIds,
+            organizationId: 'org-test',
+            organizationDeleted: false,
+            subscriptionStoreTeardownTargets: [],
+          }
+        : {
+            status: 'not_eligible',
+            clerkUserIds: [],
+            organizationId: 'org-test',
+            organizationDeleted: false,
+            subscriptionStoreTeardownTargets: [],
+          },
   };
 });
 
@@ -353,8 +383,8 @@ describe('still-withdrawn path', () => {
       'send-warning-push',
       'check-restoration',
       'notify-child',
-      'capture-charge-clerk-user-ids',
-      'delete-charge-person',
+      'email-revocation-person-erasure-capture-1',
+      'email-revocation-person-erasure-database-1',
     ]);
   });
 
@@ -378,9 +408,9 @@ describe('still-withdrawn path', () => {
     );
     expect(runner.runNames()).toEqual(
       expect.arrayContaining([
-        'capture-charge-clerk-user-ids',
-        'delete-charge-person',
-        'delete-charge-clerk-users',
+        'email-revocation-person-erasure-capture-1',
+        'email-revocation-person-erasure-database-1',
+        'email-revocation-person-erasure-clerk-users',
       ]),
     );
   });

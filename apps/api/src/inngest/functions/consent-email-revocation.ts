@@ -16,21 +16,24 @@
 import { NonRetriableError } from 'inngest';
 import { z } from 'zod';
 import { inngest } from '../client';
-import { getStepClerkSecretKey, getStepDatabase } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import {
   isConsentRevocationGenerationCurrentV2,
   getPersonDisplayNameV2,
 } from '../../services/identity-v2/consent-v2';
 import {
-  deletePersonIfConsentWithdrawnV2,
-  getPersonClerkUserIdsV2,
+  attemptPersonIfConsentWithdrawnErasureV2,
+  getPersonErasureSnapshotV2,
 } from '../../services/identity-v2/deletion-v2';
-import { deleteClerkUser } from '../../services/clerk-user';
 import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
 import { captureMessage } from '../../services/sentry';
 import { safeSend } from '../../services/safe-non-core';
+import {
+  completePersonErasureExternalWork,
+  runStablePersonErasure,
+} from './person-erasure-steps';
 
 // Schema for the app/consent.email-revoked event payload.
 // Both chargePersonId and revokedAt are required — a missing revokedAt
@@ -238,35 +241,35 @@ export const consentEmailRevocation = inngest.createFunction(
     // FK cascades remove all associated data.
     // No archive branch: the email-parent restores via the undo link within
     // grace, and after grace there is no in-app parent to archive for.
-    const clerkUserIds = await step.run(
-      'capture-charge-clerk-user-ids',
-      async () => getPersonClerkUserIdsV2(getStepDatabase(), chargePersonId),
-    );
-    const deleted = await step.run('delete-charge-person', async () => {
-      const db = getStepDatabase();
-      return deletePersonIfConsentWithdrawnV2(
-        db,
-        chargePersonId,
-        revocationRespondedAt,
-      );
+    const deletionResult = await runStablePersonErasure({
+      step,
+      stepPrefix: 'email-revocation-person-erasure',
+      capture: () =>
+        getPersonErasureSnapshotV2(getStepDatabase(), chargePersonId),
+      erase: (snapshot) =>
+        attemptPersonIfConsentWithdrawnErasureV2(
+          getStepDatabase(),
+          chargePersonId,
+          snapshot,
+          revocationRespondedAt,
+        ),
     });
 
-    if (!deleted) {
+    if (deletionResult.status === 'not_eligible') {
       return { status: 'restored', chargePersonId };
     }
-
-    if (clerkUserIds.length > 0) {
-      await step.run('delete-charge-clerk-users', () =>
-        Promise.all(
-          clerkUserIds.map((userId) =>
-            deleteClerkUser({
-              userId,
-              clerkSecretKey: getStepClerkSecretKey(),
-            }),
-          ),
-        ),
-      );
+    if (deletionResult.status === 'admin_transfer_required') {
+      return {
+        status: 'reroute_required',
+        reason: 'admin_transfer_required',
+        chargePersonId,
+      };
     }
+    await completePersonErasureExternalWork({
+      step,
+      stepPrefix: 'email-revocation-person-erasure',
+      result: deletionResult,
+    });
 
     return { status: 'deleted', chargePersonId };
   },

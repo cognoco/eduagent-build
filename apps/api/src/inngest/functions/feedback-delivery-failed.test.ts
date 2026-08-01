@@ -568,6 +568,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     });
 
     it('does not retry a permanent provider rejection', async () => {
+      const { deleteWhere } = stubFeedbackDb(feedbackRow());
       mockSendEmail.mockResolvedValue({
         sent: false,
         retryability: 'permanent',
@@ -582,6 +583,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
         result: { status: 'not_sent', reason: 'resend_api_error' },
       });
       expect(mockCaptureException).not.toHaveBeenCalled();
+      expect(deleteWhere).toHaveBeenCalledTimes(1);
     });
   });
 });

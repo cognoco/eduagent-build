@@ -52,11 +52,13 @@ import {
 } from '@eduagent/database';
 import {
   cancelDeletionV2,
+  attemptPersonIfNoConsentErasureV2,
   deleteArchivedPersonIfStillEligibleV2,
   deletePersonIfConsentWithdrawnV2,
   deletePersonIfNoConsentV2,
   deletePersonV2,
   executeDeletionV2,
+  getPersonErasureSnapshotV2,
   scheduleDeletionV2,
 } from './deletion-v2';
 import { scheduledDeletion } from '../../inngest/functions/account-deletion';
@@ -346,8 +348,109 @@ const RUN = !!process.env.DATABASE_URL;
         return admin!.id;
       }
 
-      it('refuses to delete the last remaining admin', async () => {
+      async function addLearner(orgId: string, displayName: string) {
+        const [learner] = await db
+          .insert(person)
+          .values({
+            displayName,
+            birthDate: '2012-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(learner!.id);
+        await db.insert(membership).values({
+          personId: learner!.id,
+          organizationId: orgId,
+          roles: ['learner'],
+        });
+        return learner!.id;
+      }
+
+      it('erases the organization when the target is its only person/admin', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+
+        await deletePersonV2(db, ownerId, 'user_initiated', ownerId);
+
+        expect(
+          await db.query.person.findFirst({
+            where: eq(person.id, ownerId),
+            columns: { id: true },
+          }),
+        ).toBeUndefined();
+        expect(
+          await db.query.organization.findFirst({
+            where: eq(organization.id, orgId),
+            columns: { id: true },
+          }),
+        ).toBeUndefined();
+      });
+
+      it('returns external cleanup targets when day-30 no-consent erases an org-of-one', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        await db.insert(login).values([
+          {
+            personId: ownerId,
+            clerkUserId: `clerk-a-${ownerId}`,
+            email: `a-${ownerId}@example.com`,
+          },
+          {
+            personId: ownerId,
+            clerkUserId: `clerk-b-${ownerId}`,
+            email: `b-${ownerId}@example.com`,
+          },
+        ]);
+        const snapshot = await getPersonErasureSnapshotV2(db, ownerId);
+
+        const result = await attemptPersonIfNoConsentErasureV2(
+          db,
+          ownerId,
+          snapshot,
+        );
+
+        expect(result).toMatchObject({
+          status: 'deleted',
+          organizationId: orgId,
+          organizationDeleted: true,
+          clerkUserIds: [`clerk-a-${ownerId}`, `clerk-b-${ownerId}`],
+        });
+
+        await expect(
+          attemptPersonIfNoConsentErasureV2(db, ownerId, snapshot),
+        ).resolves.toMatchObject({
+          status: 'already_deleted',
+          organizationDeleted: true,
+          clerkUserIds: [`clerk-a-${ownerId}`, `clerk-b-${ownerId}`],
+        });
+      });
+
+      it('performs no deletion when the durable external snapshot changed', async () => {
         const { ownerId } = await seedScheduledOrgWithOwner();
+        await db.insert(login).values({
+          personId: ownerId,
+          clerkUserId: `clerk-first-${ownerId}`,
+          email: `first-${ownerId}@example.com`,
+        });
+        const staleSnapshot = await getPersonErasureSnapshotV2(db, ownerId);
+        await db.insert(login).values({
+          personId: ownerId,
+          clerkUserId: `clerk-second-${ownerId}`,
+          email: `second-${ownerId}@example.com`,
+        });
+
+        await expect(
+          attemptPersonIfNoConsentErasureV2(db, ownerId, staleSnapshot),
+        ).resolves.toMatchObject({ status: 'snapshot_changed' });
+        expect(
+          await db.query.person.findFirst({
+            where: eq(person.id, ownerId),
+            columns: { id: true },
+          }),
+        ).toBeDefined();
+      });
+
+      it('refuses to delete the last admin while another member remains', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        await addLearner(orgId, 'Remaining Learner');
 
         await expect(
           deletePersonV2(db, ownerId, 'user_initiated', ownerId),
@@ -363,6 +466,7 @@ const RUN = !!process.env.DATABASE_URL;
       it('serializes concurrent deletes of two admins and preserves exactly one', async () => {
         const { orgId, ownerId } = await seedScheduledOrgWithOwner();
         const secondAdminId = await addAdmin(orgId, 'Second Admin');
+        await addLearner(orgId, 'Remaining Learner');
 
         const results = await Promise.allSettled([
           deletePersonV2(db, ownerId, 'user_initiated', ownerId),
