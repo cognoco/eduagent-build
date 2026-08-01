@@ -60,11 +60,12 @@ export type LearningTextProvenance = 'user' | 'llm' | 'migration';
  * excludes nothing and lets the producing vendor grade its own output. The type
  * cannot catch that (both are `string`); only a test asserting the vendor is
  * absent from the RESOLVED judge pool can.
+ *
+ * [WI-2952 Gate-1 SHOULD_FIX] Moved to `@eduagent/schemas` — it is returned by
+ * an exported service function and crosses the services/ → inngest/functions/
+ * boundary. Re-exported here so existing relative imports keep working.
  */
-export type LearningTextAuthor =
-  | { readonly provenance: 'llm'; readonly producerVendor: string }
-  | { readonly provenance: 'user' }
-  | { readonly provenance: 'migration' };
+export type { LearningTextAuthor } from '@eduagent/schemas';
 
 /** The deterministic lexeme/grammar finding. */
 export type LearningTextClassification = 'block' | 'clear' | 'ambiguous';

@@ -9,6 +9,7 @@ import {
 import {
   sessionAnalysisOutputSchema,
   type AccommodationMode,
+  type AnalyzedSessionTranscript,
   type ConfidenceLevel,
   type ExplanationStyle,
   type InterestEntry,
@@ -2265,18 +2266,12 @@ function hasLearnerResolutionEvidence(transcriptText: string): boolean {
 /**
  * [WI-2952] The analysis, WITH the vendor that produced it.
  *
- * This function had `routeAndCall`'s result in hand and returned only
- * `SessionAnalysisOutput`, discarding `result.provider` — which is why the gate
- * downstream had no vendor to name and fell back to a blank one that fails
- * closed. The vendor was never unrecoverable; it was thrown away one frame up.
- *
- * `provider`, never `model`: judge exclusion matches vendor names, so a model id
- * excludes nothing.
+ * Moved to `@eduagent/schemas` (Gate-1 SHOULD_FIX) — it is returned by this
+ * exported function and crosses the services/ → inngest/functions/ boundary.
+ * Re-exported here so existing imports keep working; see
+ * `packages/schemas/src/learning-profiles.ts` for the full doc comment.
  */
-export type AnalyzedSessionTranscript = {
-  readonly analysis: SessionAnalysisOutput;
-  readonly author: LearningTextAuthor;
-};
+export type { AnalyzedSessionTranscript };
 
 export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
