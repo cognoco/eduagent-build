@@ -12,6 +12,12 @@ global teardown reset passed. The sanitized machine-readable receipt is
 It supersedes the earlier bounded failure classifications below without deleting
 their audit history.
 
+The independent-review correction is recorded in
+[review-rework-rgr.md](review-rework-rgr.md). The executable transport contract
+now validates this tracked receipt and kills all three required source mutations:
+missing the exact allowlist, missing the backend-key guard, and permitting an
+ambient Clerk testing token.
+
 ## Cross-lane Clerk preflight regression
 
 The regression command was run under the repository Node 22 toolchain with the production workflow as the system under test:
