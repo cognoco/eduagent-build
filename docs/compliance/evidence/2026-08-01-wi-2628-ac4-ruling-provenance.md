@@ -64,11 +64,29 @@ The ruling is not held only in this note. It is carried in canon:
 
 `apps/api/src/services/learning-text-safety/referral.ts` models the referral payload as a
 discriminated union on origin, and cites the ruling by date at the type. The two origins
-carry different independence declarations: an LLM referral cannot be constructed without a
-producing vendor, so the fail-closed rule for an unknown producer is a type-level guarantee
-rather than a runtime check; a user referral has no vendor field at all, so it cannot
-supply one, because inventing a producer for a learner's own writing would be a falsehood
-the judge router would then act on.
+carry different independence declarations. A user referral has no vendor field at all, so
+it cannot supply one — inventing a producer for a learner's own writing would be a
+falsehood the judge router would then act on.
+
+**How the unknown-producer rule is actually enforced — the type is only part of it.** The
+union forbids an LLM referral with the vendor field *omitted*, and that much is a
+compile-time property. It does **not** exclude a blank or whitespace-only vendor, and it
+does not constrain an object built at runtime, where types are absent by construction. The
+fail-closed behaviour for those cases is enforced by runtime validation, in two places:
+
+- `apps/api/src/services/learning-text-safety/scan.ts` — the referral builder trims the
+  vendor and returns no referral at all when the result is empty, so the text never reaches
+  the judge and falls through to the blocking path.
+- `apps/api/src/services/learning-text-safety/judge.ts` — a defence-in-depth re-check that
+  refuses with a blocked/unclear verdict and records a degraded reason. The union is
+  narrowed before the vendor is read, so this guard cannot become unreachable as a
+  side effect of the user variant existing.
+
+**Both runtime checks are load-bearing and must not be removed as redundant.** An earlier
+draft of this note described the guarantee as type-level "rather than a runtime check",
+which was wrong in a way that mattered: a future maintainer or auditor reading that could
+have deleted exactly the checks the property depends on. The correction was raised in
+review of this note and is recorded here rather than silently amended.
 
 ## Scope of this note
 
