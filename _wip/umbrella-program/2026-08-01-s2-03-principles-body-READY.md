@@ -7,92 +7,67 @@ owner: Stream 2 (PRG-20) — estate-canon drain
 
 # Principles & Invariants Catalog
 
-This is the durable rule layer for the MentoMate codebase: engineering
-invariants that hold regardless of which feature or PR is in flight, the
-sanctioned exceptions to them, the code-quality guards that catch bugs
-type-checking misses, and the product-interaction invariants that bind every
-model-driven surface. It is **canon** — the same authority tier as
-`architecture.md` and `docs/adr/`, not a per-repo agent-behavior doc. Any
-agent working this codebase (`AGENTS.md` / `CLAUDE.md`) is pointed here for
-these rules rather than carrying them inline, so this file — not the pointer
-— is the source of truth when they conflict.
+The cross-cutting **index** over the domain canon, per `MMT-ADR-0000` §I.3:
+each entry is a stable principle ID, a one-line statement, and a pointer into
+the canon section that elaborates it — plus links to the ADR that established
+it and the guard that enforces it, where those exist. **The rule text lives in
+the pointed-at canon, never here.** The durable join is the ID: the canon
+section carries the same `[PRIN-NN]` token as a grep-resolvable marker, so
+headings can be renamed without breaking the bind. This file is the
+conformance surface the `MMT-ADR-0000` §II.1 significance gate reads against.
 
-Promoted from `AGENTS.md` § Non-Negotiable Engineering Rules + § Known
-Exceptions + § Code Quality Guards, `.claude/memory/project_known_bug_patterns.md`,
-and the human-override doctrine (`MMT-ADR-0046`), by the Stream 2 estate-canon
-drain (PRG-20; D4 ruled Option 1, 2026-07-15; drafted under WI-2051, lands via
-WI-2052). Every rule was re-verified against source on 2026-08-01.
+Seeded by the Stream 2 estate-canon drain (PRG-20; D4 ruled 2026-07-15; index
+shape ruled 2026-08-01; drafted under WI-2051, lands via WI-2052). Every
+entry re-verified against source 2026-08-01.
 
-## 1. Non-Negotiable Engineering Rules
+## Engineering rules
 
-- `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.
-- Business logic belongs in `services/`, not in route handlers. Route/service boundaries are lint-enforced (eslint G1 and G5 in `eslint.config.mjs`).
-- Reads must use `createScopedRepository(profileId)` when the query operates on a single scoped table. For queries that join through a parent chain (e.g. `learning_sessions → curriculum_topics → curriculum_books → subjects`), use direct `db.select()` and enforce `profileId` via `subjects.profileId` (or the closest ancestor that owns it) in the WHERE clause. The scoped repo cannot express multi-table joins; the parent-chain pattern is the sanctioned alternative. Existing examples: `services/session/session-topic.ts`, `session-book.ts`, `session-subject.ts`. A second sanctioned deviation, for a **single scoped table**: reads that need ordering and/or a limit the scoped repo's `findFirst`/`findMany` API cannot express — e.g. a strict time-bound (`lt(createdAt, …)`) with `orderBy(desc(createdAt))` and `limit(1)` together to fetch the latest row before a timestamp, or an `orderBy` + `limit` pair with no time-bound at all — use direct `db.select()` with `profileId` pinned in the WHERE clause; it is the inexpressibility, not the specific predicate shape, that makes this the sanctioned pattern rather than a violation. Existing examples: `inngest/functions/review-calibration-grade.ts` (EU-7 grader-failure cap); `apps/api/src/services/now-feed.ts`'s `collectRecapReadyCandidates` and `collectSnapshotReadyCandidates` (WI-1121 derive-on-read projections).
-- Writes must include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
-- Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors. Exception: brand-fixed hex values are acceptable inside SVG-internal animation and celebration components (`*Animation.tsx`, `*Celebration.tsx`, `AnimatedSplash.tsx`, `MentomateLogo.tsx`) when the file annotates the brand intent.
-- Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
-- LLM calls go through `services/llm/router.ts` or its barrel, not direct provider SDK calls.
-- Non-core Inngest dispatches (telemetry, post-success notifications, observability events) go through `safeSend()` in `apps/api/src/services/safe-non-core.ts` so a dispatch failure is captured in Sentry but never throws and never breaks the user action. Bare `inngest.send(...)` is reserved for CORE flows where dispatch failure must short-circuit the user action — those sites carry a `// core-send: <reason>` comment on the line(s) immediately above the call. Forward-only ratchet test: `apps/api/src/services/safe-non-core.guard.test.ts`.
-- LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
-- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook does NOT run the harness; it only checks for staged snapshot files when drift exists, or a harness-written zero-drift receipt when the full Tier-1 run rewrote snapshots with no tracked changes. Harness code: `apps/api/eval-llm/`.
-- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `assessments.mastery_challenge_verified_at` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to `needs_deepening_topics` with `source = 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns apply a routing-only rung-4 floor (`resolveChallengeRoundLlmRoutingRung` in `services/session/session-exchange-router.ts`, carried on `ExchangeContext.llmRoutingRung`), and per-tier model routing (incl. minor/Family) follows `MMT-ADR-0014` + `docs/registers/llm-models/master.md` (the prior "Family = Gemini-only" wording is superseded — Gemini is excluded under-18). The persistent Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed in Phase 0 (PR #325); today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
+Elaborated in `docs/architecture.md` § Non-Negotiable Engineering Rules
+(marker = the ID).
 
-## 2. Known Exceptions to Engineering Rules
+| ID | Principle | Established by | Enforced by |
+|---|---|---|---|
+| PRIN-01 | `@eduagent/schemas` is the shared contract — never redefine API-facing types locally | — | `@nx/enforce-module-boundaries` (barrels) |
+| PRIN-02 | Business logic lives in `services/`, never in route handlers | — | eslint G1/G5 (`eslint.config.mjs`) |
+| PRIN-03 | Scoped-table reads go through `createScopedRepository(profileId)`; sanctioned deviations pin `profileId` in the WHERE clause | — | — |
+| PRIN-04 | Writes verify ownership via explicit `profileId` or the parent chain | — | — |
+| PRIN-05 | Shared mobile components stay persona-unaware — semantic tokens, no hardcoded hex (SVG brand components excepted) | — | — |
+| PRIN-06 | Durable async work goes through Inngest — never fire-and-forget from route handlers | — | — |
+| PRIN-07 | LLM calls route through `services/llm/router.ts` only — no direct provider SDK calls | — | eslint G3 (`eslint.config.mjs`) |
+| PRIN-08 | Non-core Inngest dispatches go through `safeSend()`; bare `inngest.send` is core-only and `// core-send:`-annotated | — | `safe-non-core.guard.test.ts` |
+| PRIN-09 | State-driving LLM responses use the structured envelope, parsed with `parseEnvelope()`, with a hard cap per signal | — | `scripts/check-prompt-markers.sh` |
+| PRIN-10 | LLM prompt changes run the eval harness (Tier-1 snapshot; Tier-2 live) | — | pre-commit eval-snapshot guard |
+| PRIN-11 | Challenge Round mastery is server-owned and conservative over structured LLM evidence | `MMT-ADR-0014` (routing tiers) | — |
 
-These deviations from §1 exist in the codebase (first catalogued 2026-05-01;
-list re-verified 2026-08-01). They are listed here so reviewers don't try to
-"fix" them in unrelated PRs and so new contributors don't take them as
-precedent. Each exception should either be tracked toward a refactor, or
-promoted into an explicit rule.
+## Sanctioned exceptions
 
-- **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
+| ID | Principle | Established by | Enforced by |
+|---|---|---|---|
+| PRIN-22 | Sanctioned deviations from the engineering rules are registered in `docs/architecture.md` § Known Exceptions to Engineering Rules — never "fix" a registered exception in an unrelated PR, never take one as precedent | per-entry operator rulings (WI-1040/1043/1160/1556/2107) | — |
 
-- **`@clerk/clerk-js` ships `@coinbase/wallet-sdk` + `@solana/*` into `node_modules`, but they never reach the device bundle** — clerk-js `dist` is PRE-BUNDLED (no `require()` of those packages), so Metro never traverses them; install-footprint only, zero device-bundle impact (verified WI-1040). Not removable via pnpm config: they are real `dependencies` of clerk-js, not missing optional peers, so `pnpm.peerDependencyRules.ignoreMissing` does not apply. An upstream issue against `@clerk/clerk-expo` for a no-web3 entrypoint is the only real mitigation; do not attempt to strip them locally.
-- **The global unscoped `@tanstack/query-core` pin in root `package.json` `pnpm.overrides` is load-bearing**, not hygiene debt — it dedupes query-core to one version across `@clerk/shared` (declares `5.87.4`) and the `@tanstack/*` consumers (react-query, query-async-storage-persister, query-persist-client-core). Scoping it to the react-query edge (`@tanstack/react-query>@tanstack/query-core`) regresses to 3 separate query-core versions in the tree (verified WI-1043). Keep it global, and bump its version **in lockstep** whenever `@tanstack/react-query` is bumped.
-- **Account-level Inngest events omit `profileId`** — `app/account.reclaim_attempt` and similar events that fire at account-creation time (before any profile exists) legitimately carry no `profileId`. This is a sanctioned deviation from the "payloads always include `profileId`" rule for events scoped to the accounts table by `clerkUserId` or `accountId`. The `@inngest-admin: event-profile` annotation documents the scoping mechanism in place. Do not attempt to add a dummy `profileId: null` to satisfy the rule textually — it would be misleading.
-- **`teachingPreferenceSchema.analogyDomain` (request) keeps `.nullable().optional()`** — a documented carve-out (WI-1160, operator-ruled) from the "never `.nullable().optional()`; request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). This **request** field is genuinely tri-state: a value = set, `null` = explicitly clear, absent = leave unchanged. `null`-as-clear is established, tested product behavior (`apps/api/src/routes/retention.test.ts` → "accepts null analogyDomain to clear preference"), so both `.nullable()` and `.optional()` are required; the canon's "pick one" wrongly assumes null and absent are interchangeable here. The ban is docs-only (no automated checker), so no escape annotation is needed. The **response** fields (`teachingPreferenceResponseDataSchema.analogyDomain` / `nativeLanguage`) DO conform to `.nullable()` — the carve-out is request-side only.
-- **`profileSchemaShape.conversationLanguageConfirmed` / `.isCurrentUser` (response) keep `.optional()`** — a documented carve-out (WI-1556) from the "request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). Both are **hints derived by the API**, not stored columns, and only *some* response shapers populate them: `listProfilesV2` emits both and `getOwnerProfileV2` emits `conversationLanguageConfirmed`, while `updateProfileV2` (`apps/api/src/services/identity-v2/profile-v2.ts`, backing `PATCH /profiles/:id`), `updateProfileAppContext` (`apps/api/src/services/profile.ts`, backing `PATCH /profiles/:id/app-context`) and `getProfileV2` (`apps/api/src/services/identity-v2/profile-v2.ts`, backing `GET /profiles/:id`) emit **neither**. Mobile parses the two PATCH responses through `profileResponseSchema` (`apps/mobile/src/hooks/use-profiles.ts:134` and `:172`), so the keys are genuinely absent on **current, live traffic** — a standing shaper asymmetry, not only a rollout window; a mixed-version API rollout produces the same absent-key shape. `.nullable()` does not help: it requires the key to be **present** with a `null` value and throws when it is absent, so it would break those parses today. `.nullable().optional()` is banned outright by the same canon, which leaves `.optional()` as the only single Zod primitive that fits. **Why `.optional()` rather than the `.default(false)` used by neighbouring booleans (`hasPremiumLlm`, `hasFamilyLinks`):** `undefined` is a meaningful third state — "this response did not report the hint" — and the consumer relies on it. `shouldRequireFirstMentorLanguageConfirmation` (`apps/mobile/src/lib/first-mentor-language.ts`) gates on strict `conversationLanguageConfirmed === false`, so an absent hint **fails open** and a response from a shaper that omits the field can never raise the blocking first-Mentor gate. `.default(false)` would coerce that absence into a definitive "not confirmed" and gate a learner off a response that simply never carried the field. The ban is docs-only (no automated checker), so no escape annotation is needed. **Does not generalize:** it is scoped to these two derived hint fields on `profileSchemaShape`. Response fields backed by a real column still use `.nullable()`, and a new response field must not copy this pattern unless it is likewise shaper-optional **and** its consumer fails open on absence.
-- **`signals.topic_opened_pending_content`'s hard cap lives client-side, not server-side** — a documented deviation (WI-2107) from the "every envelope signal needs a server-side hard cap" rule. This signal has no server-side loop to cap (unlike `MAX_INTERVIEW_EXCHANGES`, which bounds an in-request loop): each auto-continuation is a discrete client-initiated request, so the termination guarantee is enforced in `apps/mobile/src/components/session/use-session-streaming.ts`'s `autoContinuationFiredRef` (capped at one auto-fired follow-up per learner turn) instead. The rule's intent — bound the flow so it terminates even if the LLM never stops emitting the signal — is preserved; only the enforcement layer differs because the control-flow shape differs.
+## Code quality guards
 
-## 3. Code Quality Guards
+Elaborated in `docs/architecture.md` § Code Quality Guards (marker = the ID).
 
-These rules catch bugs that survive type-checking and only surface at
-runtime. GC1–GC6 learned from adversarial review (2026-04-05); the two
-systemic bug patterns closing the list learned from the 2026-04-13 sweep (20
-instances found and fixed across the codebase). Both sets share the same
-authority level and the same audience — check for them when reviewing or
-writing new code.
+| ID | Principle | Established by | Enforced by |
+|---|---|---|---|
+| PRIN-12 | No internal mocks in integration tests — mock only true external boundaries | — | — |
+| PRIN-13 | No new internal `jest.mock()` (GC1) — `jest.requireActual()` with targeted overrides instead | — | GC1 CI ratchet (`scripts/check-gc1-pattern-a.ts`) |
+| PRIN-14 | Fetch Response bodies are single-use — never both `.json()` and `.text()` | — | — |
+| PRIN-15 | Classify raw errors before formatting them for display | — | — |
+| PRIN-16 | Removing a feature removes every artifact — types, keys, constants, fallback branches | — | — |
+| PRIN-17 | Verify JSX handler references exist after adding any `Pressable`/`Button` | — | — |
+| PRIN-18 | Every test-file edit removes the internal mocks it finds (GC6 boy-scout) | — | `post-edit-jest-mock-check.sh` PostToolUse hook |
+| PRIN-19 | No silent fallbacks — a failure must never look like success to the caller | — | — |
+| PRIN-20 | Async mutation handlers guard concurrency with synchronous ref locks, not React state alone | — | — |
 
-- **No internal mocks in integration tests.** Never `jest.mock` your own database, services, or middleware in integration tests. Mock only true external boundaries (Stripe, Clerk JWKS, email providers, push notification services). Internal mocks hide real bugs.
-- **No new internal `jest.mock()` (GC1 ratchet).** CI fails any PR that adds a relative-path `jest.mock('./...')` or `jest.mock('../...')` line in `*.test.ts` / `*.test.tsx`. Existing legacy sites are NOT blocked by the ratchet but are NOT considered acceptable state — they are backlog for the GC6 burn-down. To stub a few named exports of an internal module, use `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`). External-boundary mocks (LLM via `routeAndCall`, push, email, Stripe, Clerk JWKS) use bare specifiers and are unaffected. The `// gc1-allow: <reason>` escape is reserved for cases where the code under test genuinely cannot be exercised (no real implementation available in the test environment); it is not an "I don't feel like wiring the real thing today" escape.
-- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
-- **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
-- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
-- **Verify JSX handler references exist** after adding any `Pressable` or `Button` — an `onPress={handleX}` that points at a removed or renamed handler type-checks but is dead at runtime.
-- **GC6 — Boy-scout internal mocks when editing test files.** Any time you edit a test file (`*.test.ts` / `*.test.tsx` / `*.integration.test.ts`) for any reason, scan it for `jest.mock('./...')`, `jest.mock('../...')`, or `jest.mock('@eduagent/...')` and remove the internal mocks before the edit is complete. Use the real implementation, or convert to `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`). Run `/my:sweep-mocks` for the full workflow. The PostToolUse hook at `~/.claude/hooks/post-edit-jest-mock-check.sh` surfaces offending lines after every test-file edit; treat that output as a blocker on task completion, not a follow-up. External-boundary mocks (LLM via `routeAndCall`, Stripe, Clerk JWKS, push, email, Inngest framework) use bare specifiers and are not violations. The `// gc1-allow: <reason>` escape applies only when the real code cannot run in the test environment — not as a convenience. **Policy:** internal mocks are not acceptable state, they are backlog. **Why:** GC1 gates new violations; GC6 forces every test-file visit to reduce the legacy backlog. The deferral escape (leave the mocks, record file paths + count in the commit message) exists only when burn-down would balloon a focused task — it does not authorize preserving the mocks indefinitely.
-- **Silent fallbacks.** Code that silently degrades to a "safe" default instead of surfacing an error. Found in API services and mobile query consumers, 2026-04-13 sweep (10 instances: `summaries.ts`, `assessments.ts`, `subject-resolve.ts`, `subject-classify.ts`, `library.tsx`, `shelf/index.tsx`, `child/mentor-memory.tsx`, `session-summary`). Variants:
-  - `?? []` on TanStack Query `.data` — only catches null/undefined, not wrong object shapes. TanStack Query's `select` is bypassed when `enabled=false`, so `.data` can be an unexpected shape. **Fix:** `Array.isArray(query.data) ? query.data : []`.
-  - API/LLM catch blocks returning success-shaped objects (`isAccepted: true`, `status: 'direct_match'`) — masquerades a service failure as a valid result. **Fix:** return error/no-match status so the UI shows a retry path.
-  - `void mutateAsync(...)` with no `.catch()` — the user gets no feedback when a mutation fails. **Fix:** wrap in async handler with `Alert.alert` on catch.
-  - Raw LLM response text embedded in fallback strings (`response.slice(0,30)`) — error messages or safety refusals can leak into student-facing UI.
-  - **How to apply:** when writing any catch block or fallback path, ask "does this look like success to the caller?" If yes, it's a silent fallback bug.
-- **React state timing gaps.** `isPending` or `useState` booleans used as concurrency guards but vulnerable to React's async batching. Found in mobile screens with mutation + Alert retry patterns (`shelf/index.tsx`, `pick-book`, `session/index.tsx` `handleEndSession`, `session-summary` `handleSubmit`/`handleContinue`), 2026-04-13 sweep.
-  - **The race:** when a TanStack Query mutation fails, `isPending` resets to `false` before the Alert callback fires. The user can then tap both the Alert "Try again" button AND a re-enabled UI button simultaneously, firing two concurrent mutations.
-  - **Fix:** add a `useRef(false)` lock alongside the `isPending` check — the ref is synchronous and not subject to React batching:
-    ```ts
-    const inFlight = useRef(false);
-    if (mutation.isPending || inFlight.current) return;
-    inFlight.current = true;
-    // ... in catch/finally: inFlight.current = false;
-    ```
-  - **Related variant:** `setIsClosing(false)` in a catch block re-enables a button while the error Alert is still visible. **Fix:** move the state reset into the Alert's button callback instead.
-  - **How to apply:** any async handler that (a) checks `isPending` at the top, (b) calls `mutateAsync`, and (c) has an Alert with a retry callback needs a ref lock. Also check: any `setState(false)` in a catch block that re-enables a button while an Alert is still on screen.
+## Product interaction invariants
 
-## 4. Product Interaction Invariants
+| ID | Principle | Established by | Enforced by |
+|---|---|---|---|
+| PRIN-21 | Every AI-driven interaction carries a human override — the user can always reach an outcome the system did not propose; never a license to route around safety, age gating, or consent | Operator ruling (OPQ-62 carry-over, 2026-07-11); formalization drafted in `MMT-ADR-0046` (**Status: Proposed**, pending Architecture sign-off — this entry confers no ADR authority) | — |
 
-Product-level invariants that bind feature surfaces the same way §1 binds
-code. Carried into this catalog per the WI-1856/OPQ-62 operator ruling
-(2026-07-11) — that ruling, and the standing operator directive it carried
-forward, is what makes this entry binding.
-
-- **Every AI-driven interaction carries a human override.** Wherever the system suggests, ranks, orders, or decides, the user must be able to reach an outcome the system did not propose: suggestion sets accept free manual input, recommended order is advisory (never enforced), and in-session direction is redirectable — the learner can skip, redirect, or challenge any suggestion. This governs pedagogical and organisational output only; it never licenses routing around safety refusals, age-resolved gating, or consent requirements. (Operator-ruled; inclusion here mandated by the OPQ-62 carry-over, 2026-07-11.) A formalization with the full clause set and the per-screen audit question is drafted in [`MMT-ADR-0046`](../adr/MMT-ADR-0046-every-ai-driven-interaction-carries-a-human-override.md) — **Status: Proposed, pending Architecture sign-off**; per `MMT-ADR-0000` rule 3 (agents propose, a human representing Architecture ratifies) its clauses gain ADR authority only on acceptance, and this catalog entry does not confer it.
+> PRIN-21's canon elaboration home is `ux-design-specification.md` per the D6
+> ruling (2026-07-14); that section is not yet landed, so the pointer above
+> rests on the operator ruling and the Proposed ADR draft until it is. See
+> the WI-2051 extraction draft § open questions.
