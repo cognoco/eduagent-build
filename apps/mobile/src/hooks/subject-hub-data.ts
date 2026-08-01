@@ -151,6 +151,12 @@ function buildInProgressTopicIds(input: {
   return ids;
 }
 
+// Server resume kinds backed by a live (resumable) session. getBookSessions()
+// only returns completed/auto_closed sessions, so a live target's topic never
+// appears in inProgressTopicIds — it must still outrank the local fallback.
+const LIVE_RESUME_KINDS: ReadonlySet<LearningResumeTarget['resumeKind']> =
+  new Set(['active_session', 'paused_session']);
+
 function resolveContinueTopicId(input: {
   resumeTarget: LearningResumeTarget | null | undefined;
   inProgressTopicIds: ReadonlySet<string>;
@@ -158,7 +164,8 @@ function resolveContinueTopicId(input: {
 }): string | null {
   if (
     input.resumeTarget?.topicId &&
-    input.inProgressTopicIds.has(input.resumeTarget.topicId)
+    (LIVE_RESUME_KINDS.has(input.resumeTarget.resumeKind) ||
+      input.inProgressTopicIds.has(input.resumeTarget.topicId))
   ) {
     return input.resumeTarget.topicId;
   }
@@ -215,12 +222,37 @@ function buildChapters(input: {
 
 function buildNextUp(input: {
   resumeTarget: LearningResumeTarget | null | undefined;
+  continueTopicId: string | null;
   reviewTopicId: string | null;
   upNextTopic: CurriculumTopic | null;
   topicById: ReadonlyMap<string, CurriculumTopic>;
   topicBookIdByTopicId: ReadonlyMap<string, string>;
   preferDueReviewOverNextTopic: boolean;
 }): SubjectHubNextUpWithResume {
+  // buildChapters marks `continueTopicId` 'continue-now', so the hero must
+  // name the same topic — never 'All caught up' or a different (stale) server
+  // target. Attach the server resumeTarget only when it is that same topic;
+  // a synthesized continue navigates via openTopic, same as the chapter row.
+  if (input.continueTopicId) {
+    const serverTarget =
+      input.resumeTarget?.topicId === input.continueTopicId
+        ? input.resumeTarget
+        : null;
+    return {
+      kind: 'resume',
+      topicId: input.continueTopicId,
+      bookId: resolveTopicBookId(
+        input.continueTopicId,
+        input.topicBookIdByTopicId,
+      ),
+      topicTitle:
+        serverTarget?.topicTitle ??
+        input.topicById.get(input.continueTopicId)?.title ??
+        null,
+      ...(serverTarget ? { resumeTarget: serverTarget } : {}),
+    };
+  }
+
   if (
     input.resumeTarget?.topicId &&
     (!input.preferDueReviewOverNextTopic ||
@@ -370,6 +402,7 @@ export function buildSubjectHubData({
     },
     nextUp: buildNextUp({
       resumeTarget,
+      continueTopicId,
       reviewTopicId,
       upNextTopic,
       topicById,

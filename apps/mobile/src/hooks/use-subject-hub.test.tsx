@@ -274,6 +274,139 @@ describe('buildSubjectHubData', () => {
     });
   });
 
+  it('mirrors the continue-now chapter topic in the hero card when server resumeTarget is null [WI-2853 variant a]', () => {
+    const data = buildSubjectHubData({
+      subjectId: SUBJECT_ID,
+      subjectName: 'Spanish',
+      books: [book()],
+      bookDetails: [bookWithTopics],
+      sessionsByBookId: new Map([[BOOK_ID, sessions]]),
+      retentionTopics: [],
+      resumeTarget: null,
+      notes: [],
+      now: new Date('2026-06-14T00:00:00.000Z'),
+    });
+
+    const continueRow = data.chapters
+      .flatMap((chapter) => chapter.topics)
+      .find((topic) => topic.state === 'continue-now');
+    expect(continueRow?.topic.id).toBe(TOPIC_ACTIVE);
+    expect(data.nextUp.kind).not.toBe('none');
+    expect(data.nextUp).toEqual(
+      expect.objectContaining({
+        kind: 'resume',
+        topicId: TOPIC_ACTIVE,
+        bookId: BOOK_ID,
+        topicTitle: 'Greetings',
+      }),
+    );
+  });
+
+  it('follows the in-progress continue-now topic over a stale server resumeTarget [WI-2853 variant b]', () => {
+    const data = buildSubjectHubData({
+      subjectId: SUBJECT_ID,
+      subjectName: 'Spanish',
+      books: [book()],
+      bookDetails: [bookWithTopics],
+      sessionsByBookId: new Map([[BOOK_ID, sessions]]),
+      retentionTopics: [],
+      // Stale server target: a non-live suggestion (recent_topic) for the
+      // already-completed TOPIC_MASTERED, so it is not in-progress; the chapter
+      // list marks the session-derived TOPIC_ACTIVE 'continue-now' instead.
+      // Live kinds (active/paused session) are covered separately below.
+      resumeTarget: {
+        ...resumeTarget,
+        topicId: TOPIC_MASTERED,
+        topicTitle: 'Numbers',
+        sessionId: null,
+        resumeKind: 'recent_topic',
+      },
+      notes: [],
+      now: new Date('2026-06-14T00:00:00.000Z'),
+    });
+
+    const continueRow = data.chapters
+      .flatMap((chapter) => chapter.topics)
+      .find((topic) => topic.state === 'continue-now');
+    expect(continueRow?.topic.id).toBe(TOPIC_ACTIVE);
+    expect(data.nextUp).toEqual(
+      expect.objectContaining({
+        kind: 'resume',
+        topicId: TOPIC_ACTIVE,
+        bookId: BOOK_ID,
+        topicTitle: 'Greetings',
+      }),
+    );
+    // The stale server target must not ride along, or the hero tap would
+    // navigate to the stale session instead of the continue-now topic.
+    expect(data.nextUp.resumeTarget).toBeUndefined();
+  });
+
+  it.each(['active_session', 'paused_session'] as const)(
+    'retains a live server %s target over an older local short session [PR #2838 Codex P1]',
+    (resumeKind) => {
+      // getBookSessions() only returns completed/auto_closed sessions, so the
+      // live session's topic never appears in inProgressTopicIds — the server
+      // target must still win over the session-derived continue fallback.
+      const TOPIC_LIVE = 'bb0e8400-e29b-41d4-a716-446655440006';
+      const SESSION_LIVE = 'cc0e8400-e29b-41d4-a716-446655440007';
+      const data = buildSubjectHubData({
+        subjectId: SUBJECT_ID,
+        subjectName: 'Spanish',
+        books: [book()],
+        bookDetails: [
+          {
+            ...bookWithTopics,
+            topics: [
+              ...bookWithTopics.topics,
+              {
+                id: TOPIC_LIVE,
+                title: 'Introductions',
+                description: 'Introduce someone else.',
+                sortOrder: 3,
+                relevance: 'core',
+                estimatedMinutes: 20,
+                bookId: BOOK_ID,
+                chapter: 'Basics',
+                skipped: false,
+              },
+            ],
+          },
+        ],
+        // Older short (in-progress) local session on TOPIC_ACTIVE only.
+        sessionsByBookId: new Map([[BOOK_ID, sessions]]),
+        retentionTopics: [],
+        resumeTarget: {
+          ...resumeTarget,
+          topicId: TOPIC_LIVE,
+          topicTitle: 'Introductions',
+          sessionId: SESSION_LIVE,
+          resumeKind,
+        },
+        notes: [],
+        now: new Date('2026-06-14T00:00:00.000Z'),
+      });
+
+      expect(data.nextUp).toEqual(
+        expect.objectContaining({
+          kind: 'resume',
+          topicId: TOPIC_LIVE,
+          bookId: BOOK_ID,
+          topicTitle: 'Introductions',
+          resumeTarget: expect.objectContaining({
+            sessionId: SESSION_LIVE,
+            resumeKind,
+          }),
+        }),
+      );
+      // Hero and chapter list must still agree on the continue topic.
+      const continueRow = data.chapters
+        .flatMap((chapter) => chapter.topics)
+        .find((topic) => topic.state === 'continue-now');
+      expect(continueRow?.topic.id).toBe(TOPIC_LIVE);
+    },
+  );
+
   it('composes hub data and preserves active-session resume identity', () => {
     const data = buildSubjectHubData({
       subjectId: SUBJECT_ID,
