@@ -1,14 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-
 const originalEmailPrefix = process.env.PLAYWRIGHT_EMAIL_PREFIX;
 const originalApiUrl = process.env.PLAYWRIGHT_API_URL;
 const originalTestSeedSecret = process.env.PLAYWRIGHT_TEST_SEED_SECRET;
-const originalClerkSecret = process.env.CLERK_SECRET_KEY;
-const originalSkipLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API;
+const originalClerkSecretKey = process.env.CLERK_SECRET_KEY;
 const originalFetch = global.fetch;
-const originalCwd = process.cwd();
 
 afterEach(() => {
   if (originalEmailPrefix === undefined) {
@@ -26,17 +20,11 @@ afterEach(() => {
   } else {
     process.env.PLAYWRIGHT_TEST_SEED_SECRET = originalTestSeedSecret;
   }
-  if (originalClerkSecret === undefined) {
+  if (originalClerkSecretKey === undefined) {
     delete process.env.CLERK_SECRET_KEY;
   } else {
-    process.env.CLERK_SECRET_KEY = originalClerkSecret;
+    process.env.CLERK_SECRET_KEY = originalClerkSecretKey;
   }
-  if (originalSkipLocalApi === undefined) {
-    delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
-  } else {
-    process.env.PLAYWRIGHT_SKIP_LOCAL_API = originalSkipLocalApi;
-  }
-  process.chdir(originalCwd);
   global.fetch = originalFetch;
   jest.resetModules();
 });
@@ -48,166 +36,6 @@ function loadTestSeedHelper(): typeof import('./test-seed') {
   process.env.PLAYWRIGHT_TEST_SEED_SECRET = 'test-secret';
   return jest.requireActual('./test-seed');
 }
-
-function createLocalApiVars(clerkSecret?: string): {
-  cleanup: () => void;
-} {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'wi-2936-'));
-  const apiDir = path.join(root, 'apps', 'api');
-  mkdirSync(apiDir, { recursive: true });
-  writeFileSync(
-    path.join(apiDir, '.dev.vars'),
-    clerkSecret ? `CLERK_SECRET_KEY=${JSON.stringify(clerkSecret)}\n` : '',
-  );
-  process.chdir(root);
-  return {
-    cleanup: () => {
-      process.chdir(originalCwd);
-      rmSync(root, { recursive: true, force: true });
-    },
-  };
-}
-
-function seedResponse(email: string): Response {
-  return new Response(
-    JSON.stringify({
-      scenario: 'solo-learner',
-      accountId: 'account-id',
-      profileId: 'profile-id',
-      email,
-      password: 'seed-password',
-      ids: {},
-    }),
-    { status: 200 },
-  );
-}
-
-describe('local Playwright Clerk identity contract (WI-2936)', () => {
-  const email = 'seeded@example.com';
-
-  it('uses the local API identity to continue through seeded-email verification', async () => {
-    const localSecret = 'sk_test_local_api';
-    const local = createLocalApiVars(localSecret);
-    delete process.env.CLERK_SECRET_KEY;
-    delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(seedResponse(email))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify([
-            {
-              id: 'user-id',
-              email_addresses: [
-                { id: 'email-address-id', email_address: email },
-              ],
-            },
-          ]),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(new Response('{}', { status: 200 })) as jest.Mock;
-
-    try {
-      const { seedScenario } = loadTestSeedHelper();
-      await expect(
-        seedScenario({ scenario: 'solo-learner', email }),
-      ).resolves.toMatchObject({ email });
-      expect(global.fetch).toHaveBeenCalledTimes(3);
-      expect((global.fetch as jest.Mock).mock.calls[1]?.[1]).toMatchObject({
-        headers: { Authorization: `Bearer ${localSecret}` },
-      });
-    } finally {
-      local.cleanup();
-    }
-  });
-
-  it('fails before seeded-email lookup when runner and local API identities conflict', async () => {
-    const localSecret = 'sk_test_local_api';
-    const runnerSecret = 'sk_test_runner';
-    const local = createLocalApiVars(localSecret);
-    process.env.CLERK_SECRET_KEY = runnerSecret;
-    delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(seedResponse(email)) as jest.Mock;
-
-    try {
-      const { seedScenario } = loadTestSeedHelper();
-      let thrown: unknown;
-      try {
-        await seedScenario({ scenario: 'solo-learner', email });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(thrown).toBeInstanceOf(Error);
-      expect(String(thrown)).toMatch(
-        /does not match the local API Clerk identity/i,
-      );
-      expect(String(thrown)).not.toContain(localSecret);
-      expect(String(thrown)).not.toContain(runnerSecret);
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-    } finally {
-      local.cleanup();
-    }
-  });
-
-  it('fails before seeded-email lookup when the local API identity is missing', async () => {
-    const local = createLocalApiVars();
-    delete process.env.CLERK_SECRET_KEY;
-    delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(seedResponse(email)) as jest.Mock;
-
-    try {
-      const { seedScenario } = loadTestSeedHelper();
-      await expect(
-        seedScenario({ scenario: 'solo-learner', email }),
-      ).rejects.toThrow(/Local API CLERK_SECRET_KEY is unavailable/i);
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-    } finally {
-      local.cleanup();
-    }
-  });
-
-  it('keeps shared mode on its external identity without substituting local API identity', async () => {
-    const local = createLocalApiVars('sk_test_local_api');
-    const externalSecret = 'sk_test_external';
-    process.env.CLERK_SECRET_KEY = externalSecret;
-    process.env.PLAYWRIGHT_SKIP_LOCAL_API = '1';
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(seedResponse(email))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify([
-            {
-              id: 'user-id',
-              email_addresses: [
-                { id: 'email-address-id', email_address: email },
-              ],
-            },
-          ]),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(new Response('{}', { status: 200 })) as jest.Mock;
-
-    try {
-      const { seedScenario } = loadTestSeedHelper();
-      await expect(
-        seedScenario({ scenario: 'solo-learner', email }),
-      ).resolves.toMatchObject({ email });
-      expect((global.fetch as jest.Mock).mock.calls[1]?.[1]).toMatchObject({
-        headers: { Authorization: `Bearer ${externalSecret}` },
-      });
-    } finally {
-      local.cleanup();
-    }
-  });
-});
 
 describe('[WI-2820 P1] prefix cleanup batching', () => {
   it('repeats a full Worker batch and stops after the partial batch', async () => {
@@ -255,5 +83,34 @@ describe('[WI-2820 P1] prefix cleanup batching', () => {
       method: 'POST',
       headers: { 'X-Test-Secret': 'test-secret' },
     });
+  });
+});
+
+describe('[WI-2948] server-owned Clerk seed provisioning', () => {
+  it('does not query Clerk with an ambient backend key after the seed endpoint succeeds', async () => {
+    process.env.CLERK_SECRET_KEY = 'ambient-key-must-not-be-used';
+    const seeded = {
+      scenario: 'onboarding-complete',
+      accountId: 'account-seeded',
+      profileId: 'profile-seeded',
+      email: 'seed@example.com',
+      password: 'generated-password',
+      ids: {},
+    };
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === 'https://api.test.example/v1/__test/seed') {
+        return new Response(JSON.stringify(seeded), { status: 201 });
+      }
+      throw new Error(`Unexpected request to ${new URL(String(input)).host}`);
+    }) as jest.Mock;
+    const { seedScenario } = loadTestSeedHelper();
+
+    await expect(
+      seedScenario({
+        scenario: seeded.scenario,
+        email: seeded.email,
+      }),
+    ).resolves.toEqual(seeded);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });
