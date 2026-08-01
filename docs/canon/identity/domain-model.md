@@ -179,22 +179,44 @@ Persons (a dormant account still ages), so it indexes on `birth_date` / `last_ac
 
 ## §6 — The v1 family-join / consolidation primitive
 
-A minimal **"join my family" ships in v1**, built on a **shared invite/consolidation primitive** that
-also serves add-child-own-device and the consent-age self-takeover (`MMT-ADR-0010`).
+A minimal **"join my family" ships in v1**, built on a **shared
+invite/consolidation primitive** that also serves add-child-own-device and the
+consent-age self-takeover (`MMT-ADR-0010`).
 
-- **Provisioning = child completes their own Clerk sign-up** (existing JIT `findOrCreateAccount`), then
-  the self-provisioned Login is **attached to the family graph against the existing `person_id`** via a
-  named **`migration-pending`** interim. **Not** parent-creates-credential (no Clerk admin-write / no
-  password handoff; and only invite-flow is coherent with the self-takeover).
-- **v1 journey (consent-capable teen, parent-initiated):** parent buys Family → invites their
-  existing-account teen → teen accepts → **home-org reassignment** (add the family Membership **before**
-  decommissioning the teen's empty org-of-one; never orphan). Parent becomes **admin + Payer + an
-  *optional* Supportership the teen grants** (inv 19) — **never auto-Guardianship** (the teen
-  self-consents, inv 14). The teen's person + history are preserved (inv 20/21).
-- **v1 collapses to a single home org → sidesteps multi-org federation.**
-- **Billing → join-with-disclaimer:** a teen with an active store sub joins immediately (family quota
-  seat) and keeps paying their own store sub until they self-cancel (store-delegated billing rules out a
-  server-side refund), with an explicit double-charge warning + nudge.
-- **Scope held (deferred beyond v1):** the below-consent-age teen join (Guardianship + VPC); the
-  **child-initiated** request-to-join (v1 is parent-initiated invite). Minor-initiated **Guardianship**
-  stays banned (inv 28/30).
+- **Provisioning = learner completes their own Clerk sign-up** (existing JIT
+  `findOrCreateAccount`), then the self-provisioned Login is attached to the
+  existing `person_id` through the named `migration-pending` interim. It is not
+  a parent-created credential: no Clerk admin-write and no password handoff.
+- **Credentialed and consent-capable are independent facts.** Exact age ×
+  current residence-jurisdiction policy chooses either the learner's
+  self-consent path or the distinct authenticated-adult ceremony. Unknown or
+  contradictory policy inputs fail closed.
+- **Consent-capable path:** the adult-first invitation may proceed to
+  home-Organization reassignment. Add the family Membership before
+  decommissioning the learner's empty Organization-of-one; never orphan the
+  Person or history. Admin and Payer status confer no Guardianship. Any
+  Supportership remains an optional, separate learner grant (inv 14/19).
+- **Consent-gated 13–16 path:** hold the join until an authenticated adult Person
+  proves the claimed legal relationship/authority at the required assurance/VPC
+  level and accepts all destination-Organization purposes. One transaction
+  under the canonical charge-Person consent lock creates or confirms the global
+  guardian→charge edge and writes fresh Organization-, jurisdiction-, purpose-,
+  method-, policy-, evidence-, and time-bound grants. Existing global
+  Guardianship may be confirmed idempotently; consent never carries across
+  Organizations.
+- **No authority by invitation or email:** the learner may request or accept a
+  join but cannot nominate or mint Guardianship. An invitation, adulthood,
+  family Membership, admin, Payer, Supportership, or ordinary email consent
+  response cannot create it. Ordinary email approval and withdrawal retain
+  their narrow Organization-/purpose-scoped grant behavior, but cannot satisfy
+  or resume the family-join authority ceremony.
+- **Atomic and fail closed:** missing, stale, withdrawn, denied, expired,
+  partial, wrong-adult, moved-residence, changed-policy, replayed, or
+  cross-Organization inputs fail without creating a partial edge/grant state.
+  Guardianship never creates Supportership or visibility.
+- **v1 collapses to one home Organization** and sidesteps multi-Organization
+  federation. Billing retains join-with-disclaimer after identity and consent
+  gates pass.
+- **v1 remains adult-first:** a learner request may wait for an independently
+  authenticated adult, but child-initiated delivery is outside v1 and a minor
+  can never mint Guardianship (inv 28/30).
