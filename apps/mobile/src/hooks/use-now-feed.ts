@@ -387,6 +387,12 @@ export function useNowFeed(): NowFeedQueryResult {
     // the reactivity signal that ANY pair's store entry changed (a sibling
     // surface observing a disable), which this memo must re-run on to blank a
     // stale retained projection. See the `[WI-2627]` comment above.
+    // Tracked deferral, NOT a sanctioned suppression: WI-2984 owns retiring
+    // every react-hooks/exhaustive-deps suppression in this app, this site
+    // included. The fix is to make the dependency legible to the rule (pass the
+    // store value into the helper rather than having the helper read it), which
+    // is disproportionate inside this pair-binding fix and would touch a
+    // safety-adjacent path without its own regression coverage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fallbackEntry, policy]);
 
