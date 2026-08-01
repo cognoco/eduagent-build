@@ -35,7 +35,7 @@ indistinguishable from a legitimate retry.
 | Dimension | A — first-party encrypted receipt store | B — idempotency + pg advisory lock | **C — concurrency key, limit 1 (ratified direction — Status/§9 provenance)** |
 | --- | --- | --- | --- |
 | Mechanism | Encrypted claim row (`profileId+sessionId+answerEventId`) written before the paid call, same txn as the cooldown claim; second execution sees claim, waits/reuses. A bare claim is NOT enough: if the claimant dies after paying but before publishing the result, a taker-over cannot know whether payment happened — waiting strands the answer, lease-expiry/steal can overlap a slow zombie. Honest A needs a full lease + takeover + result-publication + zombie-fencing protocol, or provider-side idempotency keys | Keep existing `idempotency` (line 480) + `pg_advisory_xact_lock` on a hash of the same triple, held across the paid call | `concurrency: { key: 'event.data.sessionId + "-" + event.data.topicId', limit: 1 }`; scheduler serializes step execution per key |
-| Retry semantics | Closes the two-live-executions race via DB arbitration; the pay-then-die window remains unless provider idempotency is added — same repay class as C, plus protocol failure modes of its own | Closes it only if the lock holds: xact-scoped lock means a transaction open across an LLM call, and Neon pooling makes lock/connection affinity a verification burden; a mis-hashed key fails open silently | Serializes scheduler-visible overlap; second execution then hits the WI-2009 receipt check and never pays (§4); key stable across retries (§5) |
+| Retry semantics | Closes the two-live-executions race via DB arbitration; the pay-then-die window remains unless provider idempotency is added — same repay class as C, plus protocol failure modes of its own | Closes it only if the lock holds: xact-scoped lock means a transaction open across an LLM call, and Neon pooling makes lock/connection affinity a verification burden; a mis-hashed key fails open silently | Serializes scheduler-visible overlap; a second execution avoids payment only after the first successfully commits its receipt via `recordRetrievalEvent` (WI-2009 receipt check, §4); key stable across retries (§5) |
 | Retention / deletion / access | New PII table: retention cron, profile-deletion cascade, RLS scoping, DPIA treatment pre-launch | None | None |
 | PII | Transiently persists rationale/misconception in a second store (C-3 tension), encryption-at-rest required | None persisted | None — key evaluates over two opaque UUIDs already in the event (`packages/schemas/src/inngest-events.ts:427-433`) |
 | Cost | Migration + table + cron + DPIA sign-off, PLUS the lease/takeover/fencing protocol design and its tests; M-L | No migration; S, plus pooling verification and long-open txns | XS-S — one config field + one opts-assertion test; 15+ in-repo precedents (§6) |
@@ -131,14 +131,15 @@ export const reviewCalibrationGrade = inngest.createFunction(
   `reviewCalibrationFiredAt` is already set (line 2046), and stamps it before
   sending (line 2076); both callers (lines 4632, 5158) go through it. So a
   *distinct* `learnerMessageEventId` sharing this key is not produced by the
-  production dispatcher; a manually fabricated/re-fired one is suppressed by
-  idempotency within 24h, and outside 24h it runs serialized and may
-  legitimately pay as a distinct operation (distinct receipt). Under normal
-  one-event-per-session dispatch and same-receipt duplicate execution, the
-  cost of the shared queue is per-key latency only; the concurrency queue
-  itself never deduplicates — the 24h suppression of a fabricated distinct
-  receipt comes from the pre-existing `idempotency` config, unchanged by this
-  design. Changing this granularity is itself an architecture-approval
+  production dispatcher. The pre-existing `idempotency` config suppresses
+  ordinary duplicate EVENT deliveries with this key within 24h; no
+  suppression is claimed for manual function replays or fabricated re-fired
+  events — those run serialized, resolve from the committed receipt when one
+  exists (§4), and otherwise may pay within the §7 bounds (outside 24h a
+  fabricated distinct receipt is in any case a distinct paid operation).
+  Under normal one-event-per-session dispatch and same-receipt duplicate
+  execution, the cost of the shared queue is per-key latency only; the
+  concurrency queue itself never deduplicates. Changing this granularity is itself an architecture-approval
   question (§9). Both fields are required UUIDs on the event schema
   (`inngest-events.ts:427-433`).
 - **Limit/scope:** `1`, `fn` scope (Inngest default) — queue private to this
@@ -293,9 +294,10 @@ commit (WI-2009 receipt path), insert-conflict divergence (conflict reload).
   Per-key queueing delays a same-key execution only while another is
   executing — in practice duplicate executions of the same receipt, since the
   dispatcher emits one calibration event per session (§3). Within that normal
-  dispatch scope the cost is wait time, not a dropped grade; a fabricated
-  distinct receipt inside 24h is dropped by the pre-existing `idempotency`
-  config, not by this design.
+  dispatch scope the cost is wait time, not a dropped grade; ordinary
+  duplicate event deliveries with the same key inside 24h are dropped by the
+  pre-existing `idempotency` config, not by this design (no suppression
+  claim is made for manual replays or fabricated re-fires — §3).
 
 ## 9. OPEN — pending ruling (approval gate)
 
