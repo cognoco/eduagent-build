@@ -1479,7 +1479,7 @@ describe('CameraScreen', () => {
     alertSpy.mockRestore();
   });
 
-  it('[BUG-690] error-phase manual picker shows empty state with Create action when no subjects', async () => {
+  it('[BUG-690 / WI-2196] error-phase empty picker keeps inline subject creation in the homework draft', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
     // Subjects list is empty
@@ -1487,6 +1487,10 @@ describe('CameraScreen', () => {
       if (init?.method === 'POST') return mockCreateSubjectResult;
       return { subjects: [] };
     });
+    mockCreateSubjectResult = {
+      subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+      structureType: 'broad',
+    };
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
       status: 'error',
@@ -1513,7 +1517,7 @@ describe('CameraScreen', () => {
       ],
     };
 
-    const { getByTestId } = render(<CameraScreen />, {
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
       wrapper: createWrapper(),
     });
 
@@ -1526,14 +1530,724 @@ describe('CameraScreen', () => {
 
     await waitFor(() => {
       getByTestId('manual-subject-picker-empty');
+      getByTestId('manual-subject-name-input');
     });
-    // Empty state must include an actionable Create button (not a dead end).
-    getByTestId('manual-subject-picker-create');
+    expect(queryByTestId('manual-subject-picker-create')).toBeNull();
 
-    fireEvent.press(getByTestId('manual-subject-picker-create'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/create-subject');
+    fireEvent.changeText(getByTestId('manual-subject-name-input'), 'Algebra');
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: CREATED_SUBJECT_ID,
+          subjectName: 'Algebra',
+          problemText: 'some homework text',
+        }),
+      });
+    });
+    expect(mockRouter.push).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();
+  });
+
+  it('[WI-2196] fails closed on subject-list load error before typed subject resolution', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? mockCreateSubjectResult
+        : new Response(
+            JSON.stringify({ code: 'UPSTREAM', message: 'Unavailable' }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } },
+          ),
+    );
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => getByTestId('manual-input'));
+    fireEvent.changeText(getByTestId('manual-input'), 'Solve 3x + 7 = 22');
+    fireEvent.press(getByTestId('manual-continue-button'));
+
+    await waitFor(() => getByTestId('manual-subject-picker-load-error-retry'));
+    expect(queryByTestId('manual-subject-name-input')).toBeNull();
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('[WI-2196] creates the correct subject from the OCR manual fallback when an unrelated subject exists', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+    });
+    mockCreateSubjectResult = {
+      subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+      structureType: 'broad',
+    };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      getByTestId('manual-input');
+    });
+    fireEvent.changeText(getByTestId('manual-input'), 'Solve 3x + 7 = 22');
+    fireEvent.press(getByTestId('manual-continue-button'));
+
+    await waitFor(() => {
+      getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`);
+      getByTestId('manual-subject-name-input');
+    });
+
+    fireEvent.changeText(getByTestId('manual-subject-name-input'), 'Algebra');
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => {
+      const createCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      );
+      expect(createCalls).toHaveLength(1);
+      expect(
+        extractJsonBody<{ name: string; rawInput: string }>(
+          createCalls[0]?.init,
+        ),
+      ).toEqual({ name: 'Algebra', rawInput: 'Algebra' });
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: expect.objectContaining({
+        subjectId: CREATED_SUBJECT_ID,
+        subjectName: 'Algebra',
+        problemText: 'Solve 3x + 7 = 22',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      }),
+    });
+  });
+
+  it('[WI-2196] preserves gallery image metadata when fallback subject creation resolves the draft', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+    });
+    mockCreateSubjectResult = {
+      subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+      structureType: 'broad',
+    };
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///gallery/algebra.png',
+          mimeType: 'image/png',
+        },
+      ],
+    });
+
+    const rendered = render(<CameraScreen />, { wrapper: createWrapper() });
+    fireEvent.press(rendered.getByTestId('gallery-button'));
+    await waitFor(() => rendered.getByTestId('photo-preview'));
+    await act(async () => {
+      fireEvent.press(rendered.getByTestId('camera-use-this-button'));
+    });
+
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    rendered.rerender(<CameraScreen />);
+    await waitFor(() => rendered.getByTestId('manual-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-input'),
+      'Solve 3x + 7 = 22',
+    );
+    fireEvent.press(rendered.getByTestId('manual-continue-button'));
+    await waitFor(() => rendered.getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-subject-name-input'),
+      'Algebra',
+    );
+    fireEvent.press(rendered.getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: CREATED_SUBJECT_ID,
+          subjectName: 'Algebra',
+          problemText: 'Solve 3x + 7 = 22',
+          imageUri: 'file:///gallery/algebra.png',
+          imageMimeType: 'image/png',
+          captureSource: 'gallery',
+          entrySource: 'mentor',
+          returnTo: 'mentor',
+        }),
+      });
+    });
+  });
+
+  it('[WI-2196] reuses an existing exact-name subject without creating a duplicate', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => getByTestId('manual-input'));
+    fireEvent.changeText(getByTestId('manual-input'), 'Factor x² - 9');
+    fireEvent.press(getByTestId('manual-continue-button'));
+    await waitFor(() => getByTestId('manual-subject-name-input'));
+
+    fireEvent.changeText(
+      getByTestId('manual-subject-name-input'),
+      '  mathematics  ',
+    );
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: MATH_SUBJECT_ID,
+          subjectName: 'Mathematics',
+          problemText: 'Factor x² - 9',
+        }),
+      });
+    });
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('[WI-2196] preserves the draft and permits retry after subject creation fails', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    let shouldFail = true;
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') return { subjects: defaultSubjects };
+      if (shouldFail) {
+        return new Response(
+          JSON.stringify({ code: 'UPSTREAM', message: 'Please try again' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return {
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+        structureType: 'broad',
+      };
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => getByTestId('manual-input'));
+    fireEvent.changeText(getByTestId('manual-input'), 'Solve 3x + 7 = 22');
+    fireEvent.press(getByTestId('manual-continue-button'));
+    await waitFor(() => getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(getByTestId('manual-subject-name-input'), 'Algebra');
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+    expect(getByTestId('manual-input').props.value).toBe('Solve 3x + 7 = 22');
+    expect(getByTestId('manual-subject-name-input').props.value).toBe(
+      'Algebra',
+    );
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    shouldFail = false;
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledTimes(1));
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(2);
+
+    alertSpy.mockRestore();
+  });
+
+  it('[WI-2196] preserves fallback provenance and existing choices when the subject limit rejects creation', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? new Response(
+            JSON.stringify({
+              code: 'SUBJECT_LIMIT_EXCEEDED',
+              message: 'You can have up to 25 subjects',
+            }),
+            {
+              status: 409,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
+        : { subjects: defaultSubjects },
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: 'server',
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const rendered = render(<CameraScreen />, { wrapper: createWrapper() });
+    await waitFor(() => rendered.getByTestId('manual-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-input'),
+      'Solve 3x + 7 = 22',
+    );
+    fireEvent.press(rendered.getByTestId('manual-continue-button'));
+    await waitFor(() => rendered.getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-subject-name-input'),
+      'Algebra',
+    );
+    fireEvent.press(rendered.getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+    expect(rendered.getByTestId('manual-input').props.value).toBe(
+      'Solve 3x + 7 = 22',
+    );
+    expect(rendered.getByTestId('manual-subject-name-input').props.value).toBe(
+      'Algebra',
+    );
+    expect(
+      rendered.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`).props
+        .accessibilityState,
+    ).toEqual({ disabled: false });
+
+    fireEvent.press(
+      rendered.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`),
+    );
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledTimes(1));
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: expect.objectContaining({
+        subjectId: MATH_SUBJECT_ID,
+        problemText: 'Solve 3x + 7 = 22',
+      }),
+    });
+    alertSpy.mockRestore();
+  });
+
+  it('[WI-2196] ignores a double tap while subject creation is in flight', async () => {
+    let finishCreate:
+      | ((value: {
+          subject: ReturnType<typeof makeSubject>;
+          structureType: 'broad';
+        }) => void)
+      | undefined;
+    const pendingCreate = new Promise<{
+      subject: ReturnType<typeof makeSubject>;
+      structureType: 'broad';
+    }>((resolve) => {
+      finishCreate = resolve;
+    });
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? pendingCreate : { subjects: defaultSubjects },
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => getByTestId('manual-input'));
+    fireEvent.changeText(getByTestId('manual-input'), 'Solve 3x + 7 = 22');
+    fireEvent.press(getByTestId('manual-continue-button'));
+    await waitFor(() => getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(getByTestId('manual-subject-name-input'), 'Algebra');
+
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(mockFetch, 'subjects').filter(
+          (call) =>
+            call.init?.method === 'POST' && !call.url.includes('classify'),
+        ),
+      ).toHaveLength(1);
+    });
+
+    await act(async () => {
+      finishCreate?.({
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+        structureType: 'broad',
+      });
+    });
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledTimes(1));
+  });
+
+  it('[WI-2196] freezes the fallback draft and unrelated rows while subject creation is in flight', async () => {
+    let finishCreate:
+      | ((value: {
+          subject: ReturnType<typeof makeSubject>;
+          structureType: 'broad';
+        }) => void)
+      | undefined;
+    const pendingCreate = new Promise<{
+      subject: ReturnType<typeof makeSubject>;
+      structureType: 'broad';
+    }>((resolve) => {
+      finishCreate = resolve;
+    });
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? pendingCreate : { subjects: defaultSubjects },
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const rendered = render(<CameraScreen />, { wrapper: createWrapper() });
+    await waitFor(() => rendered.getByTestId('manual-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-input'),
+      'Solve 3x + 7 = 22',
+    );
+    fireEvent.press(rendered.getByTestId('manual-continue-button'));
+    await waitFor(() => rendered.getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-subject-name-input'),
+      'Algebra',
+    );
+    fireEvent.press(rendered.getByTestId('manual-subject-continue-button'));
+
+    await waitFor(() => {
+      expect(rendered.getByTestId('manual-input').props.editable).toBe(false);
+      expect(
+        rendered.getByTestId('manual-subject-name-input').props.editable,
+      ).toBe(false);
+      expect(
+        rendered.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`).props
+          .accessibilityState,
+      ).toEqual({ disabled: true });
+    });
+    fireEvent.press(
+      rendered.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`),
+    );
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finishCreate?.({
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+        structureType: 'broad',
+      });
+    });
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledTimes(1));
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: expect.objectContaining({
+        subjectId: CREATED_SUBJECT_ID,
+        subjectName: 'Algebra',
+      }),
+    });
+  });
+
+  it('[WI-2196] keeps typed subject creation reachable inside a scrollable fallback with many subjects', async () => {
+    const manySubjects = Array.from({ length: 25 }, (_, index) =>
+      makeSubject(
+        `00000000-0000-7000-a000-${String(index + 400).padStart(12, '0')}`,
+        `Subject ${index + 1}`,
+      ),
+    );
+    mockFetch.setRoute('subjects', () => ({ subjects: manySubjects }));
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const rendered = render(<CameraScreen />, { wrapper: createWrapper() });
+    await waitFor(() => rendered.getByTestId('manual-input'));
+    fireEvent.changeText(rendered.getByTestId('manual-input'), 'Factor x² - 9');
+    fireEvent.press(rendered.getByTestId('manual-continue-button'));
+
+    await waitFor(() => {
+      rendered.getByTestId('manual-fallback-scroll');
+      rendered.getByTestId('manual-subject-name-input');
+      rendered.getByTestId(
+        'manual-subject-pick-00000000-0000-7000-a000-000000000424',
+      );
+    });
+  });
+
+  it('[WI-2196] ignores subject creation that resolves after the camera screen unmounts', async () => {
+    let finishCreate:
+      | ((value: {
+          subject: ReturnType<typeof makeSubject>;
+          structureType: 'broad';
+        }) => void)
+      | undefined;
+    const pendingCreate = new Promise<{
+      subject: ReturnType<typeof makeSubject>;
+      structureType: 'broad';
+    }>((resolve) => {
+      finishCreate = resolve;
+    });
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? pendingCreate : { subjects: defaultSubjects },
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const rendered = render(<CameraScreen />, { wrapper: createWrapper() });
+    await waitFor(() => rendered.getByTestId('manual-input'));
+    fireEvent.changeText(rendered.getByTestId('manual-input'), 'Factor x² - 9');
+    fireEvent.press(rendered.getByTestId('manual-continue-button'));
+    await waitFor(() => rendered.getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-subject-name-input'),
+      'Algebra',
+    );
+    fireEvent.press(rendered.getByTestId('manual-subject-continue-button'));
+    await waitFor(() =>
+      expect(
+        fetchCallsMatching(mockFetch, 'subjects').filter(
+          (call) => call.init?.method === 'POST',
+        ),
+      ).toHaveLength(1),
+    );
+    rendered.unmount();
+
+    await act(async () => {
+      finishCreate?.({
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+        structureType: 'broad',
+      });
+    });
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2196] suppresses a stale creation alert when close wins during reconciliation', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    let rejectCreate: ((error: Error) => void) | undefined;
+    let finishRefetch:
+      | ((value: { subjects: ReturnType<typeof makeSubject>[] }) => void)
+      | undefined;
+    const pendingCreate = new Promise<never>((_resolve, reject) => {
+      rejectCreate = reject;
+    });
+    const pendingRefetch = new Promise<{
+      subjects: ReturnType<typeof makeSubject>[];
+    }>((resolve) => {
+      finishRefetch = resolve;
+    });
+    let getCount = 0;
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return pendingCreate;
+      getCount += 1;
+      return getCount === 1 ? { subjects: defaultSubjects } : pendingRefetch;
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ returnTo: 'mentor' });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const rendered = render(<CameraScreen />, { wrapper: createWrapper() });
+    await waitFor(() => rendered.getByTestId('manual-input'));
+    fireEvent.changeText(rendered.getByTestId('manual-input'), 'Factor x² - 9');
+    fireEvent.press(rendered.getByTestId('manual-continue-button'));
+    await waitFor(() => rendered.getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(
+      rendered.getByTestId('manual-subject-name-input'),
+      'Algebra',
+    );
+    fireEvent.press(rendered.getByTestId('manual-subject-continue-button'));
+    await act(async () => {
+      rejectCreate?.(new Error('create failed'));
+    });
+    await waitFor(() => expect(getCount).toBe(2));
+    expect(
+      rendered.getByTestId('manual-subject-continue-button').props
+        .accessibilityState,
+    ).toEqual({ disabled: true });
+
+    fireEvent.press(rendered.getByTestId('close-button'));
+    await act(async () => {
+      finishRefetch?.({ subjects: defaultSubjects });
+    });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
+    alertSpy.mockRestore();
+  });
+
+  it('[WI-2196] does not revive a closed fallback draft when subject creation resolves late', async () => {
+    let finishCreate:
+      | ((value: {
+          subject: ReturnType<typeof makeSubject>;
+          structureType: 'broad';
+        }) => void)
+      | undefined;
+    const pendingCreate = new Promise<{
+      subject: ReturnType<typeof makeSubject>;
+      structureType: 'broad';
+    }>((resolve) => {
+      finishCreate = resolve;
+    });
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? pendingCreate : { subjects: defaultSubjects },
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ returnTo: 'mentor' });
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 1,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => getByTestId('manual-input'));
+    fireEvent.changeText(getByTestId('manual-input'), 'Solve 3x + 7 = 22');
+    fireEvent.press(getByTestId('manual-continue-button'));
+    await waitFor(() => getByTestId('manual-subject-name-input'));
+    fireEvent.changeText(getByTestId('manual-subject-name-input'), 'Algebra');
+    fireEvent.press(getByTestId('manual-subject-continue-button'));
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(mockFetch, 'subjects').filter(
+          (call) =>
+            call.init?.method === 'POST' && !call.url.includes('classify'),
+        ),
+      ).toHaveLength(1);
+    });
+    fireEvent.press(getByTestId('close-button'));
+
+    await act(async () => {
+      finishCreate?.({
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Algebra'),
+        structureType: 'broad',
+      });
+    });
+    expect(mockRouter.replace).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
   });
 
   // [BUG-802] When auto-classification of the subject fails, the user must
@@ -1881,7 +2595,7 @@ describe('CameraScreen', () => {
       );
     });
 
-    it('ambiguous candidates open the picker with classifier candidates, enrolled subjects, create, and a manual-entry input', async () => {
+    it('ambiguous candidates open the picker with classifier candidates, enrolled subjects, and inline manual entry', async () => {
       (useLocalSearchParams as jest.Mock).mockReturnValue({});
       mockClassifyResult = {
         needsConfirmation: true,
@@ -1900,7 +2614,7 @@ describe('CameraScreen', () => {
       };
       withOcrDone('A ball rolls down a frictionless ramp');
 
-      const { getByTestId } = render(<CameraScreen />, {
+      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
         wrapper: createWrapper(),
       });
 
@@ -1912,8 +2626,9 @@ describe('CameraScreen', () => {
       getByTestId(`subject-pick-${PHYSICS_SUBJECT_ID}`);
       // Enrolled non-candidate subject (Science) is offered too.
       getByTestId(`subject-pick-${SCIENCE_SUBJECT_ID}`);
-      // Create + manual-entry escape hatches present.
-      getByTestId('camera-create-subject');
+      // Inline manual entry is the only new-subject escape hatch; leaving the
+      // draft for the generic create-subject route would lose its provenance.
+      expect(queryByTestId('camera-create-subject')).toBeNull();
       getByTestId('camera-subject-input');
     });
 
@@ -1948,19 +2663,19 @@ describe('CameraScreen', () => {
       (useLocalSearchParams as jest.Mock).mockReturnValue({});
       // Success, no confirmation, no candidates, no suggestion → the classify
       // effect's final branch routes the learner to the picker so they always
-      // have an actionable next step (create / type / pick enrolled).
+      // have an actionable next step (type / pick enrolled).
       mockClassifyResult = { needsConfirmation: false, candidates: [] };
       withOcrDone('Ambiguous worksheet text');
 
-      const { getByTestId } = render(<CameraScreen />, {
+      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
         wrapper: createWrapper(),
       });
 
       await waitFor(() => {
         getByTestId('subject-picker');
       });
-      // Picker stays actionable: create + manual entry are always present.
-      getByTestId('camera-create-subject');
+      // Picker stays actionable without leaving the draft.
+      expect(queryByTestId('camera-create-subject')).toBeNull();
       getByTestId('camera-subject-input');
     });
   });

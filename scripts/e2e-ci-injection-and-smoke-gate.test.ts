@@ -8916,7 +8916,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     });
   });
 
-  it('[WI-2236] hard-gates the exact guaranteed properties of the manual homework case', () => {
+  it('[WI-2196][WI-2236] hard-gates the exact guaranteed properties of the correct-subject manual homework case', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml'),
       'utf8',
@@ -8978,9 +8978,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             text: 'Solve 3x + 7 = 22',
           }),
       );
-      const subjectReadiness = items.findIndex(
+      const exactTypedSubject = items.findIndex(
         (command, index) =>
           index > exactTypedProblem &&
+          command.optional !== true &&
+          command.inputText === 'Algebra',
+      );
+      const subjectReadiness = items.findIndex(
+        (command, index) =>
+          index > exactTypedSubject &&
           command.optional !== true &&
           command.extendedWaitUntil?.timeout === 60_000 &&
           exactSelector(command.extendedWaitUntil.visible, {
@@ -8988,7 +8994,22 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           }),
       );
 
-      return exactTypedProblem >= 0 && subjectReadiness > exactTypedProblem;
+      const correctSubject = items.findIndex(
+        (command, index) =>
+          index > subjectReadiness &&
+          command.optional !== true &&
+          exactSelector(command.assertVisible, {
+            id: 'homework-subject-resolution-name',
+            text: 'Algebra',
+          }),
+      );
+
+      return (
+        exactTypedProblem >= 0 &&
+        exactTypedSubject > exactTypedProblem &&
+        subjectReadiness > exactTypedSubject &&
+        correctSubject > subjectReadiness
+      );
     };
     const containsOptionalTrue = (value: unknown): boolean => {
       if (Array.isArray(value)) return value.some(containsOptionalTrue);
@@ -9118,11 +9139,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const criticalTapIds = new Set([
         'mentor-bar-homework-chip',
         'manual-entry-cancel',
+        'homework-change-subject',
+        'homework-subject-name-input',
+        'homework-subject-resolve-button',
         'confirm-button',
         'homework-help-me-solve',
       ]);
       const criticalWaitIds = new Set([
         'homework-entry-mode-manual',
+        'homework-subject-name-input',
         'homework-subject-resolution-ready',
         'session-screen',
       ]);
@@ -9188,8 +9213,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const exactProblemInputs = matchingIndices(
         (command) => command.inputText === 'Solve 3x + 7 = 22',
       );
+      const changeSubjectTaps = tapTargets('homework-change-subject');
+      const subjectInputWaits = waitTargets('homework-subject-name-input');
+      const subjectInputTaps = tapTargets('homework-subject-name-input');
+      const exactSubjectInputs = matchingIndices(
+        (command) => command.inputText === 'Algebra',
+      );
+      const resolveSubjectTaps = tapTargets('homework-subject-resolve-button');
       const subjectReadinessWaits = waitTargets(
         'homework-subject-resolution-ready',
+      );
+      const scienceResolutions = matchingIndices((command) =>
+        exactSelector(command.assertVisible, {
+          id: 'homework-subject-resolution-name',
+          text: 'Science',
+        }),
+      );
+      const algebraResolutions = matchingIndices((command) =>
+        exactSelector(command.assertVisible, {
+          id: 'homework-subject-resolution-name',
+          text: 'Algebra',
+        }),
       );
       const confirms = tapTargets('confirm-button');
       const sessionArrivals = waitTargets('session-screen');
@@ -9203,7 +9247,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         manualMarkers.length !== 2 ||
         cancels.length !== 1 ||
         exactProblemInputs.length !== 1 ||
-        subjectReadinessWaits.length !== 1 ||
+        changeSubjectTaps.length !== 1 ||
+        subjectInputWaits.length !== 1 ||
+        subjectInputTaps.length !== 1 ||
+        exactSubjectInputs.length !== 1 ||
+        resolveSubjectTaps.length !== 1 ||
+        subjectReadinessWaits.length !== 2 ||
+        scienceResolutions.length !== 1 ||
+        algebraResolutions.length !== 1 ||
         confirms.length !== 1 ||
         sessionArrivals.length !== 1 ||
         enabledHelpActions.length !== 1 ||
@@ -9239,6 +9290,19 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ) ||
         !cancels.every((index) => exactTapAt(index, 'manual-entry-cancel')) ||
         !exactProblemInputs.every((index) => items[index]!.optional !== true) ||
+        !changeSubjectTaps.every((index) =>
+          exactTapAt(index, 'homework-change-subject'),
+        ) ||
+        !subjectInputWaits.every((index) =>
+          hardWaitAt(index, 'homework-subject-name-input', 15_000),
+        ) ||
+        !subjectInputTaps.every((index) =>
+          exactTapAt(index, 'homework-subject-name-input'),
+        ) ||
+        !exactSubjectInputs.every((index) => items[index]!.optional !== true) ||
+        !resolveSubjectTaps.every((index) =>
+          exactTapAt(index, 'homework-subject-resolve-button'),
+        ) ||
         !subjectReadinessWaits.every((index) =>
           hardWaitAt(index, 'homework-subject-resolution-ready', 60_000),
         ) ||
@@ -9275,7 +9339,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const [firstManualMarker, secondManualMarker] = manualMarkers;
       const cancel = cancels[0]!;
       const exactProblemInput = exactProblemInputs[0]!;
-      const subjectReadiness = subjectReadinessWaits[0]!;
+      const initialSubjectReadiness = subjectReadinessWaits[0]!;
+      const scienceResolution = scienceResolutions[0]!;
+      const changeSubject = changeSubjectTaps[0]!;
+      const subjectInputWait = subjectInputWaits[0]!;
+      const subjectInputTap = subjectInputTaps[0]!;
+      const exactSubjectInput = exactSubjectInputs[0]!;
+      const resolveSubject = resolveSubjectTaps[0]!;
+      const subjectReadiness = subjectReadinessWaits[1]!;
+      const algebraResolution = algebraResolutions[0]!;
       const confirm = confirms[0]!;
       const sessionArrival = sessionArrivals[0]!;
       const enabledHelpAction = enabledHelpActions[0]!;
@@ -9308,8 +9380,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         secondHomeworkLaunch > cancel &&
         secondManualMarker > secondHomeworkLaunch &&
         exactProblemInput > secondManualMarker &&
-        subjectReadiness > exactProblemInput &&
-        confirm > subjectReadiness &&
+        initialSubjectReadiness > exactProblemInput &&
+        scienceResolution > initialSubjectReadiness &&
+        changeSubject > scienceResolution &&
+        subjectInputWait > changeSubject &&
+        subjectInputTap > subjectInputWait &&
+        exactSubjectInput > subjectInputTap &&
+        resolveSubject > exactSubjectInput &&
+        subjectReadiness > resolveSubject &&
+        algebraResolution > subjectReadiness &&
+        confirm > algebraResolution &&
         sessionArrival > confirm &&
         enabledHelpAction > sessionArrival &&
         subjectResolutionAbsent > enabledHelpAction &&
