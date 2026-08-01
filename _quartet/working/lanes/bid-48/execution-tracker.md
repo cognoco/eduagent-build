@@ -56,9 +56,31 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 19:36 CEST
+## Live reconciliation — 2026-08-01 22:30 CEST
 
 ### Latest authoritative boundary
+
+- PgM accepted the landed WI-2958 falsifier, ruled Superseded by WI-2939, released the
+  expired claim under the wedge-repair precedent, applied pinned triage close, and
+  recorded the Brief disposition addendum. Direct live state is Closed/Superseded;
+  no Shepherd mutation or follow-up remains.
+- WI-2790 is independently Closed/Done at `70411272`. Adversarial review passed fresh
+  2-suite/20-test QA, exact 15 GREEN → 15 matching RED → 15 restored GREEN, strict CI,
+  runtime evidence, and producer/reviewer separation. QA comment
+  `3af8bce9-1f7c-8168-a92c-001dcce4f867`; close comment
+  `3af8bce9-1f7c-8120-a700-001d7b69243b`.
+- Live batch slice is 34 Closed, 3 Executing, and 5 Ready across 42 authoritative
+  members. PgM routed WI-2643, WI-2922, and WI-2826 to the operator with a recommendation
+  to approve; no shared-development or hosted gate is exercised before explicit grant.
+- The PgM-directed combined request for WI-2826, WI-2798, WI-2800-after-WI-2826, and
+  WI-2805 is prepared at `_state/hosted-diagnostics-authorization-package.md`. It asks
+  for one immutable revision, one operator-named target, one invocation per scenario,
+  allowlisted evidence, existing fixture lifecycle only, and no config/schema/role/
+  deployment mutation. WI-2923 and WI-2795 remain separate requests.
+- Same-owner claims for WI-2643, WI-2826, and WI-2922 were renewed through 23:29 CEST.
+  PgM routed external WI-2788 back to BID-33 via the operator; BID-48 only monitors.
+
+### Previous authoritative boundary — 2026-08-01 19:36 CEST
 
 - PgM's 2026-08-01 live Brief reconciliation formally admits WI-2958 as member 42;
   Brief and relation now agree. The prior mismatch/exclusion premise is withdrawn.

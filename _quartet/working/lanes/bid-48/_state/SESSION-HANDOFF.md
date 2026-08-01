@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 19:36 CEST
+Last reconciled: 2026-08-01 22:30 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,11 +19,37 @@ Last reconciled: 2026-08-01 19:36 CEST
   Cosmo Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 remains
   Backlog/Active in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains
   Closed / Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live authoritative slice at checkpoint: 32 Closed, 5 Executing, 5 Ready (42 members).
+- Live authoritative slice at checkpoint: 34 Closed, 3 Executing, 5 Ready (42 members).
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 19:36 CEST
+### Latest authoritative boundary — 2026-08-01 22:30 CEST
+
+- PgM verified the WI-2958 falsifier at landed `15bbb36f`, ruled the item Superseded
+  by WI-2939, released its expired claim under the wedge-repair precedent, applied
+  pinned triage close, and amended the Brief disposition. Direct live read confirms
+  WI-2958 Closed/Superseded with claim cleared; no BID-48 action remains.
+- WI-2790 completed sanctioned execution at landed `70411272`. Distinct reviewer
+  `codex:wi2790-independent-adversarial` independently verified mechanical DoD, fresh
+  2-suite/20-test focused QA, exact 15 GREEN → 15 matching RED → 15 restored GREEN,
+  strict-green CI, and WI-2939's runtime proof. It is live Closed/Done; QA comment
+  `3af8bce9-1f7c-8168-a92c-001dcce4f867`, close comment
+  `3af8bce9-1f7c-8120-a700-001d7b69243b`.
+- PgM routed WI-2643, WI-2922, and WI-2826 to the operator with a recommendation to
+  approve. BID-48 may execute the exact shared-development operations for WI-2643 and
+  WI-2922 only after explicit grants. WI-2826 additionally requires the operator to
+  name the hosted target. No gated mutation occurred.
+- PgM directed one bounded hosted read-only diagnostics authorization package for
+  WI-2826, WI-2798, WI-2800-after-WI-2826, and WI-2805, with one named target and
+  shared boundaries. The prepared request is
+  `_state/hosted-diagnostics-authorization-package.md`. WI-2923's config mutation and
+  WI-2795's Workers Logs/staging authority remain separate item-specific requests.
+- Same-owner renewal restored future claims for WI-2643, WI-2826, and WI-2922 through
+  23:29 CEST without changing ownership or exercising their operator gates.
+- PgM routed external WI-2788 to its BID-33 lane via the operator. BID-48 monitors the
+  dependency and does not take it over.
+
+### Previous authoritative boundary — 2026-08-01 19:36 CEST
 
 - PgM's live Brief amendment reconciles WI-2958 as authoritative member 42; relation
   and Brief now agree. The Shepherd withdrew the prior mismatch/exclusion premise and
