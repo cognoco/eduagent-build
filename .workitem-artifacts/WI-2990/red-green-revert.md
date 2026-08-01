@@ -25,10 +25,10 @@ evidence below.
 
 | File | Production baseline SHA-256 | Test-first / candidate SHA-256 |
 | --- | --- | --- |
-| `apps/api/src/routes/assessments.ts` | `f7322a384f6453cda60acf6e157d94cfb88c80e668207b33ccc8d1dbbc316455` | `28ba500a8134b52332c4ac8c43103254d6c46bdf8f7782bf640c771687ba9743` |
-| `apps/api/src/routes/assessments.test.ts` | `2444694e5b0992a57245152f169550144308504590a63c3d1b710e2f6c1230f6` | `8d65bee9e85274fa33dbf46c476eaf204d03ab4776638950dbc5c7384ed24241` |
-| `apps/api/src/middleware/metering.coverage.manifest.ts` | `cc7d957fe0edb38f568d05ed9fae4a6dce6da21ac2c66b8cb257fc7443c6799` | `0ead26177ee8a12c7896c35389fdacbd8ff1ce05577813f0ad922ea70973d4cc` |
-| `apps/api/src/middleware/metering.coverage.guard.test.ts` | `c4d736a50526de166752617772495175396a8617ac9a56d23d41db475f6f840` | `bbae1a438496788bfb0c8991bf34e13de7e64022aaf55d7ac6c743215d4342d5` |
+| `apps/api/src/routes/assessments.ts` | `f7322a384f46187b05f1121c0c140276dc3a08a7b95d40242ca5b0389c316455` | `28ba500a8134b52332c4ac8c43103254d6c46bdf8f7782bf640c771687ba9743` |
+| `apps/api/src/routes/assessments.test.ts` | `2444694e5b4cff55e596782cd436b15d1f79392759386b7414a264ec6c1230f6` | `8d65bee9e85274fa33dbf46c476eaf204d03ab4776638950dbc5c7384ed24241` |
+| `apps/api/src/middleware/metering.coverage.manifest.ts` | `cc7d957fe020065ef47bef916d1cbe595d75aa05b7a9e4b81de00e11203c6799` | `0ead26177ee8a12c7896c35389fdacbd8ff1ce05577813f0ad922ea70973d4cc` |
+| `apps/api/src/middleware/metering.coverage.guard.test.ts` | `c4d736a505bc145fb1eda7301c3b48c297c8917d6807eff19702448a4556f840` | `699fcdc73a2c721dcae357a100dd372a04891ded2d4a6a5e4d096eb8359a02f8` |
 
 The test-first phase changed only the route tests and structural guard. The
 candidate production patch changed only the route and manifest. The final
@@ -103,3 +103,22 @@ interface was removed from the structural test only. Its final SHA-256 became
 the production files and route-test hashes remained unchanged. The exact
 focused command then exited `0` with 2 / 2 suites and 61 / 61 cases successful
 in `0.872 s`.
+
+## Independent evidence-integrity rerun
+
+After independent review rejected the original malformed baseline hashes, the
+complete production-revert sequence was rerun on the landed squash
+`764748015d460b08449d3b6898cd1188f8552d93` using Node `22.16.0` and the
+disposable local `tests_v2` database:
+
+1. Candidate state: all four candidate hashes in the table matched; 2 / 2
+   suites and 61 / 61 cases passed.
+2. Production-only revert: `assessments.ts` and
+   `metering.coverage.manifest.ts` were restored to their exact baseline hashes
+   in the table while the candidate tests remained. The same 5 behavioral and
+   structural cases failed, with 56 cases passing.
+3. Exact restore: both production files returned to their candidate hashes;
+   2 / 2 suites and 61 / 61 cases passed again.
+
+The four baseline hashes were also recomputed directly from Git objects at
+`021ab325bef0cb00d1d4a73da72542943090620c`; all match the corrected table.

@@ -1,0 +1,197 @@
+{
+  "mode": "verify",
+  "wi_id": "WI-2990",
+  "page_id": "3af8bce9-1f7c-81ec-855f-eca26aa171e6",
+  "stage": "Reviewing",
+  "repo": "/Users/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2990",
+  "disposition": "verified",
+  "verdicts": [
+    {
+      "claim": {
+        "kind": "commit",
+        "ref": "764748015d460b08449d3b6898cd1188f8552d93",
+        "text": "Fixed In cites commit 764748015d460b08449d3b6898cd1188f8552d93",
+        "source": "fixed_in"
+      },
+      "status": "verified",
+      "evidence": "commit 764748015d460b08449d3b6898cd1188f8552d93 exists in /Users/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2990"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Definition of done (source baseline: origin/main 08d75f4):",
+        "text": "Definition of done (source baseline: origin/main 08d75f4):",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Consent ordering and externally visible variants",
+        "text": "Consent ordering and externally visible variants",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Invalid request-schema input still returns the existing 400 before handler execution.",
+        "text": "Invalid request-schema input still returns the existing 400 before handler execution.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "A missing session, including a wrong-profile session hidden by the scoped repository, returns the existing 404 even when LLM consent is withdrawn; no LLM dispatch occurs.",
+        "text": "A missing session, including a wrong-profile session hidden by the scoped repository, returns the existing 404 even when LLM consent is withdrawn; no LLM dispatch occurs.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "An existing topic-scoped session that would reach evaluateQuickCheckAnswer returns the existing consent-denied 403 when consent is withdrawn, before any LLM dispatch.",
+        "text": "An existing topic-scoped session that would reach evaluateQuickCheckAnswer returns the existing consent-denied 403 when consent is withdrawn, before any LLM dispatch.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "An existing session without a topic uses the same consent boundary and returns 403 on withdrawal before its general quick-check dispatch.",
+        "text": "An existing session without a topic uses the same consent boundary and returns 403 on withdrawal before its general quick-check dispatch.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "With active consent, each existing-session path still dispatches exactly once and preserves the existing topic-context lookup and response semantics.",
+        "text": "With active consent, each existing-session path still dispatches exactly once and preserves the existing topic-context lookup and response semantics.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Boundary coverage",
+        "text": "Boundary coverage",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Update apps/api/src/middleware/metering.coverage.manifest.ts and apps/api/src/middleware/metering.coverage.guard.test.ts so the final quick-check consent owner and ordering are structurally represented; the guard must fail if this LLM path becomes unclassified or can dispatch without a consent boundary. Quick-check metering remains route-owned and unchanged.",
+        "text": "Update apps/api/src/middleware/metering.coverage.manifest.ts and apps/api/src/middleware/metering.coverage.guard.test.ts so the final quick-check consent owner and ordering are structurally represented; the guard must fail if this LLM path becomes unclassified or can dispatch without a consent boundary. Quick-check metering remains route-owned and unchanged.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Regression proof",
+        "text": "Regression proof",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Add focused regression cases in apps/api/src/routes/assessments.test.ts for withdrawn-consent missing-session 404, withdrawn-consent wrong-profile 404, withdrawn-consent existing topic/no-topic 403 with no dispatch, and active-consent dispatch. The regression test must fail against the production implementation with the fix reverted and pass with the fix present.",
+        "text": "Add focused regression cases in apps/api/src/routes/assessments.test.ts for withdrawn-consent missing-session 404, withdrawn-consent wrong-profile 404, withdrawn-consent existing topic/no-topic 403 with no dispatch, and active-consent dispatch. The regression test must fail against the production implementation with the fix reverted and pass with the fix present.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Execute and record the focused red -> green -> production-revert red -> exact-restore green sequence with: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/mentomate_test pnpm exec jest --config apps/api/jest.config.cjs --runInBand --silent apps/api/src/routes/assessments.test.ts apps/api/src/middleware/metering.coverage.guard.test.ts",
+        "text": "Execute and record the focused red -> green -> production-revert red -> exact-restore green sequence with: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/mentomate_test pnpm exec jest --config apps/api/jest.config.cjs --runInBand --silent apps/api/src/routes/assessments.test.ts apps/api/src/middleware/metering.coverage.guard.test.ts",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Run routed validation with: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/mentomate_test bash scripts/check-change-class.sh --run --fast",
+        "text": "Run routed validation with: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/mentomate_test bash scripts/check-change-class.sh --run --fast",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Scope and authority",
+        "text": "Scope and authority",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Expected collision set: apps/api/src/routes/assessments.ts, apps/api/src/routes/assessments.test.ts, apps/api/src/middleware/metering.coverage.manifest.ts, and apps/api/src/middleware/metering.coverage.guard.test.ts; touch assessment service/test files only if the selected boundary placement requires them.",
+        "text": "Expected collision set: apps/api/src/routes/assessments.ts, apps/api/src/routes/assessments.test.ts, apps/api/src/middleware/metering.coverage.manifest.ts, and apps/api/src/middleware/metering.coverage.guard.test.ts; touch assessment service/test files only if the selected boundary placement requires them.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Preserve scoped-repository ownership hiding, session/topic lookup semantics, response schema, prompt/model/provider routing, and metering. No schema, migration, session policy, or unrelated consent-policy change is authorized. If one becomes necessary, stop and obtain a separate ruling/item.",
+        "text": "Preserve scoped-repository ownership hiding, session/topic lookup semantics, response schema, prompt/model/provider routing, and metering. No schema, migration, session policy, or unrelated consent-policy change is authorized. If one becomes necessary, stop and obtain a separate ruling/item.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Acceptance requires an exact-head strict-green Adversarial review because this is a P1 consent/security boundary change.",
+        "text": "Acceptance requires an exact-head strict-green Adversarial review because this is a P1 consent/security boundary change.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    }
+  ],
+  "counts": {
+    "verified": 1,
+    "failed": 0,
+    "cannot_verify": 0,
+    "needs_judgment": 17
+  },
+  "comment_id": null
+}
