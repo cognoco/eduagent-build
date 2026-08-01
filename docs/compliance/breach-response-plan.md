@@ -23,12 +23,12 @@
    - **Likely consequences?** Identity exposure, safety risk to a child, financial.
 4. **Notify Datatilsynet (within 72 hours of awareness)** — GDPR Art 33 — **unless** the breach is unlikely to risk people's rights and freedoms (document that reasoning if you decide not to notify). Use Datatilsynet's online breach-notification form. If you don't have all facts in 72h, file what you have and supplement — late-but-filed beats waiting.
 5. **Notify affected families (without undue delay)** — GDPR Art 34 — **only if** the breach is **high risk** to individuals (very likely whenever children's data is exposed). Plain-language message: what happened, what data, what they should do, your contact. If notifying each family individually is disproportionate, a public notice can substitute.
-6. **Document everything (Art 33(5)).** Every breach — even ones you decide not to report — goes in the breach register: facts, effects, remedial action, and the reasoning for the notify decision. Datatilsynet can ask to see this.
+6. **Document everything (Art 33(5)).** Every breach — even ones you decide not to report — goes in the breach register ([`breach-register.md`](breach-register.md)): facts, effects, remedial action, and the reasoning for the notify decision. Datatilsynet can ask to see this.
 
 ## Extra notices that may stack on top
 
 - **US users affected** → US **state breach-notification laws** add their own notices (timing and content vary by state). Flag to counsel if any affected user is US-resident.
-- **Processor breach** → if the breach is at a vendor (Clerk, Neon, RevenueCat, an LLM provider, Sentry, Resend, Inngest, Voyage, Cloudflare), their DPA (A11) should oblige them to notify *you* without undue delay; **your** 72-hour clock to Datatilsynet starts when they make you aware. Keep their breach-contact details with their DPA.
+- **Processor breach** → if the breach is at a vendor (Clerk, Neon, RevenueCat, an LLM provider, Sentry, Resend, Inngest, Voyage, Expo push, Cloudflare), their DPA (A11) should oblige them to notify *you* without undue delay; **your** 72-hour clock to Datatilsynet starts when they make you aware. Keep their breach-contact details with their DPA.
 
 ## Pre-filled facts (so they're not looked up mid-incident)
 
@@ -36,7 +36,7 @@
 - **Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway.
 - **DPO contact:** `[dpo@… — TODO]`.
 - **Representative:** none for the ruled EEA perimeter (controller established in Norway); UK representation reopens only if the UK is later enabled.
-- **Processor breach-contacts:** maintained in each provider's DPA file (see `ropa.md` recipients column).
+- **Processor breach-contacts:** maintained in each provider's DPA file (see `ropa.md` recipients column; current processor inventory: [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md)).
 
 ---
 

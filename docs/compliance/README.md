@@ -31,6 +31,7 @@ Switzerland, and all unscreened jurisdictions remain unavailable at launch. See
 | Record | Purpose |
 |---|---|
 | [`identity-compliance-register.md`](identity-compliance-register.md) | Identity and consent compliance requirements. |
+| [`breach-register.md`](breach-register.md) | GDPR Art 33(5) breach register — empty template, one row per incident. |
 | [`audience-matrix.md`](audience-matrix.md) | Reconstructed audience and access-control inventory; verify against current code before relying on line-level claims. |
 | [`2026-07-17-consent-withdrawal-bearer-token-threat-posture.md`](2026-07-17-consent-withdrawal-bearer-token-threat-posture.md) | Consent-withdrawal token security posture. |
 | [`rls-risk-acceptance-memo.md`](rls-risk-acceptance-memo.md) | Row-level-security risk decision. |
