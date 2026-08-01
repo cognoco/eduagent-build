@@ -1,8 +1,8 @@
 # MMT-ADR-0024 — Relationship scope chip supersedes mode/proxy tab-shape navigation
 
-**Status:** Proposed · 2026-06-20 (re-affirmed Proposed 2026-06-30) · **Scope:** Mobile app shell navigation and relationship-lens data access · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Person identity model), MMT-ADR-0008 (guardianship operation is distinct from everyday visibility)
+**Status:** Proposed · **explicit non-reliance in force (recorded 2026-08-01 — see § Disposition)** · 2026-06-20 (re-affirmed Proposed 2026-06-30) · **Scope:** Mobile app shell navigation and relationship-lens data access · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Person identity model), MMT-ADR-0008 (guardianship operation is distinct from everyday visibility) · **Amended by:** MMT-ADR-0037 (Accepted — supporter IA amendments an eventual acceptance change-set must incorporate)
 
-> **A Proposed ADR promotes no rule into canon.** This decision is not in force: nothing here is binding on `architecture.md` or on implementation until an acceptance change-set lands, and that change-set must amend canon in lockstep. (A section describing this model was once added to `architecture.md` prematurely and has been removed.)
+> **A Proposed ADR promotes no rule into canon.** This decision is not in force: nothing here is binding on `architecture.md` or on implementation until an acceptance change-set lands, and that change-set must amend canon in lockstep. (A section describing this model was once added to `architecture.md` prematurely and has been removed.) The § Disposition below makes the non-force posture an explicit, durable non-reliance record: downstream rollout and deletion work must not treat any clause of this ADR as ratified authority.
 
 ## Context
 
@@ -40,3 +40,40 @@ The V2 app shell uses a **relationship scope chip** as the primary scope selecto
 
 - **Canon:** none while this ADR is Proposed. Acceptance must land the canon line in the same change-set.
 - **Related implementation surfaces:** `packages/schemas/src/scope.ts`, `apps/api/src/services/scope-resolution.ts`, `apps/mobile/src/lib/scope-context.tsx`, `apps/mobile/src/components/chrome/ScopeChip.tsx`.
+
+## Disposition — Explicit non-reliance (effective 2026-08-01)
+
+This ADR's status was formally resolved as **explicit non-reliance**: the ADR stays Proposed, and no rollout, visibility-contract, or cutover/deletion work may treat any clause of it as ratified authority. Each surface that needs scope-chip semantics takes them from the governing contract in the table below, never from this ADR.
+
+This record is bookkeeping, not a new architectural position. It makes durable a posture already ruled three times: (a) this ADR's own non-force banner; (b) the 2026-06-30 ADR governance correction ("scope-chip canon must not be treated as ratified until this ADR is accepted in a separate Architecture-signed change-set" — recorded on the visibility-contract plan during a provenance re-vet); (c) the 2026-07-15 one-way-door drain ruling that named "acceptance or non-reliance note" as the required resolution artifact before the V2 cutover work may rely on scope-chip semantics. Resolution audit performed 2026-08-01 (attribution: WI-2062).
+
+### Non-reliance table — surfaces that must not depend on this ADR, and what governs them instead
+
+The covered surfaces are the V2 visibility-contract rollout (linking ceremony, two-way transparency, shared-record reads — historically labelled S5, shipped) and the V2 cutover and legacy-shell deletion work (historically labelled S6, not cleared; plan: `docs/plans/v2-plan/2026-06-10-s6-cutover-deletions.md`). "Ratified authority" below means an Accepted ADR; "working contract" means the semantics live in a spec and/or code today and canon ratification is still owed at the eventual acceptance change-set.
+
+| Scope-chip semantic (this ADR's clause) | Must be taken from | Kind |
+|---|---|---|
+| Chip composition and supporter IA — hub conditionality, Me-scope presence, single-supportee landing (points 1–2) | MMT-ADR-0037 decisions 1–3 (which amend points 1–2 of this ADR) + shell spec §4.1–§4.2 as amended | Ratified authority (0037) over a working contract (spec) |
+| Person-scope visibility derivation and reportability walls (point 3) | MMT-ADR-0027 (supporter visibility contract), MMT-ADR-0028 (visibility tier), on the MMT-ADR-0007/0008 edge model | Ratified authority |
+| Server-side authorization before supportee reads (Consequences: "assert active supportership before the read") | MMT-ADR-0027's contract plus the read-authority guard ratchet (`apps/api/src/services/profile-read-authority.guard.test.ts`); the supportership-edge read primitive is not yet fully built — see reconciliation notes | Ratified contract; wall partially built |
+| Scope-preserving bottom tabs (point 4) | Shell spec §6.3 ("Bottom tabs are scope-preserving") | Working contract |
+| V0/V1 shells stay flag-isolated until an explicit retirement ruling (point 5) | MMT-ADR-0037 decision 5 (the testable no-regression guarantee) + the cutover plan's gate structure | Ratified authority |
+| Scope defaults are user-owned; last-active wins (point 6) | Shell spec §4.2 state 3 (EU-4) + `apps/mobile/src/lib/scope-context.tsx` | Working contract |
+| Wire/data shape of `/scopes` and the scope descriptor | `packages/schemas/src/scope.ts` + `apps/api/src/services/scope-resolution.ts` and their tests | Working contract |
+
+### Reconciliation findings (audited 2026-08-01)
+
+- All four implementation surfaces named in Links exist and are live behind the V2 flags; canon (`architecture.md`) carries no scope-chip section (verified absent 2026-08-01 — the prematurely-added one remains removed).
+- `apps/api/src/services/scope-resolution.ts` still implements this ADR's *original* chip composition (Me appears only after first real learning state; hub unconditional), while MMT-ADR-0037's accepted amendments (Me always present; hub only at zero or 2+ supportees) are not yet implemented there. The running code lagging 0037 is implementation debt under 0037 — it is not evidence for accepting this ADR as written.
+- The server-side authorization wall for supporter person-scope reads is partially built: the read-authority ratchet covers profile-scoped reads, and its own notes record supporter-scope gaps awaiting a dedicated supportership-edge read primitive. Certifying point 3's consequence as satisfied canon would overstate the current wall — a further reason acceptance is not available as bookkeeping today.
+
+### Alternatives considered (for the disposition)
+
+1. **Accept now, as amended by MMT-ADR-0037.** Rejected for now: acceptance is an Architecture-signed act with a lockstep canon change-set (MMT-ADR-0000 §II.6); the supporter-read authorization wall it would certify is not fully built; and the accepted amendments are not yet reflected in the resolver. Nothing here forecloses a later acceptance change-set — MMT-ADR-0037 already requires that change-set to incorporate its amendments.
+2. **Mark Superseded by MMT-ADR-0037.** Rejected as factually wrong: 0037 builds on this ADR, amends only chip composition/IA, reaffirms point 5, and explicitly anticipates this ADR's "eventual acceptance change-set". Points 3, 4, and 6 have no successor ADR.
+3. **Leave Proposed and say nothing.** Rejected: the cutover plan's pre-execution checklist needs a resolved status to gate deletions, and an unstated posture invites exactly the "treat Proposed as ratified" drift the one-way-door risk register flagged.
+
+### Consequences of this disposition
+
+- **The executable guard it creates** (stated in the cutover plan's pre-execution checklist): no change-set of the legacy-shell deletion work may cite MMT-ADR-0024 as governing authority. Every scope-chip-dependent deletion cites its authority from the table above; at the pre-execution checkpoint, `rg -n 'MMT-ADR-0024' <deletion change-set docs and code>` must surface only historical or non-reliance references, and any hit used as authority blocks the deletion until this ADR is Accepted in an Architecture-signed change-set.
+- A future acceptance change-set — Architecture-signed, lockstep with canon, incorporating MMT-ADR-0037's amendments — supersedes this non-reliance record. Until then, the body of this ADR above is historical context only.
