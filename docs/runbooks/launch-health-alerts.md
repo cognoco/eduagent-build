@@ -283,6 +283,17 @@ null when the failed event did not provide them. Creating or changing the
 production-console rule remains operator-owned as stated at the top of this
 runbook.
 
+The account-deletion and subscription-store failure handlers dispatch through
+awaited `step.sendEvent` calls with stable step names and deterministic event
+IDs. Inngest owns the durable step record, retry, and replay memoization. An
+immediate transport rejection therefore fails the step for retry; a timeout is
+not cancellation, and a late resolution or rejection settles the same awaited
+step rather than starting a second application-level send. The source owners
+are `apps/api/src/inngest/functions/account-deletion.ts` and
+`apps/api/src/inngest/functions/billing-subscription-store-teardown.ts`.
+WI-2994 owns this dispatch durability. WI-1916 owns only downstream chat/pager
+delivery and production-console routing.
+
 Sentry filters:
 
 ```text

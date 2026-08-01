@@ -1,7 +1,5 @@
 import * as sentry from '../../services/sentry';
-import * as safeNonCore from '../../services/safe-non-core';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
-import { inngest } from '../client';
 import { billingSubscriptionStoreTeardown } from './billing-subscription-store-teardown';
 
 const handler = (billingSubscriptionStoreTeardown as any).fn as (args: {
@@ -19,7 +17,6 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[WI-885] declares account-scoped idempotency and concurrency', () => {
@@ -53,7 +50,9 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
       .onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
+    const { step } = createInngestStepRunner();
 
     const providerOutage = new Error('RevenueCat unavailable');
     const result = await onFailure({
@@ -64,6 +63,7 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
         },
       },
       error: providerOutage,
+      step,
     });
 
     expect(result).toEqual({
@@ -83,18 +83,14 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
     );
   });
 
-  it('[BREAK WI-2346] safeSends a PII-minimized subscription teardown dead-letter event', async () => {
+  it('[BREAK WI-2994] durably sends a PII-minimized subscription teardown dead-letter event', async () => {
     jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
-    const safeSendSpy = jest
-      .spyOn(safeNonCore, 'safeSend')
-      .mockResolvedValue(undefined);
-    const inngestSendSpy = jest
-      .spyOn(inngest, 'send')
-      .mockResolvedValue({ ids: [] });
+    const { step, sendEventCalls } = createInngestStepRunner();
     const onFailure = (billingSubscriptionStoreTeardown as any).opts
       .onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
 
     const maliciousError = new Error(
@@ -110,37 +106,26 @@ describe('billingSubscriptionStoreTeardown Inngest function', () => {
         },
       },
       error: maliciousError,
+      step,
     });
 
-    expect(safeSendSpy).toHaveBeenCalledTimes(1);
-    const call = safeSendSpy.mock.calls[0];
-    expect(call).toBeDefined();
-    if (!call) return;
-    const [sendThunk, surface, context] = call;
-    expect(surface).toBe(
-      'billing-subscription-store-teardown.terminal_failure',
-    );
-    expect(context).toEqual({
-      accountId: 'org-terminal',
-      runId: 'run-store-teardown',
-    });
-
-    await expect(sendThunk()).resolves.not.toThrow();
-    expect(inngestSendSpy).toHaveBeenCalledWith({
-      name: 'app/billing.subscription_store_teardown.failed',
-      data: {
-        accountId: 'org-terminal',
-        runId: 'run-store-teardown',
-        errorName: 'Error',
-        timestamp: expect.any(String),
+    expect(sendEventCalls).toEqual([
+      {
+        name: 'dispatch-billing-subscription-store-teardown-terminal-failure',
+        payload: {
+          id: 'deletion-terminal-failure:billing-subscription-store-teardown:run-store-teardown',
+          name: 'app/billing.subscription_store_teardown.failed',
+          data: {
+            accountId: 'org-terminal',
+            runId: 'run-store-teardown',
+            errorName: 'Error',
+            timestamp: expect.any(String),
+          },
+        },
       },
-    });
-    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
-      'private context',
-    );
-    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
-      'alice@example.test',
-    );
+    ]);
+    expect(JSON.stringify(sendEventCalls)).not.toContain('private context');
+    expect(JSON.stringify(sendEventCalls)).not.toContain('alice@example.test');
   });
 
   it('[WI-885] orchestrates teardown for a valid payload (all-null providers → not_applicable, no provider calls)', async () => {

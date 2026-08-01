@@ -16,7 +16,6 @@ import {
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
-import { safeSend } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
@@ -46,9 +45,13 @@ export const scheduledDeletion = inngest.createFunction(
     onFailure: async ({
       event,
       error,
+      step,
     }: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: {
+        sendEvent: (name: string, payload: unknown) => Promise<unknown>;
+      };
     }) => {
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
@@ -89,17 +92,13 @@ export const scheduledDeletion = inngest.createFunction(
           errorName,
           timestamp: new Date().toISOString(),
         });
-      await safeSend(
-        () =>
-          inngest.send({
-            // orphan-allow: observability-only dead-letter signal consumed by
-            // launch-health alerting and the Inngest dashboard.
-            name: 'app/account.deletion_teardown.failed',
-            data: failureEvent,
-          }),
-        'account-deletion.terminal_failure',
-        { accountId, runId },
-      );
+      await step.sendEvent('dispatch-account-deletion-terminal-failure', {
+        id: `deletion-terminal-failure:scheduled-account-deletion:${runId ?? accountId ?? 'unknown'}`,
+        // orphan-allow: observability-only dead-letter signal consumed by
+        // launch-health alerting and the Inngest dashboard.
+        name: 'app/account.deletion_teardown.failed',
+        data: failureEvent,
+      });
 
       return { status: 'terminal_failure', accountId };
     },
