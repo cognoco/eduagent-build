@@ -34,8 +34,11 @@ path. Delete only the stale local credential file, then verify it is absent
 before rerunning the preflight:
 
 ```powershell
-rm apps/mobile/.eas-submit/google-play-service-account.json
-test ! -e apps/mobile/.eas-submit/google-play-service-account.json
+$credentialPath = 'apps/mobile/.eas-submit/google-play-service-account.json'
+Remove-Item -LiteralPath $credentialPath -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $credentialPath) {
+  throw "Stale Google Play credential still exists at $credentialPath"
+}
 ```
 
 Do not print, copy, or stage its contents. The legacy directory remains ignored
