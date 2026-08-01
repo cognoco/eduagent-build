@@ -56,7 +56,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 14:12 CEST
+## Live reconciliation — 2026-08-01 14:18 CEST
 
 ### Latest authoritative boundary
 
@@ -90,8 +90,10 @@ Delivery Batch as `Done`.
   The governed gate landed `8a26201b`; ordinary landed push verification is running
   with no failure observed before execute-complete.
 - WI-2922 is properly claimed/Executing in isolated worktree `WI-2922` for only its
-  repository guard and disposable-schema test frontier. Shared-development mutation
-  remains explicitly ungranted; staging and production are out of bounds.
+  repository guard and disposable-schema test frontier. Draft PR #2830 at `f8320a9d`
+  has focused 33/33 and fast change-class 4 commands/62 tests green. No database or
+  secret access occurred. Shared-development mutation remains explicitly ungranted;
+  staging and production are out of bounds. Fresh CI/review is running.
 - The four-WIP figure remains throughput guidance; blocked waits do not suppress
   otherwise safe dispatch.
 

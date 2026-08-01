@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 14:12 CEST
+Last reconciled: 2026-08-01 14:18 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -23,7 +23,7 @@ Last reconciled: 2026-08-01 14:12 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 14:12 CEST
+### Latest authoritative boundary — 2026-08-01 14:18 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -72,9 +72,11 @@ Last reconciled: 2026-08-01 14:12 CEST
   dependency/authority-bound Executing items.
 - WI-2922 was live-reconciled Ready/Active/unclaimed, then properly claimed as
   `codex:wi2922-repository-executor:WI-2922` in isolated worktree `WI-2922`. Its
-  executor is building only repository guards and disposable-schema tests. Shared
-  development, staging, and production remain untouched; AC2's explicit shared-dev
-  mutation gate is not granted.
+  repository-only frontier is published in draft PR #2830 at `f8320a9d`. Focused
+  catalog/DDL/guard coverage passes 33/33; fast change-class passes four commands
+  and 62 tests. Commit/push hooks passed and `execute pr-opened` recorded the PR.
+  Shared development, staging, production, and secrets remain untouched; AC2's
+  explicit shared-dev mutation gate is not granted. Fresh CI/review is running.
 - The operator clarified that the four-WIP figure is throughput guidance, not a
   reason to leave Ready work idle while executor capacity exists. Dependency/authority
   waits do not consume practical dispatch capacity.
