@@ -83,7 +83,8 @@ command.
 
 ```powershell
 cd apps/mobile
-eas submit -p android --profile production --id <android-build-id> --non-interactive --wait
+$androidBuildId = Read-Host 'Recorded Android build ID'
+eas submit -p android --profile production --id $androidBuildId --non-interactive --wait
 ```
 
 Confirm the submission succeeds and the build appears on Play internal testing before promoting any release.
@@ -92,7 +93,8 @@ For iOS, submit the verified production build to TestFlight:
 
 ```powershell
 cd apps/mobile
-eas submit -p ios --profile production --id <ios-build-id> --non-interactive --wait
+$iosBuildId = Read-Host 'Recorded iOS build ID'
+eas submit -p ios --profile production --id $iosBuildId --non-interactive --wait
 ```
 
 Confirm processing in App Store Connect and add only approved internal TestFlight groups.

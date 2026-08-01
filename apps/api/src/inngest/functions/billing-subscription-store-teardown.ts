@@ -13,7 +13,6 @@ import {
 } from '../helpers';
 import { teardownSubscriptionStoresForErasure } from '../../services/billing/store-teardown';
 import { createLogger } from '../../services/logger';
-import { safeSend } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
@@ -25,13 +24,7 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
     retries: 5,
     idempotency: 'event.data.accountId',
     concurrency: { key: 'event.data.accountId', limit: 1 },
-    onFailure: async ({
-      event,
-      error,
-    }: {
-      event: { data: { event?: { data?: unknown }; run_id?: string } };
-      error: unknown;
-    }) => {
+    onFailure: async ({ event, error, step }) => {
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
@@ -68,16 +61,15 @@ export const billingSubscriptionStoreTeardown = inngest.createFunction(
           errorName,
           timestamp: new Date().toISOString(),
         });
-      await safeSend(
-        () =>
-          inngest.send({
-            // orphan-allow: observability-only dead-letter signal consumed by
-            // launch-health alerting and the Inngest dashboard.
-            name: 'app/billing.subscription_store_teardown.failed',
-            data: failureEvent,
-          }),
-        'billing-subscription-store-teardown.terminal_failure',
-        { accountId, runId },
+      await step.sendEvent(
+        'dispatch-billing-subscription-store-teardown-terminal-failure',
+        {
+          id: `deletion-terminal-failure:billing-subscription-store-teardown:${runId ?? accountId ?? 'unknown'}`,
+          // orphan-allow: observability-only dead-letter signal consumed by
+          // launch-health alerting and the Inngest dashboard.
+          name: 'app/billing.subscription_store_teardown.failed',
+          data: failureEvent,
+        },
       );
 
       return { status: 'terminal_failure' as const, accountId };

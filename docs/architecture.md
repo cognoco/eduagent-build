@@ -547,7 +547,9 @@ The `(app)/` group contains all authenticated screens. View differences between 
 
 ### Mobile-API Integration Patterns
 
-**X-Profile-Id Header Convention:** All authenticated API requests include an `X-Profile-Id` header. The `useApiClient()` hook in `apps/mobile/src/lib/api-client.ts` automatically injects this from `ProfileProvider`. On the API side, routes extract it via `c.get('profileId')` set by `profileScopeMiddleware`. Falls back to `account.id` when the header is absent.
+**X-Profile-Id Header Convention:** Authenticated mobile requests normally include an `X-Profile-Id` header, which `useApiClient()` in `apps/mobile/src/lib/api-client.ts` injects from `ProfileProvider`. On the API side, `profileScopeMiddleware` validates that explicit selection before setting `c.get('profileId')`: the requested Person/profile must be operable by the authenticated caller, and a non-owned or otherwise unauthorized selection fails closed with `403`.
+
+When the header is absent, the middleware follows a different self-resolution path. It uses the server-resolved login binding (`callerPersonId`) to select the authenticated caller's own canonical Person/profile. `account.id` identifies the organization and is never used as a profile fallback. A missing or inoperable caller scope fails closed with `403`, while a transient resolution failure returns `503`; account-level routes that do not require `profileId` remain unaffected.
 
 **SSE Streaming Parser:** Learning sessions use Server-Sent Events for real-time LLM responses. The `useStreamMessage` hook in `apps/mobile/src/hooks/use-sessions.ts` manages an `AsyncGenerator` for text streaming, concatenating chunks and handling cleanup on unmount.
 

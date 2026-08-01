@@ -14,11 +14,12 @@ WHERE table_schema = 'public'
   AND (
     (table_name = 'retention_cards' AND column_name = 'last_recall_feedback')
     OR (table_name = 'subscription' AND column_name = 'past_due_at')
+    OR (table_name = 'session_summaries' AND column_name = 'language_learning_summary')
   )
 ORDER BY table_name, column_name
 `;
 
-const REQUIRED_COLUMNS = [
+export const REQUIRED_DEVELOPMENT_COLUMNS = [
   {
     qualifiedName: 'retention_cards.last_recall_feedback',
     dataType: 'jsonb',
@@ -29,7 +30,54 @@ const REQUIRED_COLUMNS = [
     dataType: 'timestamp with time zone',
     isNullable: 'YES',
   },
+  {
+    qualifiedName: 'session_summaries.language_learning_summary',
+    dataType: 'jsonb',
+    isNullable: 'YES',
+  },
 ];
+
+function normalizedHostname(value) {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return value.trim().toLowerCase().replace(/:\d+$/, '');
+  }
+}
+
+export function isExactDevelopmentTarget({
+  databaseUrl,
+  dopplerProject,
+  dopplerConfig,
+  dopplerEnvironment,
+  developmentHost,
+  stagingHost,
+  productionHost,
+}) {
+  if (
+    dopplerProject !== 'mentomate' ||
+    dopplerConfig !== 'dev' ||
+    dopplerEnvironment !== 'dev'
+  ) {
+    return false;
+  }
+
+  let host;
+  try {
+    host = new URL(databaseUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  const expected = normalizedHostname(developmentHost);
+  if (!expected || host !== expected) return false;
+
+  const protectedHosts = [stagingHost, productionHost]
+    .map(normalizedHostname)
+    .filter(Boolean);
+  return !protectedHosts.includes(host);
+}
 
 function columnsByQualifiedName(rows) {
   return new Map(
@@ -39,14 +87,14 @@ function columnsByQualifiedName(rows) {
 
 export function missingDevelopmentColumns(rows) {
   const found = columnsByQualifiedName(rows);
-  return REQUIRED_COLUMNS.filter(
+  return REQUIRED_DEVELOPMENT_COLUMNS.filter(
     ({ qualifiedName }) => !found.has(qualifiedName),
   ).map(({ qualifiedName }) => qualifiedName);
 }
 
 export function incompatibleDevelopmentColumns(rows) {
   const found = columnsByQualifiedName(rows);
-  return REQUIRED_COLUMNS.flatMap((expected) => {
+  return REQUIRED_DEVELOPMENT_COLUMNS.flatMap((expected) => {
     const actual = found.get(expected.qualifiedName);
     if (!actual) return [];
 
@@ -67,7 +115,12 @@ export function incompatibleDevelopmentColumns(rows) {
 
 export async function runDevelopmentSchemaCheck({
   databaseUrl,
+  dopplerProject,
   dopplerConfig,
+  dopplerEnvironment,
+  developmentHost,
+  stagingHost,
+  productionHost,
   queryCatalog,
   stdout,
   stderr,
@@ -81,6 +134,23 @@ export async function runDevelopmentSchemaCheck({
 
   if (!databaseUrl) {
     stderr('development schema freshness unavailable: DATABASE_URL is not set');
+    return 1;
+  }
+
+  if (
+    !isExactDevelopmentTarget({
+      databaseUrl,
+      dopplerProject,
+      dopplerConfig,
+      dopplerEnvironment,
+      developmentHost,
+      stagingHost,
+      productionHost,
+    })
+  ) {
+    stderr(
+      'development schema freshness unavailable: exact development target verification failed',
+    );
     return 1;
   }
 
@@ -102,7 +172,7 @@ export async function runDevelopmentSchemaCheck({
     }
 
     stdout(
-      'development schema freshness passed: retention_cards.last_recall_feedback and subscription.past_due_at are present',
+      'development schema freshness passed: retention_cards.last_recall_feedback, subscription.past_due_at, and session_summaries.language_learning_summary are present',
     );
     return 0;
   } catch {
@@ -118,7 +188,12 @@ async function queryLiveCatalog(databaseUrl, query) {
 async function main() {
   return runDevelopmentSchemaCheck({
     databaseUrl: process.env.DATABASE_URL,
+    dopplerProject: process.env.DOPPLER_PROJECT,
     dopplerConfig: process.env.DOPPLER_CONFIG,
+    dopplerEnvironment: process.env.DOPPLER_ENVIRONMENT,
+    developmentHost: process.env.DATABASE_URL_DEVELOPMENT_HOST,
+    stagingHost: process.env.DATABASE_URL_STAGING_HOST,
+    productionHost: process.env.DATABASE_URL_PRODUCTION_HOST,
     queryCatalog: queryLiveCatalog,
     stdout: console.log,
     stderr: console.error,

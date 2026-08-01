@@ -1,21 +1,13 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  guardianQualificationSchema,
+  type GuardianQualification,
+} from '@eduagent/schemas';
 import { z } from 'zod';
 
 const TOKEN_VERSION = 'ga1';
 export const GUARDIAN_AUTHORITY_MAX_TTL_MS = 15 * 60 * 1000;
 export const GUARDIAN_AUTHORITY_CLOCK_SKEW_MS = 60 * 1000;
-
-export const guardianQualificationSchema = z.enum([
-  'biological_parent',
-  'adoptive_parent',
-  'stepparent',
-  'grandparent',
-  'court_appointed_guardian',
-  'foster_parent',
-  'kinship_caregiver',
-  'sibling_with_custody',
-  'other',
-]);
 
 const guardianAuthorityPayloadSchema = z.object({
   version: z.literal(TOKEN_VERSION),
@@ -44,7 +36,7 @@ export interface GuardianAuthorityAssertion {
   policyVersion: string;
   assuranceMethod: string;
   evidenceId: string;
-  qualification: z.infer<typeof guardianQualificationSchema>;
+  qualification: GuardianQualification;
   decision: 'pending' | 'approved' | 'denied';
   learnerAssentAt: Date | null;
   issuedAt: Date;

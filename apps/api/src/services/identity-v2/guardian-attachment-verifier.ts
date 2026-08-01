@@ -5,10 +5,12 @@ import {
   guardianAuthorityRedemptions,
   type Database,
 } from '@eduagent/database';
-import { CONSENT_PURPOSES } from '@eduagent/schemas';
+import {
+  CONSENT_PURPOSES,
+  guardianQualificationSchema,
+} from '@eduagent/schemas';
 import {
   GUARDIAN_AUTHORITY_MAX_TTL_MS,
-  guardianQualificationSchema,
   guardianAuthorityTokenDigest,
   signGuardianAuthorityToken,
   verifyGuardianAuthorityToken,

@@ -17,6 +17,7 @@ import {
   addParkingLotItem,
   MAX_ITEMS_PER_TOPIC,
 } from '../services/parking-lot-data';
+import { assertCanReadProfile } from '../services/family-access';
 import { getSession } from '../services/session';
 import { apiError, notFound } from '../errors';
 
@@ -25,6 +26,8 @@ type ParkingLotRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
     profileId: string | undefined;
   };
 };
@@ -47,6 +50,8 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2882] Organization membership alone does not grant read access.
+      await assertCanReadProfile(c, profileId);
       const { sessionId } = c.req.valid('param');
 
       const result = await getParkingLotItems(db, profileId, sessionId);
@@ -61,6 +66,8 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2882] Organization membership alone does not grant read access.
+      await assertCanReadProfile(c, profileId);
       const { topicId } = c.req.valid('param');
 
       const result = await getParkingLotItemsForTopic(db, profileId, topicId);

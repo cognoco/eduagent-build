@@ -1,0 +1,26 @@
+{
+  "noiseBaselineVersion": "2026-08-01",
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Both terminal deletion signals use stable awaited Inngest steps for durable retry and replay.",
+      "pointer": "apps/api/src/inngest/functions/account-deletion.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Focused tests cover rejection, late resolution, late rejection, replay, both events, and payload minimization.",
+      "pointer": "apps/api/src/inngest/functions/account-deletion.test.ts:647"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Compliance evidence and the launch-health runbook describe current ownership and timeout semantics.",
+      "pointer": "docs/compliance/evidence/2026-07-26-retention-schedule-draft.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Existing payload and remediation behavior are preserved without a migration or environment mutation.",
+      "pointer": "apps/api/src/inngest/functions/billing-subscription-store-teardown.test.ts:86"
+    }
+  ],
+  "redGreenPointer": ".workitem-artifacts/WI-2994/red-green-revert.md"
+}

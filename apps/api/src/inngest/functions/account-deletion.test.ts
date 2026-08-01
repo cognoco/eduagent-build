@@ -1,7 +1,5 @@
 import { scheduledDeletion } from './account-deletion';
-import { inngest } from '../client';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
-import * as safeNonCore from '../../services/safe-non-core';
 import * as sentry from '../../services/sentry';
 
 const mockGetStepDatabase = jest.fn();
@@ -598,7 +596,6 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[BREAK] declares an onFailure handler', () => {
@@ -614,7 +611,9 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
+    const { step } = createInngestStepRunner();
 
     const clerkOutage = new Error('Clerk delete failed with status 503');
     const result = await onFailure({
@@ -625,6 +624,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
         },
       },
       error: clerkOutage,
+      step,
     });
 
     expect(result).toEqual({
@@ -644,18 +644,14 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     );
   });
 
-  it('[BREAK WI-2346] safeSends a PII-minimized account deletion teardown dead-letter event', async () => {
+  it('[BREAK WI-2994] durably sends a PII-minimized account deletion teardown dead-letter event', async () => {
     jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
-    const safeSendSpy = jest
-      .spyOn(safeNonCore, 'safeSend')
-      .mockResolvedValue(undefined);
-    const inngestSendSpy = jest
-      .spyOn(inngest, 'send')
-      .mockResolvedValue({ ids: [] });
+    const { step, sendEventCalls } = createInngestStepRunner();
 
     const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
     const maliciousError = new Error(
       'Clerk response contained private context',
@@ -670,35 +666,140 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
         },
       },
       error: maliciousError,
+      step,
     });
 
-    expect(safeSendSpy).toHaveBeenCalledTimes(1);
-    const call = safeSendSpy.mock.calls[0];
-    expect(call).toBeDefined();
-    if (!call) return;
-    const [sendThunk, surface, context] = call;
-    expect(surface).toBe('account-deletion.terminal_failure');
-    expect(context).toEqual({
-      accountId: 'acc-terminal',
-      runId: 'run-xyz',
-    });
+    expect(sendEventCalls).toEqual([
+      {
+        name: 'dispatch-account-deletion-terminal-failure',
+        payload: {
+          id: 'deletion-terminal-failure:scheduled-account-deletion:run-xyz',
+          name: 'app/account.deletion_teardown.failed',
+          data: {
+            accountId: 'acc-terminal',
+            runId: 'run-xyz',
+            errorName: 'Error',
+            timestamp: expect.any(String),
+          },
+        },
+      },
+    ]);
+    expect(JSON.stringify(sendEventCalls)).not.toContain('private context');
+    expect(JSON.stringify(sendEventCalls)).not.toContain('alice@example.test');
+  });
 
-    await expect(sendThunk()).resolves.not.toThrow();
-    expect(inngestSendSpy).toHaveBeenCalledWith({
-      name: 'app/account.deletion_teardown.failed',
-      data: {
-        accountId: 'acc-terminal',
-        runId: 'run-xyz',
-        errorName: 'Error',
-        timestamp: expect.any(String),
+  it('[BREAK WI-2994] propagates durable-step rejection so Inngest can retry', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const transportError = new Error('event transport unavailable');
+    const { step, sendEventCalls } = createInngestStepRunner({
+      sendEventErrors: {
+        'dispatch-account-deletion-terminal-failure': transportError,
       },
     });
-    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
-      'private context',
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
+    }) => Promise<unknown>;
+
+    await expect(
+      onFailure({
+        event: {
+          data: {
+            event: { data: { accountId: 'acc-terminal' } },
+            run_id: 'run-xyz',
+          },
+        },
+        error: new Error('terminal deletion failure'),
+        step,
+      }),
+    ).rejects.toBe(transportError);
+    expect(sendEventCalls).toHaveLength(1);
+  });
+
+  it.each([
+    ['late resolution', false],
+    ['late rejection', true],
+  ] as const)(
+    '[BREAK WI-2994] awaits %s without starting a duplicate dispatch',
+    async (_label, rejects) => {
+      jest
+        .spyOn(sentry, 'captureException')
+        .mockImplementation(() => undefined);
+      let settle!: () => void;
+      const pending = new Promise<void>((resolve, reject) => {
+        settle = () => (rejects ? reject(new Error('late reject')) : resolve());
+      });
+      const sendEvent = jest.fn().mockReturnValue(pending);
+      const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+        event: { data: { event?: { data?: unknown }; run_id?: string } };
+        error: unknown;
+        step: { sendEvent: typeof sendEvent };
+      }) => Promise<unknown>;
+
+      const result = onFailure({
+        event: {
+          data: {
+            event: { data: { accountId: 'acc-terminal' } },
+            run_id: 'run-xyz',
+          },
+        },
+        error: new Error('terminal deletion failure'),
+        step: { sendEvent },
+      });
+      await Promise.resolve();
+      expect(sendEvent).toHaveBeenCalledTimes(1);
+      settle();
+      if (rejects) {
+        await expect(result).rejects.toThrow('late reject');
+      } else {
+        await expect(result).resolves.toEqual({
+          status: 'terminal_failure',
+          accountId: 'acc-terminal',
+        });
+      }
+      expect(sendEvent).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('[BREAK WI-2994] uses a stable memoization key across replay', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const transport = jest.fn().mockResolvedValue({ ids: ['event-1'] });
+    const memoized = new Map<string, Promise<unknown>>();
+    const sendEvent = jest.fn((name: string, payload: unknown) => {
+      const prior = memoized.get(name);
+      if (prior) return prior;
+      const dispatched = transport(payload);
+      memoized.set(name, dispatched);
+      return dispatched;
+    });
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+      step: { sendEvent: typeof sendEvent };
+    }) => Promise<unknown>;
+    const args = {
+      event: {
+        data: {
+          event: { data: { accountId: 'acc-terminal' } },
+          run_id: 'run-xyz',
+        },
+      },
+      error: new Error('terminal deletion failure'),
+      step: { sendEvent },
+    };
+
+    await onFailure(args);
+    await onFailure(args);
+
+    expect(sendEvent).toHaveBeenCalledTimes(2);
+    expect(sendEvent.mock.calls[0]?.[0]).toBe(
+      'dispatch-account-deletion-terminal-failure',
     );
-    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
-      'alice@example.test',
+    expect(sendEvent.mock.calls[1]?.[0]).toBe(
+      'dispatch-account-deletion-terminal-failure',
     );
+    expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it('tolerates a missing original event payload (accountId null)', async () => {
@@ -709,11 +810,14 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
+    const { step } = createInngestStepRunner();
 
     const result = await onFailure({
       event: { data: {} },
       error: 'non-error-rejection',
+      step,
     });
 
     expect(result).toEqual({ status: 'terminal_failure', accountId: null });

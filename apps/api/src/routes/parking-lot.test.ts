@@ -36,6 +36,11 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
 }));
 
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+
+import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
+import { TEST_SESSION_ID } from '@eduagent/test-utils';
+
 import { parkingLotRoutes } from './parking-lot';
 import {
   getParkingLotItems,
@@ -43,7 +48,7 @@ import {
   addParkingLotItem,
 } from '../services/parking-lot-data';
 import { getSession } from '../services/session';
-import { TEST_SESSION_ID } from '@eduagent/test-utils';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 
 const mockGetParkingLotItems = getParkingLotItems as jest.MockedFunction<
   typeof getParkingLotItems
@@ -56,10 +61,15 @@ const mockAddParkingLotItem = addParkingLotItem as jest.MockedFunction<
   typeof addParkingLotItem
 >;
 const mockGetSession = getSession as jest.MockedFunction<typeof getSession>;
+const mockVerifyPersonOwnershipV2 =
+  verifyPersonOwnershipV2 as jest.MockedFunction<
+    typeof verifyPersonOwnershipV2
+  >;
 
 const TEST_TOPIC_ID = 'a0000000-0000-4000-a000-000000000301';
 const TEST_SUBJECT_ID = 'a0000000-0000-4000-a000-000000000201';
 const TEST_ITEM_ID = 'a0000000-0000-4000-a000-000000000501';
+const OTHER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000601';
 
 const MOCK_ITEM = {
   id: TEST_ITEM_ID,
@@ -72,7 +82,7 @@ const NO_PROFILE = Symbol('no-profile');
 
 function createApp(
   profileId: string | typeof NO_PROFILE = 'test-profile-id',
-  opts?: { isOwner?: boolean },
+  opts?: { isOwner?: boolean; callerPersonId?: string },
 ) {
   const app = new Hono();
   app.use('*', async (c, next) => {
@@ -82,7 +92,7 @@ function createApp(
       // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
       // assertCanWriteProfile, which requires account + callerPersonId.
       c.set('account' as never, { id: 'test-account-id' });
-      c.set('callerPersonId' as never, profileId);
+      c.set('callerPersonId' as never, opts?.callerPersonId ?? profileId);
     }
     c.set('user' as never, { id: 'test-user' });
     // [WI-161 / DS-072] Mirror profileScopeMiddleware: set profileMeta so the
@@ -96,11 +106,24 @@ function createApp(
     });
     await next();
   });
+  app.onError((err, c) => {
+    if (err instanceof HTTPException) return err.getResponse();
+    if (err instanceof ForbiddenError) {
+      return c.json({ code: ERROR_CODES.FORBIDDEN, message: err.message }, 403);
+    }
+    return c.json(
+      { code: ERROR_CODES.INTERNAL_ERROR, message: err.message },
+      500,
+    );
+  });
   app.route('/', parkingLotRoutes);
   return app;
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockVerifyPersonOwnershipV2.mockReset().mockResolvedValue(undefined);
+});
 
 // [BUG-392] UUID validation guard tests — non-UUID path params must be rejected
 // with 400 before reaching the DB layer. This prevents Postgres errors (5xx)
@@ -172,6 +195,20 @@ describe('GET /sessions/:sessionId/parking-lot', () => {
     expect(mockGetParkingLotItems).not.toHaveBeenCalled();
   });
 
+  it('[WI-2882] rejects another profile id before reading session parking-lot data', async () => {
+    mockVerifyPersonOwnershipV2.mockRejectedValueOnce(
+      new Error('caller cannot read selected profile'),
+    );
+    const app = createApp(OTHER_PROFILE_ID, {
+      callerPersonId: 'authenticated-caller-profile-id',
+    });
+
+    const res = await app.request(`/sessions/${TEST_SESSION_ID}/parking-lot`);
+
+    expect(res.status).toBe(403);
+    expect(mockGetParkingLotItems).not.toHaveBeenCalled();
+  });
+
   it('returns empty items when session has no parked questions', async () => {
     mockGetParkingLotItems.mockResolvedValueOnce({ items: [], count: 0 });
     const app = createApp();
@@ -214,6 +251,22 @@ describe('GET /subjects/:subjectId/topics/:topicId/parking-lot', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(mockGetParkingLotItemsForTopic).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2882] rejects another profile id before reading topic parking-lot data', async () => {
+    mockVerifyPersonOwnershipV2.mockRejectedValueOnce(
+      new Error('caller cannot read selected profile'),
+    );
+    const app = createApp(OTHER_PROFILE_ID, {
+      callerPersonId: 'authenticated-caller-profile-id',
+    });
+
+    const res = await app.request(
+      `/subjects/${TEST_SUBJECT_ID}/topics/${TEST_TOPIC_ID}/parking-lot`,
+    );
+
+    expect(res.status).toBe(403);
     expect(mockGetParkingLotItemsForTopic).not.toHaveBeenCalled();
   });
 });
