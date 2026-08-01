@@ -200,16 +200,6 @@
     "route": "/notifications/child-cap"
   },
   {
-    "file": "apps/api/src/routes/now.ts",
-    "method": "get",
-    "route": "/now"
-  },
-  {
-    "file": "apps/api/src/routes/now.ts",
-    "method": "get",
-    "route": "/now/overflow"
-  },
-  {
     "file": "apps/api/src/routes/nudges.ts",
     "method": "get",
     "route": "/nudges"

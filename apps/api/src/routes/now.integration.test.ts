@@ -8,8 +8,10 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  guardianship,
   learningSessions,
   login,
+  membership,
   mentorActivityLedger,
   mentorNotices,
   needsDeepeningTopics,
@@ -47,6 +49,8 @@ type TestEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: undefined;
+    // [WI-2565] Caller organization context, required by assertCanReadProfile.
+    account: { id: string } | undefined;
     callerPersonId: string | undefined;
     user: unknown;
   };
@@ -76,13 +80,30 @@ function makeApp(
 ) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
+    const callerPersonId = options.callerPersonId ?? profileId;
+    // [WI-2565] assertCanReadProfile reads the caller's organization context
+    // (production: set app-wide by accountMiddleware from the authenticated
+    // login). Resolve it from the caller's REAL membership row — never a dummy
+    // id — so cross-profile cases (callerPersonId ≠ selected profile) keep
+    // authentic organization semantics, and fail loudly when a seed carries no
+    // membership: the harness must never silently omit the account context
+    // again (that omission turned every guarded read into a 403 fail-closed
+    // before its intended assertion).
+    const [callerMembership] = await db
+      .select({ organizationId: membership.organizationId })
+      .from(membership)
+      .where(eq(membership.personId, callerPersonId))
+      .limit(1);
+    if (!callerMembership) {
+      throw new Error(
+        `Integration harness: no organization membership seeded for caller ${callerPersonId}`,
+      );
+    }
     c.set('db', db);
     c.set('profileId', profileId);
     c.set('profileMeta', undefined);
-    c.set(
-      'callerPersonId' as never,
-      (options.callerPersonId ?? profileId) as never,
-    );
+    c.set('account', { id: callerMembership.organizationId });
+    c.set('callerPersonId' as never, callerPersonId as never);
     if (options.mentorNoticeEnabled) {
       c.env = { MENTOR_NOTICE_ENABLED: 'true' } as never;
     }
@@ -102,6 +123,7 @@ function makeApp(
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integ-now-${RUN_ID}`;
 const seededAccountIds: string[] = [];
+const seededGuardianshipIds: string[] = [];
 const seededProfileIds: string[] = [];
 const seededSupportershipIds: string[] = [];
 
@@ -114,6 +136,7 @@ async function seedProfileInAccount(
   label: string,
   accountId: string,
   isOwner: boolean,
+  credentialed = true,
 ): Promise<string> {
   const profileId = generateUUIDv7();
   const clerkUserId = `${CLERK_PREFIX}-${label}`;
@@ -135,7 +158,7 @@ async function seedProfileInAccount(
   // The legacy test helper intentionally models non-owners as managed people
   // without a login. This attack requires a credentialed learner-role member,
   // so add the real login binding while retaining the non-admin membership.
-  if (!isOwner) {
+  if (!isOwner && credentialed) {
     const [loginRow] = await database
       .insert(login)
       .values({
@@ -365,6 +388,11 @@ async function seedParkedQuestion(
 }
 
 async function cleanup(database: Database): Promise<void> {
+  if (seededGuardianshipIds.length > 0) {
+    await database
+      .delete(guardianship)
+      .where(inArray(guardianship.id, seededGuardianshipIds));
+  }
   if (seededSupportershipIds.length > 0) {
     await database
       .delete(supportership)
@@ -375,6 +403,7 @@ async function cleanup(database: Database): Promise<void> {
     profileIds: seededProfileIds,
   });
   seededSupportershipIds.length = 0;
+  seededGuardianshipIds.length = 0;
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }
@@ -833,6 +862,45 @@ describe('Integration: now routes', () => {
     });
   });
 
+  it('[WI-2565][AC-2] allows an authorized guardian of an uncredentialed charge through both Now endpoints', async () => {
+    const accountId = generateUUIDv7();
+    const guardianPersonId = await seedProfileInAccount(
+      db,
+      'read-authority-guardian',
+      accountId,
+      true,
+    );
+    const chargePersonId = await seedProfileInAccount(
+      db,
+      'read-authority-uncredentialed-charge',
+      accountId,
+      false,
+      false,
+    );
+    const [edge] = await db
+      .insert(guardianship)
+      .values({ guardianPersonId, chargePersonId })
+      .returning({ id: guardianship.id });
+    if (!edge) throw new Error('Failed to seed active guardianship');
+    seededGuardianshipIds.push(edge.id);
+
+    const [chargeLogin] = await db
+      .select({ id: login.id })
+      .from(login)
+      .where(eq(login.personId, chargePersonId))
+      .limit(1);
+    expect(chargeLogin).toBeUndefined();
+
+    const app = makeApp(db, chargePersonId, {
+      callerPersonId: guardianPersonId,
+    });
+    const nowRes = await app.request('/v1/now?scope=self');
+    const overflowRes = await app.request('/v1/now/overflow?scope=self');
+
+    expect(nowRes.status).toBe(200);
+    expect(overflowRes.status).toBe(200);
+  });
+
   it('[WI-2518][RGR] rejects a same-account non-owner borrowing the selected profile supportership on both Now endpoints and the hub', async () => {
     const accountId = generateUUIDv7();
     const selectedEdgeHolderId = await seedProfileInAccount(
@@ -865,11 +933,18 @@ describe('Integration: now routes', () => {
     );
     const hubRes = await borrowedApp.request('/v1/now?scope=supporter-hub');
 
+    // [WI-2565] The read-authority guard rejects the borrowed selection at
+    // the boundary: the caller holds no self-or-guardian authority over the
+    // selected profile, so all three reads — person, overflow, AND the hub
+    // read that previously returned an empty 200 from the caller's own
+    // (absent) edges — now 403 before any feed builds. A strict tightening
+    // for this unauthorized caller; the WI-2518 callerPersonId binding
+    // inside the feed builders stays covered by the honest path below and
+    // the route-unit RGR in now.test.ts.
     expect(personRes.status).toBe(403);
     expect(overflowRes.status).toBe(403);
-    expect(hubRes.status).toBe(200);
-    const hubBody = (await hubRes.json()) as { cards: unknown[] };
-    expect(hubBody.cards).toEqual([]);
+    expect(hubRes.status).toBe(403);
+    const hubBody = (await hubRes.json()) as Record<string, unknown>;
     expect(JSON.stringify(hubBody)).not.toContain(
       'selected-profile-edge-must-not-authorize-caller',
     );
