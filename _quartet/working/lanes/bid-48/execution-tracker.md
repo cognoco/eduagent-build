@@ -56,7 +56,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-07-31 11:10 CEST
+## Live reconciliation — 2026-08-01 09:43 CEST
 
 - The live Brief and membership relation agree on 41 authoritative members.
   The operator retracted WI-2941 from BID-48 and routed it to Nexus / Cosmo
@@ -91,9 +91,12 @@ Delivery Batch as `Done`.
   - WI-2939 — disposable API schema bootstrap. Handoff 103751 corrected ownership to
     BID-48 only. Exact head `45cad26d0` passed all 14 checks; the governed gate verified
     four resolved threads and a fresh zero-finding approval, then squash-landed PR
-    #2741 as `42609a6d`. The item remains Executing behind AC-4's explicit operator
-    ruling for the uniquely named disposable non-staging live bootstrap; no DB
-    connection or mutation has occurred.
+    #2741 as `42609a6d`. The operator authorized the dedicated
+    `mentomate/dev_integration` bootstrap/test, but two fresh read-only preflights
+    failed PostgreSQL authentication with SQLSTATE `28000`. The authorization remains
+    unconsumed and no database/config/secret mutation or forbidden-environment
+    connection occurred. Dedicated credentials and the two missing identity metadata
+    variables require operator repair before the authorized run can proceed.
 - Ready queue:
   - WI-2643 — shared integration-role mutation gate.
   - WI-2795 — Workers Logs or controlled telemetry-reproduction gate.
@@ -103,12 +106,17 @@ Delivery Batch as `Done`.
   - WI-2826 — instrumentation/live hosted proof gate.
   - WI-2922 — bounded shared-development database reconciliation gate.
   - WI-2923 — bounded development Clerk/Doppler mutation gate.
-  - WI-2936 — now Executing/Active under live claimant
+  - WI-2936 — Executing/Active under live claimant
     `codex:wi2936-exec:WI-2936`. Operator-authorized one-worktree exception: use the canonical
     isolated worktree and install dependencies, skip `pnpm env:sync`, and use only
     already-existing local credentials without printing, committing, uploading,
-    rotating, or remotely synchronizing them. WI-2755's freed execution slot was
-    immediately reused and the typed executor is active under those boundaries.
+    rotating, or remotely synchronizing them. PR #2789 passed focused and independent
+    review at `d6d168b1`; after external billing-fixture repair #2803 landed, the
+    executor cleanly merged current main to local head `d54f366b`, preserving the
+    exact six-file WI delta and green focused verification. The remote remains at
+    `d6d168b1` because the normal pre-push hook selects unrelated current-main API
+    tests that reject the machine staging Doppler fallback. One `--no-verify` push is
+    awaiting explicit operator disposition before fresh exact-head CI/reviews.
 - Finding Occurrences, not new Work Items, now preserve delivery observations:
   FO-2075 (`OCC-F968A7988008`) records the intake/scope correction; FO-2076
   (`OCC-B9142581EAF8`) records the WI-2755 completion/PR mismatch; FO-2077
@@ -120,18 +128,16 @@ Delivery Batch as `Done`.
   or product fix is claimed.
 - Marketplace PR #166 for WI-2941 is preserved open/draft at `9652d7d`; its clean
   local worktree was removed and its local/remote proposal branch remains.
-- Direct live reconciliation at 15:20 UTC / 17:20 CEST verifies WI-2755, WI-2790,
-  WI-2921, and WI-2939 under their exact existing owners with
-  `Claim Expired=false`. WI-2755, WI-2790, and WI-2921 were sanctioned same-owner
-  renewals at that boundary; WI-2939's current heartbeat is 15:12 UTC.
+- Direct live reconciliation at 09:43 CEST verifies WI-2790, WI-2921, WI-2936,
+  and WI-2939 under their exact existing owners with `Claim Expired=false`.
 - WI-2936's worktree exception is authorized in Cosmo comment
   `3ae8bce9-1f7c-8166-8f54-001da619ca14`. FO-2080
   (`OCC-894322F2C99D`) records that mandatory `env:sync` has broader staging and
   remote-mutation effects than isolated local setup; no new Work Item was created.
 - FO-2081 (`OCC-85FD83133D26`) records WI-2755's landed direct-URL preference still
   failing the required DATABASE_URL-only teardown replay; no new Work Item was created.
-- Checkpoint branch `bid-48-lane-state` was pushed through `0ecce9bed` before this
-  handoff update.
+- Checkpoint branch `bid-48-lane-state` was previously pushed through `0ecce9bed`;
+  this reconciliation update is not yet committed or pushed.
 - The historical sections below are retained only as an audit trail. This section,
   Cosmo, and GitHub supersede every stale lifecycle position below.
 

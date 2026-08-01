@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-07-31 18:27 CEST
+Last reconciled: 2026-08-01 09:43 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -43,8 +43,16 @@ Last reconciled: 2026-07-31 18:27 CEST
   four resolved review threads and a fresh zero-finding approval, then squash-landed
   the PR as `42609a6d`. Cosmo comment
   `3ae8bce9-1f7c-8133-bd98-001dc987bf40` records the topology and landing evidence.
-  The item remains Executing: no DB connection occurred, and AC-4's live bootstrap of
-  the uniquely named disposable non-staging target remains explicitly operator-gated.
+  The operator authorized the revision-pinned bootstrap/canonical test against only
+  the uniquely named disposable `mentomate/dev_integration` target. Two fresh
+  authoritative preflights passed the non-persisted target-identity guard but failed
+  read-only PostgreSQL authentication with SQLSTATE `28000`. The authorization is
+  unconsumed: no bootstrap/test invocation, database/config/secret mutation, or
+  shared-development, staging, or production connection occurred. The dedicated
+  role/password or URL must be repaired, and `INTEGRATION_DATABASE_TARGET_ID` plus
+  `DATABASE_URL_DEVELOPMENT_HOST` must be provisioned, before the preflight and
+  authorized run can proceed. Redacted evidence is in
+  `.workitem-artifacts/WI-2939/preflight-blocker.json`.
 - Operator correction — all eight shepherd-created infrastructure Work Items
   (WI-2792, WI-2812, WI-2815, WI-2819, WI-2924, WI-2931, WI-2941, WI-2946)
   are assigned to Nexus and normalized as factual issue reports. Their original
@@ -124,20 +132,31 @@ Last reconciled: 2026-07-31 18:27 CEST
   worktree and install dependencies, skip `pnpm env:sync`, and use only existing
   local credentials without printing, committing, uploading, rotating, or remotely
   synchronizing them. The freed WI-2755 execution slot was immediately reused and
-  the typed executor is operating under that bounded exception. FO-2080 /
+  the typed executor operated under that bounded exception. PR #2789 reached
+  correction head `d6d168b1`: focused 3 suites/16 tests, targeted quality checks,
+  exact-head automated review, and independent review passed. Its Flag-ON job then
+  reproduced an unrelated hard-coded billing-fixture date boundary twice; FO-2083
+  and FO-2084 record the two occurrences. External PR #2803 independently repaired
+  that test and landed as `503f4759`. The WI branch is now cleanly merged with that
+  current main at local head `d54f366b`; the six-file WI delta is byte-identical and
+  focused verification remains green. A normal push is blocked because the merge
+  makes the local hook select broad unrelated current-main API tests, whose setup
+  rejects the machine's staging Doppler fallback. The remote branch remains
+  `d6d168b1`; one explicitly authorized `--no-verify` push is awaiting operator
+  disposition before exact-head CI and both reviews are retriggered. FO-2080 /
   `OCC-894322F2C99D` records the broader setup observation without creating a WI.
 - WI-2922 and WI-2923 — Ready behind explicit development-only shared mutation gates.
 - Remaining shared-database, hosted-reproduction, and credential mutations retain
   their item-specific operator gates; no broad batch mandate silently widens them.
-- The persistent goal is active again. Existing execution WIP is WI-2755, WI-2790,
-  WI-2921, and WI-2939. Ready items with explicit
+- The persistent goal remains active. Existing execution WIP is WI-2790, WI-2921,
+  WI-2936, and WI-2939. WI-2755 is first on the Ready executor frontier. Other Ready
+  items with explicit
   database, credential, hosted-reproduction, or worktree/Doppler gates remain held
   until their recorded authority is satisfied. PR #2741 remains fail-closed on the
   twice-reproduced WI-2826 dependency.
-- Claim heartbeat (17:20 CEST): direct live reconciliation verifies WI-2755,
-  WI-2790, WI-2921, and WI-2939 Executing under their exact existing owners with
-  `Claim Expired=false`. WI-2755, WI-2790, and WI-2921 were sanctioned same-owner
-  renewals at 15:20 UTC; WI-2939's current heartbeat is 15:12 UTC.
+- Claim/lifecycle reconciliation (09:43 CEST): the live relation verifies WI-2790,
+  WI-2921, WI-2936, and WI-2939 Executing under their exact existing owners with
+  `Claim Expired=false`; all other non-Closed members are Ready/Active and unclaimed.
 
 ## Closed / Done
 
