@@ -7,6 +7,7 @@ const mockSendEmail = jest.fn();
 
 jest.mock(/* gc1-allow: step dependency boundary */ '../helpers', () => ({
   getStepDatabase: () => mockDb,
+  getStepEnvironment: () => 'production',
   getStepResendApiKey: () => 'resend-test-key',
   getStepEmailFrom: () => 'billing@mentomate.test',
 }));
@@ -151,6 +152,7 @@ describe('paymentFailedObserve', () => {
       }),
       {
         db: mockDb,
+        environment: 'production',
         resendApiKey: 'resend-test-key',
         emailFrom: 'billing@mentomate.test',
         idempotencyKey: 'stripe-payment-failed:evt-123',

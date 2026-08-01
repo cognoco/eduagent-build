@@ -22,6 +22,7 @@ import { inngest } from '../client';
 import {
   getStepDatabase,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepResendApiKey,
 } from '../helpers';
 
@@ -189,6 +190,7 @@ export const paymentFailedObserve = inngest.createFunction(
         formatPaymentFailedEmail(target.email, manageBillingUrl),
         {
           db,
+          environment: getStepEnvironment(),
           resendApiKey: getStepResendApiKey(),
           emailFrom: getStepEmailFrom(),
           idempotencyKey: sourceEventId,
@@ -202,7 +204,7 @@ export const paymentFailedObserve = inngest.createFunction(
         alertId: persisted.alertId,
         channel: 'email',
         sent: email.sent,
-        ...(email.reason ? { reason: email.reason } : {}),
+        ...(!email.sent ? { reason: email.reason } : {}),
       });
     });
     if (!email.sent) {

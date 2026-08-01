@@ -27,7 +27,11 @@ import {
   progressSnapshots,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase, getStepResendApiKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepEnvironment,
+  getStepResendApiKey,
+} from '../helpers';
 import {
   generateMonthlyReportData,
   generateReportHighlights,
@@ -673,6 +677,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           struggleLines,
         );
         const result = await sendEmail(emailPayload, {
+          environment: getStepEnvironment(),
           resendApiKey: getStepResendApiKey(),
           idempotencyKey: buildLegacyEmailIdempotencyKey(
             'monthly',

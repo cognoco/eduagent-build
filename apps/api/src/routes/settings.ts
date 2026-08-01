@@ -58,6 +58,7 @@ import { forbidden, notFound, NotFoundError } from '../errors';
 type SettingsRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
+    ENVIRONMENT?: string;
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
@@ -317,6 +318,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       db,
       profileId,
       {
+        environment: c.env.ENVIRONMENT,
         resendApiKey: c.env.RESEND_API_KEY,
         emailFrom: c.env.EMAIL_FROM,
       },

@@ -16,6 +16,7 @@ import {
   closeStepDatabases,
   getStepDatabase,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepResendApiKey,
   getStepSupportEmail,
   runWithStepDatabaseScope,
@@ -102,6 +103,7 @@ export const accountReclaimAttempt = inngest.createFunction(
           const result = await sendEmail(
             formatAccountReclaimAttemptEmail(account.email, supportEmail),
             {
+              environment: getStepEnvironment(),
               resendApiKey: getStepResendApiKey(),
               emailFrom: getStepEmailFrom(),
               idempotencyKey: buildEmailIdempotencyKey(
@@ -113,41 +115,21 @@ export const accountReclaimAttempt = inngest.createFunction(
           );
 
           if (!result.sent) {
-            if (result.reason === 'no_api_key') {
-              captureException(
-                new Error(
-                  'account-reclaim-attempt: RESEND_API_KEY not configured',
-                ),
-                {
-                  extra: {
-                    surface: 'account-reclaim-attempt.no_api_key',
-                    accountId: account.id,
-                  },
-                },
-              );
+            if (result.retryability !== 'transient') {
               logger.warn(
-                '[account-reclaim-attempt] RESEND_API_KEY not configured — email not sent',
-                { accountId: account.id },
+                '[account-reclaim-attempt] email not sent',
+                { accountId: account.id, reason: result.reason },
               );
               return {
                 status: 'not_sent' as const,
-                reason: 'no_api_key' as const,
+                reason: result.reason,
                 accountId: account.id,
               };
             }
 
             const error = new Error(
-              `account-reclaim-attempt send failed: ${
-                result.reason ?? 'unknown'
-              }`,
+              `account-reclaim-attempt transient send failure: ${result.reason}`,
             );
-            captureException(error, {
-              extra: {
-                surface: 'account-reclaim-attempt',
-                accountId: account.id,
-                reason: result.reason,
-              },
-            });
             logger.warn('[account-reclaim-attempt] send failed — retrying', {
               accountId: account.id,
               reason: result.reason,

@@ -37,6 +37,7 @@ import { inngest } from '../client';
 import {
   getStepDatabase,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepResendApiKey,
 } from '../helpers';
 
@@ -98,6 +99,7 @@ export const familyJoinStoreCancelNudge = inngest.createFunction(
       }
       return sendEmail(formatFamilyJoinStoreCancelEmail(loginRow.email), {
         db,
+        environment: getStepEnvironment(),
         resendApiKey: getStepResendApiKey(),
         emailFrom: getStepEmailFrom(),
         idempotencyKey: buildFamilyJoinStoreCancelKey(teenPersonId),

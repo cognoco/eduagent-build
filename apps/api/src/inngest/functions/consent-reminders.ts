@@ -6,6 +6,7 @@ import {
   getStepDatabase,
   getStepResendApiKey,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepAppUrl,
 } from '../helpers';
 import { and, eq, gte, inArray, lt } from 'drizzle-orm';
@@ -73,6 +74,7 @@ export const consentReminder = inngest.createFunction(
     // event (e.g. re-requesting consent for the same profile after the
     // workflow concluded) will produce a fresh key and send a fresh email.
     const emailOpts = (stepId: string): EmailOptions => ({
+      environment: getStepEnvironment(),
       resendApiKey: getStepResendApiKey(),
       emailFrom: getStepEmailFrom(),
       idempotencyKey: buildEmailIdempotencyKey(

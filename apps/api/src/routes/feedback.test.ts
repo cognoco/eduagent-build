@@ -36,6 +36,7 @@ type FeedbackEnv = {
     profileId: string | undefined;
   };
   Bindings: {
+    ENVIRONMENT?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     SUPPORT_EMAIL?: string;
@@ -78,6 +79,7 @@ function createTestApp(
     c.set('db', dbStub as FeedbackEnv['Variables']['db']);
     // Inject bindings so sendEmail actually attempts the Resend fetch
     c.env = {
+      ENVIRONMENT: 'production',
       RESEND_API_KEY: TEST_API_KEY,
       EMAIL_FROM: TEST_EMAIL_FROM,
       ...bindings,
@@ -255,14 +257,15 @@ describe('POST /feedback', () => {
   });
 
   // [BUG-767 / A-24] BREAK TESTS. The route MUST dispatch the
-  // app/feedback.delivery_failed event whenever the synchronous send fails,
+  // app/feedback.delivery_failed event whenever the synchronous send fails
+  // transiently,
   // and the consumer (feedback-delivery-failed Inngest function) is what
   // turns that event into a retry. Pre-fix audit found the event was wired
   // here but had no consumer — every queued retry was a black hole.
   //
   // Use unique userIds to avoid colliding with the in-memory feedback rate
   // limit (5/hour/userId) accumulated by earlier tests in this suite.
-  it('[BUG-767 / A-24] dispatches app/feedback.delivery_failed when sendEmail fails', async () => {
+  it('[BUG-767 / A-24] dispatches app/feedback.delivery_failed when sendEmail fails transiently', async () => {
     const { inngest } = require('../inngest/client');
     (inngest.send as jest.Mock).mockClear();
 
@@ -440,7 +443,7 @@ describe('POST /feedback', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, queued: true });
+    expect(await res.json()).toEqual({ success: true, queued: false });
 
     // Verify no fetch to Resend was attempted
     const resendCalls = fetchSpy.mock.calls.filter(([input]) => {
@@ -453,6 +456,32 @@ describe('POST /feedback', () => {
       return url === RESEND_API_URL;
     });
     expect(resendCalls).toHaveLength(0);
+  });
+
+  it('does not queue or retry a permanent Resend rejection', async () => {
+    const { inngest } = require('../inngest/client');
+    (inngest.send as jest.Mock).mockClear();
+    fetchSpy.mockImplementationOnce(async () =>
+      new Response(JSON.stringify({ name: 'validation_error' }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const app = createTestApp(undefined, {
+      userId: 'user-permanent-email',
+      profileId: 'profile-permanent-email',
+    });
+    const res = await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'bug', message: 'Permanent failure' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, queued: false });
+    expect(insertedRetryRows).toHaveLength(0);
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   // ---------------------------------------------------------------------------

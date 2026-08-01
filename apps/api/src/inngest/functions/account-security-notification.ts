@@ -11,7 +11,11 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { securityNotificationTypeSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepResendApiKey, getStepEmailFrom } from '../helpers';
+import {
+  getStepEnvironment,
+  getStepResendApiKey,
+  getStepEmailFrom,
+} from '../helpers';
 import {
   formatSecurityNotificationEmail,
   sendEmail,
@@ -97,27 +101,26 @@ export const accountSecurityNotification = inngest.createFunction(
 
       const result = await sendEmail(
         formatSecurityNotificationEmail(to, type),
-        { resendApiKey, emailFrom, idempotencyKey },
+        {
+          environment: getStepEnvironment(),
+          resendApiKey,
+          emailFrom,
+          idempotencyKey,
+        },
       );
 
       if (!result.sent) {
-        // no_api_key is a configuration state, not a transient failure — do not
-        // retry forever on it, but still surface it so it is queryable.
-        if (result.reason === 'no_api_key') {
-          logger.warn(
-            '[account-security-notification] RESEND_API_KEY not configured — email not sent',
-            { accountId, type },
-          );
-          return { ok: false as const, reason: 'no_api_key' as const };
+        if (result.retryability !== 'transient') {
+          logger.warn('[account-security-notification] email not sent', {
+            accountId,
+            type,
+            reason: result.reason,
+          });
+          return { ok: false as const, reason: result.reason };
         }
         const err = new Error(
-          `account-security-notification send failed: ${
-            result.reason ?? 'unknown'
-          }`,
+          `account-security-notification transient send failure: ${result.reason}`,
         );
-        captureException(err, {
-          extra: { surface: 'account-security-notification', type, accountId },
-        });
         logger.warn('[account-security-notification] send failed — retrying', {
           accountId,
           type,

@@ -16,6 +16,7 @@ import { inngest } from '../client';
 import {
   getStepDatabase,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepResendApiKey,
   getStepSupportEmail,
 } from '../helpers';
@@ -75,7 +76,7 @@ interface DeliveryDependencies {
   loadClosed(currentUtcDate: string): Promise<BlockedSafetyDailyBucket[]>;
   deliver(
     bucket: BlockedSafetyDailyBucket,
-  ): Promise<{ delivered: boolean; reason?: 'empty' }>;
+  ): Promise<{ delivered: boolean; reason?: 'empty' | 'email_not_sent' }>;
 }
 
 const defaultDeliveryDependencies: DeliveryDependencies = {
@@ -88,6 +89,7 @@ const defaultDeliveryDependencies: DeliveryDependencies = {
   deliver: (bucket) =>
     deliverBlockedSafetyDigestBucket(getStepDatabase(), bucket, {
       to: getStepSupportEmail(),
+      environment: getStepEnvironment(),
       resendApiKey: getStepResendApiKey(),
       emailFrom: getStepEmailFrom(),
     }),

@@ -18,6 +18,7 @@ import {
   getStepDatabase,
   getStepResendApiKey,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepSupportEmail,
 } from '../helpers';
 import {
@@ -168,20 +169,29 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           body: `${queued.message}\n\n---\n${queued.metaLines}`,
           type: 'feedback',
         },
-        { resendApiKey, emailFrom, idempotencyKey },
+        {
+          environment: getStepEnvironment(),
+          resendApiKey,
+          emailFrom,
+          idempotencyKey,
+        },
       );
 
       if (!result.sent) {
+        if (result.retryability !== 'transient') {
+          logger.warn('[feedback-delivery-failed] email not sent', {
+            profileId,
+            reason: result.reason,
+          });
+          return {
+            status: 'not_sent' as const,
+            reason: result.reason,
+            profileId,
+          };
+        }
         const err = new Error(
-          `feedback-delivery-failed retry unsuccessful: ${
-            result.reason ?? 'unknown'
-          }`,
+          `feedback-delivery-failed transient retry failure: ${result.reason}`,
         );
-        captureException(err, {
-          profileId,
-          tags: { surface: 'feedback', signal: 'delivery-failed' },
-          extra: { category: queued.category, reason: result.reason },
-        });
         logger.warn('[feedback-delivery-failed] retry still failed', {
           profileId,
           reason: result.reason,

@@ -928,12 +928,12 @@ export async function requestConsentV2(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.reason === 'no_api_key') {
+    if (emailResult.retryability === 'none') {
       // Config issue, not delivery failure — keep the request row.
       return { emailDelivered: false };
     }
     await rollbackCounter(db, write.requestIds, write.isRecipientChange);
-    throw new EmailDeliveryError(emailResult.reason ?? undefined);
+    throw new EmailDeliveryError(emailResult.reason);
   }
 
   return { emailDelivered: true };
@@ -1027,11 +1027,11 @@ export async function resendConsentV2(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.reason === 'no_api_key') {
+    if (emailResult.retryability === 'none') {
       return { emailDelivered: false };
     }
     await rollbackCounter(db, write.requestIds, false);
-    throw new EmailDeliveryError(emailResult.reason ?? undefined);
+    throw new EmailDeliveryError(emailResult.reason);
   }
 
   return { emailDelivered: true };

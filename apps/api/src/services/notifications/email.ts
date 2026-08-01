@@ -47,6 +47,13 @@ export interface EmailPayload {
 }
 
 export interface EmailOptions {
+  /**
+   * Runtime environment for the delivery boundary. Any value other than the
+   * exact production environment fails closed unless the recipient appears in
+   * the explicit non-production allowlist below.
+   */
+  environment: string | undefined;
+  nonProductionRecipientAllowlist?: readonly string[];
   resendApiKey?: string;
   emailFrom?: string;
   /**
@@ -67,11 +74,25 @@ export interface EmailOptions {
   db?: Database;
 }
 
-export interface EmailResult {
-  sent: boolean;
-  messageId?: string;
-  reason?: string;
-}
+export type EmailResult =
+  | { sent: true; messageId?: string }
+  | {
+      sent: false;
+      retryability: 'none';
+      reason: 'no_api_key' | 'suppressed' | 'non_production_recipient';
+    }
+  | {
+      sent: false;
+      retryability: 'permanent' | 'transient';
+      reason: 'resend_api_error';
+      statusCode: number;
+      providerCode: string;
+    }
+  | {
+      sent: false;
+      retryability: 'transient';
+      reason: 'network_error';
+    };
 
 export type EmailTransport = (
   payload: EmailPayload,
@@ -97,6 +118,32 @@ export function registerEmailTransportForTesting(
 }
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
+const RESEND_PROVIDER_CODE_PATTERN = /^[a-z0-9_]{1,64}$/;
+
+function parseResendProviderCode(body: unknown): string {
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    'name' in body &&
+    typeof body.name === 'string' &&
+    RESEND_PROVIDER_CODE_PATTERN.test(body.name)
+  ) {
+    return body.name;
+  }
+  return 'unknown';
+}
+
+function isTransientResendFailure(
+  statusCode: number,
+  providerCode: string,
+): boolean {
+  return (
+    statusCode === 408 ||
+    statusCode === 429 ||
+    statusCode >= 500 ||
+    (statusCode === 409 && providerCode === 'concurrent_idempotent_requests')
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Send
@@ -119,7 +166,27 @@ export async function sendEmail(
   const apiKey = options?.resendApiKey;
   if (!apiKey) {
     logger.warn('[email] RESEND_API_KEY not configured — skipping email send');
-    return { sent: false, reason: 'no_api_key' };
+    return { sent: false, retryability: 'none', reason: 'no_api_key' };
+  }
+
+  const normalizedRecipient = payload.to.trim().toLowerCase();
+  const recipientAllowed =
+    options.environment === 'production' ||
+    options.nonProductionRecipientAllowlist?.some(
+      (recipient) => recipient.trim().toLowerCase() === normalizedRecipient,
+    ) === true;
+
+  if (!recipientAllowed) {
+    logger.warn('[email] non-production recipient not allowlisted — skipping send', {
+      event: 'notification.email.non_production_recipient',
+      type: payload.type,
+      environment: options.environment,
+    });
+    return {
+      sent: false,
+      retryability: 'none',
+      reason: 'non_production_recipient',
+    };
   }
 
   // Skip permanently-dead addresses (prior hard bounce / spam complaint). This
@@ -132,7 +199,7 @@ export async function sendEmail(
       event: 'notification.email.suppressed',
       type: payload.type,
     });
-    return { sent: false, reason: 'suppressed' };
+    return { sent: false, retryability: 'none', reason: 'suppressed' };
   }
 
   const from = options?.emailFrom ?? 'noreply@mentomate.com';
@@ -159,38 +226,60 @@ export async function sendEmail(
     });
 
     if (!response.ok) {
-      // Log only status code — error body may contain PII (echoed email addresses)
-      // [logging sweep] structured logger so PII fields land as JSON context
-      // [C-2] Escalate via Sentry too — `logger.error` alone is not queryable
-      // for the "how often did this fire in 24h" question, the same reason the
-      // network-error path below captures. Status only, no PII in tags.
+      const responseBody: unknown = await response.json().catch(() => null);
+      const providerCode = parseResendProviderCode(responseBody);
+      const retryability = isTransientResendFailure(
+        response.status,
+        providerCode,
+      )
+        ? 'transient'
+        : 'permanent';
+
+      // Provider response messages can echo recipient addresses. Record only
+      // the stable provider code and HTTP status at this boundary.
       logger.error('[email] Resend API error', {
         event: 'notification.email.resend_api_error',
         type: payload.type,
         status: response.status,
+        providerCode,
+        retryability,
       });
-      captureException(new Error(`Resend API ${response.status}`), {
-        tags: { surface: 'email', reason: `http_${response.status}` },
-        extra: { type: payload.type },
-      });
-      return { sent: false, reason: `resend_api_error_${response.status}` };
+      if (retryability === 'permanent') {
+        captureException(new Error('Resend API request permanently rejected'), {
+          tags: {
+            surface: 'email',
+            reason: 'resend_api_error',
+            providerCode,
+          },
+          extra: {
+            type: payload.type,
+            statusCode: response.status,
+            providerCode,
+          },
+        });
+      }
+      return {
+        sent: false,
+        retryability,
+        reason: 'resend_api_error',
+        statusCode: response.status,
+        providerCode,
+      };
     }
 
     const result = (await response.json()) as { id?: string };
     return { sent: true, messageId: result.id };
   } catch (err) {
-    // [logging sweep] structured logger so PII fields land as JSON context.
-    // Escalate via Sentry too — `logger.error` alone is not queryable for
-    // the "how often did this fire in 24h" question.
     logger.error('[email] Network error sending email', {
       event: 'notification.email.network_error',
       type: payload.type,
-      error: err instanceof Error ? err.message : String(err),
+      errorName: err instanceof Error ? err.name : 'UnknownError',
     });
-    captureException(err, {
-      tags: { surface: 'email', reason: 'network_error' },
-    });
-    return { sent: false, reason: 'network_error' };
+    return {
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    };
   }
 }
 

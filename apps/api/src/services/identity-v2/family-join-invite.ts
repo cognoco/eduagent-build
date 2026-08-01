@@ -171,7 +171,7 @@ export async function initiateFamilyJoinInvite(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.reason === 'no_api_key') {
+    if (emailResult.retryability === 'none') {
       // Config issue, not a delivery failure — keep the invite row.
       return { emailDelivered: false };
     }

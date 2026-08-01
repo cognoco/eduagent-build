@@ -17,6 +17,7 @@ import { apiError } from '../errors';
 
 type FeedbackRouteEnv = {
   Bindings: {
+    ENVIRONMENT?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     SUPPORT_EMAIL?: string;
@@ -105,12 +106,13 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
         type: 'feedback',
       },
       {
+        environment: env.ENVIRONMENT,
         resendApiKey: env.RESEND_API_KEY,
         emailFrom: env.EMAIL_FROM,
       },
     );
 
-    if (!emailResult.sent) {
+    if (!emailResult.sent && emailResult.retryability === 'transient') {
       // PII egress: the feedback free-text and the support address must not
       // ride in the Inngest event (third-party event store). Park the payload
       // in the first-party retry queue; the event carries the opaque row id
@@ -144,6 +146,12 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
           success: true,
           queued: retryId !== null,
         }),
+      );
+    }
+
+    if (!emailResult.sent) {
+      return c.json(
+        feedbackResponseSchema.parse({ success: true, queued: false }),
       );
     }
 
