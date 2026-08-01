@@ -61,6 +61,36 @@ export async function initiateLink(
   );
 }
 
+export async function findActiveLinkContract(
+  db: Database,
+  input: Pick<
+    VisibilityLinkInitiate,
+    'supporterPersonId' | 'supporteePersonId'
+  >,
+): Promise<VisibilityContract | null> {
+  const rows = await db
+    .select({ contract: supportVisibilityContracts })
+    .from(supportVisibilityContracts)
+    .innerJoin(
+      supportership,
+      eq(supportership.id, supportVisibilityContracts.supportershipId),
+    )
+    .where(
+      and(
+        eq(supportership.supporterPersonId, input.supporterPersonId),
+        eq(supportership.supporteePersonId, input.supporteePersonId),
+        isNull(supportership.revokedAt),
+        inArray(supportVisibilityContracts.status, [
+          'pending',
+          'accepted',
+          'restamped',
+        ]),
+      ),
+    )
+    .limit(1);
+  return rows[0] ? mapContract(rows[0].contract) : null;
+}
+
 /**
  * Canonical link initiation for callers that already own a transaction.
  * Repairs a pre-existing bare supportership by adding its missing contract.

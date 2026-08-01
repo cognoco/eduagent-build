@@ -63,7 +63,10 @@ import {
 } from './deletion-v2';
 import { getChargePersonIds, getGuardianPersonIds } from './guardianship';
 import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
-import { initiateLinkInTransaction } from '../linking-ceremony';
+import {
+  findActiveLinkContract,
+  initiateLinkInTransaction,
+} from '../linking-ceremony';
 
 /**
  * v1 gate (TODO(WI-1753 Fork 2 / OPQ-75: teen age eligibility — pending Zuzka
@@ -260,7 +263,10 @@ export async function acceptFamilyJoin(
               managedTierActive: false,
               initiatedByPersonId: teenPersonId,
             })
-          : null;
+          : await findActiveLinkContract(tx, {
+              supporterPersonId: parentPersonId,
+              supporteePersonId: teenPersonId,
+            });
         return {
           familyOrgId,
           teenPersonId,

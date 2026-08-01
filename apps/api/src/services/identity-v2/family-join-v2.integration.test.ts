@@ -58,6 +58,7 @@ import {
 } from '@eduagent/database';
 import { BadRequestError, ConflictError, ForbiddenError } from '../../errors';
 import { getSubscriptionByAccountIdV2 } from '../billing/billing-v2';
+import { acceptLink, initiateLink } from '../linking-ceremony';
 import { createIdentityGraph } from './identity-graph';
 import { acceptFamilyJoin } from './family-join-v2';
 
@@ -635,6 +636,183 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     });
     expect(await readMembershipOrg(teen.personId)).toBe(family.orgId);
   });
+
+  itGraph(
+    'returns an existing accepted visibility contract on a repeated opt-out',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const otherParent = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Other parent',
+      });
+      const teen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen',
+      });
+
+      await acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        ...(await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        })),
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      });
+      const contract = await initiateLink(db, {
+        supporterPersonId: otherParent.personId,
+        supporteePersonId: teen.personId,
+        relation: 'parent',
+        managedTier: false,
+      });
+      await acceptLink(db, contract.id, {
+        actorPersonId: teen.personId,
+        audience: 'supportee',
+        contractVersion: contract.contractVersion,
+      });
+      await acceptLink(db, contract.id, {
+        actorPersonId: otherParent.personId,
+        audience: 'supporter',
+        contractVersion: contract.contractVersion,
+      });
+
+      const repeated = await acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        ...(await seedInvite({
+          inviterPersonId: otherParent.personId,
+          familyOrgId: family.orgId,
+        })),
+        familyOrgId: family.orgId,
+        parentPersonId: otherParent.personId,
+        optInSupportership: false,
+      });
+
+      expect(repeated.visibilityContract).toMatchObject({
+        id: contract.id,
+        supporterPersonId: otherParent.personId,
+        supporteePersonId: teen.personId,
+        status: 'accepted',
+      });
+    },
+  );
+
+  itGraph(
+    'refuses an already-member guardian who opts into supportership',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const otherParent = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Other parent',
+      });
+      const teen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen',
+      });
+      const charge = await seedGraph({
+        birthYear: NOT_CAPABLE_BIRTH_YEAR,
+        displayName: 'Charge',
+      });
+      await acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        ...(await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        })),
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      });
+      await db.insert(guardianship).values({
+        guardianPersonId: teen.personId,
+        chargePersonId: charge.personId,
+      });
+
+      await expect(
+        acceptFamilyJoin(db, {
+          teenPersonId: teen.personId,
+          ...(await seedInvite({
+            inviterPersonId: otherParent.personId,
+            familyOrgId: family.orgId,
+          })),
+          familyOrgId: family.orgId,
+          parentPersonId: otherParent.personId,
+          optInSupportership: true,
+        }),
+      ).rejects.toThrow(ForbiddenError);
+      expect(
+        await db.query.supportership.findFirst({
+          where: and(
+            eq(supportership.supporterPersonId, otherParent.personId),
+            eq(supportership.supporteePersonId, teen.personId),
+          ),
+        }),
+      ).toBeUndefined();
+    },
+  );
+
+  itGraph(
+    'refuses an already-member managed child who opts into supportership',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const otherParent = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Other parent',
+      });
+      const teen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen',
+      });
+      const guardian = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Guardian',
+      });
+      await acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        ...(await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        })),
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      });
+      await db.insert(guardianship).values({
+        guardianPersonId: guardian.personId,
+        chargePersonId: teen.personId,
+      });
+
+      await expect(
+        acceptFamilyJoin(db, {
+          teenPersonId: teen.personId,
+          ...(await seedInvite({
+            inviterPersonId: otherParent.personId,
+            familyOrgId: family.orgId,
+          })),
+          familyOrgId: family.orgId,
+          parentPersonId: otherParent.personId,
+          optInSupportership: true,
+        }),
+      ).rejects.toThrow(ForbiddenError);
+      expect(
+        await db.query.supportership.findFirst({
+          where: and(
+            eq(supportership.supporterPersonId, otherParent.personId),
+            eq(supportership.supporteePersonId, teen.personId),
+          ),
+        }),
+      ).toBeUndefined();
+    },
+  );
 
   // ---- NEGATIVE break-tests: each refuses and leaves every row unchanged. ----
 
