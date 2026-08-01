@@ -56,7 +56,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 15:25 CEST
+## Live reconciliation — 2026-08-01 15:31 CEST
 
 ### Latest authoritative boundary
 
@@ -109,10 +109,16 @@ Delivery Batch as `Done`.
   has focused 33/33 and fast change-class 4 commands/62 tests green. No database or
   secret access occurred. Shared-development mutation remains explicitly ungranted;
   staging and production are out of bounds. All 14 exact-head checks are green.
-- WI-2643 draft PR #2833 exact head `033ce57e` contains the six-file fixed-role/setup/
-  check/rollback contract. Disposable local PostgreSQL passed 74/74 integration
-  suites (610 passed, one skipped), focused RLS 9/9, setup contract 5/5, and mutation
-  RED/restore GREEN. CI is running; no shared database or secret was touched.
+- WI-2643 draft PR #2833 initially failed Flag-ON at `033ce57e` because that sibling
+  CI job omitted role provisioning while main provisioned successfully. FO-2089 /
+  `OCC-C0E17AC9B170` records the occurrence. Minimal repair head `fc2de822` invokes
+  the existing guarded provisioner before Flag-ON integration and adds mutation-
+  sensitive coverage requiring both CI lanes to provision first; contract 6/6 and
+  focused workflow 61/61 pass. Fresh exact-head CI run 30701739419 is running. The
+  broader six-file fixed-role/setup/check/rollback contract has disposable local
+  PostgreSQL evidence: 74/74 integration suites (610 passed, one skipped), focused
+  RLS 9/9, setup contract 5/5, and mutation RED/restore GREEN. No shared database or
+  secret was touched.
 - Same-owner heartbeats renewed WI-2643, WI-2790, WI-2826, WI-2922, and WI-2939;
   WI-2921's fresh reclaim is also live. No Executing member has an expired claim.
 - The four-WIP figure remains throughput guidance; blocked waits do not suppress

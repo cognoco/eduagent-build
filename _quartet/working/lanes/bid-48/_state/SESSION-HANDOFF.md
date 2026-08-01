@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 15:25 CEST
+Last reconciled: 2026-08-01 15:31 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -26,7 +26,7 @@ Last reconciled: 2026-08-01 15:25 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 15:25 CEST
+### Latest authoritative boundary — 2026-08-01 15:31 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -95,8 +95,15 @@ Last reconciled: 2026-08-01 15:25 CEST
   Shared development, staging, production, and secrets remain untouched; AC2's
   explicit shared-dev mutation gate is not granted. All 14 exact-head checks are now
   green; PR #2830 remains draft pending the later shared-development ruling.
-- WI-2643 repository repair is published in draft PR #2833 at exact head `033ce57e`.
-  Its six-file contract defines a minimal fixed NOLOGIN/NOINHERIT role, explicit SET
+- WI-2643 repository repair is published in draft PR #2833. Initial head `033ce57e`
+  failed only the Flag-ON CI job because that sibling job omitted the new local-role
+  provisioning step; the normal main job provisioned successfully. FO-2089 /
+  `OCC-C0E17AC9B170` records the exact CI occurrence. Minimal two-file repair head
+  `fc2de822` invokes the existing guarded loopback provisioner in Flag-ON and adds a
+  mutation-sensitive contract requiring both CI lanes to provision before integration.
+  Restored contract coverage passes 6/6 and focused workflow coverage 61/61; fresh
+  exact-head CI run 30701739419 is running. The broader six-file contract defines a
+  minimal fixed NOLOGIN/NOINHERIT role, explicit SET
   membership, narrow schema/table grants, fail-closed remote/apply guards, CI-local
   provisioning, and documented shared-dev verification/rollback. Disposable local
   PostgreSQL verification passed 74/74 integration suites (610 passed, one skipped),
