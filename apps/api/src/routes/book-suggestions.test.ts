@@ -193,7 +193,13 @@ const AUTH_HEADERS = makeAuthHeaders();
 // in this file (billing-v2 / metering-v2 continuity mocks are absent here,
 // unlike dictation.test.ts / filing.test.ts), so routing through it 500s.
 // Mirrors this file's own makeProxyApp() pattern below, but isOwner: true.
-function makeWriteApp() {
+function makeWriteApp(
+  profileMetaOverrides: {
+    birthYear?: number;
+    birthMonth?: number | null;
+    birthDay?: number | null;
+  } = {},
+) {
   const writeApp = new Hono();
   writeApp.use('*', async (c, next) => {
     c.set('db' as never, {});
@@ -202,8 +208,12 @@ function makeWriteApp() {
     c.set('account' as never, { id: 'test-account-id' });
     c.set('callerPersonId' as never, 'test-profile-id');
     c.set('profileMeta' as never, {
+      birthYear: 2000,
+      birthMonth: null,
+      birthDay: null,
       isOwner: true,
       resolvedVia: 'explicit-header',
+      ...profileMetaOverrides,
     });
     await next();
   });
@@ -365,6 +375,32 @@ describe('book-suggestions routes', () => {
         expect(assertLlmConsent).not.toHaveBeenCalled();
       } finally {
         (assertLlmConsent as jest.Mock).mockResolvedValue(undefined);
+      }
+    });
+
+    it('uses the exact birth date for the safety age bracket before the 18th birthday', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00Z'));
+      (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockClear();
+
+      try {
+        const res = await makeWriteApp({
+          birthYear: 2008,
+          birthMonth: 12,
+          birthDay: 31,
+        }).request(
+          '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/topup',
+          { method: 'POST' },
+        );
+
+        expect(res.status).toBe(200);
+        expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalledWith(
+          expect.anything(),
+          'test-profile-id',
+          'a0000000-0000-4000-a000-000000000201',
+          expect.objectContaining({ ageBracket: 'adolescent' }),
+        );
+      } finally {
+        jest.useRealTimers();
       }
     });
 

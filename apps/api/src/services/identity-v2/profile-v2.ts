@@ -100,8 +100,8 @@ function deriveHasPremiumLlm(): boolean {
 }
 
 /**
- * Build the byte-identical ProfileMeta from a person row + its membership +
- * the resolved consent status. Pure given its inputs.
+ * Build ProfileMeta from a person row + its membership + the resolved consent
+ * status. Pure given its inputs.
  */
 function buildProfileMeta(args: {
   birthDate: string;
@@ -116,8 +116,12 @@ function buildProfileMeta(args: {
   // explicit owner as 'auto'.
   resolvedVia: 'auto' | 'explicit-header';
 }): ProfileMeta {
+  const { birthMonth, birthDay } = birthMonthDayFromDate(args.birthDate);
+
   return {
     birthYear: birthYearFromDate(args.birthDate),
+    birthMonth,
+    birthDay,
     location: jurisdictionToLocation(args.residenceJurisdiction),
     consentStatus: args.consentStatus,
     hasPremiumLlm: deriveHasPremiumLlm(),

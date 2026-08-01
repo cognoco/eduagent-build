@@ -1,5 +1,6 @@
 import { generateDictationOutputSchema } from '@eduagent/schemas';
 import type {
+  AgeBracket,
   ConversationLanguage,
   GenerateDictationOutput,
 } from '@eduagent/schemas';
@@ -33,6 +34,8 @@ export interface GenerateContext {
   nativeLanguage: string;
   /** Learner's age in years — used to calibrate sentence length, vocabulary, and literary themes. */
   ageYears: number;
+  /** Safety routing bracket derived from the learner's profile. */
+  ageBracket?: AgeBracket;
   /**
    * Learner's interests with context tags. Optional — backward-compatible.
    * 'free_time' and 'both' interests are used to theme the literary passage.
@@ -213,6 +216,7 @@ export async function generateDictation(
   const result = await routeAndCall(messages, 1, {
     flow: 'dictation.generate',
     conversationLanguage: ctx.conversationLanguage,
+    ageBracket: ctx.ageBracket,
   });
 
   // [WI-1073 deferred] Uses extractJsonObject (a throwing wrapper from

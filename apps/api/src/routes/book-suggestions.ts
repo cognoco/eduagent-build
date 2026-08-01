@@ -16,6 +16,7 @@ import {
 import {
   bookSuggestionsResponseSchema,
   bookSuggestionsArrayResponseSchema,
+  computeAgeBracketFromDate,
 } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../services/llm';
 
@@ -82,6 +83,14 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
           conversationLanguage: parseConversationLanguage(
             profileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            profileMeta == null
+              ? undefined
+              : computeAgeBracketFromDate(
+                  profileMeta.birthYear,
+                  profileMeta.birthMonth ?? undefined,
+                  profileMeta.birthDay ?? undefined,
+                ),
         },
       );
       return c.json(bookSuggestionsResponseSchema.parse(result), 200);

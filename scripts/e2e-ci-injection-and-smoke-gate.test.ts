@@ -501,6 +501,9 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     expect(v2Script).toContain('pnpm run test:e2e:web:v2');
     expect(v2Script).not.toContain('pnpm run test:e2e:web:smoke');
     expect(v2Script).toContain('playwright-staging-gate.cjs --decide');
+    expect(v2Script).toContain("grep '^GATE_STATE='");
+    expect(v2Script).toContain("grep '^GATE_REASON='");
+    expect(v2Script).toContain('CANARY_PREFLIGHT_REASON=\\${PRE_REASON}');
     expect(classifyCommand).toBeDefined();
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
 

@@ -3,7 +3,10 @@ import { and, eq } from 'drizzle-orm';
 import { learningSessions, sessionSummaries } from '@eduagent/database';
 import { NonRetriableError } from 'inngest';
 import type { LlmSummary, SummaryEventPayload } from '@eduagent/schemas';
-import { summaryEventPayloadSchema } from '@eduagent/schemas';
+import {
+  computeAgeBracketFromDate,
+  summaryEventPayloadSchema,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
@@ -190,6 +193,13 @@ export const sessionSummaryCreate = inngest.createFunction(
         conversationLanguage: parseConversationLanguage(
           createConversationLanguage,
         ),
+        ageBracket: createCtx
+          ? computeAgeBracketFromDate(
+              createCtx.birthYear,
+              createCtx.birthMonth ?? undefined,
+              createCtx.birthDay ?? undefined,
+            )
+          : undefined,
       });
 
       if (!summary) {
@@ -263,6 +273,13 @@ export const sessionSummaryRegenerate = inngest.createFunction(
         conversationLanguage: parseConversationLanguage(
           regenerateConversationLanguage,
         ),
+        ageBracket: regenerateCtx
+          ? computeAgeBracketFromDate(
+              regenerateCtx.birthYear,
+              regenerateCtx.birthMonth ?? undefined,
+              regenerateCtx.birthDay ?? undefined,
+            )
+          : undefined,
       });
 
       return {

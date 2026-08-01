@@ -7,6 +7,7 @@ import {
 } from '@eduagent/database';
 import {
   llmSummarySchema,
+  type AgeBracket,
   type ConversationLanguage,
   type LlmSummary,
 } from '@eduagent/schemas';
@@ -30,6 +31,7 @@ export interface SessionLlmSummaryInput {
   // i18n Phase 1 — learner-prose threading. Callers load this from
   // profile.conversation_language and forward it through.
   conversationLanguage?: ConversationLanguage;
+  ageBracket?: AgeBracket;
 }
 
 interface SessionLlmSummaryPromptInput {
@@ -318,6 +320,7 @@ export async function generateLlmSummary(
       flow: 'session-llm-summary',
       sessionId: input.sessionId,
       conversationLanguage: input.conversationLanguage,
+      ageBracket: input.ageBracket,
     });
     const parsed = parseLlmSummaryResponse(result.response);
     if (parsed.ok) {

@@ -36,9 +36,8 @@ module.exports = {
       { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' },
     ],
   },
-  // Swap Neon HTTP driver for standard pg when DATABASE_URL points at
-  // localhost (CI container). Unit tests override with their own jest.mock.
-  // File lives outside apps/api/ to avoid NX module-boundary lint cascade.
+  // Keep the database driver shim that makes package exports safely mockable,
+  // but never load api-database-env-setup.ts or resolve a unit-test database.
   setupFilesAfterEnv: [
     join(__dirname, '../../tests/integration/api-setup.ts'),
     join(__dirname, '../../tests/unit/api-env-setup.ts'),

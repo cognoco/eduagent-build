@@ -17,6 +17,7 @@ import {
   topicUnskipResponseSchema,
   challengeCurriculumResponseSchema,
   explainTopicResponseSchema,
+  computeAgeBracketFromDate,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -213,11 +214,22 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await assertLlmConsent(db, profileId);
       }
       try {
+        const profileMeta = c.get('profileMeta');
         const result = await addCurriculumTopic(
           db,
           profileId,
           subjectId,
           input,
+          {
+            ageBracket:
+              profileMeta == null
+                ? undefined
+                : computeAgeBracketFromDate(
+                    profileMeta.birthYear,
+                    profileMeta.birthMonth ?? undefined,
+                    profileMeta.birthDay ?? undefined,
+                  ),
+          },
         );
         return c.json(curriculumTopicAddResponseSchema.parse(result));
       } catch (error) {
@@ -241,11 +253,22 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
       await assertLlmConsent(db, profileId);
       try {
+        const profileMeta = c.get('profileMeta');
         const curriculum = await challengeCurriculum(
           db,
           profileId,
           subjectId,
           feedback,
+          {
+            ageBracket:
+              profileMeta == null
+                ? undefined
+                : computeAgeBracketFromDate(
+                    profileMeta.birthYear,
+                    profileMeta.birthMonth ?? undefined,
+                    profileMeta.birthDay ?? undefined,
+                  ),
+          },
         );
         return c.json(challengeCurriculumResponseSchema.parse({ curriculum }));
       } catch (error) {
@@ -303,6 +326,14 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             profileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            profileMeta == null
+              ? undefined
+              : computeAgeBracketFromDate(
+                  profileMeta.birthYear,
+                  profileMeta.birthMonth ?? undefined,
+                  profileMeta.birthDay ?? undefined,
+                ),
         },
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));

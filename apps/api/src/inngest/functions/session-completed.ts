@@ -9,6 +9,10 @@ import {
 import { isLlmExchangeConsentAllowed } from '../../services/identity-v2/consent-status-v2';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import {
+  birthMonthDayFromDate,
+  birthYearFromDate,
+} from '../../services/identity-v2/profile-v2';
+import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
 } from '../../services/retention-data';
@@ -104,6 +108,16 @@ import {
 import { safeSend } from '../../services/safe-non-core';
 
 const logger = createLogger();
+
+function ageBracketFromBirthDate(birthDate: string | null | undefined) {
+  if (!birthDate) return undefined;
+  const { birthMonth, birthDay } = birthMonthDayFromDate(birthDate);
+  return computeAgeBracketFromDate(
+    birthYearFromDate(birthDate),
+    birthMonth ?? undefined,
+    birthDay ?? undefined,
+  );
+}
 
 // [PROFILE-SCOPE-GUARD] Verify ownership via the parent chain
 // (topics → books → subjects.profileId) before exposing the title.
@@ -1576,13 +1590,12 @@ export const sessionCompleted = inngest.createFunction(
           // i18n Phase 1 — load conversation_language so the parent-facing
           // summary renders in the learner's selected language.
           // [WI-586] v2 path: read conversationLanguage from person (profiles dropped).
+          const llmSummaryProfile = await db.query.person.findFirst({
+            where: eq(person.id, profileId),
+            columns: { conversationLanguage: true, birthDate: true },
+          });
           const llmSummaryConversationLanguage =
-            (
-              await db.query.person.findFirst({
-                where: eq(person.id, profileId),
-                columns: { conversationLanguage: true },
-              })
-            )?.conversationLanguage ?? null;
+            llmSummaryProfile?.conversationLanguage ?? null;
 
           const summary = await generateAndStoreLlmSummary(db, {
             sessionId,
@@ -1594,6 +1607,7 @@ export const sessionCompleted = inngest.createFunction(
             conversationLanguage: parseConversationLanguage(
               llmSummaryConversationLanguage,
             ),
+            ageBracket: ageBracketFromBirthDate(llmSummaryProfile?.birthDate),
           });
 
           if (!summary) {
@@ -2098,12 +2112,15 @@ export const sessionCompleted = inngest.createFunction(
         // which was dropped 2026-06-14).
         let homeworkOrganizationId: string | undefined;
         const [personRow] = await db
-          .select({ conversationLanguage: person.conversationLanguage })
+          .select({
+            conversationLanguage: person.conversationLanguage,
+            birthDate: person.birthDate,
+          })
           .from(person)
           .where(eq(person.id, profileId))
           .limit(1);
         const homeworkProfile:
-          | { conversationLanguage: string | null }
+          | { conversationLanguage: string | null; birthDate: string }
           | undefined = personRow;
         if (personRow) {
           // person → membership(org) resolution. No orderBy: this mirrors the
@@ -2284,6 +2301,7 @@ export const sessionCompleted = inngest.createFunction(
               conversationLanguage: parseConversationLanguage(
                 homeworkProfile?.conversationLanguage,
               ),
+              ageBracket: ageBracketFromBirthDate(homeworkProfile?.birthDate),
             });
           } catch (err) {
             // LLM call failed after quota was decremented — refund so

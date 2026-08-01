@@ -139,6 +139,10 @@ describe('summary-regenerate handlers', () => {
     });
 
     expect(result).toEqual({ status: 'completed', summaryId: SUMMARY_ID });
+    expect(mockGenerateAndStoreLlmSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ ageBracket: 'adolescent' }),
+    );
     expect(sendEventCalls).toEqual(
       expect.arrayContaining([
         {

@@ -48,12 +48,21 @@ describe('generateDictation', () => {
     const result = await generateDictation({
       nativeLanguage: 'cs',
       ageYears: 10,
+      ageBracket: 'child',
     });
 
     expect(result.sentences.length).toBeGreaterThanOrEqual(1);
     expect(result.title).toBe('Sopky');
     expect(result.topic).toBe('Přírodní jevy');
     expect(result.language).toBe('cs');
+    expect(mockRouteAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      1,
+      expect.objectContaining({
+        flow: 'dictation.generate',
+        ageBracket: 'child',
+      }),
+    );
   });
 
   it('throws on empty LLM response', async () => {
