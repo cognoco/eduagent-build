@@ -43,16 +43,19 @@ jobs:
       github.event.label.name == 'run-live-evals'
     runs-on: ubuntu-latest
     # Sized for the real run, not the old fail-fast one: Tier-2 envelope matrix
-    # (~242 live calls) + mastery-sim (189 calls) + setup ≈ 431 calls total.
+    # (~242 live calls) + teaching-session (5 runLive × ~17 internal calls ≈ 85)
+    # + mastery-sim (189 calls) + setup ≈ 516 calls total.
     # The previous 30 only ever held because the budget-starved drift check
     # failed within the first ~20 calls; with a real budget (WI-560) the job
-    # runs to completion. 120 is an interim cap with headroom for OpenRouter
-    # queue spikes (~30-60s/call) since no full run has been measured yet —
-    # re-tune from the observed P90 of the first workflow_dispatch run.
+    # runs to completion. 150 is an interim cap with headroom for OpenRouter
+    # queue spikes (~30-60s/call) since no full three-gate run has been
+    # measured yet — re-tune from the observed P90 of the first
+    # workflow_dispatch run (raised from 120 when the teaching gate was added,
+    # WI-2461).
     # NOTE: the 300 --max-live-calls budget below assumes the current envelope
     # scenario counts (Σ baseline n = 242); a large scenario-matrix growth
     # needs both numbers revisited.
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -73,7 +76,12 @@ jobs:
       # Same pinned, checksum-verified Doppler CLI install as deploy.yml.
       # DOPPLER_TOKEN_STG is a config-scoped service token (stg) — live evals
       # read LLM provider keys from the staging config, never production.
+      # `id: doppler` doubles as the setup guard for the later gate steps:
+      # steps run in order, so a successful Doppler install implies checkout /
+      # pnpm / node setup all succeeded (WI-2461 gate-independence contract,
+      # scripts/eval-live-gate-independence.test.ts).
       - name: Install Doppler CLI
+        id: doppler
         env:
           DOPPLER_TOKEN_STG: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: |
@@ -101,9 +109,33 @@ jobs:
       # behavior (see eval-llm/README). Non-deterministic by nature — that is
       # WHY it lives here and not in a required PR check.
       - name: Tier-2 live evals + signal-drift check
+        id: envelope-gate
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: doppler run -- pnpm eval:llm -- --live --check-baseline --only-envelope-flows --max-live-calls 300
+
+      # Teaching-session live gate (WI-2461). --only-envelope-flows above
+      # filters to emitsEnvelope:true flows, and teaching-session deliberately
+      # does NOT emit the envelope (it is judged on a transcript verdict, not
+      # signal distribution) — so it needs its own dedicated step or it never
+      # runs at all, which is exactly the blind spot that let the core
+      # tutoring-quality flow go unwatched. Budget: --max-live-calls counts
+      # runLive invocations, one per scenario × pinned profile, and the fixture
+      # set is 5 scenarios (TS01–TS05, apps/api/eval-llm/fixtures/
+      # teaching-scenarios.ts) → budget 5. Each runLive internally makes up to
+      # ~17 real LLM calls (8 mentor + 7 learner + 1 transfer probe + 1 judge)
+      # ≈ 85 calls total. A scenario-count change must retune this number in
+      # the same PR — enforced by scripts/eval-live-gate-independence.test.ts.
+      # A transfer-failed verdict is a qualityError → exit 1 → this step fails.
+      # Runs even if the envelope gate failed (`!cancelled()`), but not when
+      # setup itself broke (`steps.doppler.outcome`). Scope caveat: the
+      # scenario set is PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo).
+      - name: Teaching-session live gate (transfer + teaching quality)
+        id: teaching-gate
+        if: ${{ !cancelled() && steps.doppler.outcome == 'success' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: doppler run -- pnpm eval:llm -- --live --flow teaching-session --max-live-calls 5
 
       # Mastery-SIMULATION gate (over-credit ceiling + drift). Tutor pinned to
       # gpt-oss-120b (MENTOR_MODEL, via OpenRouter) + production judge (the
@@ -116,7 +148,12 @@ jobs:
       # A reproduced over-credit breach exits 1 (the hard ceiling); soft drift
       # only warns. Distinct baseline from the signal one above — this reads
       # simulation-baseline.json. Seeded under DOPPLER_TOKEN_STG (same judge slug).
+      # Runs even if an earlier gate failed (`!cancelled()`) so one gate's
+      # failure can no longer mask this one's result (WI-2461); the job still
+      # concludes failed when any gate genuinely failed.
       - name: Mastery-simulation gate (over-credit ceiling + drift)
+        id: mastery-gate
+        if: ${{ !cancelled() && steps.doppler.outcome == 'success' }}
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: >-
@@ -160,9 +197,13 @@ jobs:
               body: [
                 `## Scheduled live-eval failure`,
                 ``,
-                `The weekly Tier-2 live evals / signal-drift check failed on \`main\`.`,
-                `Either a live response no longer matches its expectedResponseSchema,`,
-                `or the envelope-signal distribution drifted beyond tolerance vs`,
+                `A weekly live quality gate failed on \`main\` (the gates run`,
+                `independently — check WHICH step(s) went red: envelope-flow`,
+                `drift, teaching-session, or mastery-simulation).`,
+                ``,
+                `If it was the **Tier-2 live evals + signal-drift check**: either a`,
+                `live response no longer matches its expectedResponseSchema, or the`,
+                `envelope-signal distribution drifted beyond tolerance vs`,
                 `\`apps/api/eval-llm/baseline.json\`.`,
                 ``,
                 `Run: ${runUrl}`,
@@ -170,6 +211,13 @@ jobs:
                 `Triage: re-run to rule out provider flakiness; if drift is real and`,
                 `intentional, re-baseline with`,
                 `\`doppler run -- pnpm eval:llm -- --live --update-baseline\` and commit.`,
+                ``,
+                `If the failing step was the **Teaching-session live gate**, the`,
+                `judge found a transfer/teaching-quality failure (the simulated`,
+                `learner could not apply the concept after teaching). There is no`,
+                `baseline to re-seed — read the run's quality-issue output, re-run`,
+                `once to rule out provider flakiness, and treat a reproduced`,
+                `transfer failure as a real tutoring regression.`,
                 ``,
                 `If the failing step was the **Mastery-simulation gate** (over-credit`,
                 `ceiling / simulation-baseline.json drift), it is a DIFFERENT baseline —`,
