@@ -4401,7 +4401,10 @@
       "revoke": "End sharing",
       "revoking": "Ending sharing...",
       "revokeErrorTitle": "Couldn't end sharing",
-      "missingActor": "We could not identify the active person."
+      "missingActor": "We could not identify the active person.",
+      "wrongProfileTitle": "This invite is for a specific profile",
+      "wrongProfileMessage": "This invite can only be opened with the profile it was sent to. Choose that profile, then open the invite again.",
+      "wrongProfileSwitch": "Choose profile"
     },
     "sharedRecord": {
       "emptyTitle": "No shared record yet",
