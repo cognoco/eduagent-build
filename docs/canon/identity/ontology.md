@@ -5,6 +5,39 @@ their canonical home), `MMT-ADR-0001`/`0002`/`0007`–`0012`, and the sibling id
 (`domain-model.md`, `data-model.md`, `prd.md`). **CONTEXT.md extracts its identity glossary from this
 doc.**
 
+> **Implementation status — the jurisdiction-consent model is TARGET; its resolution is UNBUILT
+> (verified 2026-08-01 against `origin/main` @ `764748015`).** The
+> `resolveConsentRequirement(age × residence_jurisdiction)` model in this doc (§3.2, §3.4, inv 10/29)
+> is canon for what we are building — it is **not** a description of shipped behaviour. As of the
+> verification commit:
+>
+> - **Schema shipped; two policy-data paths, one seeded.** `person.residence_jurisdiction` and the
+>   `regimes` / `policy_cells` tables exist (migration `0108_identity_foundation_baseline.sql`), but
+>   `policy_cells` is **unpopulated**. A newer DB-mastered path, `country_policy_registry`, **is**
+>   seeded (31 EEA+UK rows; migrations `0157`/`0158`, WI-2690).
+> - **Resolvers exist but are unconsumed.** The older `evaluatePolicyCell`
+>   (`apps/api/src/services/policy-engine/engine.ts:51-60`) is a fail-closed scaffold returning
+>   `consentRequired: true` for **all** inputs, with no consumers outside the policy-engine barrel.
+>   The newer `resolveCountryPolicy` / `resolveJurisdiction`
+>   (`apps/api/src/services/identity-v2/country-policy.ts`, `country-policy-loader.ts` — WI-2690's
+>   self-described canonical habitual-residence resolver) computes a real per-country
+>   `AgeConsentDecision` over the seeded registry — but **neither resolver has any production
+>   consumer**. Nothing in the wired consent flows reads `residence_jurisdiction` to make a consent
+>   decision.
+> - **The live consent gate is jurisdiction-blind.** What the wired flows actually import is the flat
+>   age threshold in `apps/api/src/services/consent.ts` — `checkConsentRequired` /
+>   `checkConsentRequiredFromDate` (`age <= 16` → GDPR consent required; lines 163/207 — the
+>   "GDPR-everywhere" model, where location is not a factor). Wired callers include
+>   `apps/api/src/middleware/consent.ts` and the `identity-v2` services.
+>
+> **Refiners and executors: treat this model as *resolution-unbuilt*.** Acceptance criteria for
+> consent-cluster items must scope **building out** the jurisdiction resolution — the owning resolver
+> and consumer-wiring work — never **consuming** it as if it were live. Do not write ACs that call a
+> jurisdiction-aware resolver until that work has landed and been verified; and do not scope a *new*
+> resolver without reconciling against the WI-2690 resolver that already exists unconsumed. This
+> banner labels current reality; it does not amend the target model, which stands exactly as written
+> below.
+
 **What this is.** The single *structural* terminus for the identity foundation: the entities, their
 one-line definitions, the relationships between them, and the invariants that bind them — in one
 agreed vocabulary that the PRD is *written in*, the data model *persists*, and CONTEXT.md *extracts
@@ -164,6 +197,7 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
   not managed profiles.
 
 ### §3.2 — Consent requirement & the consent decision
+*(Target model — resolution unbuilt; see the implementation-status banner at the top.)*
 - **Not** a `minor` boolean. Two **complementary** pieces (not rival names):
   - **`resolveConsentRequirement(age × residence_jurisdiction)`** — the **policy function**: what the
     *law requires* (e.g. a 14-year-old in Germany needs guardian consent). Knows the rule only.
@@ -197,6 +231,7 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
   as-is; it is the one identity-adjacent term that is *not* drifting.
 
 ### §3.4 — Residence jurisdiction
+*(Column shipped; nothing yet reads it for consent — see the implementation-status banner at the top.)*
 - A Person carries a **`residence_jurisdiction`**: a **first-class, time-versioned attribute** (history
   retained for audit — *"what policy was in force when we processed"*), keyed off **residence**, not
   current location (a holiday or VPN must not re-gate). It is the input to the consent computation
