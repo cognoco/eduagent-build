@@ -31,6 +31,7 @@ Switzerland, and all unscreened jurisdictions remain unavailable at launch. See
 | Record | Purpose |
 |---|---|
 | [`identity-compliance-register.md`](identity-compliance-register.md) | Identity and consent compliance requirements. |
+| [`voice-floor-exception-ledger.md`](voice-floor-exception-ledger.md) | Ruled voice-input exceptions to the V2 transcription floor (WI-2553); guard-enforced. |
 | [`breach-register.md`](breach-register.md) | GDPR Art 33(5) breach register — empty template, one row per incident. |
 | [`audience-matrix.md`](audience-matrix.md) | Reconstructed audience and access-control inventory; verify against current code before relying on line-level claims. |
 | [`2026-07-17-consent-withdrawal-bearer-token-threat-posture.md`](2026-07-17-consent-withdrawal-bearer-token-threat-posture.md) | Consent-withdrawal token security posture. |
