@@ -2939,9 +2939,11 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
   ] as const;
 
   describe.each(EDUCATIONAL_TEXTS)('operator example: %s', (text) => {
-    // AC-6, boundary 1: learner-authored educational text must REACH the judge
-    // rather than being blocked outright. Under the pre-fix hard-coded 'llm' +
-    // null vendor this resolved to null and blocked.
+    // AC-6, boundary `learner-profile.ts`: learner-authored educational text
+    // must REACH the judge rather than being blocked outright. Under the
+    // pre-fix hard-coded 'llm' + null vendor this resolved to null and blocked.
+    // (AC-6 names its two boundaries by FILE — `learner-profile.ts` and
+    // `inngest/functions/memory-facts-backfill.ts` — not by test layer.)
     it('user provenance REFERS to the judge rather than being refused by the matrix', () => {
       // Asserted at the SCAN layer, which is where the matrix decision lives.
       // The gate one layer up then consults the judge, and an unavailable judge
@@ -2997,12 +2999,18 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
     });
   });
 
-  // AC-6, boundary 2 — NOT COVERED HERE, and saying so in the file rather than
-  // only in a report. Tracked: WI-2971 (real-database integration test for the
-  // applyAnalysis write path, asserting the persisted projection).
+  // AC-6 write-path coverage for the `learner-profile.ts` boundary IS NOW
+  // CLOSED, end to end, in
+  // `tests/integration/wi-2952-analysis-provenance.integration.test.ts`: it
+  // drives `applyAnalysis` against a real database with both operator strings,
+  // asserts the persisted `interests` CONTAINS the text under
+  // `{provenance:'user'}` and does NOT contain it under the pre-fix
+  // `{provenance:'llm', producerVendor:''}`, and was proven red against the
+  // reverted implementation. WI-2971, filed while the gap was open, is
+  // superseded by that test.
   //
-  // An end-to-end assertion through `applyAnalysis` needs to observe the
-  // SANITISED projection the write persists. Two attempts failed to discriminate:
+  // Two earlier unit-level attempts failed to discriminate, which is why the
+  // evidence had to move to an integration test:
   //
   //   1. `expect(txMock).toHaveBeenCalled()` — measured against mutation 1
   //      (reverting `evaluateProfileFieldTexts` to the hard-coded 'llm' + null):
@@ -3012,15 +3020,19 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
   //      the stub does not satisfy enough of the real transaction body to reach
   //      the write.
   //
-  // The provenance contract IS covered above at the matrix layer, which is where
-  // the decision this item changes actually lives. What is missing is the
-  // end-to-end restatement, and it wants an integration test against a real
-  // database rather than a deeper unit stub.
+  // AC-6's SECOND boundary — `inngest/functions/memory-facts-backfill.ts` — is
+  // REFUSED AS WRITTEN, not skipped. That file hard-codes
+  // `provenance: 'migration'` with no caller-supplied author, so no
+  // caller-provenance decision exists there for this item's fix to change. The
+  // operator's 2026-07-26 ruling (quoted in `learning-text-safety/scan.ts`)
+  // keeps migration text blocked BY DESIGN: backfill text has no live author.
+  // Making the operator strings pass at that boundary would contradict the
+  // ruling, so the clause is unsatisfiable as written and is declined on that
+  // authority rather than left silently uncovered.
   //
   // AC-4's named trap (provider vs model id) IS covered — see the
   // `analyzeSessionTranscript — judge independence (WI-2952 AC-4)` describe
   // earlier in this file: it asserts the producing vendor is absent from the
   // RESOLVED judge pool against the real resolver, with a model-id control
-  // proving a `result.model` mutation would leave the vendor present. The
-  // uncovered gap in this block is ONLY the AC-6 end-to-end restatement above.
+  // proving a `result.model` mutation would leave the vendor present.
 });
