@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 14:51 CEST
+Last reconciled: 2026-08-01 15:02 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -23,7 +23,7 @@ Last reconciled: 2026-08-01 14:51 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 14:51 CEST
+### Latest authoritative boundary — 2026-08-01 15:02 CEST
 
 - WI-2936 is independently Closed/Done at landed commit `08d75f40`; its sole
   evidence-integrity bounce was corrected without production changes. Independent
@@ -74,9 +74,12 @@ Last reconciled: 2026-08-01 14:51 CEST
   the factual evidence-integrity failure. It is now reclaimed on evidence-only branch
   `WI-2921-evidence-r2`: a fresh real local run passed 4/4 with one worker and zero
   retries, and the disconnected-source mutation produced the expected RED before an
-  exact restore returned GREEN. A tracked sanitized evidence artifact and draft PR
-  are being prepared without production-code changes. WI-2790 and WI-2939 remain
-  dependency/authority-bound Executing items.
+  exact restore returned GREEN. The single-file tracked artifact landed through the
+  governed merge gate: PR #2832 exact head `99decc568` passed 14 required checks,
+  zero automated threads, and a fresh zero-finding Claude approval, then squash-landed
+  as `9a3415b5`. Landed checks and corrected execute-complete artifacts are now being
+  established before independent re-review. WI-2790 and WI-2939 remain dependency/
+  authority-bound Executing items.
 - WI-2922 was live-reconciled Ready/Active/unclaimed, then properly claimed as
   `codex:wi2922-repository-executor:WI-2922` in isolated worktree `WI-2922`. Its
   repository-only frontier is published in draft PR #2830 at `f8320a9d`. Focused

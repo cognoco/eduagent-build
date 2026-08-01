@@ -15,7 +15,7 @@
       "task-id": "thread-goal:root-direct-poll"
     },
     {
-      "target": "Every PR referenced by a non-Closed BID-48 member, currently including eduagent-build #2715/#2718/#2733/#2809/#2811/#2830; checks, reviews, merge state, and origin/main",
+      "target": "Every PR referenced by a non-Closed BID-48 member, currently including eduagent-build #2715/#2718/#2733/#2809/#2811/#2830/#2832; checks, reviews, merge state, and origin/main",
       "purpose": "enforce strict-green landing and landed completion evidence",
       "command": "gh PR/check/review queries and git fetch/rev-parse",
       "task-id": "thread-goal:root-direct-poll"

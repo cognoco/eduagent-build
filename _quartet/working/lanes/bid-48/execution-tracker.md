@@ -56,7 +56,7 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 14:51 CEST
+## Live reconciliation — 2026-08-01 15:02 CEST
 
 ### Latest authoritative boundary
 
@@ -93,7 +93,10 @@ Delivery Batch as `Done`.
   evidence. FO-2088 / `OCC-965BA3CB88AA` records the occurrence. Fresh evidence-only
   rework is reclaimed on `WI-2921-evidence-r2`; real local Playwright passed 4/4 and
   an exact disconnected-source mutation produced RED before restore returned GREEN.
-  A tracked sanitized evidence artifact and draft PR are in preparation.
+  Evidence-only PR #2832 exact head `99decc568` passed 14 required checks, zero
+  automated threads, and fresh zero-finding Claude review; the governed gate
+  squash-landed it as `9a3415b5`. Landed checks and corrected execute-complete
+  artifacts are now in progress before independent re-review.
 - WI-2922 is properly claimed/Executing in isolated worktree `WI-2922` for only its
   repository guard and disposable-schema test frontier. Draft PR #2830 at `f8320a9d`
   has focused 33/33 and fast change-class 4 commands/62 tests green. No database or
