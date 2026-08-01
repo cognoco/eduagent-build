@@ -1,5 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { parse } from 'dotenv';
 
 import { defaultApiUrl } from './e2e-defaults.js';
 
@@ -32,6 +34,52 @@ export const apiBaseUrl = trimTrailingSlash(
 export const appBaseUrl = trimTrailingSlash(
   process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:19006',
 );
+
+function resolveTestSeedSecret(): string | undefined {
+  const runnerSecret =
+    process.env.PLAYWRIGHT_TEST_SEED_SECRET ?? process.env.TEST_SEED_SECRET;
+
+  if (process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1') {
+    return runnerSecret;
+  }
+
+  const cwdApiVarsPath = path.join(process.cwd(), 'apps', 'api', '.dev.vars');
+  const apiVarsPath = existsSync(cwdApiVarsPath)
+    ? cwdApiVarsPath
+    : path.resolve(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '..',
+        'apps',
+        'api',
+        '.dev.vars',
+      );
+
+  let apiSecret: string | undefined;
+  try {
+    apiSecret = parse(readFileSync(apiVarsPath, 'utf8')).TEST_SEED_SECRET;
+  } catch {
+    throw new Error(
+      '[playwright:seed-secret] Local API TEST_SEED_SECRET is unavailable. Run pnpm env:sync before a local Playwright run.',
+    );
+  }
+
+  if (!apiSecret) {
+    throw new Error(
+      '[playwright:seed-secret] Local API TEST_SEED_SECRET is unavailable. Run pnpm env:sync before a local Playwright run.',
+    );
+  }
+
+  if (runnerSecret !== undefined && runnerSecret !== apiSecret) {
+    throw new Error(
+      '[playwright:seed-secret] PLAYWRIGHT_TEST_SEED_SECRET or TEST_SEED_SECRET does not match the local API seed secret. Run without a runner override, or regenerate local configuration with pnpm env:sync.',
+    );
+  }
+
+  return apiSecret;
+}
 
 function sanitizeEmailAlias(alias: string): string {
   const normalized = alias
@@ -74,8 +122,6 @@ export function buildSeedEmail(alias: string): string {
 }
 
 export function buildTestSeedHeaders(): Record<string, string> {
-  const secret =
-    process.env.PLAYWRIGHT_TEST_SEED_SECRET ?? process.env.TEST_SEED_SECRET;
-
-  return secret ? { 'X-Test-Secret': secret } : {};
+  const testSeedSecret = resolveTestSeedSecret();
+  return testSeedSecret ? { 'X-Test-Secret': testSeedSecret } : {};
 }

@@ -1,6 +1,7 @@
 const originalEmailPrefix = process.env.PLAYWRIGHT_EMAIL_PREFIX;
 const originalApiUrl = process.env.PLAYWRIGHT_API_URL;
 const originalTestSeedSecret = process.env.PLAYWRIGHT_TEST_SEED_SECRET;
+const originalSkipLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API;
 const originalClerkSecretKey = process.env.CLERK_SECRET_KEY;
 const originalFetch = global.fetch;
 
@@ -20,6 +21,11 @@ afterEach(() => {
   } else {
     process.env.PLAYWRIGHT_TEST_SEED_SECRET = originalTestSeedSecret;
   }
+  if (originalSkipLocalApi === undefined) {
+    delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
+  } else {
+    process.env.PLAYWRIGHT_SKIP_LOCAL_API = originalSkipLocalApi;
+  }
   if (originalClerkSecretKey === undefined) {
     delete process.env.CLERK_SECRET_KEY;
   } else {
@@ -34,6 +40,7 @@ function loadTestSeedHelper(): typeof import('./test-seed') {
   process.env.PLAYWRIGHT_EMAIL_PREFIX = 'pw-batched-cleanup-';
   process.env.PLAYWRIGHT_API_URL = 'https://api.test.example';
   process.env.PLAYWRIGHT_TEST_SEED_SECRET = 'test-secret';
+  process.env.PLAYWRIGHT_SKIP_LOCAL_API = '1';
   return jest.requireActual('./test-seed');
 }
 
