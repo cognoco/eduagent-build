@@ -765,7 +765,7 @@ function assertion(
       ).toBe(true);
     });
 
-    it('[WI-2986 RED] recovers the original authority after response loss without redeeming the handle twice', async () => {
+    it('[WI-2986] recovers the original authority after response loss without redeeming the handle twice', async () => {
       const adult = await seedIdentity('adult-response-loss', 40);
       const learner = await seedIdentity('learner-response-loss', 14);
       const verificationHandle = `verification-${randomUUID()}`;

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GuardianAttachmentScreen from './guardian-attachment';
 import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
@@ -110,9 +110,8 @@ describe('GuardianAttachmentScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('guardian-attachment-error')).toBeTruthy();
     });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('guardian-attachment-retry'));
-    });
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('guardian-attachment-retry'));
     await waitFor(() => {
       expect(screen.getByTestId('guardian-attachment-complete')).toBeTruthy();
     });

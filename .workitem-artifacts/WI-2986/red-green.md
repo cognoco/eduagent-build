@@ -15,4 +15,21 @@ The run preceded all production-code and schema changes for WI-2986.
 
 ## GREEN
 
-Pending revision-pinned disposable-schema bootstrap and rerun after the implementation commit.
+Revision: `9c0f357cb3369c88b25fa8e7259432cc18cf9702`
+
+The shared remote disposable target was left untouched because its guarded
+bootstrap marker belonged to another Orion session. Equivalent verification
+ran against two isolated, ephemeral local `pgvector/pgvector:pg16` containers;
+both containers and all test data were deleted immediately afterward.
+
+- Fresh committed migration-chain replay: `pnpm --filter @eduagent/database run db:migrate` — passed through migration `0164_busy_mongu`; the new table exposed 21 columns and 13 constraints/FKs.
+- Focused API integration: `pnpm test:api:integration --jest apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts --runInBand` with an explicit local integration DSN — 15/15 passed.
+- Database schema unit suite — 2/2 passed.
+- Guardian authority-token unit suite — 8/8 passed.
+- Guardian attachment mobile suites — 4/4 passed.
+- API, database, and mobile TypeScript checks passed; the API Wrangler dry-run build passed.
+
+The green integration matrix covers ordinary success, exact response-loss
+recovery, concurrent duplicate redemption across two database connections,
+mutated learner-tuple replay, provider success followed by missing local
+persistence, and a correctly signed token without a durable receipt.
