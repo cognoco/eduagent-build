@@ -3,6 +3,10 @@ import { mkdir } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { pressableClick } from './pressable';
+import type {
+  OwnerJourneyPhaseDiagnostics,
+  OwnerJourneyReadinessMarker,
+} from './owner-journey-phase-diagnostics';
 
 export interface SignInOptions {
   email: string;
@@ -10,6 +14,8 @@ export interface SignInOptions {
   landingTestId: string | readonly string[];
   landingPath?: string;
   activeProfileId?: string;
+  diagnostics?: OwnerJourneyPhaseDiagnostics;
+  diagnosticReadinessMarker?: OwnerJourneyReadinessMarker;
 }
 
 export interface PersistedSignInOptions extends SignInOptions {
@@ -99,6 +105,12 @@ async function waitForSignedInReady(
   let profileRetryCount = 0;
   let signInRetryCount = 0;
 
+  options.diagnostics?.enter({
+    phase: 'sign-in-readiness',
+    url: page.url(),
+    readinessMarker: options.diagnosticReadinessMarker,
+  });
+
   while (Date.now() < deadline) {
     if (
       waitOptions.allowPostApproval &&
@@ -125,6 +137,12 @@ async function waitForSignedInReady(
       (await profileLoadRetry.isVisible().catch(() => false))
     ) {
       profileRetryCount += 1;
+      options.diagnostics?.enter({
+        phase: 'sign-in-readiness',
+        attempt: profileRetryCount,
+        url: page.url(),
+        readinessMarker: options.diagnosticReadinessMarker,
+      });
       await pressableClick(profileLoadRetry);
       await page.waitForTimeout(500);
       continue;
@@ -136,6 +154,12 @@ async function waitForSignedInReady(
       (await signInButton.isVisible().catch(() => false))
     ) {
       signInRetryCount += 1;
+      options.diagnostics?.enter({
+        phase: 'sign-in-readiness',
+        attempt: signInRetryCount,
+        url: page.url(),
+        readinessMarker: options.diagnosticReadinessMarker,
+      });
       await signInButton.click();
       await page.waitForTimeout(1_000);
       continue;
@@ -211,6 +235,11 @@ export async function signIn(
   page.on('pageerror', onPageError);
   page.on('console', onConsole);
 
+  options.diagnostics?.enter({
+    phase: 'sign-in-setup',
+    url: '/sign-in',
+    readinessMarker: 'sign-in-form',
+  });
   await setupClerkTestingToken({ page });
   await page.goto('/sign-in', { waitUntil: 'commit' });
   await expect(page.getByTestId('sign-in-email')).toBeVisible({
@@ -220,6 +249,11 @@ export async function signIn(
   await page.getByTestId('sign-in-email').fill(options.email);
   await page.getByTestId('sign-in-password').fill(options.password);
   await page.getByTestId('sign-in-button').click();
+  options.diagnostics?.enter({
+    phase: 'sign-in-session',
+    url: page.url(),
+    readinessMarker: 'session-cookie',
+  });
   await expect
     .poll(async () => markPreAuthIntroSeen(page), {
       timeout: 30_000,
@@ -231,12 +265,16 @@ export async function signIn(
       window.localStorage.removeItem('parent-proxy-active');
     }, options.activeProfileId);
   }
+  options.diagnostics?.enter({
+    phase: 'sign-in-readiness',
+    url: options.landingPath ?? '/home',
+    readinessMarker: options.diagnosticReadinessMarker,
+  });
   await page.goto(options.landingPath ?? '/home', { waitUntil: 'commit' });
 
   try {
     // Tap through the post-approval landing if it appears (fresh SecureStore)
     const postApproval = page.getByTestId('post-approval-continue');
-    const landing = page.getByTestId(options.landingTestId);
     const first = await waitForSignedInReady(page, options, {
       allowPostApproval: true,
     });
@@ -251,6 +289,11 @@ export async function signIn(
     }
 
     if (first === 'post-approval') {
+      options.diagnostics?.enter({
+        phase: 'sign-in-readiness',
+        url: page.url(),
+        readinessMarker: 'post-approval',
+      });
       await pressableClick(postApproval);
       const second = await waitForSignedInReady(page, options, {
         allowPostApproval: false,

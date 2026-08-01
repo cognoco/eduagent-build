@@ -1,4 +1,9 @@
 import { apiBaseUrl, buildTestSeedHeaders, seedEmailPrefix } from './runtime';
+import type {
+  OwnerJourneyPhase,
+  OwnerJourneyPhaseDiagnostics,
+  OwnerJourneyReadinessMarker,
+} from './owner-journey-phase-diagnostics';
 
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
 
@@ -55,12 +60,31 @@ async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
   action: string,
+  diagnostic?: {
+    reporter: OwnerJourneyPhaseDiagnostics;
+    phase: OwnerJourneyPhase;
+    backoffPhase?: OwnerJourneyPhase;
+    readinessMarker?: OwnerJourneyReadinessMarker;
+  },
 ): Promise<Response> {
   // Initialised to a generic Error so the post-loop throw is always typed —
   // overwritten on every retryable failure with the actual status + body.
   let lastError = new Error(`${action} failed: no attempts made`);
   for (let attempt = 0; attempt < RETRY_MAX_ATTEMPTS; attempt++) {
+    const requestUrl = input instanceof Request ? input.url : input;
+    diagnostic?.reporter.enter({
+      phase: diagnostic.phase,
+      attempt: attempt + 1,
+      url: requestUrl,
+    });
     const response = await fetch(input, init);
+    diagnostic?.reporter.enter({
+      phase: diagnostic.phase,
+      attempt: attempt + 1,
+      status: response.status,
+      url: requestUrl,
+      readinessMarker: response.ok ? diagnostic.readinessMarker : undefined,
+    });
     if (response.ok) {
       return response;
     }
@@ -84,6 +108,14 @@ async function fetchWithRetry(
 
     lastError = new Error(`${action} failed (${response.status}): ${detail}`);
     if (attempt < RETRY_MAX_ATTEMPTS - 1) {
+      if (diagnostic?.backoffPhase) {
+        diagnostic.reporter.enter({
+          phase: diagnostic.backoffPhase,
+          attempt: attempt + 1,
+          status: response.status,
+          url: requestUrl,
+        });
+      }
       // Exponential backoff with ±20% jitter
       const base = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
       const jitter = base * (0.8 + Math.random() * 0.4);
@@ -105,10 +137,13 @@ async function readJsonOrThrow<T>(
   return (await response.json()) as T;
 }
 
-export async function seedScenario(input: {
-  scenario: string;
-  email: string;
-}): Promise<SeedResponse> {
+export async function seedScenario(
+  input: {
+    scenario: string;
+    email: string;
+  },
+  diagnostics?: OwnerJourneyPhaseDiagnostics,
+): Promise<SeedResponse> {
   const response = await fetchWithRetry(
     `${apiBaseUrl}/v1/__test/seed`,
     {
@@ -120,13 +155,21 @@ export async function seedScenario(input: {
       body: JSON.stringify(input),
     },
     `Seeding ${input.scenario}`,
+    diagnostics
+      ? {
+          reporter: diagnostics,
+          phase: 'seed-request',
+          backoffPhase: 'seed-backoff',
+          readinessMarker: 'seed-response',
+        }
+      : undefined,
   );
 
   const seeded = await readJsonOrThrow<SeedResponse>(
     response,
     `Seeding ${input.scenario}`,
   );
-  await verifySeededClerkEmail(seeded.email);
+  await verifySeededClerkEmail(seeded.email, diagnostics);
   return seeded;
 }
 
@@ -150,13 +193,17 @@ export async function resetSeededAccounts(
   return readJsonOrThrow<ResetResponse>(response, 'Resetting seeded accounts');
 }
 
-async function verifySeededClerkEmail(email: string): Promise<void> {
+async function verifySeededClerkEmail(
+  email: string,
+  diagnostics?: OwnerJourneyPhaseDiagnostics,
+): Promise<void> {
   const clerkSecretKey = process.env.CLERK_SECRET_KEY;
   if (!clerkSecretKey) return;
 
   const emailAddressId = await findSeededClerkEmailAddressId(
     email,
     clerkSecretKey,
+    diagnostics,
   );
 
   if (!emailAddressId) {
@@ -176,6 +223,13 @@ async function verifySeededClerkEmail(email: string): Promise<void> {
       body: JSON.stringify({ verified: true, primary: true }),
     },
     `Verifying Clerk seed email ${email}`,
+    diagnostics
+      ? {
+          reporter: diagnostics,
+          phase: 'clerk-verification',
+          readinessMarker: 'clerk-email-verification',
+        }
+      : undefined,
   );
 
   if (!verifyResponse.ok) {
@@ -189,10 +243,16 @@ async function verifySeededClerkEmail(email: string): Promise<void> {
 async function findSeededClerkEmailAddressId(
   email: string,
   clerkSecretKey: string,
+  diagnostics?: OwnerJourneyPhaseDiagnostics,
 ): Promise<string | null> {
   const params = new URLSearchParams({ email_address: email });
 
   for (let attempt = 0; attempt < CLERK_LOOKUP_MAX_ATTEMPTS; attempt++) {
+    diagnostics?.enter({
+      phase: 'clerk-lookup',
+      attempt: attempt + 1,
+      url: `${CLERK_API_BASE}/users`,
+    });
     const lookupResponse = await fetchWithRetry(
       `${CLERK_API_BASE}/users?${params.toString()}`,
       {
@@ -214,6 +274,13 @@ async function findSeededClerkEmailAddressId(
     const emailAddressId = emailAddress?.id ?? user?.primary_email_address_id;
 
     if (emailAddressId) {
+      diagnostics?.enter({
+        phase: 'clerk-lookup',
+        attempt: attempt + 1,
+        status: lookupResponse.status,
+        url: `${CLERK_API_BASE}/users`,
+        readinessMarker: 'clerk-email-address',
+      });
       return emailAddressId;
     }
 
