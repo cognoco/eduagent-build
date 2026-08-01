@@ -56,9 +56,24 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 19:27 CEST
+## Live reconciliation — 2026-08-01 19:36 CEST
 
 ### Latest authoritative boundary
+
+- PgM's 2026-08-01 live Brief reconciliation formally admits WI-2958 as member 42;
+  Brief and relation now agree. The prior mismatch/exclusion premise is withdrawn.
+  Per PgM direction, the Shepherd has not touched WI-2958's known stale lifecycle
+  fields or expired external claim.
+- The requested re-disposition falsifier is present in landed tracked evidence at
+  `15bbb36f:docs/evidence/WI-2939/README.md`: the exact logical database
+  `eduagent_integration_wi2790_811f580999ce`, owner `wi2939_integration`, and stable
+  branch/endpoint were operator-authorized; failed target ID `4886158` was deleted
+  rather than repaired, and the same target was recreated as ID `4886176` before
+  revision `55eb79c4` returned `action=bootstrapped`. Both post-run and independent
+  review found exactly one matching live binding at ID `4886176`. WI-2958 remains
+  unchanged pending PgM's evidence-based Superseded disposition.
+
+### Previous authoritative boundary — 2026-08-01 19:27 CEST
 
 - WI-2939's exact logical disposable development target was recreated under the
   bounded operator ruling after exact-name absence/deletion was verified. Failed
@@ -81,9 +96,9 @@ Delivery Batch as `Done`.
   ancestry, and live read-only target identity. Sanctioned independent review closed
   the item Done; QA comment `3af8bce9-1f7c-81f2-8a5e-001d89972f58`, close comment
   `3af8bce9-1f7c-81cc-8fe1-001d2d51f9d6`.
-- Live relation slice: 32 Closed, 5 Executing, 5 Ready across 42 rows. The 41-member
-  Brief slice is 32 Closed, 4 Executing, 5 Ready. WI-2958 remains the unadmitted extra
-  relation row pending formal disposition.
+- Live relation slice: 32 Closed, 5 Executing, 5 Ready across 42 rows. At this
+  boundary the Brief still listed 41; PgM's later reconciliation above admits
+  WI-2958 as member 42 and restores parity.
 - Same-owner claim renewal at 19:22 CEST gave WI-2643, WI-2790, WI-2826, and WI-2922
   future expiry at 20:22 UTC without changing ownership or lifecycle position.
 

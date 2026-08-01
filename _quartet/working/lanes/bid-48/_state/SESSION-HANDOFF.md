@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 19:27 CEST
+Last reconciled: 2026-08-01 19:36 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -8,25 +8,37 @@ Last reconciled: 2026-08-01 19:27 CEST
   attachment; the operator explicitly directed one bounded read/action of handoff
   103751 on `mentomate-pgm` for WI-2939.
 - Status: `Running`.
-- Authoritative members (41): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (42): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
   WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818, WI-2819,
   WI-2822, WI-2826, WI-2833, WI-2921, WI-2922, WI-2923, WI-2924, WI-2925,
-  WI-2931, WI-2936, WI-2939.
-- Brief/relation parity: currently divergent. The Brief remains at 41 after the 2026-07-31 operator ruling
-  retracted WI-2941's admission. WI-2941 is Backlog/Active in Nexus / Cosmo
-  Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 is Backlog/Active
-  in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains Closed /
-  Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925. The live
-  relation now also contains WI-2958 without a Brief amendment; formal membership
-  disposition is pending and the item is not silently admitted or taken over.
-- Live relation slice at checkpoint: 32 Closed, 5 Executing, 5 Ready (42 related
-  rows). The 41 Brief-declared members comprise 32 Closed, 4 Executing, 5 Ready.
+  WI-2931, WI-2936, WI-2939, WI-2958.
+- Brief/relation parity: reconciled at 42. PgM's live 2026-08-01 reconciliation
+  formally admits WI-2958 as member 42. WI-2941 remains Backlog/Active in Nexus /
+  Cosmo Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 remains
+  Backlog/Active in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains
+  Closed / Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
+- Live authoritative slice at checkpoint: 32 Closed, 5 Executing, 5 Ready (42 members).
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 19:27 CEST
+### Latest authoritative boundary — 2026-08-01 19:36 CEST
+
+- PgM's live Brief amendment reconciles WI-2958 as authoritative member 42; relation
+  and Brief now agree. The Shepherd withdrew the prior mismatch/exclusion premise and
+  did not mutate WI-2958's known stale lifecycle fields.
+- PgM supplied a falsifier for re-disposition: proof that the exact logical target was
+  already destroyed/recreated under operator authority. Landed WI-2939 evidence at
+  `15bbb36f:docs/evidence/WI-2939/README.md` records exact target
+  `eduagent_integration_wi2790_811f580999ce` / owner `wi2939_integration` on branch
+  `br-crimson-moon-agmi36va`; failed database ID `4886158` was deleted rather than
+  repaired, the same target was recreated as ID `4886176`, and revision `55eb79c4`
+  returned `action=bootstrapped`. Post-run and independent-review read-only inventory
+  found exactly one matching binding at ID `4886176`. WI-2958 remains untouched while
+  PgM considers Superseded re-disposition on that evidence.
+
+### Previous authoritative boundary — 2026-08-01 19:27 CEST
 
 - WI-2939's same logical disposable development database and owner were recreated
   under the operator's item-specific authority after exact-name deletion reduced the
@@ -56,8 +68,8 @@ Last reconciled: 2026-08-01 19:27 CEST
   `3af8bce9-1f7c-81f2-8a5e-001d89972f58`, close comment
   `3af8bce9-1f7c-81cc-8fe1-001d2d51f9d6`.
 - Direct Cosmo polling returns 42 related rows: 32 Closed, 5 Executing, and 5 Ready.
-  WI-2958 remains the extra, unadmitted relation row under an expired external claim.
-  The Brief still declares 41 authoritative members.
+  At this boundary WI-2958 remained an extra relation row pending the later PgM Brief
+  reconciliation recorded above.
 - Same-owner heartbeats renewed WI-2643, WI-2790, WI-2826, and WI-2922 at 19:22 CEST.
   The authoritative pages record future expiry at 20:22 UTC; no claim was transferred.
 
