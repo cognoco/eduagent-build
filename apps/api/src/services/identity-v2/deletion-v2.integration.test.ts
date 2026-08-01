@@ -56,6 +56,7 @@ import {
   attemptPersonIfNoConsentErasureV2,
   clerkErasureDigest,
   deleteArchivedPersonIfStillEligibleV2,
+  deleteExpiredClerkErasureFences,
   deletePersonIfConsentWithdrawnV2,
   deletePersonIfNoConsentV2,
   deletePersonV2,
@@ -263,6 +264,48 @@ const RUN = !!process.env.DATABASE_URL;
           `owner-b-${ownerId}@example.com`,
           `member-${secondPerson!.id}@example.com`,
         ].sort(),
+      );
+    });
+
+    it('[WI-2788] purges only expired Clerk fences and retains pending or active-grace fences', async () => {
+      const rawIds = [
+        `clerk-cleanup-expired-${Date.now()}`,
+        `clerk-cleanup-grace-${Date.now()}`,
+        `clerk-cleanup-pending-${Date.now()}`,
+      ];
+      clerkUserIds.push(...rawIds);
+      const setDigest = clerkErasureDigest(rawIds.join(':'));
+      const now = Date.now();
+      await db.insert(pendingClerkErasure).values([
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[0]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(now - 60 * 60 * 1000),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[1]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(now + 60 * 60 * 1000),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[2]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: null,
+        },
+      ]);
+
+      await expect(deleteExpiredClerkErasureFences(db)).resolves.toBe(1);
+      const survivors = await db
+        .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+        .from(pendingClerkErasure)
+        .where(
+          inArray(
+            pendingClerkErasure.clerkUserIdDigest,
+            rawIds.map(clerkErasureDigest),
+          ),
+        );
+      expect(survivors.map((row) => row.digest).sort()).toEqual(
+        rawIds.slice(1).map(clerkErasureDigest).sort(),
       );
     });
 

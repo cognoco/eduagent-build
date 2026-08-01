@@ -214,13 +214,10 @@ describe('scheduledDeletion', () => {
       step,
     });
 
-    // [WI-867] v2 adds capture-owner-email step (pre-reads owner email for
-    // executeDeletionV2). v1 short-circuited that step before acquiring a DB
-    // connection, so count was 4. v2 path: check-account-exists,
-    // capture-clerk-user-id, capture-owner-email, check-cancellation,
-    // capture-subscription-store-teardown-targets, delete-account-data = 6.
-    // delete-clerk-user uses getStepClerkSecretKey.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
+    // Existing durable scalar steps remain DB-backed for rollback/resume ABI
+    // compatibility. The complete snapshot, delete, reserve, and release add
+    // four more DB steps to the five historical reads.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(9);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
@@ -535,6 +532,43 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
     ).rejects.toBeInstanceOf(NonRetriableError);
     expect(mockDeleteClerkUser).not.toHaveBeenCalled();
     expect(mockMarkPendingClerkErasuresComplete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] resumes origin/main-shaped durable step receipts without losing Clerk cleanup', async () => {
+    const { step, runNames } = createInngestStepRunner({
+      runResults: {
+        'capture-clerk-user-id': 'clerk_legacy_sleeping_run',
+        'capture-owner-email': 'legacy@example.com',
+        'capture-subscription-store-teardown-targets': [],
+        'capture-organization-erasure-v2': {
+          organizationExists: false,
+          organizationId: 'acc-legacy',
+          personIds: [],
+          clerkUserIds: [],
+          loginEmails: [],
+          subscriptionStoreTeardownTargets: [],
+        },
+        'delete-account-data': 'already_deleted',
+        // This is the OLD memoized result shape. The versioned executor must
+        // never consume it as the new multi-user array result.
+        'delete-clerk-user': { deleted: true },
+      },
+    });
+
+    const handler = (scheduledDeletion as any).fn;
+    await expect(
+      handler({ event: { data: { accountId: 'acc-legacy' } }, step }),
+    ).resolves.toEqual({
+      status: 'already_deleted',
+      accountId: 'acc-legacy',
+    });
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_legacy_sleeping_run',
+      clerkSecretKey: 'sk_test_step',
+    });
+    expect(runNames()).toContain('delete-clerk-users-v2');
+    expect(runNames()).not.toContain('delete-clerk-user');
   });
 
   it('captures the Clerk id BEFORE executeDeletion removes the row', async () => {
@@ -1103,11 +1137,7 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     const handler = (scheduledDeletion as any).fn;
     await handler({ event: { data: { accountId: 'org-1' } }, step });
 
-    // check-account-exists, capture-clerk-user-id, capture-owner-email,
-    // check-cancellation, capture-subscription-store-teardown-targets,
-    // delete-account-data — delete-clerk-user uses getStepClerkSecretKey,
-    // not getStepDatabase.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(9);
   });
 
   it('[BREAK CODEX-P1] pinned v2 survives a mid-grace-period flip to legacy — erases via executeDeletionV2', async () => {

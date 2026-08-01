@@ -13,6 +13,9 @@ import {
   executeDeletionV2,
   ensurePendingClerkErasures,
   getOrganizationErasureSnapshotV2,
+  getOrganizationOwnerClerkUserIdV2,
+  getOrganizationOwnerEmailV2,
+  getSubscriptionStoreTeardownTargetsV2,
   markPendingClerkErasuresComplete,
   type OrganizationErasureSnapshotV2,
 } from '../../services/identity-v2/deletion-v2';
@@ -129,24 +132,19 @@ export const scheduledDeletion = inngest.createFunction(
       return { status: 'already_deleted', accountId };
     }
 
-    // [R1][WI-2788] Capture the COMPLETE organization erasure set before the
-    // transaction removes it: every person, Clerk identity, login email, and
-    // subscription-provider target. Keep the historical durable step name so
-    // already-sleeping runs resume without losing their memoized pre-read.
-    let erasureSnapshot: OrganizationErasureSnapshotV2 = await step.run(
+    // Preserve the historical durable-step result ABIs for runs already asleep
+    // across a deployment. New runs also write these scalar receipts so an old
+    // executor can still resume safely during a rollback.
+    const legacyClerkUserId = await step.run(
       'capture-clerk-user-id',
       async () => {
         const db = getStepDatabase();
-        return getOrganizationErasureSnapshotV2(db, accountId);
+        return getOrganizationOwnerClerkUserIdV2(db, accountId);
       },
     );
-
-    // These compatibility steps intentionally derive from the complete
-    // snapshot instead of issuing independent scalar reads. Existing durable
-    // histories retain their step names while new runs cannot observe a split
-    // Clerk/email/provider view of the organization.
-    let ownerEmail = await step.run('capture-owner-email', async () => {
-      return erasureSnapshot.loginEmails[0] ?? null;
+    const legacyOwnerEmail = await step.run('capture-owner-email', async () => {
+      const db = getStepDatabase();
+      return getOrganizationOwnerEmailV2(db, accountId);
     });
 
     // Check if deletion was cancelled
@@ -164,12 +162,38 @@ export const scheduledDeletion = inngest.createFunction(
     // after the DB erasure commits to emit a durable teardown event. This keeps
     // provider work out of the DB transaction and avoids a lost-ID retry hole if
     // dispatch fails after the subscription rows are gone.
-    let subscriptionStoreTeardownTargets = await step.run(
+    const legacyStoreTeardownTargets = await step.run(
       'capture-subscription-store-teardown-targets',
       async () => {
-        return erasureSnapshot.subscriptionStoreTeardownTargets;
+        const db = getStepDatabase();
+        return getSubscriptionStoreTeardownTargetsV2(db, accountId);
       },
     );
+
+    // [R1][WI-2788] The versioned step captures the COMPLETE organization
+    // erasure set. If an old run resumes after its DB commit, the organization
+    // is already absent; reconstruct the external cleanup set from the three
+    // historical scalar/list receipts above instead of losing those targets.
+    let erasureSnapshot: OrganizationErasureSnapshotV2 = await step.run(
+      'capture-organization-erasure-v2',
+      async () => {
+        const db = getStepDatabase();
+        return getOrganizationErasureSnapshotV2(db, accountId);
+      },
+    );
+    if (!erasureSnapshot.organizationExists) {
+      erasureSnapshot = {
+        organizationExists: false,
+        organizationId: accountId,
+        personIds: [],
+        clerkUserIds: legacyClerkUserId ? [legacyClerkUserId] : [],
+        loginEmails: legacyOwnerEmail ? [legacyOwnerEmail] : [],
+        subscriptionStoreTeardownTargets: legacyStoreTeardownTargets,
+      };
+    }
+    let ownerEmail = erasureSnapshot.loginEmails[0] ?? legacyOwnerEmail;
+    let subscriptionStoreTeardownTargets =
+      erasureSnapshot.subscriptionStoreTeardownTargets;
 
     // Permanently delete all data.
     // [Fix Bug #494] executeDeletionV2 includes an atomic TOCTOU guard: the
@@ -266,7 +290,7 @@ export const scheduledDeletion = inngest.createFunction(
         );
       }
 
-      const clerkResults = await step.run('delete-clerk-user', async () => {
+      const clerkResults = await step.run('delete-clerk-users-v2', async () => {
         const clerkSecretKey = getStepClerkSecretKey();
         const results = [];
         for (const userId of erasureSnapshot.clerkUserIds) {

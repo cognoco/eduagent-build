@@ -25,6 +25,7 @@ describe('pendingNotices schema (BUG-224)', () => {
     expect(pendingNotices).toHaveProperty('id');
     expect(pendingNotices).toHaveProperty('type');
     expect(pendingNotices).toHaveProperty('payloadJson');
+    expect(pendingNotices).toHaveProperty('readyAt');
     expect(pendingNotices).toHaveProperty('seenAt');
   });
 

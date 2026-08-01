@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import { pendingNotices, type Database } from '@eduagent/database';
 import type { PendingNotice, PendingNoticeType } from '@eduagent/schemas';
@@ -36,6 +36,8 @@ export async function recordPendingNotice(
     type: PendingNoticeType;
     childName: string;
     sourceId?: string;
+    /** False prepares an invisible notice that must be activated after work succeeds. */
+    ready?: boolean;
   },
 ): Promise<string> {
   const payloadJson: PendingNoticePayload = { childName: input.childName };
@@ -48,6 +50,7 @@ export async function recordPendingNotice(
       ownerProfileId: input.ownerProfileId,
       type: input.type,
       payloadJson,
+      readyAt: input.ready === false ? null : new Date(),
     })
     .onConflictDoNothing({
       target: [
@@ -73,6 +76,25 @@ export async function recordPendingNotice(
     throw new Error('pending_notices insert conflict returned no row');
   }
   return existing.id;
+}
+
+/** Publish a prepared notice only after its irreversible work has completed. */
+export async function activatePendingNotice(
+  db: Database,
+  ownerProfileId: string,
+  noticeId: string,
+): Promise<boolean> {
+  const rows = await db
+    .update(pendingNotices)
+    .set({ readyAt: new Date() })
+    .where(
+      and(
+        eq(pendingNotices.id, noticeId),
+        eq(pendingNotices.ownerProfileId, ownerProfileId),
+      ),
+    )
+    .returning({ id: pendingNotices.id });
+  return rows.length > 0;
 }
 
 /**
@@ -120,6 +142,7 @@ export async function listPendingNotices(
   const rows = await db.query.pendingNotices.findMany({
     where: and(
       eq(pendingNotices.ownerProfileId, ownerProfileId),
+      isNotNull(pendingNotices.readyAt),
       isNull(pendingNotices.seenAt),
     ),
     orderBy: (table, { asc }) => [asc(table.createdAt)],

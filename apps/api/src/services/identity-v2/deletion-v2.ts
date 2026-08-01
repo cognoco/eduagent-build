@@ -1280,6 +1280,26 @@ export async function markPendingClerkErasuresComplete(
   });
 }
 
+/**
+ * Remove only fences whose post-deletion JWT grace period has elapsed. The
+ * database clock is authoritative so worker clock skew cannot release a fence
+ * early. Pending (`release_after IS NULL`) and active-grace rows survive.
+ */
+export async function deleteExpiredClerkErasureFences(
+  db: Database,
+): Promise<number> {
+  const rows = await db
+    .delete(pendingClerkErasure)
+    .where(
+      and(
+        isNotNull(pendingClerkErasure.releaseAfter),
+        lte(pendingClerkErasure.releaseAfter, sql`now()`),
+      ),
+    )
+    .returning({ digest: pendingClerkErasure.clerkUserIdDigest });
+  return rows.length;
+}
+
 async function currentGdprGrantSetTx(
   tx: DeletionTx,
   personId: string,

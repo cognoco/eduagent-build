@@ -1,0 +1,1 @@
+ALTER TABLE "pending_notices" ADD COLUMN "ready_at" timestamp with time zone DEFAULT now();

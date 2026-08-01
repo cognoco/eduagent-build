@@ -48,7 +48,9 @@ describe('recordPendingNotice', () => {
   });
 
   it('returns the existing notice id when an Inngest retry repeats the write', async () => {
-    const { db, findFirst } = makeInsertDb([], { id: 'notice-existing' });
+    const { db, findFirst, values } = makeInsertDb([], {
+      id: 'notice-existing',
+    });
 
     await expect(
       recordPendingNotice(db, {
@@ -56,10 +58,14 @@ describe('recordPendingNotice', () => {
         type: 'consent_deleted',
         childName: 'Ada',
         sourceId: 'consent-revocation:child-1:2026-07-01T00:00:00.000Z',
+        ready: false,
       }),
     ).resolves.toBe('notice-existing');
 
     expect(findFirst).toHaveBeenCalledTimes(1);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ readyAt: null }),
+    );
   });
 
   it('includes a stable source id in the dedupe payload for same-name children', async () => {

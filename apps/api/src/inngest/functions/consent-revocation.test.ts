@@ -204,6 +204,7 @@ jest.mock('../../services/settings', () => {
 const mockRecordPendingNotice = jest.fn().mockResolvedValue('notice-001');
 const mockGetPendingNoticeChildName = jest.fn().mockResolvedValue('Emma');
 const mockDeletePendingNotice = jest.fn().mockResolvedValue(undefined);
+const mockActivatePendingNotice = jest.fn().mockResolvedValue(true);
 jest.mock('../../services/notices', () => {
   const actual = jest.requireActual(
     '../../services/notices',
@@ -216,6 +217,8 @@ jest.mock('../../services/notices', () => {
       mockGetPendingNoticeChildName(...args),
     deletePendingNotice: (...args: unknown[]) =>
       mockDeletePendingNotice(...args),
+    activatePendingNotice: (...args: unknown[]) =>
+      mockActivatePendingNotice(...args),
   };
 });
 
@@ -571,6 +574,7 @@ describe('consentRevocation', () => {
         'prepare-child-deletion-notice',
         'child-revocation-person-erasure-capture-1',
         'child-revocation-person-erasure-database-1',
+        'activate-child-deletion-notice',
         'notify-parent',
       ]);
     });
@@ -601,6 +605,48 @@ describe('consentRevocation', () => {
           'child-revocation-person-erasure-clerk-users',
         ]),
       );
+      expect(mockActivatePendingNotice).toHaveBeenCalledWith(
+        expect.anything(),
+        'parent-001',
+        'notice-001',
+      );
+    });
+
+    it('[WI-2788] leaves the prepared deletion notice hidden when DB erasure fails', async () => {
+      mockDeletePersonIfConsentWithdrawnV2.mockRejectedValueOnce(
+        new Error('synthetic DB erasure failure'),
+      );
+
+      await expect(
+        executeRevocation({
+          childProfileId: 'child-001',
+          parentProfileId: 'parent-001',
+          revokedAt: '2026-05-01T00:00:01.000Z',
+        }),
+      ).rejects.toThrow('synthetic DB erasure failure');
+
+      expect(mockRecordPendingNotice).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: 'consent_deleted', ready: false }),
+      );
+      expect(mockActivatePendingNotice).not.toHaveBeenCalled();
+    });
+
+    it('[WI-2788] leaves the prepared deletion notice hidden when Clerk cleanup fails', async () => {
+      mockGetPersonClerkUserIdsV2.mockResolvedValueOnce(['clerk-child-001']);
+      mockDeleteClerkUser.mockRejectedValueOnce(
+        new Error('synthetic Clerk cleanup failure'),
+      );
+
+      await expect(
+        executeRevocation({
+          childProfileId: 'child-001',
+          parentProfileId: 'parent-001',
+          revokedAt: '2026-05-01T00:00:01.000Z',
+        }),
+      ).rejects.toThrow('synthetic Clerk cleanup failure');
+
+      expect(mockActivatePendingNotice).not.toHaveBeenCalled();
     });
   });
 

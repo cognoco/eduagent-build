@@ -26,6 +26,7 @@ import {
   getWithdrawalArchivePreference,
 } from '../../services/settings';
 import {
+  activatePendingNotice,
   deletePendingNotice,
   getPendingNoticeChildName,
   recordPendingNotice,
@@ -421,6 +422,7 @@ export const consentRevocation = inngest.createFunction(
           type: 'consent_deleted',
           childName,
           sourceId: pendingNoticeSourceId,
+          ready: false,
         });
       },
     );
@@ -462,6 +464,19 @@ export const consentRevocation = inngest.createFunction(
       step,
       stepPrefix: 'child-revocation-person-erasure',
       result: deletionResult,
+    });
+
+    await step.run('activate-child-deletion-notice', async () => {
+      const activated = await activatePendingNotice(
+        getStepDatabase(),
+        archiveDecision.ownerProfileId,
+        deleteNoticeId,
+      );
+      if (!activated) {
+        throw new Error(
+          'consent-revocation: prepared deletion notice was not found',
+        );
+      }
     });
 
     // The notice was written before deletion and carries only an opaque id in

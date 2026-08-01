@@ -102,6 +102,7 @@ export const pendingNotices = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    readyAt: timestamp('ready_at', { withTimezone: true }).defaultNow(),
     seenAt: timestamp('seen_at', { withTimezone: true }),
   },
   (table) => [
