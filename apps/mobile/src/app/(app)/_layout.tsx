@@ -151,6 +151,7 @@ export const V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP = {
   subscription: 'child',
   billing: 'root',
   'mentor-memory': 'child',
+  'guardian-attachment': 'child',
   subject: 'child',
   'subject-hub': 'root',
   'pick-book': 'child',

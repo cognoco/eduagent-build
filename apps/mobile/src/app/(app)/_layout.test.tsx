@@ -2734,6 +2734,7 @@ describe('V2 pushed-route safe-area ownership invariant', () => {
       subscription: 'child',
       billing: 'root',
       'mentor-memory': 'child',
+      'guardian-attachment': 'child',
       subject: 'child',
       'subject-hub': 'root',
       'pick-book': 'child',

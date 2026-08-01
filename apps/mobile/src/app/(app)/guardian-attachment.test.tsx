@@ -14,13 +14,16 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock('../../lib/api-client', () => ({
-  ...jest.requireActual('../../lib/api-client'),
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-}));
+jest.mock(
+  '../../lib/api-client', // gc1-allow: transport-boundary — real Hono RPC client wired over mockFetch
+  () => ({
+    ...jest.requireActual('../../lib/api-client'),
+    useApiClient: () => {
+      const { hc } = require('hono/client');
+      return hc('http://localhost', { fetch: mockFetch });
+    },
+  }),
+);
 
 jest.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },

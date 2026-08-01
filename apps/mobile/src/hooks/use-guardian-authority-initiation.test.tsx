@@ -6,13 +6,16 @@ import { createRoutedMockFetch } from '../test-utils/mock-api-routes';
 
 const mockFetch = createRoutedMockFetch();
 
-jest.mock('../lib/api-client', () => ({
-  ...jest.requireActual('../lib/api-client'),
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-}));
+jest.mock(
+  '../lib/api-client', // gc1-allow: transport-boundary — real Hono RPC client wired over mockFetch
+  () => ({
+    ...jest.requireActual('../lib/api-client'),
+    useApiClient: () => {
+      const { hc } = require('hono/client');
+      return hc('http://localhost', { fetch: mockFetch });
+    },
+  }),
+);
 
 describe('useGuardianAuthorityInitiation', () => {
   const wrapper = ({ children }: PropsWithChildren) => (
