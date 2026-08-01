@@ -111,7 +111,6 @@ export async function withTransientDatabaseRetry<T>(
         'database',
         'warning',
         {
-          error: error instanceof Error ? error.message : String(error),
           retryable: true,
           operation: label,
           attempt: attempt + 1,

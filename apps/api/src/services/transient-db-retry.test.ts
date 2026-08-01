@@ -111,6 +111,43 @@ describe('withTransientDatabaseRetry', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
+  it('[WI-2788] never places Drizzle bound parameters in retry breadcrumbs', async () => {
+    const secretParameter = 'synthetic-bound-parameter-must-not-leak';
+    const driverError = Object.assign(new Error('socket interrupted'), {
+      code: 'ECONNRESET',
+    });
+    const wrapped = new DrizzleQueryError(
+      'select * from login where clerk_user_id = $1',
+      [secretParameter],
+      driverError,
+    );
+    const op = jest
+      .fn<Promise<string>, []>()
+      .mockRejectedValueOnce(wrapped)
+      .mockResolvedValueOnce('recovered');
+
+    await expect(
+      withTransientDatabaseRetry('safe_breadcrumb', op, {
+        idempotent: true,
+      }),
+    ).resolves.toBe('recovered');
+
+    expect(addBreadcrumb).toHaveBeenCalledWith({
+      message: 'Transient database error; retrying',
+      category: 'database',
+      level: 'warning',
+      data: {
+        retryable: true,
+        operation: 'safe_breadcrumb',
+        attempt: 1,
+        maxAttempts: 4,
+      },
+    });
+    expect(JSON.stringify(addBreadcrumb.mock.calls)).not.toContain(
+      secretParameter,
+    );
+  });
+
   it('throws immediately on non-transient error', async () => {
     const nonTransient = new Error('unique constraint violation');
     const op = jest.fn(() => Promise.reject(nonTransient));
