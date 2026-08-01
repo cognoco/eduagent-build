@@ -67,6 +67,44 @@ export class EmbeddingDimensionMismatchError extends Error {
   }
 }
 
+const MAX_VOYAGE_RETRY_AFTER_MS = 15 * 60_000;
+
+/** Parse Retry-After without allowing a provider response to park work forever. */
+export function parseVoyageRetryAfterMs(
+  value: string | null,
+  nowMs = Date.now(),
+): number | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+
+  let delayMs: number;
+  if (/^\d+$/.test(normalized)) {
+    const seconds = Number(normalized);
+    if (!Number.isSafeInteger(seconds) || seconds <= 0) return null;
+    delayMs = seconds * 1000;
+  } else {
+    const retryAt = Date.parse(normalized);
+    if (!Number.isFinite(retryAt)) return null;
+    delayMs = retryAt - nowMs;
+    if (delayMs <= 0) return null;
+  }
+
+  return Math.min(delayMs, MAX_VOYAGE_RETRY_AFTER_MS);
+}
+
+/** Sanitized Voyage HTTP failure; provider response bodies are never retained. */
+export class VoyageEmbeddingHttpError extends Error {
+  readonly status: number;
+  readonly retryAfterMs: number | null;
+
+  constructor(params: { status: number; retryAfterMs: number | null }) {
+    super(`Voyage AI embedding request failed (${params.status})`);
+    this.name = 'VoyageEmbeddingHttpError';
+    this.status = params.status;
+    this.retryAfterMs = params.retryAfterMs;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -129,10 +167,12 @@ export async function generateEmbedding(
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(
-      `Voyage AI embedding request failed (${response.status}): ${body}`,
-    );
+    throw new VoyageEmbeddingHttpError({
+      status: response.status,
+      retryAfterMs: parseVoyageRetryAfterMs(
+        response.headers.get('Retry-After'),
+      ),
+    });
   }
 
   const json = (await response.json()) as VoyageEmbeddingResponse;
