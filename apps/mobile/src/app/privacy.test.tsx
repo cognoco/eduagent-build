@@ -130,24 +130,55 @@ describe('PrivacyPolicyScreen', () => {
     expect(policyHtml).toContain(
       'Before any international transfer of learner data occurs',
     );
+    // ---------------------------------------------------------------------
+    // LAUNCH PERIMETER — operator ruling 2026-08-01. Read this before editing.
+    //
+    // These assertions previously encoded the perimeter ratified on 2026-07-23
+    // (#2559): the launch perimeter covers all 30 EEA countries, with only
+    // non-EEA markets disabled. The WI-1109 publication package (#2848)
+    // rewrote the notice to a NARROWER perimeter — only EEA countries whose
+    // GDPR Article 8 consent age is 13, with the United Kingdom, Switzerland,
+    // France, Germany and Poland excluded at launch.
+    //
+    // That is a substantive reversal, not a rewording, and it broke this guard.
+    // The operator has ruled the NARROWER Article-8-13 perimeter correct, so
+    // the assertions below are realigned to it deliberately, in lockstep with
+    // the notice, rather than loosened until they stop failing.
+    //
+    // The guard still bites: each assertion names a specific commitment the
+    // notice must keep making. A future rewrite that drops the availability
+    // list, the exclusion of higher-consent-age countries, or the parental
+    // authorization requirement fails here rather than shipping quietly.
+    // ---------------------------------------------------------------------
     expect(policyHtml).toContain(
-      'Within enabled EEA countries, the age at which a minor may consent',
+      'the EEA countries whose national age of digital consent under GDPR Article 8 is 13',
     );
-    expect(policyHtml).toContain(
-      'MentoMate is unavailable to users under 13 at launch',
-    );
+    expect(policyHtml).toContain('MentoMate is unavailable to users under 13.');
     expect(policyHtml).toContain(
       'verified authorization from the holder of parental responsibility',
     );
     expect(policyHtml).toContain(
-      'intended launch perimeter covers all 30 EEA countries',
+      'MentoMate is offered only in countries on a maintained availability list',
     );
     expect(policyHtml).toContain('country of habitual residence');
     expect(policyHtml).toContain(
-      'The United Kingdom, United States, and all other non-EEA markets are disabled',
+      'The United Kingdom, Switzerland, and EEA countries with a higher national consent age',
     );
-    expect(policyHtml).not.toContain(
-      'first launch perimeter includes only countries whose current threshold is 13',
+    // The closing guarantee the narrower perimeter rests on: because every
+    // enabled country's threshold is 13 and under-13s cannot register, no user
+    // below their national consent age can use the product. Without this
+    // sentence the narrower perimeter is merely a country list; with it, the
+    // list carries a stated safety property.
+    expect(policyHtml).toContain(
+      'no user below their national age of digital consent can use MentoMate',
     );
+
+    // The former `not.toContain` guard forbidding the phrase "first launch
+    // perimeter includes only countries whose current threshold is 13" is
+    // REMOVED, not relocated. It existed to prevent exactly the narrowing the
+    // operator has now ruled correct, so keeping it would encode a superseded
+    // policy and make the ruled-correct notice permanently unshippable.
+    // Removing it is the substantive half of this change and is recorded here
+    // so it reads as a decision rather than a deletion.
   });
 });
