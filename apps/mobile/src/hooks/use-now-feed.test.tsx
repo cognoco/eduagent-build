@@ -18,7 +18,10 @@ import {
 } from '../test-utils/app-hook-test-utils';
 import { NetworkError, setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
-import { resetMentorNoticePolicyStoreForTests } from '../lib/mentor-notice-policy';
+import {
+  foldMentorNoticePolicyFor,
+  resetMentorNoticePolicyStoreForTests,
+} from '../lib/mentor-notice-policy';
 import { ProfileContext, type ProfileContextValue } from '../lib/profile';
 
 import {
@@ -371,6 +374,59 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
     expect(
       result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
     ).toContain('mentor_notice');
+
+    mockActorId = 'wi2498-test-actor';
+    queryClient.clear();
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2933 Gate-1 lint fix] The regression the `noticeSafeFallback` memo's
+  // dependency on a pair-scoped LIVE policy subscription (`fallbackPolicy`)
+  // exists to prevent: if the memo stopped re-running when the bound pair's
+  // policy store changed, a projection that painted permissively (no floor
+  // yet observed) would keep painting forever, silently, even after a
+  // sibling surface observed a disable for the SAME pair — every prior test
+  // in this file still passes, because none of them mutate the store AFTER
+  // the fallback has already painted.
+  // -------------------------------------------------------------------------
+  it('[WI-2933 Gate-1] re-blanks the cached notice surface when the bound pair’s policy store observes a disable after the projection already painted', async () => {
+    await seedWarmNoticeCache();
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+    // Deliberately no stored floor yet — the projection paints permissively,
+    // same precondition as the NO-stored-floor control above.
+
+    const { result, queryClient } = await renderSlowFallback();
+    await waitFor(() => expect(result.current.fallbackFeed).not.toBeNull());
+    // Precondition: the notice really did paint, so the assertion below is a
+    // BLANKING, not an artifact of an already-empty projection.
+    expect(
+      result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+    ).toContain('mentor_notice');
+
+    // A SIBLING surface observes a disable for the SAME (actor, profile) pair
+    // — no re-render of `useNowFeed`'s own props, no new fetch. This is
+    // exactly the "sibling surface observing a disable" the memo's comment
+    // describes: the reactivity under test is the memo noticing a STORE
+    // change, not a prop change.
+    await act(async () => {
+      foldMentorNoticePolicyFor(
+        CACHE_BINDING.actorId,
+        CACHE_BINDING.profileId,
+        {
+          revision: 7,
+          enabled: false,
+        },
+      );
+      await Promise.resolve();
+    });
+
+    // THE CRITERION: the retained projection is re-judged and blanked without
+    // any other trigger.
+    await waitFor(() =>
+      expect(
+        result.current.fallbackFeed?.cards.map((card) => card.kind) ?? [],
+      ).not.toContain('mentor_notice'),
+    );
 
     mockActorId = 'wi2498-test-actor';
     queryClient.clear();

@@ -30,7 +30,7 @@ import {
   writeCachedNowFeed,
 } from '../lib/now-feed-cache';
 import {
-  mentorNoticePolicySuppressesPayloadFor,
+  noticesSuppressedForPayload,
   useMentorNoticePolicy,
 } from '../lib/mentor-notice-policy';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
@@ -343,6 +343,20 @@ export function useNowFeed(): NowFeedQueryResult {
       : query.data;
   }, [query.data, policy]);
 
+  // [WI-2933 lint fix] A LIVE subscription scoped to `fallbackEntry.pair` — not
+  // the currently-bound `policy` above, which tracks whichever pair is bound at
+  // THIS render and only coincidentally matches `fallbackEntry.pair` outside
+  // the one-render A -> B transition window described above. Its `state` /
+  // `observed` / `hydrated` / `trusted` fields ARE `fallbackEntry.pair`'s
+  // knowledge, passed into `noticesSuppressedForPayload` below as an argument
+  // rather than re-derived from a module-level read inside the memo body — so
+  // the dependency the exhaustive-deps rule wants is the same value the memo
+  // actually reads. No suppression needed.
+  const fallbackPolicy = useMentorNoticePolicy(
+    fallbackEntry?.pair.actorId,
+    fallbackEntry?.pair.profileId,
+  );
+
   // [WI-2933] Judge the persisted projection against the floor of the pair it
   // was CACHED FOR, not against whatever pair happens to be bound at render.
   //
@@ -375,26 +389,11 @@ export function useNowFeed(): NowFeedQueryResult {
   // permissive default and nothing is blanked fleet-wide (AC-2).
   const noticeSafeFallback = useMemo(() => {
     if (!fallbackEntry) return null;
-    const { feed, pair } = fallbackEntry;
-    const suppressed = mentorNoticePolicySuppressesPayloadFor(
-      pair.actorId,
-      pair.profileId,
-      undefined,
-    );
-    return suppressed ? stripNoticeCards(feed) : feed;
-    // `policy` is not read in the body — `mentorNoticePolicySuppressesPayloadFor`
-    // reads the store directly for `pair` — but it must stay a dependency: it is
-    // the reactivity signal that ANY pair's store entry changed (a sibling
-    // surface observing a disable), which this memo must re-run on to blank a
-    // stale retained projection. See the `[WI-2627]` comment above.
-    // Tracked deferral, NOT a sanctioned suppression: WI-2984 owns retiring
-    // every react-hooks/exhaustive-deps suppression in this app, this site
-    // included. The fix is to make the dependency legible to the rule (pass the
-    // store value into the helper rather than having the helper read it), which
-    // is disproportionate inside this pair-binding fix and would touch a
-    // safety-adjacent path without its own regression coverage.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fallbackEntry, policy]);
+    const suppressed = noticesSuppressedForPayload(fallbackPolicy, undefined);
+    return suppressed
+      ? stripNoticeCards(fallbackEntry.feed)
+      : fallbackEntry.feed;
+  }, [fallbackEntry, fallbackPolicy]);
 
   // The cast is the `UseQueryResult` discriminated union, not a type escape:
   // overriding `data` on a spread widens it to `NowResponse | undefined`, which
