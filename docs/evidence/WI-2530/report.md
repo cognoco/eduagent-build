@@ -89,55 +89,79 @@ timing flake.
 
 ## Deterministic delay-controlled RGR
 
+Chronology: an initial delay-controlled RGR ran at approximately 09:48 UTC, but
+that run did not retain the exact patch and raw per-leg receipts. The sequence
+below was re-executed at 10:42 UTC with the now-committed patch and raw-receipt
+capture, and it supersedes that earlier uninstrumented run. These retained legs
+therefore postdate the 09:51 focused repetitions, the 09:58 full serialized
+suite, and its landed-checkout proof documented later in this report. Sections
+are grouped by evidence type rather than execution order.
+
 To test the changed wait-budget boundary deterministically, each leg applied the
 same temporary test-only control after restoring the selected source blob. The
-control delayed only the first test's routed session response by 1,100 ms:
+control delayed only the first test's routed session response by 1,100 ms. The
+complete mutation is retained as
+[`controlled-delay.patch`](controlled-delay.patch) (SHA-256
+`f0a0bea6d9bbda6f0ca9782c47b60262ca0ba9327a8651e65110624c0df76d57`). It is
+committed only as a passive evidence artifact and is not applied to the test
+source in this revision.
 
-```diff
--function setRoutes(session: unknown): void {
-+function setRoutes(session: unknown, delayMs = 0): void {
-   mockFetch.setRoute(
-     '/dashboard/children/child-profile-001/sessions/session-001',
--    () => {
-+    async () => {
-+      if (delayMs > 0) {
-+        await new Promise((resolve) => setTimeout(resolve, delayMs));
-+      }
-       // existing response body unchanged
-   );
- }
+The parent source retains the default 1-second `waitFor` budget; the landed
+source has the explicit 5-second budget and exact route assertion. The same
+patch applies cleanly to both source blobs and makes each controlled blob
+independently reproducible:
 
- setRoutes(
-   makeSession({
-     displaySummary: 'Practiced light reactions',
-     // existing fixture fields unchanged
-   }),
-+  1_100,
- );
+```bash
+SOURCE=a0a2f161ee1d59ff9177598d62ae76a639eda3f2 # parent RED
+# SOURCE=f9f904eb8726c94493115c848fa53531e97aaacb # landed GREEN
+PATCH=docs/evidence/WI-2530/controlled-delay.patch
+TARGET='apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx'
+TEST_NAME='shows session metadata when displaySummary is present'
+
+git restore --source="$SOURCE" -- "$TARGET"
+git apply --check "$PATCH"
+git apply "$PATCH"
+git hash-object "$TARGET"
+CI=1 FORCE_COLOR=0 pnpm dlx node@22 --max-old-space-size=6144 \
+  ./node_modules/jest/bin/jest.js \
+  --config apps/mobile/jest.config.cjs --runInBand --forceExit \
+  --runTestsByPath "$TARGET" --testNamePattern="$TEST_NAME"
+git restore --source=HEAD --staged --worktree -- "$TARGET"
+git status --short
 ```
 
-The delay was never committed. The parent source retains the default 1-second
-`waitFor` budget; the landed source has the explicit 5-second budget and exact
-route assertion. An initial malformed application of the temporary control
-failed during parsing with zero tests executed; it was discarded and is not a
-leg below. The valid sequence began only after the control compiled and tests
-executed.
+The test-name filter isolates the changed async boundary and prevents a RED
+assertion from skipping cleanup and cascading into later tests. Each invocation
+starts a fresh Node/Jest process.
 
 | Leg | Source restored before control | Controlled blob | UTC interval | Exit | Result |
 |---:|---|---|---|---:|---|
-| 1 | Parent `a0a2f161…` | `b2f053bdf9115bcf95f13a6fa4261553656f7c75` | 09:48:16–09:48:21 | 1 | **RED** — `Unable to find an element with text: Practiced light reactions`; 1 failed, 14 passed |
-| 2 | Landed `f9f904eb…` | `6b50b04cde2b3a8018e70edef64b6e924f0fed65` | 09:48:45–09:48:50 | 0 | **GREEN** — 15 passed |
-| 3 | Parent `a0a2f161…` | `b2f053bdf9115bcf95f13a6fa4261553656f7c75` | 09:49:09–09:49:13 | 1 | **RED** — same missing-summary assertion; 1 failed, 14 passed |
-| 4 | Landed `f9f904eb…` | `6b50b04cde2b3a8018e70edef64b6e924f0fed65` | 09:49:33–09:49:38 | 0 | **GREEN** — 15 passed |
+| 1 | Parent `a0a2f161…` | `b2f053bdf9115bcf95f13a6fa4261553656f7c75` | 10:42:32–10:42:36 | 1 | [**RED** — 1 failed, 14 skipped](rgr-leg-1-parent-red.txt) |
+| 2 | Landed `f9f904eb…` | `6b50b04cde2b3a8018e70edef64b6e924f0fed65` | 10:42:36–10:42:40 | 0 | [**GREEN** — 1 passed, 14 skipped](rgr-leg-2-landed-green.txt) |
+| 3 | Parent `a0a2f161…` | `b2f053bdf9115bcf95f13a6fa4261553656f7c75` | 10:42:40–10:42:44 | 1 | [**RED** — 1 failed, 14 skipped](rgr-leg-3-parent-red.txt) |
+| 4 | Landed `f9f904eb…` | `6b50b04cde2b3a8018e70edef64b6e924f0fed65` | 10:42:44–10:42:48 | 0 | [**GREEN** — 1 passed, 14 skipped](rgr-leg-4-landed-green.txt) |
 
-The controlled hashes attest within this run that both RED legs used an
-identical controlled file and both GREEN legs used an identical controlled
-file. Because these are uncommitted blob IDs, they are not independently
-re-derivable from Git history.
+The controlled hashes attest that both RED legs used identical controlled
+content and both GREEN legs used identical controlled content. A reviewer can
+derive them independently by applying the retained patch to the corresponding
+source blob.
+
+The linked receipts preserve the complete Jest stdout/stderr plus commands,
+exit codes, UTC timing, source/blob checks, patch checksum, and final clean-tree
+proof. Sanitization is limited to replacing the exact temporary checkout root
+with `<verification-checkout>`, replacing the exact evidence-worktree root with
+`<workspace>`, and removing ANSI color-control bytes; no test or result text was
+omitted. The `(app)../../child` segment in the RED stack paths is Jest message
+formatting retained verbatim, not a sanitizer rewrite.
+
+Each retained leg ends by restoring the target from `HEAD` and recording its own
+cleanup and clean-tree proof (`status_lines=0`); the fourth receipt is the final
+10:42 checkout proof for the retained sequence.
 
 ## Ten fresh focused processes at the landed revision
 
-Before these runs, the control was removed with
+For these earlier 09:51 runs, the temporary control used by the now-superseded
+09:48 sequence was removed with
 `git restore --source="$LANDED" -- "$TARGET"`, the target hash matched the landed
 blob, and both `git diff --exit-code` and `git status --short` were empty.
 
@@ -162,9 +186,10 @@ Aggregate: 10/10 fresh processes exited `0`; 150/150 test executions passed.
 |---|---|---:|---|
 | Landed `f9f904eb…`; target blob `3a4a7ced…` | 2026-08-01 09:51:53–09:58:38 | 0 | `524 passed, 524 total`; `6973 passed, 6973 total`; `402.616 s` |
 
-## Final checkout proof
+## Landed-checkout proof after the 09:58 full suite
 
-The following checks ran after the final full suite:
+The following checks ran after the 09:58 full serialized suite and before the
+later retained 10:42 RGR re-execution:
 
 ```bash
 test "$(git rev-parse HEAD)" = "$LANDED"
@@ -182,5 +207,7 @@ diff_exit=0
 status_lines=0
 ```
 
-The temporary delay was fully removed; the verification checkout ended clean
-and byte-identical to the landed revision for every tracked file.
+At this checkpoint, the temporary delay was fully removed and the verification
+checkout was clean and byte-identical to the landed revision for every tracked
+file. The later retained RGR receipts supersede the 09:48 sequence and each
+carry their own restore and clean-tree proof, as described above.
