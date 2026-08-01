@@ -56,18 +56,24 @@ describe('resolveSupporterColdStart', () => {
           personId: '00000000-0000-4000-8000-000000000201',
           displayName: 'Managed Child',
           credentialed: false,
+          contractId: null,
+          contractStatus: null,
         },
         {
           edgeId: '00000000-0000-4000-8000-000000000102',
           personId: '00000000-0000-4000-8000-000000000202',
           displayName: 'Idle Teen',
           credentialed: true,
+          contractId: '00000000-0000-4000-8000-000000000302',
+          contractStatus: 'accepted',
         },
         {
           edgeId: '00000000-0000-4000-8000-000000000103',
           personId: '00000000-0000-4000-8000-000000000203',
           displayName: 'Active Teen',
           credentialed: true,
+          contractId: '00000000-0000-4000-8000-000000000303',
+          contractStatus: 'accepted',
         },
       ],
       // [WI-2226 owner-gate] getPersonOrganizationId(supporterPersonId) —
@@ -106,12 +112,34 @@ describe('resolveSupporterColdStart', () => {
     });
   });
 
-  it('does not synthesize consent-pending cards without an S5 pending-link source', async () => {
-    const db = dbWithSelectResults([[]]);
+  it('renders a pending contract as a minimal resumable consent card', async () => {
+    const db = dbWithSelectResults([
+      [
+        {
+          edgeId: '00000000-0000-4000-8000-000000000101',
+          personId: '00000000-0000-4000-8000-000000000201',
+          displayName: 'Pending Teen',
+          credentialed: true,
+          contractId: '00000000-0000-4000-8000-000000000301',
+          contractStatus: 'pending',
+        },
+      ],
+    ]);
 
-    const result = await resolveSupporterColdStart(db, supporterPersonId);
-
-    expect(JSON.stringify(result)).not.toContain('consent-pending');
+    await expect(
+      resolveSupporterColdStart(db, supporterPersonId),
+    ).resolves.toEqual({
+      variant: 'per-child',
+      selfLearningDoorway: true,
+      cards: [
+        {
+          pendingLinkId: '00000000-0000-4000-8000-000000000301',
+          displayName: 'Pending Teen',
+          state: 'consent-pending',
+          anchor: 'approve',
+        },
+      ],
+    });
   });
 
   // [WI-2226 owner-gate] Routing-level check that an uncredentialed candidate
@@ -128,6 +156,8 @@ describe('resolveSupporterColdStart', () => {
           personId: '00000000-0000-4000-8000-000000000201',
           displayName: 'Cross-Org Candidate',
           credentialed: false,
+          contractId: null,
+          contractStatus: null,
         },
       ],
       // getPersonOrganizationId(supporterPersonId).

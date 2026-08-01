@@ -151,24 +151,6 @@ async function seedAcceptedContract(
   return initiated.supportershipId;
 }
 
-async function seedSupportership(
-  database: Database,
-  supporterPersonId: string,
-  supporteePersonId: string,
-): Promise<string> {
-  const [row] = await database
-    .insert(supportership)
-    .values({
-      supporterPersonId,
-      supporteePersonId,
-    })
-    .returning({ id: supportership.id });
-
-  if (!row) throw new Error('Failed to seed supportership');
-  seededSupportershipIds.push(row.id);
-  return row.id;
-}
-
 async function cleanup(database: Database): Promise<void> {
   if (seededSubjectIds.length > 0) {
     await database
@@ -215,10 +197,10 @@ describe('Integration: GET /scopes/coldstart', () => {
     });
   });
 
-  it('returns per-child variant with a granted-idle card when an active supportership edge is seeded', async () => {
+  it('returns per-child variant with a granted-idle card when an accepted visibility contract is seeded', async () => {
     const supporterId = await seedProfile(db, 'per-child-supporter');
     const childId = await seedProfile(db, 'per-child-child');
-    const edgeId = await seedSupportership(db, supporterId, childId);
+    const edgeId = await seedAcceptedContract(db, supporterId, childId);
 
     await db
       .update(person)
