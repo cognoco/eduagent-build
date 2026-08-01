@@ -87,7 +87,7 @@ channel. `Page` routes to the accountable launch operator.
 | 2. LLM routing | Structured fallback logs plus `llm.stop_reason`; Sentry `surface=llm-router`, `signal=provider-fallback` | Fallback rate greater than 2% over 15 minutes with at least 20 calls | Fallback rate greater than 10% over 15 minutes with at least 20 calls, or any `primary-circuit-open` signal |
 | 3. Challenge grader | Sentry `surface:challenge-round signal:finalize-failed` | One failure in 24 hours | Three failures in 1 hour |
 | 4. Notification delivery | Sentry `surface:notification signal:suppressed`; `surface:email`; `surface:feedback signal:delivery-failed` | Three suppressions/bounces/retries in 1 hour | One `surface:email signal:complained` or terminal feedback-retry failure, or ten combined failures in 1 hour |
-| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed`; `app/account.deletion_teardown.failed`; `app/billing.subscription_store_teardown.failed`; `app/billing.alias_merge.failed` | Any delayed purge or retrying revocation failure | Any terminal purge, consent-revocation, deletion-teardown, or billing-alias failure; delayed purge count at least 10 |
+| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed`; `app/consent.email-revocation.failed`; `app/account.deletion_teardown.failed`; `app/billing.subscription_store_teardown.failed`; `app/billing.alias_merge.failed` | Any delayed purge or retrying revocation failure | Any terminal purge, consent-revocation, deletion-teardown, or billing-alias failure; delayed purge count at least 10 |
 | 6. Stranded filing | Sentry `surface:filing` | Any filing auto-retry | Three unrecoverable filings in 1 hour |
 
 Every bucket also has the fleet-wide terminal-failure backstop:
@@ -270,18 +270,18 @@ and paid access is not stranded by a failed subscription alias reconciliation.
 Retrying errors warn; terminal errors page. Delayed and terminal transcript
 purges are filterable by real Sentry tags. The code-owned terminal dead-letter
 contract groups `app/consent.revocation.failed`,
+`app/consent.email-revocation.failed`,
 `app/account.deletion_teardown.failed`,
 `app/billing.subscription_store_teardown.failed`, and
 `app/billing.alias_merge.failed` under the same immediate-page threshold and
-Inngest dashboard query. The three WI-2346 teardown payloads contain only an
-opaque `accountId` or `eventId`, nullable Inngest `runId`, a bounded coarse
-`errorName`, and `timestamp`. The two pre-existing consent dead letters,
-`app/consent.revocation.failed` and `app/consent.email-revocation.failed`, still
-carry raw `error` message text and do not yet share that privacy-minimized
-shape. Their separately admitted hardening is WI-2977 (Privacy-minimize
-consent-revocation dead-letter payloads); it is not implemented here. Creating
-or changing the production-console rule remains operator-owned as stated at
-the top of this runbook.
+Inngest dashboard query. The two consent events carry their opaque profile or
+person identifiers, `runId`, a bounded `errorClass` (`error` or `non_error`),
+and `timestamp`. Account deletion and subscription-store teardown carry
+`accountId`, `runId`, `errorName`, and `timestamp`; alias merge carries
+`eventId`, `runId`, `errorName`, and `timestamp`. Identifiers and run IDs may be
+null when the failed event did not provide them. Creating or changing the
+production-console rule remains operator-owned as stated at the top of this
+runbook.
 
 Sentry filters:
 

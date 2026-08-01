@@ -1146,7 +1146,7 @@ describe('[WI-997] onFailure dead-letter handler', () => {
     );
   });
 
-  it('[BREAK] calls safeSend with app/consent.revocation.failed event on terminal failure', async () => {
+  it('[BREAK] emits a privacy-minimized app/consent.revocation.failed event', async () => {
     jest.spyOn(sentry, 'captureMessage').mockImplementation(() => undefined);
     const safeSendSpy = jest
       .spyOn(safeNonCore, 'safeSend')
@@ -1165,7 +1165,10 @@ describe('[WI-997] onFailure dead-letter handler', () => {
           run_id: 'run-revoke-abc',
         },
       },
-      error: new Error('DB connection lost'),
+      error: Object.assign(
+        new Error('DB connection lost for learner@example.test'),
+        { name: 'DatabaseError learner@example.test' },
+      ),
     });
 
     expect(safeSendSpy).toHaveBeenCalledTimes(1);
@@ -1180,16 +1183,18 @@ describe('[WI-997] onFailure dead-letter handler', () => {
     // Invoke the thunk to confirm it tries to send the right event name.
     // mockInngestSend is already wired to the inngest.send stub in this file.
     await expect(sendThunk()).resolves.not.toThrow();
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'app/consent.revocation.failed',
-        data: expect.objectContaining({
-          childProfileId: 'child-revoke-001',
-          parentProfileId: 'parent-revoke-001',
-          error: 'DB connection lost',
-        }),
-      }),
-    );
+    const sentEvent = mockInngestSend.mock.calls.at(-1)?.[0];
+    expect(sentEvent).toEqual({
+      name: 'app/consent.revocation.failed',
+      data: {
+        childProfileId: 'child-revoke-001',
+        parentProfileId: 'parent-revoke-001',
+        runId: 'run-revoke-abc',
+        errorClass: 'error',
+        timestamp: expect.any(String),
+      },
+    });
+    expect(JSON.stringify(sentEvent)).not.toContain('learner@example.test');
   });
 
   it('tolerates missing original event payload (null childProfileId/parentProfileId)', async () => {
