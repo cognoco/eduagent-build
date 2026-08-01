@@ -40,6 +40,13 @@ tags:
     id: 'tab-more'
 
 # Mentor action: open E2E manual homework entry, cancel it, then return.
+# WI-3024: the chip is disabled under E2E while the subjects index loads —
+# wait for enabled before tapping, or the tap silently no-ops.
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-bar-homework-chip'
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
