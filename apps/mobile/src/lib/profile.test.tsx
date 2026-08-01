@@ -122,6 +122,7 @@ describe('ProfileProvider', () => {
   afterEach(() => {
     jest.useRealTimers();
     queryClient?.clear();
+    jest.restoreAllMocks();
   });
 
   it('fetches profiles and selects owner as active by default', async () => {
@@ -421,7 +422,7 @@ describe('ProfileProvider', () => {
   it('[WI-2128][J-03] keeps the cached shell mounted during foreground authority revalidation', async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
     const removeListener = jest.fn();
-    const appStateSpy = jest
+    jest
       .spyOn(AppState, 'addEventListener')
       .mockImplementation((_event, listener) => {
         appStateListener = listener;
@@ -465,7 +466,6 @@ describe('ProfileProvider', () => {
 
     unmount();
     expect(removeListener).toHaveBeenCalled();
-    appStateSpy.mockRestore();
   });
 
   it('[BREAK] falls back to owner when active-profile SecureStore restore hangs', async () => {

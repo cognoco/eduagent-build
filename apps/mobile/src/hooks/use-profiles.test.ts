@@ -95,6 +95,7 @@ afterEach(() => {
   queryClient?.clear();
   setActiveProfileId(undefined);
   setProxyMode(false);
+  jest.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -188,7 +189,7 @@ describe('useProfiles', () => {
 
   it('[WI-2128][BREAK] keeps the selected Person on a concurrent request during foreground authority refresh', async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
-    const appStateSpy = jest
+    jest
       .spyOn(AppState, 'addEventListener')
       .mockImplementation((_event, listener) => {
         appStateListener = listener;
@@ -263,7 +264,6 @@ describe('useProfiles', () => {
       );
     });
     hook.unmount();
-    appStateSpy.mockRestore();
   });
 
   it('returns empty array when no profiles exist', async () => {
