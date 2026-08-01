@@ -382,6 +382,33 @@ async function cleanupByClerk(
     expect(membershipsAfter).toEqual(membershipsBefore);
   });
 
+  it('[WI-2895 BREAK] does not repair hasOwnAccount when the reverse Person-to-Login binding is missing', async () => {
+    const clerkUserId = uniqueClerk();
+    const email = `wi2895_unbound_${generateUUIDv7()}@test.local`;
+    const args = {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Incomplete Credential Binding',
+      birthYear: 1985,
+      location: 'EU' as const,
+    };
+    const first = await createIdentityGraph(db, args);
+
+    await db
+      .update(person)
+      .set({ hasOwnAccount: false, loginId: null })
+      .where(eq(person.id, first.personId));
+
+    const replay = await createIdentityGraph(db, args);
+    const unchanged = await db.query.person.findFirst({
+      where: eq(person.id, first.personId),
+    });
+
+    expect(replay.personId).toBe(first.personId);
+    expect(unchanged?.loginId).toBeNull();
+    expect(unchanged?.hasOwnAccount).toBe(false);
+  });
+
   it('[BUG-411 sequential] refuses a same-email/different-clerk reclaim with the audited ConflictError', async () => {
     const victimClerk = uniqueClerk();
     const sharedEmail = `victim_${generateUUIDv7()}@test.local`;

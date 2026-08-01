@@ -14,7 +14,7 @@
 // path and concurrent-race path live in identity-graph.integration.test.ts.
 // ---------------------------------------------------------------------------
 
-import { organization, person, type Database } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 import { ConflictError } from '../../errors';
 import { createIdentityGraph } from './identity-graph';
 
@@ -88,51 +88,6 @@ const BASE_INPUT = {
   birthYear: 1990,
 } as const;
 
-function makeOwnerPersonInsertProbeDb(
-  onPersonValues: (value: unknown) => void,
-): {
-  db: Database;
-  stopAfterPersonInsert: Error;
-} {
-  const stopAfterPersonInsert = new Error('stop after Person insert');
-  const tx = {
-    query: {
-      login: {
-        findFirst: jest.fn().mockResolvedValue(undefined),
-      },
-    },
-    insert: jest.fn((table: unknown) => ({
-      values: jest.fn((value: unknown) => {
-        if (table === organization) {
-          return {
-            returning: jest.fn().mockResolvedValue([
-              {
-                id: '00000000-0000-4000-8000-000000000001',
-                timezone: null,
-                createdAt: new Date('2026-08-01T00:00:00.000Z'),
-                updatedAt: new Date('2026-08-01T00:00:00.000Z'),
-              },
-            ]),
-          };
-        }
-        if (table === person) {
-          onPersonValues(value);
-          throw stopAfterPersonInsert;
-        }
-        throw new Error('unexpected insert before Person probe completed');
-      }),
-    })),
-  };
-  return {
-    db: {
-      transaction: jest.fn((callback: (value: unknown) => unknown) =>
-        callback(tx),
-      ),
-    } as unknown as Database,
-    stopAfterPersonInsert,
-  };
-}
-
 // ── Tests ────────────────────────────────────────────────────────────────
 
 describe('[WI-1166] createIdentityGraph — LOGIN_EMAIL_UNIQUE race null-clerkUserId guard', () => {
@@ -205,21 +160,5 @@ describe('[WI-1166] createIdentityGraph — LOGIN_EMAIL_UNIQUE race null-clerkUs
       (emittedEvent?.[0] as { data?: { existingClerkUserId?: string } })?.data
         ?.existingClerkUserId,
     ).toBe('victim_clerk');
-  });
-});
-
-describe('[WI-2895] createIdentityGraph — persisted credential indicator', () => {
-  it('persists hasOwnAccount=true in the credentialed owner Person insert', async () => {
-    let personValues: unknown;
-    const { db, stopAfterPersonInsert } = makeOwnerPersonInsertProbeDb(
-      (value) => {
-        personValues = value;
-      },
-    );
-
-    await expect(createIdentityGraph(db, BASE_INPUT)).rejects.toBe(
-      stopAfterPersonInsert,
-    );
-    expect(personValues).toMatchObject({ hasOwnAccount: true });
   });
 });

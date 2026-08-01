@@ -277,6 +277,7 @@ export async function createIdentityGraph(
             .where(
               and(
                 eq(person.id, existingByEmail.personId),
+                eq(person.loginId, existingByEmail.id),
                 eq(person.hasOwnAccount, false),
               ),
             );
