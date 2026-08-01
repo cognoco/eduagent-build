@@ -1,163 +1,266 @@
-# Audience Matrix — Scattered Gating Snapshot
+# Audience Matrix — UI Navigation & Gating Inventory
 
-> **Reconstructed scaffold (2026-05-22).** The original `docs/compliance/audience-matrix.md` was lost — it was created in another agent's working tree on 2026-05-21 and wiped by a stash cycle before any git operation captured it (not in any commit, dangling blob, or worktree on disk).
->
-> **Scope boundary (2026-07-23):** this is a product-audience/navigation gating
-> inventory, not the country/consent matrix. Product age bands, national
+**Status:** Refreshed 2026-08-01 against `origin/main` @ `764748015` (WI-2656). All
+file:line citations below were re-verified on that commit. The 2026-05 scaffold
+inventory this file used to carry is retired; its findings register (F1–F14) is
+re-derived below with per-finding disposition.
+
+**Authority:** `AGENTS.md` ("Profile Shapes" section) and the live code —
+`apps/mobile/src/lib/navigation-contract.ts`, `apps/mobile/src/lib/legacy-navigation-contract.ts`,
+`apps/mobile/src/hooks/use-navigation-contract.ts` — are the current authority for
+navigation/gating behavior. Where any document (including this one) disagrees with
+the code at `origin/main`, the code wins. The archived spec
+[`docs/_archive/specs/Done/2026-05-21-navigation-contract.md`](../_archive/specs/Done/2026-05-21-navigation-contract.md)
+is **historical provenance only** — it describes the design rationale of the
+then-pending contract migration, which has since landed. It is never a statement
+of current or target behavior.
+
+> **Scope boundary (2026-07-23, unchanged):** this is a product-audience/navigation
+> gating inventory, not the country/consent matrix. Product age bands, national
 > Article 8 thresholds, and launch-country eligibility live in
 > [`docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`](2026-07-23-13-plus-eea-launch-country-ruling.md).
 >
-> This scaffold rebuilds the doc from references in the earlier draft of `docs/_archive/specs/Done/2026-05-21-navigation-contract.md` (dangling commit `e6287097`). The original severity labels (F1–F14) are *inferred* from the navigation-contract's "5 of 14 findings addressed" callout. Re-derive F-numbers and file:line citations from a fresh audit before using them as current evidence.
-
-**Status:** Historical reconstructed inventory, partially refreshed 2026-07-23 for the home-route branch and compliance-document location. It is not a current whole-file line map. F-numbering remains scaffolded.
-
-> **Regression constraint.** All currently shipped flag states must remain intact until the V0-retirement milestone. Read the per-environment flags and the current rule in `AGENTS.md`; do not infer one global mode from this historical matrix.
+> **V0 non-regression boundary (ruled 2026-06-09, still standing).** All currently
+> shipped flag states — the flags-off legacy shell, the V0 mode shells, and the
+> V1/V2 shells — must not regress across any nav PR until the V0-retirement ruling
+> (`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §13, owner: product)
+> is executed at its S6 milestone. The legacy helpers
+> (`apps/mobile/src/lib/legacy-navigation-contract.ts`) and the flags-off
+> short-circuits in `app-context.tsx` stay alive. The resolver itself
+> (`resolveNavigationContract`) runs under **every** flag state
+> (`useResolvedNavigationState`, `use-navigation-contract.ts:63-122`); what is
+> flag-gated is which output consumers use — `resolveShellVisibleTabs()` selects
+> contract vs legacy tab sets on `MODE_NAV_V1_ENABLED`, and `useEntryGate` falls
+> back to the proxy-only check when V1 is off — so the legacy fallback is never
+> replaced.
 
 ## Related documents
 
-- [`docs/_archive/specs/Done/2026-05-21-navigation-contract.md`](../_archive/specs/Done/2026-05-21-navigation-contract.md) — archived target spec that introduced `resolveNavigationContract(ctx)`.
-- [`docs/flows/flow-master-directory.md`](../flows/flow-master-directory.md) — flow register. Each flow page in `flows/master-directory/` cites this matrix when it touches a gated surface (home, more, account, privacy, progress).
-- `AGENTS.md` — "Profile Shapes" is authoritative for current tab shapes and records the `home.tsx` branch on `navigationContract.home.screen`.
+- [`docs/flows/mobile-app-flow-inventory.md`](../flows/mobile-app-flow-inventory.md) —
+  "Navigation shell matrix" (audience × flag-state, per-row citations) and the V2
+  shell section. Note its "shipped today" flag table was captured 2026-07-19 and
+  predates the 2026-07-27 production flag flip recorded below.
+- [`docs/flows/flow-master-directory.md`](../flows/flow-master-directory.md) — flow
+  register; flow pages cite this matrix when they touch a gated surface.
+- `AGENTS.md` — "Profile Shapes" is the short-form authority for tab shapes and
+  gating rules. Its inline flag snapshot ("as of 2026-06-09") also predates the
+  2026-07-27 flip; per its own instruction, read the per-environment flags from
+  `apps/mobile/eas.json` rather than any doc snapshot, including this one.
+- `_wip/mvp-roadmap/2026-07-23-doc-drain-assessment.md` — the staleness finding
+  (gap #1) that triggered this refresh.
 
 ---
 
-## Purpose
+## Navigation system as implemented
 
-This matrix preserves the reconstructed 2026-05 snapshot of scattered UI/navigation gating across the mobile app. It is supporting compliance evidence, not current authority; current behavior must be checked against `AGENTS.md`, `apps/mobile/src/lib/navigation-contract.ts`, and the cited consumers.
+One function owns UI navigation gating: `resolveNavigationContract(context)` in
+`apps/mobile/src/lib/navigation-contract.ts:602-643`. It composes:
 
-The matrix and `docs/_archive/specs/Done/2026-05-21-navigation-contract.md` are historically paired:
+- `resolveShape()` (`navigation-contract.ts:276-362`) — picks shape
+  (`study`/`family`), effective app context, and the visible tab set, with a
+  diagnostic `reason` enumerating every branch (`profile-loading`,
+  `legacy-v0-flags-off`, `v1-disabled`, `parent-proxy`, `child-study-only`,
+  `explicit-family`, `family-intent-without-family-links`,
+  `profile-default-family`, `explicit-study`).
+- `resolveGates()` (`:364-439`) — the `gates.*` booleans consumed inside screens
+  (`showBilling`, `showAccountSecurity`, `showExportDelete`, `showAddChild`,
+  `showRemoveFamilyMember`, child-editor gates, `sessionIsOwner`,
+  `progressScope`, …).
+- `resolveCanEnter()` / `resolveIsSurfaced()` (`:457-527`, `:529-584`) — deep-route
+  entry and surfacing predicates, including the parent-proxy short-circuit
+  (`:469-471`) and the `V2_ROUTES` gate (`:473-475`).
+- `resolveChrome()` (`:586-600`) — ModeSwitcher / proxy-banner visibility.
 
-- **This matrix = current state inventory** with file:line citations and findings F1–F14.
-- **The navigation-contract spec = target state** describing the single `resolveNavigationContract(ctx)` function consumers migrate to.
+The hook layer (`apps/mobile/src/hooks/use-navigation-contract.ts`) resolves the
+contract once (`useResolvedNavigationState`, `:63-122`) and exposes it via
+`useNavigationContract()`, `useNavigationShellContract()` (tab bar),
+`useNavigationHomeContract()`, and `useNavigationDataScopeContract()`.
 
-The navigation-contract addresses **5 of 14 findings** here (F5, F6, F7, F8, F11 — all LOW, UI sweep targets). The other 9 are server-side, age-math, or push-delivery gaps that the contract does **not** close. A green ratchet test on the navigation-contract is **not** evidence that the gaps in this matrix are fixed.
+### Tab sets (all four, plus the V2 override)
 
----
+V1 sets in `navigation-contract.ts`:
 
-## Inventory — Scattered Gating Sites
+| Set | Tabs | Source |
+|---|---|---|
+| `STUDY_TABS` | home, library, progress, more (4) | `navigation-contract.ts:153-158` |
+| `FAMILY_TABS` | home, recaps, progress, more (4) | `navigation-contract.ts:159-164` |
+| `PROXY_TABS` | home, library, progress (3 — no More tab) | `navigation-contract.ts:165-169` |
+| `LEGACY_GUARDIAN_TABS` | home, own-learning, library, progress, more (5) | `navigation-contract.ts:170-176` |
 
-Each entry is a current-code site that branches on profile attributes (`isOwner`, `role`, `birthYear`, `mode`, `isParentProxy`, `tier`, `consentStatus`). Verified 2026-05-23 against HEAD.
+Legacy/V0 sets in `legacy-navigation-contract.ts`: `GUARDIAN_TABS` (5, `:4-10`),
+`LEARNER_TABS` (4, `:12-17`), `PARENT_PROXY_TABS` (3, `:19-23`),
+`FAMILY_MODE_TABS` (3, `:25-29`), `STUDY_MODE_TABS` (4, `:31-36`). Which family
+resolves is decided by `resolveShellVisibleTabs()`
+(`legacy-navigation-contract.ts:153-185`): contract `visibleTabs` when V1 is on,
+legacy sets when V1 is off.
 
-### Shell and Routing
+**V2 is a hard tab-visibility override, independent of the shape resolution:**
+when `MODE_NAV_V2_ENABLED` is true, `useNavigationShellContract()`
+(`use-navigation-contract.ts:192-203`) returns the fixed 3-tab
+`V2_TABS = {mentor, subjects, journal}` set (`:22`) for **every** audience —
+solo, child, supporter, and parent-proxy alike. `V2_ROUTES` in
+`navigation-contract.ts:178` gates only `canEnter`/`isSurfaced` for those three
+route names; the hook-level override is what the UI renders from. The V2 shell's
+audience distinctions collapse for tab visibility but persist as *scope*
+(me / person / supporter-hub via `useScopeContext`) — see
+`docs/flows/mobile-app-flow-inventory.md` → "V2 Shell".
 
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/app/(app)/_layout.tsx:2093-2109` | `tabShape`, `visibleTabs`, `homeTabPresentation` | Tab bar composition; replaced by `useNavigationContract()` | F11 |
-| `apps/mobile/src/app/(app)/_layout.tsx:1581` | `consentStatus === 'PARENTAL_CONSENT_REQUESTED'` | Full-screen consent overlay (shell-level interception) | F2 |
-| `apps/mobile/src/app/(app)/_layout.tsx:2491` | Withdrawal flow | Full-screen withdrawal overlay | F2 |
+### Flag wiring and per-build-profile posture
 
-### Home
+Flags are **build-time**: `MODE_NAV_V0_ENABLED = EXPO_PUBLIC_ENABLE_MODE_NAV === 'true'`,
+`MODE_NAV_V1_ENABLED = ..._V1`, `MODE_NAV_V2_ENABLED = ..._V2`
+(`apps/mobile/src/lib/feature-flags.ts:30-32`). They intentionally differ by
+environment. **Never treat any row below as "the default"** — read the values for
+the build profile in question. As read from `apps/mobile/eas.json` and
+`.github/workflows/ci.yml` on 2026-08-01:
 
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/app/(app)/home.tsx:21, 166-169` | `navigationContract.home.screen` | **Current branch:** `FamilyHome` mounts `<ParentHomeScreen>`; every other contract result mounts `<LearnerScreen>`. | F11 (historical finding closed by contract wiring) |
-| `apps/mobile/src/components/home/LearnerScreen.tsx` | `navigationContract.gates.*` | Learner-home content consumes the navigation contract; the removed `showParentHome` / inline `ParentHomeScreen` branch must not be reintroduced. | F11 (historical finding closed) |
+| Build profile | V0 | V1 | V2 | Classification (R9 ratchet, `scripts/check-mode-nav-flag-combo.ts`) |
+|---|---|---|---|---|
+| `production` (`eas.json:12-18`) | off | on | on | **Config T — sanctioned target** (flipped 2026-07-27, commit `09fe6671d`, WI-1341) |
+| `development` (`eas.json:25-31`) | on | on | on | Banned combo, grandfathered (`scripts/mode-nav-flag-combo-baseline.json`) |
+| `preview` (`eas.json:43-49`) + preview-channel OTA (`.github/workflows/ci.yml:728-730`) | on | on | on | Banned combo, grandfathered |
+| `fallback` (`eas.json:57-63`) | on | on | off | Banned combo, grandfathered |
+| local example (`apps/mobile/.env.example:8`) | off | off | off | Flags-off legacy shell |
 
-### More / Account / Privacy
+The `production` **build profile** is therefore configured for Config T — the
+next production binary built from it carries the V2 3-tab shell. That is a
+build-profile fact, **not release evidence**: flags are baked in at build time,
+installed binaries do not change when `eas.json` does, and as of this refresh
+the store-submission pipeline still records the production build/submission
+steps as open (`docs/plans/2026-07-11-store-submission-pipeline.md`;
+`docs/runbooks/store-submission.md` — approval alone does not build or release).
+Treat Config T as the **production candidate** and classify real users by the
+flag triple of the build they actually run — which may still be a pre-flip V0
+binary. Earlier snapshots saying "production is V0-on/V1-off" (AGENTS.md's
+2026-06-09 note, the flow inventory's 2026-07-19 table) describe the
+pre-2026-07-27 profile state. The non-regression boundary above still protects
+the flags-off and V0 shells regardless of which profile currently carries them.
 
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/app/(app)/more/index.tsx:40, 66, 112-118` | `role` (40), `subscription.tier` (66, family/pro gate for add-child), `activeProfile.isOwner` (112), `isAdultOwner({role, birthYear})` (115-118) | `showAddChild`, linked-children list for `showRemoveFamilyMember` | F5, F8 |
-| `apps/mobile/src/app/(app)/more/account.tsx:81-82, 95-96` | `activeProfile.isOwner` (81-82), `role === 'owner'` (95-96) | `showAccountSecurity` (81-82), `showBilling` / subscription row (95-96) | F5 |
-| `apps/mobile/src/app/(app)/more/accommodation.tsx:43-46` | `isOwner` on `activeProfile` AND `childProfile` (proxy-edit canonical) | `canEditChildPreferences` → accommodation child editor | F5 |
-| `apps/mobile/src/app/(app)/more/celebrations.tsx:34-37` | `isOwner` on `activeProfile` AND `childProfile` (proxy-edit canonical) | `canEditChildPreferences` → celebrations child editor | F5 |
-| `apps/mobile/src/app/(app)/more/privacy.tsx:96, 135, 147` | `role === 'owner'` | Withdrawal-archive section (96), Export Data row (135), Delete Account row (147) — **NOT** mentor-memory consent (that lives in `mentor-memory.tsx`) | F5, F7 |
-| `apps/mobile/src/app/(app)/subscription.tsx:1590` | `activeProfile.isOwner === true && !member.isOwner` | Remove-family-member button | F5 |
-| `apps/mobile/src/app/(app)/subscription.tsx:70-77` | Documentation block (no runtime branch) | BUG-899 intent: Family/Pro tiers hidden from upgrade UI. Actual runtime gate is the tier filter that builds `TIER_FEATURES` and the `tier !== 'family' && tier !== 'pro'` check at `more/index.tsx:71` | F10 |
-| `apps/mobile/src/app/(app)/subscription.tsx:649, 653, 661` | `activeProfile?.isOwner === true` | **Analytics tag (not a gate)** — excluded from AST ratchet | F6 (no-op) |
+### Mode semantics (V0 vs V1)
 
-### Mentor Memory
-
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:217-218` | `profile.memoryConsentStatus` → `consentStatus`, `memoryEnabled` | Local derived state used by all downstream gates in this screen | F2 |
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:233` | `navigationContract.canEnter('mentor-memory')` | Proxy redirect (`<Redirect href="/(app)/home" />`); now reads via contract, not raw `isParentProxy` | F3 |
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:366-372, 410` | `consentStatus`, `isOwnerSelf` (via `navigationContract.gates.sessionIsOwner` at 61) | Pending-copy role-aware branch (366-372) and adult-owner consent prompt visibility (410) | F5, F7 |
-| `apps/mobile/src/app/(app)/mentor-memory.tsx:469` | `!isOwnerSelf` | **UX copy branching** ("Set by parent" badge) — not a visibility gate | F7 |
-
-### Progress / Child Routes
-
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/app/(app)/progress/index.tsx:729-731` | `role === 'impersonated-child'` → `isParentProxyView` (V0) or `navigationContract.isParentProxy` (V1) | Discriminator for progress header / picker rendering. | F11 |
-| `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx:12, 41` | Wraps `<Stack>` in `<RequireFamilyContext>` | Family-link membership guard. The `setMode('family')` side effect lives in `components/guards/RequireFamilyContext.tsx:45` (read via `useGuardFamilyRoute()` declared at `lib/navigation.ts:106`). | F8 |
-| `apps/mobile/src/app/(app)/child/[profileId]/index.tsx:432-441` | `consent.data?.consentStatus` (432), `'CONSENTED'`/`'WITHDRAWN'` checks (436-437, 441) | Child-profile data display gate (`hasConsentRecord`, `isWithdrawn`) | F2 |
-
-### Deep Learning Routes
-
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/app/(app)/own-learning.tsx:32-35` | `resolveTabShape({activeProfile, profiles, isParentProxy})` (32), `familyCapable` + `tabShape !== 'guardian'` (33) | Redirect-to-home for non-guardian, non-family-capable profiles (`canEnter('own-learning')` analogue) | F11 |
-| `apps/mobile/src/app/(app)/dictation/_layout.tsx:63` | mode/proxy | `canEnter('dictation')` | F11 |
-| `apps/mobile/src/app/(app)/homework/_layout.tsx:9` | mode/proxy | `canEnter('homework')` | F11 |
-| `apps/mobile/src/app/(app)/session/_layout.tsx:9` | mode/proxy | `canEnter('session')` | F11 |
-| `apps/mobile/src/app/(app)/quiz/_layout.tsx:118` | mode/proxy | `canEnter('quiz')` | F11 |
-| `apps/mobile/src/app/(app)/practice/index.tsx:441` | mode/proxy | `canEnter('practice')` | F11 |
-| `apps/mobile/src/app/(app)/session/index.tsx:1109` | `isOwner` | `sessionIsOwner` | F5 |
-
-### Supporting
-
-| File:line | Reads | What it gates | Finding |
-|---|---|---|---|
-| `apps/mobile/src/lib/profile.ts:42-48` | `activeProfile.id / isOwner / birthYear`, `profiles[].isOwner` | `isFamilyCapableProfile()` predicate | — |
-| `apps/mobile/src/lib/app-context.tsx:52` | `useState<AppMode \| null>` | `modeOverride` React state — not persisted to AsyncStorage/SecureStore (final `mode` derived at line 88) | F9 |
-| `apps/mobile/src/lib/app-context.tsx:74-84` | `activeProfile.id / isOwner / birthYear` change | `useEffect` clears `modeOverride` on active-profile flip | F9 |
-| `packages/schemas/src/age.ts:53-65` | `role`, `isOwner`, `birthYear` | `isAdultOwner(profile, currentYear?)` canonical predicate | — |
-| `apps/mobile/src/lib/navigation.ts:106` + `apps/mobile/src/components/guards/RequireFamilyContext.tsx:45` | `useGuardFamilyRoute()` declared at `navigation.ts:106` (pure read); `setMode('family')` side effect lives in the consumer `RequireFamilyContext.tsx:45` | Family-route guard with consumer-side mode-flip side effect — not a pure guard at the guard-component level | F8 |
-
-**Estimated touch count:** ~20 production files, ~119 line-level reads in scope (revised after adversarial AST grep, 2026-05-21).
-
-Excluded from this matrix:
-- 13 `isOwner` content-gating sites + 4 `role`-gating sites scattered across 9 files — already covered in rows above.
-- Analytics property writes (`subscription.tsx:649,653,661`) — not gates.
-- Test files, type definitions, schemas — not consumers.
-
----
-
-## Findings F1–F14
-
-> ⚠ F-numbering is *inferred* from the navigation-contract's "5 of 14 findings addressed" callout and re-derived from the draft's CRITICAL/HIGH/MEDIUM-N severity labels. Treat as scaffold; re-audit for precise IDs and severities.
-
-### Inside navigation-contract scope (LOW — UI sweep)
-
-| ID | Severity | Title | Status |
-|---|---|---|---|
-| F5 | LOW | `isOwner` content gating duplicated across 13 sites in More/Account/Subscription/MentorMemory/Session — single source of truth missing. | Closed by contract `gates.show*` fields (Phase 2 PRs 2-5). |
-| F6 | LOW | Analytics-tag `isOwner` reads at `subscription.tsx:649,653,661` falsely flagged as gates by earlier audits. | Closed; AST ratchet excludes object-literal property writes. |
-| F7 | LOW | Mentor-memory copy variation (`"Set by parent"`) is UX copy branching, not visibility gate. | Closed; either add `gates.mentorMemoryOriginCopy` or allowlist. |
-| F8 | LOW | `RequireFamilyContext` not purely a guard — calls `setMode('family')` side effect inside `useGuardFamilyRoute()`. | Closed by Phase 2 PR 4 decision: keep wrapper using contract for read-only checks, OR extract side effect into `useApplyContractIntent()`. |
-| F11 | LOW | Tab composition, deep-route entry guards, and home-screen selection recomputed in ~10 files. | Closed by `useNavigationContract()` adoption. |
-
-### Outside navigation-contract scope (HIGH / server-side / age-math / delivery)
-
-| ID | Severity | Title | Why outside contract |
-|---|---|---|---|
-| F1 | HIGH | IDOR on `PATCH /profiles/:id` (server-side authorization gap). | Server-side. Addressed by `createScopedRepository(profileId)` + parent-chain WHERE filters. |
-| F2 | HIGH | Consent-state interception is shell-level (above contract output); not a contract dimension. | Different layer; full-screen overlay covers the contract's output. Folding into contract would require explicit `gates.requireConsent` field + matrix rows per consent state. |
-| F3 | TBD | Mentor-memory proxy redirect at `mentor-memory.tsx:233` migrates to `canEnter('mentor-memory')`. | Addressed in spec but listed because earlier draft missed it. |
-| F4 | TBD | (Reserved — re-derive from full audit.) | — |
-| F9 | TBD | `mode` is React state only; not persisted. Cross-account leak risk mitigated by `signOutWithCleanup()` clearing `activeProfile` atomically. | Cross-cutting; do not add storage-backed mode persistence without re-reviewing the leak guarantee. |
-| F10 | TBD | Pro tier treated identically to Family for navigation (BUG-899). Contract is forward-compatible; product divergence would require adding a tier dimension. | Product/billing decision, not navigation. |
-| F12 | TBD | Hook memoization rule — contract must memoize on stable signature of inputs, not array reference (TanStack Query returns new `profiles` array reference on every refetch). | Implementation detail of the contract hook, captured in spec's "Failure Modes". |
-| F13 | TBD | (Reserved — re-derive from full audit.) | — |
-| F14 | TBD | (Reserved — re-derive from full audit.) | — |
+- **V1:** mode ("app context") is server-driven — `profile.defaultAppContext`,
+  patched via `PATCH /profiles/:id/app-context`
+  (`apps/api/src/routes/profiles.ts:397-451`, with explicit-header + ownership
+  enforcement). Client-side, `app-context.tsx` holds a session `modeOverride`
+  (`:63`) over the server-derived `derivedMode` (`:74`), cleared on active-profile
+  change (`:103`).
+- **V0:** mode is client-derived capability + local React state, never persisted.
+- **Flags-off:** `familyCapable=false`, `mode=null` (legacy short-circuits in
+  `app-context.tsx`).
 
 ---
 
-## Re-verification Checklist
+## Where gating lives now (verified consumers)
+
+The 2026-05 scaffold listed ~20 files with scattered raw `isOwner`/`role` reads.
+That consolidation has landed: screens now read `navigationContract.gates.*` and
+route entry goes through the contract. Representative current sites:
+
+| Surface | Current mechanism | Cite (2026-08-01) |
+|---|---|---|
+| Tab bar composition | `useNavigationShellContract()` → contract `visibleTabs` / legacy sets / `V2_TABS` override | `use-navigation-contract.ts:151-211` |
+| Home screen selection | `navigationContract.home.screen === 'FamilyHome'` → `ParentHomeScreen`, else `LearnerScreen` | `apps/mobile/src/app/(app)/home.tsx:166-167` |
+| Deep-route entry (session, homework, dictation, quiz, practice, mentor-memory, topic/relearn) | `useEntryGate(route)` — `blocked = MODE_NAV_V1_ENABLED ? !canEnter(route) : isParentProxy` (flag branch is deliberate; see comment) | `apps/mobile/src/hooks/use-entry-gate.ts:14-33`; e.g. `mentor-memory.tsx:248` |
+| Add child / remove family member | `gates.showAddChild`, `gates.showRemoveFamilyMember` | `more/index.tsx:58-81` |
+| Billing / account security | `gates.showBilling`, `gates.showAccountSecurity`, `gates.sessionIsOwner` | `more/account.tsx:83-125` |
+| Export / delete, withdrawal archive | `gates.showExportDelete`, `gates.showRemoveFamilyMember` | `more/privacy.tsx:25-26` |
+| Subscription owner surface | `gates.showBilling`, `gates.showRemoveFamilyMember` | `subscription.tsx:197-198` |
+| Progress proxy/picker | `gates.showProgressProfilePicker`; proxy discriminator flag-branches to contract vs legacy `role === 'impersonated-child'` | `progress/index.tsx:89, 329-331` |
+| Family/child routes guard | `RequireFamilyContext` — **read-only** guard via `contract.canEnter(route, params)`; mode switch only via explicit user CTA (`useEnterFamilyMode`) | `components/guards/RequireFamilyContext.tsx:12-46` |
+| Recaps / library / vocabulary entry | `navigationContract.canEnter(...)` redirects | `recaps/index.tsx:19`, `recaps/[recapId].tsx:32`, `library.tsx:151`, `progress/vocabulary.tsx:105` |
+| Legacy own-learning tab | still uses legacy `resolveTabShape()` — sanctioned residual legacy read; the tab only exists in legacy/V0 shells | `own-learning.tsx:32-34` |
+| Consent-state interception | shell-level, **above** the contract's output: pending-consent and withdrawn gates in the app layout | `apps/mobile/src/app/(app)/_layout.tsx:955-966` |
+
+## UI navigation vs server authorization
+
+The navigation contract is **client-side defense-in-depth UI hardening, not
+authorization**. Server-side authorization is enforced independently and is the
+authoritative layer:
+
+- Profile mutations: `PATCH /profiles/:id` enforces owner-or-self
+  ([CR-2026-05-19-H1], `apps/api/src/routes/profiles.ts:462`), rejects
+  auto-resolved headerless identities ([Issue 901]), and resolves caller-to-target
+  authority via `assertCanWriteProfile` (`profiles.ts:432, 492`).
+- Data reads/writes: `createScopedRepository(profileId)` or parent-chain
+  `profileId` WHERE enforcement (repo-wide rule, `AGENTS.md` → "Non-Negotiable
+  Engineering Rules").
+- Owner-gated billing operations enforce the constraint server-side:
+  `GET /subscription` (403 for non-owners, BUG-644,
+  `apps/api/src/routes/billing.ts:128-140`), checkout (`:270`), cancel
+  (`:365-370`), top-up purchase (`:469-477`), billing portal (`:786-794`).
+  **Exception:** `GET /usage` (`:541`) is deliberately *not* owner-gated — it
+  serves non-owner viewers a self-scoped response and masks family-wide
+  aggregates (`:674-738`; see `docs/flows/mobile-app-flow-inventory.md` quota
+  model). Do not treat `/usage` as owner-only in authorization reviews. The
+  client `gates.showBilling` is intentional defense-in-depth duplication (see
+  the comment at `more/account.tsx:119-124`).
+
+A green navigation-contract test is therefore **not** evidence about server-side
+authorization, and vice versa. Findings below are labeled by layer.
+
+---
+
+## Findings register F1–F14 — re-derived 2026-08-01
+
+The F-numbers originated in a lost 2026-05-21 audit and were scaffolded from a
+dangling-commit reconstruction (see Provenance). Each is now either re-derived
+against current code or explicitly retired. "Resolved" means the condition the
+finding described no longer exists at the cited location; it is not a claim that
+adjacent risks are gone.
+
+| ID | Layer | Original concern | Disposition (2026-08-01) |
+|---|---|---|---|
+| F1 | Server | IDOR on `PATCH /profiles/:id` — a child profile could edit sibling profiles. | **Resolved.** Owner-or-self enforcement + headerless-identity rejection + `assertCanWriteProfile` (`apps/api/src/routes/profiles.ts:452-492`). The app-context PATCH (`:397-451`) carries the same guards. |
+| F2 | Shell (above contract) | Consent-state interception is shell-level, not a contract dimension. | **Still current, by design.** Pending-consent and withdrawn full-screen gates live in `(app)/_layout.tsx:955-966`, above the contract's output. Folding consent into the contract remains not-planned; treat consent gating as a separate layer when auditing. |
+| F3 | UI | Mentor-memory proxy redirect used a raw `isParentProxy` read. | **Resolved.** Entry now goes through `useEntryGate('mentor-memory')` (`mentor-memory.tsx:248`; `use-entry-gate.ts:14-33`). Remaining `navigationContract.isParentProxy` reads in that screen are in-screen content/pending-state branches, not the entry gate. |
+| F4 | — | Reserved slot; content never recovered from the lost audit. | **Retired.** No recoverable claim; nothing to re-derive. Do not cite F4. |
+| F5 | UI | `isOwner` content gating duplicated across ~13 sites with no single source of truth. | **Resolved.** Consolidated into `resolveGates()` (`navigation-contract.ts:364-439`); consumers read `gates.*` (see consumer table above). |
+| F6 | — | Analytics-tag `isOwner` reads misflagged as gates. | **Retired (non-finding).** `subscription.tsx:208, 216` still write `is_owner` analytics properties; they remain analytics-only, not gates. |
+| F7 | UI | Mentor-memory "Set by parent" copy variation misread as a visibility gate. | **Retired (non-finding).** The copy branch survives (`mentor-memory.tsx:491`, on `isOwnerSelf` ← `gates.sessionIsOwner` at `:71`) and is UX copy, not a gate. |
+| F8 | UI | `RequireFamilyContext` mutated mode (`setMode('family')`) as a guard side effect. | **Resolved.** The guard is now explicitly read-only ([PARENT-03], `RequireFamilyContext.tsx:12-16`); mode changes require the explicit user CTA (`useEnterFamilyMode`). |
+| F9 | UI/data | `mode` was React state only, not persisted; cross-account leak surface. | **Superseded (split).** Under V1, mode is server-persisted (`profile.defaultAppContext`, `profiles.ts:397-451`) with a session-only client override cleared on profile change (`app-context.tsx:63, 74, 103`). Under V0 (dev-zone profiles only), mode remains client-only until V0 retirement. Do not add storage-backed client persistence without re-reviewing the leak guarantee. |
+| F10 | — | Pro tier treated identically to Family for navigation (BUG-899). | **Retired (misattributed).** The navigation contract is tier-blind by design — `familyCapable` derives from adult-owner + `hasFamilyLinks` (`navigation-contract.ts:220-223`), never tier — so there is no navigation-layer Family/Pro equivalence to track. The `tier === 'family' \|\| tier === 'pro'` read at `more/index.tsx:46` only enables the family-pool subscription query; it gates no navigation. BUG-899 itself is a billing guardrail (Family/Pro SKUs read-only unless already entitled — `docs/flows/master-directory/billing/BILLING-04.md`), tracked there, not here. |
+| F11 | UI | Tab composition, deep-route guards, and home selection recomputed in ~10 files. | **Resolved.** Single resolution path: `useNavigationShellContract()` for tabs, `useEntryGate()` for deep routes, `home.tsx:166` for home selection. Residual sanctioned legacy read: `own-learning.tsx:32` (legacy-only tab). |
+| F12 | UI (perf) | Contract hook must memoize on a stable signature, not array reference. | **Open (accepted).** `useResolvedNavigationState` memoizes with `profiles`/`activeProfile` references in the dep list (`use-navigation-contract.ts:78-112`), so a refetch-produced new array reference recomputes the contract. Resolution is a pure, cheap function — correctness is unaffected; this stays a perf note, not a gating bug. |
+| F13 | — | Reserved slot; content never recovered. | **Retired.** Same as F4. |
+| F14 | — | Reserved slot; content never recovered. | **Retired.** Same as F4. |
+
+**Unresolved-by-anything items to carry forward:** F2 (consent stays a separate
+shell layer — audit it separately) and F12 (memoization identity churn). Neither
+is closed by the navigation contract, and a green contract test says nothing
+about them.
+
+---
+
+## Re-verification checklist
 
 Before citing this matrix in a PR or review:
 
-1. Open each `file:line` in the inventory table; confirm the gate still exists at that location.
-2. For findings F1–F14, re-derive the F-numbering from a fresh adversarial audit — the IDs here are scaffolded.
-3. Run AST grep for any new `isOwner`, `role`, `birthYear`, `isParentProxy`, `mode`, `consentStatus` reads that aren't in the inventory.
-4. Cross-check against `docs/_archive/specs/Done/2026-05-21-navigation-contract.md` Phase 2 plan and the current `AGENTS.md` profile-shape rules.
+1. Confirm the flag posture for the build profile under discussion from
+   `apps/mobile/eas.json` / `.github/workflows/ci.yml` — not from any doc
+   snapshot, including the table above.
+2. Open the cited `file:line` sites; this file was verified against `origin/main`
+   @ `764748015` (2026-08-01) and line numbers rot.
+3. For gating questions, distinguish the layer: contract (`gates.*`,
+   `canEnter`), shell consent interception (`_layout.tsx`), or server
+   authorization (`profiles.ts`, scoped repositories).
+4. Cross-check `AGENTS.md` → "Profile Shapes" and
+   `docs/flows/mobile-app-flow-inventory.md` → "Navigation shell matrix"; where
+   any doc disagrees with code, the code wins.
 
 ---
 
 ## Provenance
 
-- **Original source:** lost (wiped by stash cycle on 2026-05-21).
-- **Reconstruction source:** dangling commit `e6287097a6fe4cfea03a82f77d7a2b22d46fc17b` (earlier draft of navigation-contract spec).
-- **Recovery worktree:** `.worktrees/recovery-2026-05-22/`.
-- **Recovery branch:** `recovery/2026-05-22-wip`.
+- **Original audit (2026-05-21):** lost — created in another agent's working tree
+  and wiped by a stash cycle before any git operation captured it.
+- **Reconstruction (2026-05-22):** scaffolded from dangling commit
+  `e6287097a6fe4cfea03a82f77d7a2b22d46fc17b` (an earlier draft of the
+  navigation-contract spec); F-numbering was inferred, never recovered.
+- **Archived design rationale:**
+  [`docs/_archive/specs/Done/2026-05-21-navigation-contract.md`](../_archive/specs/Done/2026-05-21-navigation-contract.md)
+  — historical provenance for the contract's design; the migration it describes
+  has landed.
+- **This refresh (2026-08-01, WI-2656):** full re-audit against `origin/main`
+  @ `764748015`; scaffold inventory retired, findings re-derived above.
+  Triggered by `_wip/mvp-roadmap/2026-07-23-doc-drain-assessment.md` gap #1.
