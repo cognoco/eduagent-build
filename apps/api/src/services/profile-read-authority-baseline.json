@@ -215,16 +215,6 @@
     "route": "/nudges"
   },
   {
-    "file": "apps/api/src/routes/parking-lot.ts",
-    "method": "get",
-    "route": "/sessions/:sessionId/parking-lot"
-  },
-  {
-    "file": "apps/api/src/routes/parking-lot.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/topics/:topicId/parking-lot"
-  },
-  {
     "file": "apps/api/src/routes/recaps.ts",
     "method": "get",
     "route": "/recaps"
