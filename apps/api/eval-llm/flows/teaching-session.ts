@@ -300,6 +300,41 @@ export interface TeachingSessionInput {
 
 interface TeachingRunLiveResult {
   verdict?: TeachingVerdict | { error: string };
+  /**
+   * Structured record of internal provider-call failures (mentor turn,
+   * learner simulator, transfer probe) captured during runLive. Each entry is
+   * error-class in evaluateTeachingVerdict [WI-2461 review round 2]: pre-fix
+   * these were caught into transcript strings only, so the runner counted the
+   * call as liveCallsOk and a permissive judge could pass a broken run.
+   */
+  executionFailures?: string[];
+}
+
+const VERDICT_BOOLEAN_FIELDS = [
+  'scaffolding_appropriate',
+  'looped_or_incoherent',
+  'told_not_taught',
+] as const;
+
+/**
+ * Structural verdict validation [WI-2461 review round 2]. A parseable but
+ * structurally invalid verdict ({}, unknown transfer value, missing fields,
+ * wrong types) must fail closed: pre-fix, `{}` fell through to a WARNING and
+ * the boolean dimensions silently no-op'd on non-boolean values, so a judge
+ * returning garbage JSON passed the gate. Returns the list of problems
+ * (empty = structurally valid).
+ */
+function verdictSchemaProblems(v: TeachingVerdict): string[] {
+  const problems: string[] = [];
+  if (v.transfer !== 'yes' && v.transfer !== 'partial' && v.transfer !== 'no') {
+    problems.push(`transfer=${JSON.stringify(v.transfer) ?? 'undefined'}`);
+  }
+  for (const field of VERDICT_BOOLEAN_FIELDS) {
+    if (typeof v[field] !== 'boolean') {
+      problems.push(`${field}=${JSON.stringify(v[field]) ?? 'undefined'}`);
+    }
+  }
+  return problems;
 }
 
 export function evaluateTeachingVerdict(
@@ -309,12 +344,26 @@ export function evaluateTeachingVerdict(
   const parsed = parseFirstJsonObject<TeachingRunLiveResult>(liveResponse);
   const verdict = parsed?.verdict;
 
+  // Internal provider failures recorded by runTeachingSession are error-class
+  // regardless of what the judge said afterwards — a run with a failed mentor/
+  // learner/probe call is not a trustworthy teaching sample [WI-2461 r2].
+  const issues: QualityIssue[] = [];
+  for (const failure of parsed?.executionFailures ?? []) {
+    issues.push(
+      qualityError(
+        `${input.scenarioId}.provider-call-failed`,
+        `Live provider call failed during the teaching run (${failure}) — run is not a trustworthy sample; failing closed.`,
+      ),
+    );
+  }
+
   // Fail CLOSED on an unjudged transcript [WI-2461 AC-3]: these are errors,
   // not warnings, because a warning never increments summary.qualityFailures —
   // pre-fix, a run where the judge was down (or returned unparseable output)
   // for every scenario exited 0 and the weekly gate read green.
   if (!verdict) {
     return [
+      ...issues,
       qualityError(
         `${input.scenarioId}.no-verdict`,
         'Run produced no judge verdict — transcript NOT judged; failing closed. Rerun before drawing conclusions.',
@@ -323,6 +372,7 @@ export function evaluateTeachingVerdict(
   }
   if ('error' in verdict && verdict.error) {
     return [
+      ...issues,
       qualityError(
         `${input.scenarioId}.judge-unavailable`,
         `Judge did not return a usable verdict (${String(verdict.error)}) — transcript NOT judged; failing closed.`,
@@ -331,7 +381,20 @@ export function evaluateTeachingVerdict(
   }
 
   const v = verdict as TeachingVerdict;
-  const issues: QualityIssue[] = [];
+
+  // Structural validation before any dimension logic [WI-2461 r2] — an
+  // invalid verdict shape means the transcript was NOT reliably judged.
+  const schemaProblems = verdictSchemaProblems(v);
+  if (schemaProblems.length > 0) {
+    return [
+      ...issues,
+      qualityError(
+        `${input.scenarioId}.verdict-schema-invalid`,
+        `Judge verdict is structurally invalid (${schemaProblems.join('; ')}) — transcript NOT judged; failing closed.`,
+      ),
+    ];
+  }
+
   const evidence =
     typeof v.evidence === 'string' && v.evidence ? ` Judge: ${v.evidence}` : '';
 
@@ -348,14 +411,6 @@ export function evaluateTeachingVerdict(
       qualityWarning(
         `${input.scenarioId}.transfer-partial`,
         `Transfer only partial — learner partially applies the concept but is still shaky.${evidence}`,
-      ),
-    );
-  } else if (v.transfer !== 'yes') {
-    // Unrecognised value
-    issues.push(
-      qualityWarning(
-        `${input.scenarioId}.transfer-unknown`,
-        `Judge returned an unrecognised transfer value: ${String(v.transfer)}.`,
       ),
     );
   }
@@ -392,12 +447,191 @@ export function evaluateTeachingVerdict(
 }
 
 // ---------------------------------------------------------------------------
-// Flow definition
+// Live-run core (deps-injected for deterministic testing — no jest.mock,
+// same dependency-injection pattern as runner/gates.ts GateDeps)
 // ---------------------------------------------------------------------------
 
 interface MentorEnvelopeLike {
   reply?: unknown;
 }
+
+export interface TeachingSessionLiveDeps {
+  /** Raw mentor model output for one turn (envelope JSON or prose). */
+  mentorTurn(args: {
+    system: string;
+    learnerMessage: string;
+    context: ExchangeContext;
+    conversationLanguage: ConversationLanguage;
+    scenarioId: string;
+  }): Promise<string>;
+  learnerTurn(
+    scenario: TeachingScenario,
+    age: number,
+    conversationLanguage: string,
+    history: DialogueTurn[],
+  ): Promise<string>;
+  transferProbe(
+    scenario: TeachingScenario,
+    age: number,
+    conversationLanguage: string,
+    history: DialogueTurn[],
+  ): Promise<string>;
+  judge(
+    scenario: TeachingScenario,
+    history: DialogueTurn[],
+    transferAnswer: string,
+  ): Promise<TeachingVerdict | { error: string }>;
+}
+
+export const defaultTeachingSessionDeps: TeachingSessionLiveDeps = {
+  async mentorTurn({
+    system,
+    learnerMessage,
+    context,
+    conversationLanguage,
+    scenarioId,
+  }) {
+    return runHarnessLlm(
+      [
+        { role: 'system', content: system },
+        { role: 'user', content: learnerMessage },
+      ],
+      2,
+      {
+        llmTier: context.llmTier,
+        ageBracket: resolveAgeBracket(context.birthYear),
+        conversationLanguage,
+        responseFormat: 'json',
+        sessionId: `eval-teaching-session-${scenarioId}`,
+      },
+    );
+  },
+  learnerTurn: simulateLearnerTurn,
+  transferProbe: simulateTransferProbe,
+  judge: judgeTranscript,
+};
+
+/**
+ * The multi-turn teaching simulation behind runLive. Every internal provider
+ * failure (mentor turn, learner simulator, transfer probe) is captured BOTH as
+ * a transcript diagnostic string (so the snapshot shows where the run broke)
+ * AND as a structured `executionFailures` entry that evaluateTeachingVerdict
+ * turns into an error-class issue [WI-2461 review round 2] — pre-fix only the
+ * transcript string existed, the runner counted the call as liveCallsOk, and a
+ * permissive judge could pass a broken run.
+ */
+export async function runTeachingSession(
+  input: TeachingSessionInput,
+  deps: TeachingSessionLiveDeps,
+): Promise<string> {
+  const scenario = getTeachingScenario(input.scenarioId);
+  if (!scenario) {
+    return JSON.stringify({
+      verdict: { error: `unknown scenario ${input.scenarioId}` },
+    });
+  }
+
+  const history: DialogueTurn[] = [];
+  const executionFailures: string[] = [];
+  let nextLearnerMessage = input.learnerOpening;
+  const conversationLanguage = input.context.conversationLanguage ?? 'en';
+
+  for (let turn = 0; turn < MAX_MENTOR_TURNS; turn++) {
+    // Mentor turn — production system prompt with the dialogue so far baked
+    // into context.exchangeHistory. Swap in the growing history each turn.
+    const context: ExchangeContext = {
+      ...input.context,
+      exchangeHistory: history,
+      exchangeCount: history.length,
+    };
+    const sourceEvidence = buildExchangeSourceEvidence(
+      context,
+      nextLearnerMessage,
+    );
+    const system = buildSystemPrompt({ ...context, sourceEvidence });
+
+    let mentorReply: string;
+    try {
+      const raw = await deps.mentorTurn({
+        system,
+        learnerMessage: nextLearnerMessage,
+        context,
+        conversationLanguage: conversationLanguage as ConversationLanguage,
+        scenarioId: scenario.id,
+      });
+      const parsed = parseFirstJsonObject<MentorEnvelopeLike>(raw);
+      mentorReply =
+        parsed && typeof parsed.reply === 'string' ? parsed.reply : raw;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      executionFailures.push(`mentor turn ${turn + 1}: ${msg}`);
+      mentorReply = `[mentor call failed: ${msg}]`;
+    }
+
+    history.push({ role: 'user', content: nextLearnerMessage });
+    history.push({ role: 'assistant', content: mentorReply });
+
+    if (turn === MAX_MENTOR_TURNS - 1) break;
+
+    // Simulated learner replies in character — stays at startingGap unless
+    // the mentor has genuinely taught the concept (HIGH-4 constraint).
+    try {
+      nextLearnerMessage = await deps.learnerTurn(
+        scenario,
+        input.learnerAge,
+        conversationLanguage,
+        history,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      executionFailures.push(`learner sim after turn ${turn + 1}: ${msg}`);
+      nextLearnerMessage = `[learner sim failed: ${msg}]`;
+      history.push({ role: 'user', content: nextLearnerMessage });
+      break;
+    }
+  }
+
+  // Transfer probe: learner answers the pre-authored novel question unaided.
+  // The mentor does NOT answer it — this tests whether teaching led to
+  // genuine understanding, not just in-dialogue repetition (HIGH-4).
+  let transferAnswer: string;
+  try {
+    transferAnswer = await deps.transferProbe(
+      scenario,
+      input.learnerAge,
+      conversationLanguage,
+      history,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    executionFailures.push(`transfer probe: ${msg}`);
+    transferAnswer = `[transfer probe failed: ${msg}]`;
+  }
+
+  // Judge reads the full transcript + transfer answer and returns
+  // the four-field TeachingVerdict. Judge failure surfaces as the {error}
+  // verdict → error-class judge-unavailable in evaluateTeachingVerdict.
+  const verdict = await deps.judge(scenario, history, transferAnswer);
+
+  return JSON.stringify(
+    {
+      // SCENARIO_BAND_LABEL surfaced in the snapshot so a reader sees the
+      // teen-band caveat without opening the fixture file (F1/M7).
+      band: SCENARIO_BAND_LABEL,
+      scenarioId: input.scenarioId,
+      transcript: history,
+      transferAnswer,
+      verdict,
+      ...(executionFailures.length > 0 ? { executionFailures } : {}),
+    },
+    null,
+    2,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Flow definition
+// ---------------------------------------------------------------------------
 
 export const teachingSessionFlow: FlowDefinition<TeachingSessionInput> = {
   id: 'teaching-session',
@@ -458,113 +692,7 @@ export const teachingSessionFlow: FlowDefinition<TeachingSessionInput> = {
     input: TeachingSessionInput,
     _messages: PromptMessages,
   ): Promise<string> {
-    const scenario = getTeachingScenario(input.scenarioId);
-    if (!scenario) {
-      return JSON.stringify({
-        verdict: { error: `unknown scenario ${input.scenarioId}` },
-      });
-    }
-
-    const history: DialogueTurn[] = [];
-    let nextLearnerMessage = input.learnerOpening;
-    const conversationLanguage = input.context.conversationLanguage ?? 'en';
-
-    for (let turn = 0; turn < MAX_MENTOR_TURNS; turn++) {
-      // Mentor turn — production system prompt with the dialogue so far baked
-      // into context.exchangeHistory. Swap in the growing history each turn.
-      const context: ExchangeContext = {
-        ...input.context,
-        exchangeHistory: history,
-        exchangeCount: history.length,
-      };
-      const sourceEvidence = buildExchangeSourceEvidence(
-        context,
-        nextLearnerMessage,
-      );
-      const system = buildSystemPrompt({ ...context, sourceEvidence });
-
-      let mentorReply: string;
-      try {
-        const raw = await runHarnessLlm(
-          [
-            { role: 'system', content: system },
-            { role: 'user', content: nextLearnerMessage },
-          ],
-          2,
-          {
-            llmTier: context.llmTier,
-            ageBracket: resolveAgeBracket(context.birthYear),
-            conversationLanguage: conversationLanguage as ConversationLanguage,
-            responseFormat: 'json',
-            sessionId: `eval-teaching-session-${scenario.id}`,
-          },
-        );
-        const parsed = parseFirstJsonObject<MentorEnvelopeLike>(raw);
-        mentorReply =
-          parsed && typeof parsed.reply === 'string' ? parsed.reply : raw;
-      } catch (err) {
-        mentorReply = `[mentor call failed: ${
-          err instanceof Error ? err.message : String(err)
-        }]`;
-      }
-
-      history.push({ role: 'user', content: nextLearnerMessage });
-      history.push({ role: 'assistant', content: mentorReply });
-
-      if (turn === MAX_MENTOR_TURNS - 1) break;
-
-      // Simulated learner replies in character — stays at startingGap unless
-      // the mentor has genuinely taught the concept (HIGH-4 constraint).
-      try {
-        nextLearnerMessage = await simulateLearnerTurn(
-          scenario,
-          input.learnerAge,
-          conversationLanguage,
-          history,
-        );
-      } catch (err) {
-        nextLearnerMessage = `[learner sim failed: ${
-          err instanceof Error ? err.message : String(err)
-        }]`;
-        history.push({ role: 'user', content: nextLearnerMessage });
-        break;
-      }
-    }
-
-    // Transfer probe: learner answers the pre-authored novel question unaided.
-    // The mentor does NOT answer it — this tests whether teaching led to
-    // genuine understanding, not just in-dialogue repetition (HIGH-4).
-    let transferAnswer: string;
-    try {
-      transferAnswer = await simulateTransferProbe(
-        scenario,
-        input.learnerAge,
-        conversationLanguage,
-        history,
-      );
-    } catch (err) {
-      transferAnswer = `[transfer probe failed: ${
-        err instanceof Error ? err.message : String(err)
-      }]`;
-    }
-
-    // Judge reads the full transcript + transfer answer and returns
-    // the four-field TeachingVerdict.
-    const verdict = await judgeTranscript(scenario, history, transferAnswer);
-
-    return JSON.stringify(
-      {
-        // SCENARIO_BAND_LABEL surfaced in the snapshot so a reader sees the
-        // teen-band caveat without opening the fixture file (F1/M7).
-        band: SCENARIO_BAND_LABEL,
-        scenarioId: input.scenarioId,
-        transcript: history,
-        transferAnswer,
-        verdict,
-      },
-      null,
-      2,
-    );
+    return runTeachingSession(input, defaultTeachingSessionDeps);
   },
 
   evaluateQuality({ input, liveResponse }): QualityIssue[] {

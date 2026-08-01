@@ -391,10 +391,14 @@ was taught", then an LLM judge returns a 4-field `TeachingVerdict`:
 | Coherence (no looping / contradiction) | warning |
 | Told-not-taught (reasoned, not asserted) | warning |
 
-An absent or unusable verdict (`no-verdict` / `judge-unavailable`) is also
-**error**-class — the gate fails closed on an unjudged transcript, and the
-harness additionally exits 1 whenever any live call failed to execute
-(`summary.liveCallsFailed > 0`, enforced in `runner/gates.ts`) (WI-2461).
+An absent, unusable, or structurally invalid verdict (`no-verdict` /
+`judge-unavailable` / `verdict-schema-invalid`) is also **error**-class — the
+gate fails closed on an unjudged transcript. Internal provider failures during
+the run (mentor turn, learner simulator, transfer probe) surface as
+error-class `provider-call-failed` issues via the result's
+`executionFailures`, and the harness additionally exits 1 whenever any live
+call failed to execute (`summary.liveCallsFailed > 0`, enforced in
+`runner/gates.ts`) (WI-2461).
 
 `evaluateTeachingVerdict()` is exported pure and unit-tested for the severity
 mapping; `assertScenarioProfilesResolve(PROFILES)` runs at import time so a
