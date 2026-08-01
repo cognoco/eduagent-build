@@ -14,7 +14,7 @@ We keep information you or your parent gives us, such as your name, date of birt
 
 We also keep information about your learning: subjects, messages, progress, review results, notes, and what you have mastered or may need to practise again.
 
-We do not collect your location, contacts, browsing history, or other photos from your device. We use a homework image only when you choose one. If you use the microphone, your device's speech service turns your voice into text; MentoMate only gets the words as text and never receives or keeps the audio recording.
+We do not collect your location, contacts, browsing history, or other photos from your device. We use a homework image only when you choose one; to answer it, the image is sent to one of the AI companies that helps power MentoMate, and MentoMate itself does not keep the image. If you use the microphone, your device's speech service turns your voice into text; MentoMate only gets the words as text and never receives or keeps the audio recording.
 
 ## You are talking to AI
 
@@ -24,7 +24,7 @@ The mentor's replies are made by artificial intelligence, not a human teacher. T
 
 MentoMate makes a learning memory from your activity. It may include subjects, progress, mastery results, notes, recaps, and short quotations from things you wrote. This helps the tutor remember what you have already learned.
 
-We use this memory for tutoring continuity—not advertising, marketing profiles, or training another company's general-purpose AI model.
+We use this memory for tutoring continuity—not advertising or marketing profiles. The AI companies we work with must promise not to use your content to train their general-purpose AI models, and we check those promises before MentoMate launches.
 
 ## Who receives information
 

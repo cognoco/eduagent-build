@@ -15,7 +15,8 @@ Code evidence pointers below resolve at the landed SHA of this change.
 |---|---|---|
 | [`privacy-policy.html`](privacy-policy.html) | Adult-facing public notice (English master) | Draft — carries an on-face draft banner and an OPQ-annotated PRE-PUBLISH comment block |
 | [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md) | Child-readable transparency summary + comprehension prompts | Draft — OPQ-annotated draft banner |
-| `apps/mobile/src/i18n/locales/{de,es,ja,nb,pl,pt}.json` → `legal.privacy.*` | Generated locale drafts of the in-app notice | Machine-generated; native-speaker legal review outstanding (external) |
+| `apps/mobile/src/i18n/locales/en.json` → `legal.privacy.*` | In-app notice English master (the source the locale drafts are generated from) | Authored copy; carries the in-app divergences flagged in §4 |
+| `apps/mobile/src/i18n/locales/{de,es,ja,nb,pl,pt}.json` → `legal.privacy.*` | Generated locale drafts of the in-app notice | Machine-generated from the `en.json` master; native-speaker legal review outstanding (external) |
 | [`history/2026-07-22-privacy-surface-evidence.md`](history/2026-07-22-privacy-surface-evidence.md) | Prior engineering evidence matrix (snapshot `9a4ae7c`) | Historical baseline; superseded where §2 below differs |
 | [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) | Processor / transfer evidence ledger | Current internal inventory; external closure with OPQ-110 |
 | [`2026-07-24-wi-1194-production-transcript-purge-evidence.md`](2026-07-24-wi-1194-production-transcript-purge-evidence.md) | Production transcript-purge run evidence | Most recent production configuration evidence |
@@ -32,7 +33,7 @@ code-verified is explicitly *not* established by this repository.
 | # | Claim (policy § / summary section) | Status | Evidence pointer or gate |
 |---|---|---|---|
 | 1 | Controller is ZWIZZLY AS, org.nr 811 696 072, Fiskekroken 3B, 0139 Oslo (§1, §11; summary intro) | external/legal | Consistent across [`breach-register.md`](breach-register.md), [`ropa.md`](ropa.md); corporate registration proof (Brønnøysund extract) is external — controller/DPO |
-| 2 | Minimum age 13; under-13 cannot register (§1, §4; summary intro) | code-verified | `packages/schemas/src/age.ts` (`PROFILE_MINIMUM_AGE = 13`); exact-date checks in `apps/api/src/services/identity-v2/child-profile-v2.ts` |
+| 2 | Minimum age 13; under-13 cannot register (§1, §4; summary intro) | code-verified **with a named implementation gap** | `packages/schemas/src/age.ts` (`PROFILE_MINIMUM_AGE = 13`). The exact-date floor check in `apps/api/src/services/identity-v2/child-profile-v2.ts` runs only when `birthMonth`/`birthDay` are supplied; `profileCreateSchema` (`packages/schemas/src/profiles.ts`) permits a year-only payload, which falls back to a calendar-year age check that can admit a not-yet-13 user via a direct API call. **Publication blocker — see §4** |
 | 3 | Availability limited to an allowlist: EEA threshold-13 countries + individually screened non-EEA; US provisionally screened, not finally admitted; UK/CH/higher-threshold EEA out at launch (§4; summary intro) | external/legal + config-dependent | Ruling: [`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`](2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md); US screen: [`2026-07-26-us-launch-screen-record.md`](2026-07-26-us-launch-screen-record.md). Store-distribution config + residence gating are launch gates verified at the launch check, not here |
 | 4 | Account data: email, display name, date of birth, residence, language, pronouns (§2) | code-verified | `packages/database/src/schema/identity.ts` (`person.display_name`, `person.birth_date`, `person.residence_jurisdiction`; `login.email`); consent use of birth date in `apps/api/src/services/identity-v2/consent-v2.ts` |
 | 5 | Voice: device speech service converts to text; MentoMate receives/retains no audio (§2; summary "What we know") | code-verified (app side) | `apps/mobile/src/hooks/use-speech-recognition.ts` — native module invoked with config only; app receives transcript events, no audio upload path exists. Whether the OS speech service itself is purely on-device is platform-controlled and NOT claimed (wording softened 2026-08-01; see [`../screenshots_and_store_info/app-privacy-data-safety-worksheet.md`](../screenshots_and_store_info/app-privacy-data-safety-worksheet.md) Audio row) |
@@ -103,7 +104,24 @@ outside this repository's authority.
    under `docs/compliance/evidence/` (or the controller's records system) with
    a source date and integrity hash, per the evidence rules in
    [`README.md`](README.md).
-9. **Pre-publication re-verification**: `RETENTION_PURGE_ENABLED` still
+9. **Named missing control — international-routing launch-stop** *(gap; the
+   absence of this control is recorded as a fact, never represented as
+   compliance)*: no executable runtime control currently blocks learner data
+   from being routed to non-EEA AI providers while the OPQ-110 transfer
+   evidence is pending. The serving-region seam is
+   `V2_SERVING_REGION_PLACEHOLDER` in `apps/api/src/services/llm/router.ts`,
+   which today pins all traffic — EU included — to the US-hosted primary
+   (claim row #13). Before publication and launch, the launch-compliance gate
+   this checklist feeds (WI-1577 — launch-compliance gate) must hold either
+   verified OPQ-110 safeguards for every provider actually routed, or an
+   implemented technical stop. Bounded Work-Item shape for capture
+   (engineering, not this docs item): a config-gated launch-stop at the
+   `V2_SERVING_REGION_PLACEHOLDER` seam — an explicit setting the router
+   checks before selecting a non-EEA provider for learner traffic, failing
+   over to the tier's EU secondary or refusing the call — verified at the
+   launch gate. Accountable owner: engineering, under the launch-compliance
+   gate.
+10. **Pre-publication re-verification**: `RETENTION_PURGE_ENABLED` still
    enabled in production (latest evidence 2026-07-24); the live provider set
    still matches the 2026-07-25 ledger; the launch perimeter still matches the
    2026-07-26 ruling. Any drift reopens the affected claim rows in §2.
@@ -111,9 +129,30 @@ outside this repository's authority.
 ## 4. Known repo-owned divergences flagged for the OPQ-106 pass
 
 Found during the 2026-08-01 reconciliation; deliberately **not** fixed in this
-docs-only change because they live in mobile app copy (7 locales + tests). They
-must be resolved in the release that accompanies publication (checklist §3.5):
+docs-only change because they live in application code or mobile app copy
+(7 locales + tests). They must be resolved before or in the release that
+accompanies publication:
 
+- **PUBLICATION BLOCKER — under-13 registration gap (year-only DOB
+  fallback).** `profileCreateSchema`
+  (`packages/schemas/src/profiles.ts:81-82`) accepts a payload carrying
+  `birthYear` without `birthMonth`/`birthDay`; the create-child service
+  (`apps/api/src/services/identity-v2/child-profile-v2.ts:138-145`) then falls
+  back to the calendar-year check (`checkConsentRequired`,
+  `apps/api/src/services/consent.ts:201`), which over-estimates age by up to
+  ~11 months, and stores the `YYYY-01-01` sentinel birth date
+  (`child-profile-v2.ts:166`) — so a direct API call can register a
+  not-yet-13 user born late in the calendar year, and later exact-date reads
+  inherit the sentinel. The shipped mobile client always sends the full date
+  (`apps/mobile/src/app/create-profile.tsx:348-349`), so the exposure is the
+  API trust boundary, not the app UI flow — but the notice claim
+  "unavailable to users under 13" must not be published while the gap holds
+  (claim row #2). Route to the OPQ-106 checklist as a blocker. Bounded fix
+  (engineering Work Item for capture, not this docs item): require
+  `birthMonth`/`birthDay` server-side on profile create (schema + service),
+  or make the service reject year-only payloads at the age floor instead of
+  falling back to calendar-year math — then restore claim row #2 to
+  code-verified.
 - `legal.privacy.s7Body` (in-app, all locales) asserts present-tense transfer
   safeguards including the UK Addendum; the repository policy uses the honest
   future-tense formulation (safeguards established **before** transfer, no UK
