@@ -419,7 +419,9 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && steps.scope.outputs.database_script_guards == 'true')
         run: |
           node --test packages/database/scripts/check-db-push-target.test.mjs
+          node --test packages/database/scripts/check-development-schema.test.mjs
           node --test packages/database/scripts/check-identity-fk-drift.test.mjs
+          node --test packages/database/scripts/reconcile-development-schema.test.mjs
 
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
       # it gates — fails if any entry is missing an owner or a Cosmo WI-NN, or
