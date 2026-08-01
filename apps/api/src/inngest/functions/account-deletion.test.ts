@@ -657,6 +657,11 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
     }) => Promise<unknown>;
+    const maliciousError = new Error(
+      'Clerk response contained private context',
+    );
+    maliciousError.name = `payer alice@example.test ${'x'.repeat(160)}`;
+
     await onFailure({
       event: {
         data: {
@@ -664,7 +669,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
           run_id: 'run-xyz',
         },
       },
-      error: new Error('Clerk response contained private context'),
+      error: maliciousError,
     });
 
     expect(safeSendSpy).toHaveBeenCalledTimes(1);
@@ -690,6 +695,9 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     });
     expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
       'private context',
+    );
+    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
+      'alice@example.test',
     );
   });
 

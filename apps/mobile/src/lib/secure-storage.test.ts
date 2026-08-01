@@ -72,12 +72,35 @@ describe('secure-storage sanitizer (platform-agnostic)', () => {
 
 describe('[BUG-131] secure-storage web fallback warning', () => {
   let warnSpy: jest.SpyInstance;
+  const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'localStorage',
+  );
+
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: undefined,
+    });
+  });
+
+  afterAll(() => {
+    if (originalLocalStorageDescriptor) {
+      Object.defineProperty(
+        globalThis,
+        'localStorage',
+        originalLocalStorageDescriptor,
+      );
+    } else {
+      Reflect.deleteProperty(globalThis, 'localStorage');
+    }
+  });
 
   beforeEach(() => {
     __resetWebFallbackWarning();
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     // Reset localStorage between tests so values from one don't leak.
-    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
+    if (globalThis.localStorage) {
       globalThis.localStorage.clear();
     }
   });

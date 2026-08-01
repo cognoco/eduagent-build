@@ -7,6 +7,7 @@ const SECRET = 'guardian-authority-test-secret-at-least-32-chars';
 const NOW = new Date('2026-07-30T12:00:00.000Z');
 
 const assertion = {
+  redemptionId: '44444444-4444-4444-8444-444444444444',
   guardianPersonId: '11111111-1111-4111-8111-111111111111',
   chargePersonId: '22222222-2222-4222-8222-222222222222',
   organizationId: '33333333-3333-4333-8333-333333333333',

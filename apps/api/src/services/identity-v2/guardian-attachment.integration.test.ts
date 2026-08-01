@@ -7,6 +7,7 @@ import {
   consentRequest,
   countryPolicyRegistry,
   createDatabase,
+  guardianAuthorityRedemptions,
   guardianship,
   membership,
   person,
@@ -31,10 +32,14 @@ import {
   attachGuardianConsentForCredentialedLearner,
   GuardianAttachmentRejectedError,
 } from './guardian-attachment';
-import type { GuardianAuthorityAssertion } from './guardian-attachment-token';
+import {
+  signGuardianAuthorityToken,
+  type GuardianAuthorityAssertion,
+} from './guardian-attachment-token';
 import { resolveConsentSetStatus } from './consent-status-v2';
 import { processConsentResponseV2, restoreConsentV2 } from './consent-v2';
 import { consentPersonLockKey } from './deletion-v2';
+import { initiateGuardianAuthorityVerification } from './guardian-attachment-verifier';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -62,6 +67,7 @@ let verifierRequest: {
   authorization: string | null;
   body: Record<string, unknown>;
 } | null = null;
+let verifierRequestCount = 0;
 const nativeFetch = globalThis.fetch;
 installFetchInterceptor();
 mockClerkJWKS();
@@ -108,6 +114,7 @@ function assertion(
   overrides: Partial<GuardianAuthorityAssertion> = {},
 ): GuardianAuthorityAssertion {
   return {
+    redemptionId: randomUUID(),
     guardianPersonId,
     chargePersonId,
     organizationId,
@@ -171,6 +178,7 @@ function assertion(
         },
       });
       addFetchHandler(VERIFIER_URL, async (_url, init) => {
+        verifierRequestCount += 1;
         const body = JSON.parse(String(init?.body)) as {
           verificationHandle: string;
           expected: {
@@ -755,6 +763,281 @@ function assertion(
             grant.assuranceToken?.startsWith('vpc:'),
         ),
       ).toBe(true);
+    });
+
+    it('[WI-2986] recovers the original authority after response loss without redeeming the handle twice', async () => {
+      const adult = await seedIdentity('adult-response-loss', 40);
+      const learner = await seedIdentity('learner-response-loss', 14);
+      const verificationHandle = `verification-${randomUUID()}`;
+      const env = {
+        ...buildIntegrationEnv(),
+        DATABASE_URL: process.env.DATABASE_URL!,
+        GUARDIAN_AUTHORITY_TOKEN_SECRET: TOKEN_SECRET,
+        GUARDIAN_AUTHORITY_VERIFIER_URL: VERIFIER_URL,
+        GUARDIAN_AUTHORITY_VERIFIER_KEY: VERIFIER_KEY,
+      };
+      const request = {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: adult.clerkUserId, email: adult.email },
+          adult.personId,
+        ),
+        body: JSON.stringify({
+          chargePersonId: learner.personId,
+          verificationHandle,
+        }),
+      };
+      const callsBefore = verifierRequestCount;
+
+      const first = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        request,
+        env,
+      );
+      const second = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        request,
+        env,
+      );
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      await expect(second.json()).resolves.toEqual(await first.json());
+      expect(verifierRequestCount - callsBefore).toBe(1);
+    });
+
+    it('[WI-2986] rejects a verifier handle replayed against a different learner tuple', async () => {
+      const adult = await seedIdentity('adult-mutated-replay', 40);
+      const firstLearner = await seedIdentity('learner-mutated-replay-a', 14);
+      const secondLearner = await seedIdentity('learner-mutated-replay-b', 14);
+      const verificationHandle = `verification-${randomUUID()}`;
+      const env = {
+        ...buildIntegrationEnv(),
+        DATABASE_URL: process.env.DATABASE_URL!,
+        GUARDIAN_AUTHORITY_TOKEN_SECRET: TOKEN_SECRET,
+        GUARDIAN_AUTHORITY_VERIFIER_URL: VERIFIER_URL,
+        GUARDIAN_AUTHORITY_VERIFIER_KEY: VERIFIER_KEY,
+      };
+      const headers = buildAuthHeaders(
+        { sub: adult.clerkUserId, email: adult.email },
+        adult.personId,
+      );
+      const callsBefore = verifierRequestCount;
+
+      const first = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: firstLearner.personId,
+            verificationHandle,
+          }),
+        },
+        env,
+      );
+      const mutated = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chargePersonId: secondLearner.personId,
+            verificationHandle,
+          }),
+        },
+        env,
+      );
+
+      expect(first.status).toBe(200);
+      expect(mutated.status).toBe(403);
+      expect(verifierRequestCount - callsBefore).toBe(1);
+    });
+
+    it('[WI-2986] lets only one database connection redeem a concurrent duplicate handle', async () => {
+      const adult = await seedIdentity('adult-verifier-contention', 40);
+      const learner = await seedIdentity('learner-verifier-contention', 14);
+      const secondConnection = createDatabase(process.env.DATABASE_URL!);
+      const verificationHandle = `verification-${randomUUID()}`;
+      let providerCalls = 0;
+      let releaseProvider!: () => void;
+      let signalProviderStarted!: () => void;
+      const providerStarted = new Promise<void>((resolveStarted) => {
+        signalProviderStarted = resolveStarted;
+      });
+      const providerRelease = new Promise<void>((resolveRelease) => {
+        releaseProvider = resolveRelease;
+      });
+      const fetchImpl: typeof fetch = async (_input, init) => {
+        providerCalls += 1;
+        const body = JSON.parse(String(init?.body)) as {
+          expected: {
+            guardianPersonId: string;
+            chargePersonId: string;
+            organizationId: string;
+            jurisdiction: string;
+            policyVersion: string;
+          };
+        };
+        signalProviderStarted();
+        await providerRelease;
+        return new Response(
+          JSON.stringify({
+            decision: 'approved',
+            guardianPersonId: body.expected.guardianPersonId,
+            chargePersonId: body.expected.chargePersonId,
+            organizationId: body.expected.organizationId,
+            jurisdiction: body.expected.jurisdiction,
+            policyVersion: body.expected.policyVersion,
+            assuranceLevel: 'VPC_VERIFIED',
+            assuranceMethod: 'verified_parental_responsibility_credential',
+            evidenceId: `vpc:${randomUUID()}`,
+            qualification: 'biological_parent',
+            learnerAssentAt: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      };
+      const input = {
+        callerPersonId: adult.personId,
+        chargePersonId: learner.personId,
+        verificationHandle,
+        verifierUrl: VERIFIER_URL,
+        verifierKey: VERIFIER_KEY,
+        tokenSecret: TOKEN_SECRET,
+        now: AS_OF,
+        fetchImpl,
+      };
+
+      const winner = initiateGuardianAuthorityVerification(db, input);
+      await providerStarted;
+      await expect(
+        initiateGuardianAuthorityVerification(secondConnection, input),
+      ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+      expect(providerCalls).toBe(1);
+      releaseProvider();
+      await expect(winner).resolves.toEqual({
+        authorityToken: expect.any(String),
+      });
+    });
+
+    it('[WI-2986] returns no authority when persistence disappears after provider success', async () => {
+      const adult = await seedIdentity('adult-persist-failure', 40);
+      const learner = await seedIdentity('learner-persist-failure', 14);
+      let providerApproved = false;
+
+      await expect(
+        initiateGuardianAuthorityVerification(db, {
+          callerPersonId: adult.personId,
+          chargePersonId: learner.personId,
+          verificationHandle: `verification-${randomUUID()}`,
+          verifierUrl: VERIFIER_URL,
+          verifierKey: VERIFIER_KEY,
+          tokenSecret: TOKEN_SECRET,
+          now: AS_OF,
+          fetchImpl: async (_input, init) => {
+            const body = JSON.parse(String(init?.body)) as {
+              expected: {
+                guardianPersonId: string;
+                chargePersonId: string;
+                organizationId: string;
+                jurisdiction: string;
+                policyVersion: string;
+              };
+            };
+            providerApproved = true;
+            await db
+              .delete(guardianAuthorityRedemptions)
+              .where(
+                and(
+                  eq(
+                    guardianAuthorityRedemptions.guardianPersonId,
+                    adult.personId,
+                  ),
+                  eq(
+                    guardianAuthorityRedemptions.chargePersonId,
+                    learner.personId,
+                  ),
+                  eq(guardianAuthorityRedemptions.status, 'redeeming'),
+                ),
+              );
+            return new Response(
+              JSON.stringify({
+                decision: 'approved',
+                guardianPersonId: body.expected.guardianPersonId,
+                chargePersonId: body.expected.chargePersonId,
+                organizationId: body.expected.organizationId,
+                jurisdiction: body.expected.jurisdiction,
+                policyVersion: body.expected.policyVersion,
+                assuranceLevel: 'VPC_VERIFIED',
+                assuranceMethod: 'verified_parental_responsibility_credential',
+                evidenceId: `vpc:${randomUUID()}`,
+                qualification: 'biological_parent',
+                learnerAssentAt: null,
+              }),
+              {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            );
+          },
+        }),
+      ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+      expect(providerApproved).toBe(true);
+      await expect(
+        db
+          .select()
+          .from(guardianAuthorityRedemptions)
+          .where(
+            and(
+              eq(guardianAuthorityRedemptions.guardianPersonId, adult.personId),
+              eq(guardianAuthorityRedemptions.chargePersonId, learner.personId),
+            ),
+          ),
+      ).resolves.toEqual([]);
+    });
+
+    it('[WI-2986] rejects a correctly signed token without its durable redemption receipt', async () => {
+      const adult = await seedIdentity('adult-missing-receipt', 40);
+      const learner = await seedIdentity('learner-missing-receipt', 14);
+      const issuedAt = new Date();
+      const token = signGuardianAuthorityToken(
+        assertion(adult.personId, learner.personId, learner.organizationId, {
+          issuedAt,
+          notBefore: issuedAt,
+          expiresAt: new Date(issuedAt.getTime() + 15 * 60 * 1000),
+        }),
+        TOKEN_SECRET,
+      );
+
+      const response = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(
+            { sub: adult.clerkUserId, email: adult.email },
+            adult.personId,
+          ),
+          body: JSON.stringify({
+            chargePersonId: learner.personId,
+            authorityToken: token,
+          }),
+        },
+        {
+          ...buildIntegrationEnv(),
+          DATABASE_URL: process.env.DATABASE_URL!,
+          GUARDIAN_AUTHORITY_TOKEN_SECRET: TOKEN_SECRET,
+          GUARDIAN_AUTHORITY_VERIFIER_URL: VERIFIER_URL,
+          GUARDIAN_AUTHORITY_VERIFIER_KEY: VERIFIER_KEY,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      await expect(
+        db.query.guardianship.findMany({
+          where: eq(guardianship.chargePersonId, learner.personId),
+        }),
+      ).resolves.toEqual([]);
     });
 
     it('requires a fresh organization-specific HTTP ceremony after an org move', async () => {

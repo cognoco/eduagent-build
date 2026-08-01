@@ -1,8 +1,16 @@
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Database } from '@eduagent/database';
+import {
+  guardianAuthorityRedemptions,
+  type Database,
+} from '@eduagent/database';
+import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
   GUARDIAN_AUTHORITY_MAX_TTL_MS,
+  guardianAuthorityTokenDigest,
   signGuardianAuthorityToken,
+  verifyGuardianAuthorityToken,
 } from './guardian-attachment-token';
 import {
   GuardianAttachmentRejectedError,
@@ -46,6 +54,108 @@ export interface GuardianAuthorityInitiationInput {
   fetchImpl?: typeof fetch;
 }
 
+function verifierHandleDigest(handle: string, secret: string): string {
+  return createHmac('sha256', secret)
+    .update(`guardian-verifier-handle:${handle}`, 'utf8')
+    .digest('hex');
+}
+
+function purposeSetDigest(): string {
+  return createHash('sha256')
+    .update(JSON.stringify([...CONSENT_PURPOSES].sort()), 'utf8')
+    .digest('hex');
+}
+
+function commandBindingDigest(
+  input: {
+    guardianPersonId: string;
+    chargePersonId: string;
+    organizationId: string;
+    jurisdiction: string;
+    policyVersion: string;
+    authorizationForm: string;
+    requiredAssuranceLevel: string;
+    purposeSetDigest: string;
+  },
+  secret: string,
+): string {
+  return createHmac('sha256', secret)
+    .update(JSON.stringify(input), 'utf8')
+    .digest('hex');
+}
+
+function sameDigest(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left, 'utf8');
+  const rightBytes = Buffer.from(right, 'utf8');
+  return (
+    leftBytes.length === rightBytes.length &&
+    timingSafeEqual(leftBytes, rightBytes)
+  );
+}
+
+async function rejectReservation(
+  db: Database,
+  reservationId: string,
+  now: Date,
+): Promise<never> {
+  await db
+    .update(guardianAuthorityRedemptions)
+    .set({ status: 'rejected', updatedAt: now })
+    .where(
+      and(
+        eq(guardianAuthorityRedemptions.id, reservationId),
+        eq(guardianAuthorityRedemptions.status, 'redeeming'),
+      ),
+    );
+  throw new GuardianAttachmentRejectedError();
+}
+
+/**
+ * Verifies both the token signature and its durable issued-redemption receipt.
+ * A signed token without the matching committed receipt is never attachment
+ * authority.
+ */
+export async function verifyDurableGuardianAuthorityToken(
+  db: Database,
+  token: string,
+  secret: string,
+  now = new Date(),
+) {
+  const authority = verifyGuardianAuthorityToken(token, secret, now);
+  if (!authority) return null;
+
+  const [redemption] = await db
+    .select()
+    .from(guardianAuthorityRedemptions)
+    .where(eq(guardianAuthorityRedemptions.id, authority.redemptionId))
+    .limit(1);
+  if (
+    !redemption ||
+    redemption.status !== 'issued' ||
+    !redemption.authorityTokenDigest ||
+    !sameDigest(
+      redemption.authorityTokenDigest,
+      guardianAuthorityTokenDigest(token),
+    ) ||
+    redemption.guardianPersonId !== authority.guardianPersonId ||
+    redemption.chargePersonId !== authority.chargePersonId ||
+    redemption.organizationId !== authority.organizationId ||
+    redemption.jurisdiction !== authority.jurisdiction ||
+    redemption.policyVersion !== authority.policyVersion ||
+    redemption.assuranceMethod !== authority.assuranceMethod ||
+    redemption.evidenceId !== authority.evidenceId ||
+    redemption.qualification !== authority.qualification ||
+    redemption.learnerAssentAt?.getTime() !==
+      authority.learnerAssentAt?.getTime() ||
+    redemption.issuedAt?.getTime() !== authority.issuedAt.getTime() ||
+    redemption.notBefore?.getTime() !== authority.notBefore.getTime() ||
+    redemption.expiresAt?.getTime() !== authority.expiresAt.getTime()
+  ) {
+    return null;
+  }
+  return authority;
+}
+
 /**
  * Redeems an opaque provider handle over the configured server-to-server VPC
  * boundary and mints the only assertion accepted by attachment redemption.
@@ -62,6 +172,109 @@ export async function initiateGuardianAuthorityVerification(
     chargePersonId: input.chargePersonId,
     asOf: now,
   });
+
+  const purposesDigest = purposeSetDigest();
+  const handleDigest = verifierHandleDigest(
+    input.verificationHandle,
+    input.tokenSecret,
+  );
+  const bindingDigest = commandBindingDigest(
+    {
+      guardianPersonId: input.callerPersonId,
+      chargePersonId: input.chargePersonId,
+      organizationId: context.organizationId,
+      jurisdiction: context.jurisdiction,
+      policyVersion: context.policyVersion,
+      authorizationForm: context.authorizationForm,
+      requiredAssuranceLevel: context.requiredAssuranceLevel,
+      purposeSetDigest: purposesDigest,
+    },
+    input.tokenSecret,
+  );
+
+  const [reservation] = await db
+    .insert(guardianAuthorityRedemptions)
+    .values({
+      verifierHandleDigest: handleDigest,
+      commandBindingDigest: bindingDigest,
+      guardianPersonId: input.callerPersonId,
+      chargePersonId: input.chargePersonId,
+      organizationId: context.organizationId,
+      jurisdiction: context.jurisdiction,
+      policyVersion: context.policyVersion,
+      authorizationForm: context.authorizationForm,
+      purposeSetDigest: purposesDigest,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({
+      target: guardianAuthorityRedemptions.verifierHandleDigest,
+    })
+    .returning({ id: guardianAuthorityRedemptions.id });
+
+  if (!reservation) {
+    const [existing] = await db
+      .select()
+      .from(guardianAuthorityRedemptions)
+      .where(
+        eq(guardianAuthorityRedemptions.verifierHandleDigest, handleDigest),
+      )
+      .limit(1);
+    if (
+      !existing ||
+      !sameDigest(existing.commandBindingDigest, bindingDigest) ||
+      existing.guardianPersonId !== input.callerPersonId ||
+      existing.chargePersonId !== input.chargePersonId ||
+      existing.organizationId !== context.organizationId ||
+      existing.jurisdiction !== context.jurisdiction ||
+      existing.policyVersion !== context.policyVersion ||
+      existing.authorizationForm !== context.authorizationForm ||
+      !sameDigest(existing.purposeSetDigest, purposesDigest) ||
+      existing.status !== 'issued' ||
+      !existing.assuranceMethod ||
+      !existing.evidenceId ||
+      !existing.qualification ||
+      !existing.issuedAt ||
+      !existing.notBefore ||
+      !existing.expiresAt ||
+      !existing.authorityTokenDigest
+    ) {
+      throw new GuardianAttachmentRejectedError();
+    }
+
+    const authorityToken = signGuardianAuthorityToken(
+      {
+        redemptionId: existing.id,
+        guardianPersonId: existing.guardianPersonId,
+        chargePersonId: existing.chargePersonId,
+        organizationId: existing.organizationId,
+        jurisdiction: existing.jurisdiction,
+        policyVersion: existing.policyVersion,
+        assuranceMethod: existing.assuranceMethod,
+        evidenceId: existing.evidenceId,
+        qualification:
+          guardianAuthorityVerifierResponseSchema.shape.qualification.parse(
+            existing.qualification,
+          ),
+        decision: 'approved',
+        learnerAssentAt: existing.learnerAssentAt,
+        issuedAt: existing.issuedAt,
+        notBefore: existing.notBefore,
+        expiresAt: existing.expiresAt,
+      },
+      input.tokenSecret,
+    );
+    if (
+      !sameDigest(
+        existing.authorityTokenDigest,
+        guardianAuthorityTokenDigest(authorityToken),
+      ) ||
+      !verifyGuardianAuthorityToken(authorityToken, input.tokenSecret, now)
+    ) {
+      throw new GuardianAttachmentRejectedError();
+    }
+    return { authorityToken };
+  }
 
   let response: Response;
   try {
@@ -85,10 +298,10 @@ export async function initiateGuardianAuthorityVerification(
       }),
     });
   } catch {
-    throw new GuardianAttachmentRejectedError();
+    return rejectReservation(db, reservation.id, now);
   }
   if (!response.ok) {
-    throw new GuardianAttachmentRejectedError();
+    return rejectReservation(db, reservation.id, now);
   }
 
   let verified: z.infer<typeof guardianAuthorityVerifierResponseSchema>;
@@ -97,7 +310,7 @@ export async function initiateGuardianAuthorityVerification(
       await response.json(),
     );
   } catch {
-    throw new GuardianAttachmentRejectedError();
+    return rejectReservation(db, reservation.id, now);
   }
 
   if (
@@ -110,29 +323,56 @@ export async function initiateGuardianAuthorityVerification(
     (context.authorizationForm === 'joint_child_guardian' &&
       !verified.learnerAssentAt)
   ) {
+    return rejectReservation(db, reservation.id, now);
+  }
+
+  const assertion = {
+    redemptionId: reservation.id,
+    guardianPersonId: verified.guardianPersonId,
+    chargePersonId: verified.chargePersonId,
+    organizationId: verified.organizationId,
+    jurisdiction: verified.jurisdiction,
+    policyVersion: verified.policyVersion,
+    assuranceMethod: verified.assuranceMethod,
+    evidenceId: verified.evidenceId,
+    qualification: verified.qualification,
+    decision: verified.decision,
+    learnerAssentAt: verified.learnerAssentAt
+      ? new Date(verified.learnerAssentAt)
+      : null,
+    issuedAt: now,
+    notBefore: now,
+    expiresAt: new Date(now.getTime() + GUARDIAN_AUTHORITY_MAX_TTL_MS),
+  } as const;
+  const authorityToken = signGuardianAuthorityToken(
+    assertion,
+    input.tokenSecret,
+  );
+  const [issued] = await db
+    .update(guardianAuthorityRedemptions)
+    .set({
+      status: 'issued',
+      assuranceMethod: assertion.assuranceMethod,
+      evidenceId: assertion.evidenceId,
+      qualification: assertion.qualification,
+      learnerAssentAt: assertion.learnerAssentAt,
+      issuedAt: assertion.issuedAt,
+      notBefore: assertion.notBefore,
+      expiresAt: assertion.expiresAt,
+      authorityTokenDigest: guardianAuthorityTokenDigest(authorityToken),
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(guardianAuthorityRedemptions.id, reservation.id),
+        eq(guardianAuthorityRedemptions.status, 'redeeming'),
+        eq(guardianAuthorityRedemptions.commandBindingDigest, bindingDigest),
+      ),
+    )
+    .returning({ id: guardianAuthorityRedemptions.id });
+  if (!issued) {
     throw new GuardianAttachmentRejectedError();
   }
 
-  return {
-    authorityToken: signGuardianAuthorityToken(
-      {
-        guardianPersonId: verified.guardianPersonId,
-        chargePersonId: verified.chargePersonId,
-        organizationId: verified.organizationId,
-        jurisdiction: verified.jurisdiction,
-        policyVersion: verified.policyVersion,
-        assuranceMethod: verified.assuranceMethod,
-        evidenceId: verified.evidenceId,
-        qualification: verified.qualification,
-        decision: verified.decision,
-        learnerAssentAt: verified.learnerAssentAt
-          ? new Date(verified.learnerAssentAt)
-          : null,
-        issuedAt: now,
-        notBefore: now,
-        expiresAt: new Date(now.getTime() + GUARDIAN_AUTHORITY_MAX_TTL_MS),
-      },
-      input.tokenSecret,
-    ),
-  };
+  return { authorityToken };
 }

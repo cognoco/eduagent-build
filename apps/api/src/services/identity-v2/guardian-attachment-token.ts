@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
 const TOKEN_VERSION = 'ga1';
@@ -19,6 +19,7 @@ export const guardianQualificationSchema = z.enum([
 
 const guardianAuthorityPayloadSchema = z.object({
   version: z.literal(TOKEN_VERSION),
+  redemptionId: z.string().uuid(),
   guardianPersonId: z.string().uuid(),
   chargePersonId: z.string().uuid(),
   organizationId: z.string().uuid(),
@@ -35,6 +36,7 @@ const guardianAuthorityPayloadSchema = z.object({
 });
 
 export interface GuardianAuthorityAssertion {
+  redemptionId: string;
   guardianPersonId: string;
   chargePersonId: string;
   organizationId: string;
@@ -48,6 +50,10 @@ export interface GuardianAuthorityAssertion {
   issuedAt: Date;
   notBefore: Date;
   expiresAt: Date;
+}
+
+export function guardianAuthorityTokenDigest(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
 function signature(encodedPayload: string, secret: string): string {
@@ -134,6 +140,7 @@ export function verifyGuardianAuthorityToken(
       return null;
     }
     return {
+      redemptionId: parsed.redemptionId,
       guardianPersonId: parsed.guardianPersonId,
       chargePersonId: parsed.chargePersonId,
       organizationId: parsed.organizationId,

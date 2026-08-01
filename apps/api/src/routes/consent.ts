@@ -74,8 +74,10 @@ import {
   attachGuardianConsentForCredentialedLearner,
   GuardianAttachmentRejectedError,
 } from '../services/identity-v2/guardian-attachment';
-import { verifyGuardianAuthorityToken } from '../services/identity-v2/guardian-attachment-token';
-import { initiateGuardianAuthorityVerification } from '../services/identity-v2/guardian-attachment-verifier';
+import {
+  initiateGuardianAuthorityVerification,
+  verifyDurableGuardianAuthorityToken,
+} from '../services/identity-v2/guardian-attachment-verifier';
 
 // [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
 // emailed link, no session). The token is a 122-bit UUID so brute-force is
@@ -263,7 +265,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      const authority = verifyGuardianAuthorityToken(
+      const authority = await verifyDurableGuardianAuthorityToken(
+        c.get('db'),
         input.authorityToken,
         secret,
       );

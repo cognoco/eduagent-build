@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GuardianAttachmentScreen from './guardian-attachment';
 import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
@@ -78,5 +78,59 @@ describe('GuardianAttachmentScreen', () => {
       chargePersonId: '22222222-2222-4222-8222-222222222222',
       authorityToken: 'server-minted-authority-token',
     });
+  });
+
+  it('[WI-2986] retries the same opaque handle so the server can recover a committed token', async () => {
+    let attempts = 0;
+    mockFetch.setRoute('/consent/guardian-attachment/initiate', () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response(JSON.stringify({ error: 'response lost' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return { authorityToken: 'recovered-authority-token' };
+    });
+    const screen = render(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: {
+              queries: { retry: false },
+              mutations: { retry: false },
+            },
+          })
+        }
+      >
+        <GuardianAttachmentScreen />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guardian-attachment-error')).toBeTruthy();
+    });
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('guardian-attachment-retry'));
+    await waitFor(() => {
+      expect(screen.getByTestId('guardian-attachment-complete')).toBeTruthy();
+    });
+
+    const initiationBodies = mockFetch.mock.calls
+      .filter(([url]) =>
+        String(url).includes('/consent/guardian-attachment/initiate'),
+      )
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+    expect(initiationBodies).toEqual([
+      {
+        chargePersonId: '22222222-2222-4222-8222-222222222222',
+        verificationHandle: 'single-use-provider-handle',
+      },
+      {
+        chargePersonId: '22222222-2222-4222-8222-222222222222',
+        verificationHandle: 'single-use-provider-handle',
+      },
+    ]);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });
