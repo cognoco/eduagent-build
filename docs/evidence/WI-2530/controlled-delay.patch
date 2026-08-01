@@ -1,0 +1,26 @@
+diff --git a/apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx b/apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+index 5a823b8ea..b2f053bdf 100644
+--- a/apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
++++ b/apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+@@ -116,10 +116,13 @@ const linkedChildProfile = {
+  * child-detail GET (returns `{ child }`). Returning `session: null` produces a
+  * 404 so the real hook resolves to null (session-not-found path).
+  */
+-function setRoutes(session: unknown): void {
++function setRoutes(session: unknown, delayMs = 0): void {
+   mockFetch.setRoute(
+     '/dashboard/children/child-profile-001/sessions/session-001',
+-    () => {
++    async () => {
++      if (delayMs > 0) {
++        await new Promise((resolve) => setTimeout(resolve, delayMs));
++      }
+       if (session === null) {
+         return new Response(JSON.stringify({ message: 'not found' }), {
+           status: 404,
+@@ -202,4 +205,5 @@ describe('SessionDetailScreen (summary-only)', () => {
+         displaySummary: 'Practiced light reactions',
+         narrative: 'They linked sunlight to the way plants make food.',
+       }),
++      1_100,
+     );
