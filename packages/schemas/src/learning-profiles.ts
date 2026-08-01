@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isoDateField } from './common.ts';
+import type { LearningTextAuthor } from './learning-text-safety.ts';
 
 export const explanationStyleSchema = z.enum([
   'stories',
@@ -218,6 +219,28 @@ export const sessionAnalysisOutputSchema = z.object({
     .optional(),
 });
 export type SessionAnalysisOutput = z.infer<typeof sessionAnalysisOutputSchema>;
+
+/**
+ * [WI-2952] The analysis, WITH the vendor that produced it.
+ *
+ * `analyzeSessionTranscript` (apps/api/src/services/learner-profile.ts) had
+ * `routeAndCall`'s result in hand and returned only `SessionAnalysisOutput`,
+ * discarding `result.provider` — which is why the gate downstream had no
+ * vendor to name and fell back to a blank one that fails closed. The vendor
+ * was never unrecoverable; it was thrown away one frame up.
+ *
+ * `provider`, never `model`: judge exclusion matches vendor names, so a model
+ * id excludes nothing.
+ *
+ * [WI-2952 Gate-1 SHOULD_FIX] Moved here from `learner-profile.ts` — it is
+ * returned by an exported service function and crosses the services/ →
+ * inngest/functions/ boundary. Re-exported from `learner-profile.ts` so
+ * existing imports keep working.
+ */
+export type AnalyzedSessionTranscript = {
+  readonly analysis: SessionAnalysisOutput;
+  readonly author: LearningTextAuthor;
+};
 
 export const deleteMemoryItemSchema = z
   .object({

@@ -9,6 +9,7 @@ import {
 import {
   sessionAnalysisOutputSchema,
   type AccommodationMode,
+  type AnalyzedSessionTranscript,
   type ConfidenceLevel,
   type ExplanationStyle,
   type InterestEntry,
@@ -34,6 +35,7 @@ import {
   isContentSafe,
   type LearningTextGateResult,
 } from './learning-text-safety/gate';
+import type { LearningTextAuthor } from './learning-text-safety/scan';
 import { cascadeDeleteFactWithAncestry } from './memory/cascade-delete';
 import {
   escapeXml,
@@ -1506,43 +1508,38 @@ function evaluatedTextSet(
  * The gate for the profile's own free-text JSONB fields and the struggle
  * notifications derived alongside them.
  *
- * `provenance: 'llm'` with a null `producerVendor` — INTERIM, and deliberately
- * the strictest of the available readings. Null fails the scan closed on anything
- * ambiguous (AC-4), so nothing unsafe can ride through while the question below is
- * open; a confidently wrong vendor would silently defeat the judge's independence
- * guarantee instead.
+ * Provenance is a property of the CALLER, and since WI-2952 the callers declare
+ * it: `applyAnalysis` threads its `author` argument here, and every production
+ * caller passes one explicitly.
  *
- * THE OPEN QUESTION, recorded here so it is not re-derived as "vendor
- * unrecoverable". The vendor is NOT unrecoverable — it is DISCARDED one frame
- * above. `analyzeSessionTranscript` has `routeAndCall`'s result in hand (see its
- * call at the bottom of this file) and returns only `SessionAnalysisOutput`,
- * dropping `result.provider`. Worse, provenance at this boundary is not even
- * uniform: it is a property of the CALLER, and `applyAnalysis` cannot see which.
- *
- *   inngest/functions/session-completed.ts  → 'llm'; vendor available, discarded
- *   services/learner-input.ts (LLM path)    → 'llm'; vendor available, discarded
+ *   inngest/functions/session-completed.ts  → 'llm' + `result.provider` (the
+ *                                             vendor `analyzeSessionTranscript`
+ *                                             now returns alongside the analysis)
+ *   services/learner-input.ts (LLM path)    → 'llm' + `result.provider`
  *   services/learner-input.ts (fallback)    → 'user'. `fallbackAnalysis` regexes
  *                                             the learner's OWN typed words into
  *                                             `interests[]` and `struggles[].topic`
- *                                             verbatim — no model involved.
+ *                                             verbatim — no model involved, so the
+ *                                             learner's self-disclosure is JUDGED
+ *                                             rather than silently dropped.
  *
- * That third row is why this is a product/safety decision and not a cleanup:
- * `'user'` is the one provenance that REACHES the judge, and it exists precisely
- * because a learner describing themselves is a different call from a model
- * inferring a diagnosis about them. Under today's uniform fail-closed reading a
- * learner's own self-disclosure is DROPPED rather than judged. Widening it is not
- * this change-set's call to make.
+ * The `applyAnalysis` default `{provenance: 'llm', producerVendor: ''}` remains
+ * the strictest reading — a blank vendor fails the scan closed on anything
+ * ambiguous — so a caller that omits `author` can only be MORE restrictive than
+ * intended, never less.
  *
  * WHEN THREADING A VENDOR HERE, pass the VENDOR (`anthropic`), never the model id
  * (`claude-sonnet-4-6`). Judge exclusion matches vendor names, so a model id
  * matches no pool member and the producing vendor ends up grading its own output.
  * It does NOT fail closed — the guard rejects only a BLANK vendor — and both
- * fields are typed `string`, so the compiler will not catch it. The only real
- * guard is a test asserting the producing vendor is absent from the RESOLVED judge
- * pool, asserted against the real resolver rather than behind a mock.
+ * fields are typed `string`, so the compiler will not catch it. The real guard is
+ * the test asserting the producing vendor is absent from the RESOLVED judge pool
+ * against the real resolver: `analyzeSessionTranscript — judge independence
+ * (WI-2952 AC-4)` in learner-profile.test.ts.
  */
 function evaluateProfileFieldTexts(
   texts: readonly (string | null | undefined)[],
+  author: LearningTextAuthor,
 ): Promise<LearningTextGateResult> {
   return evaluateLearningTextByContent({
     texts,
@@ -1551,8 +1548,10 @@ function evaluateProfileFieldTexts(
     // attribution grammars and keeps the strictest verdict. Never `'en'` —
     // assuming English is the defect this Work Item removes.
     conversationLanguage: undefined,
-    provenance: 'llm',
-    producerVendor: null,
+    // [WI-2952] Spread, not two literals: the union guarantees a vendor is
+    // present iff the provenance is `'llm'`, and spreading is what carries that
+    // guarantee across the boundary into the flat scan input.
+    ...author,
   });
 }
 
@@ -1566,9 +1565,27 @@ function evaluateProfileFieldTexts(
  *
  * `provenance` differs by path, and the two calls are NOT interchangeable:
  *
- *   'llm'       — `applyAnalysis`. Session-analysis output merged into the stored
- *                 row. See `evaluateProfileFieldTexts` above for the open question
- *                 about its vendor, which applies identically here.
+ *   via `applyAnalysis` (this call threads the caller's `author` through, so
+ *   every provenance that reaches `evaluateProfileFieldTexts` reaches here too):
+ *     'llm' + real vendor — session-completed.ts and learner-input.ts's LLM path
+ *                 thread `result.provider`. With a real vendor the judge CAN be
+ *                 consulted, so this path can now `refer`.
+ *     'user'    — learner-input.ts's fallback path. Note the asymmetry with the
+ *                 'migration' rationale below: here the mapper-composed row text
+ *                 IS built from the learner's own typed words, so 'user' is the
+ *                 honest declaration — and it makes this gate more permissive
+ *                 over composed text than the pre-WI-2952 uniform reading was.
+ *                 That widening is deliberate (the item exists to stop dropping
+ *                 learner self-disclosure), but it is a fail-closed gate getting
+ *                 wider: audit here first if composed-text leaks are suspected.
+ *                 Independence caveat: provenance is per-write-batch (storage
+ *                 has no per-fragment author), so a 'user' write sweeps stored
+ *                 LLM-authored fragments into a batch judged with NO vendor
+ *                 exclusion — a vendor that produced a stored fragment embedded
+ *                 in composed row text can grade that text. Collection-level
+ *                 granularity is tracked as WI-2972.
+ *     'llm' + blank vendor — the `applyAnalysis` default for callers that omit
+ *                 `author`; cannot consult the judge, fails closed on `refer`.
  *   'migration' — `deleteMemoryItem` / `unsuppressInference`. Determined from the
  *                 code, not copied from the backfill: the only text these project
  *                 is text ALREADY STORED on the row, with no identifiable author
@@ -1577,21 +1594,19 @@ function evaluateProfileFieldTexts(
  *                 so `'user'` would be a mis-declaration despite a user driving
  *                 the request.
  *
- * Both fail closed on `refer` today (`'migration'` never consults the judge;
- * `'llm'` with a null vendor cannot), so the two are currently
- * behaviour-equivalent — but only because the vendor is null. Do not read that
- * equivalence as licence to collapse them.
+ * The two calls are therefore NOT behaviour-equivalent: 'migration' never
+ * consults the judge, while the `applyAnalysis` path can refer whenever its
+ * author carries a real vendor or 'user' provenance. Do not collapse them.
  */
 function evaluateMemoryFactTexts(
   texts: readonly (string | null | undefined)[],
-  provenance: 'llm' | 'migration',
+  author: LearningTextAuthor,
 ): Promise<LearningTextGateResult> {
   return evaluateLearningTextByContent({
     texts,
     fieldKind: 'memory_fact',
     conversationLanguage: undefined,
-    provenance,
-    producerVendor: null,
+    ...author,
   });
 }
 
@@ -1609,6 +1624,18 @@ export async function applyAnalysis(
   /** [CR-119.3]: Prefer subjectId for urgency boost writes — name match
    *  is ambiguous when no (profileId, name) uniqueness constraint exists. */
   subjectId?: string | null,
+  /**
+   * [WI-2952] WHO authored the text this analysis carries. Was hard-coded to
+   * `{provenance:'llm', producerVendor:null}` for every caller, which under the
+   * fail-closed matrix resolves the referral to null and BLOCKS — so genuinely
+   * user-authored text never reached the judge and a learner's own
+   * self-description was silently dropped from `interests[]`.
+   *
+   * Optional with an `'llm'`-without-vendor default ONLY so the two in-repo
+   * callers migrate independently; that default is the strictest reading and
+   * blocks on anything ambiguous, never the permissive one.
+   */
+  author: LearningTextAuthor = { provenance: 'llm', producerVendor: '' },
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1665,7 +1692,10 @@ export async function applyAnalysis(
     const collector = createLearningTextCollector();
     sanitizeAnalysisProfileProjection(preMergedState, collector.record);
     filterSafeStruggleNotifications(preUpdates.notifications, collector.record);
-    const profileFieldGate = await evaluateProfileFieldTexts(collector.texts);
+    const profileFieldGate = await evaluateProfileFieldTexts(
+      collector.texts,
+      author,
+    );
     const evaluatedProfileFields = evaluatedTextSet(collector.texts);
 
     // The memory-fact batch is derived from the SANITISED state, not the raw
@@ -1687,7 +1717,7 @@ export async function applyAnalysis(
     );
     const memoryFactGate = await evaluateMemoryFactTexts(
       preMemoryFactTexts,
-      'llm',
+      author,
     );
     const evaluatedMemoryFacts = evaluatedTextSet(preMemoryFactTexts);
 
@@ -1938,10 +1968,9 @@ async function withMemoryFactGateRetry<
             profileId,
             preDerived.mergedState,
           );
-    const learningTextGate = await evaluateMemoryFactTexts(
-      preTexts,
-      'migration',
-    );
+    const learningTextGate = await evaluateMemoryFactTexts(preTexts, {
+      provenance: 'migration',
+    });
     const evaluated = evaluatedTextSet(preTexts);
 
     const outcome = await db.transaction(async (tx) => {
@@ -2234,6 +2263,16 @@ function hasLearnerResolutionEvidence(transcriptText: string): boolean {
   );
 }
 
+/**
+ * [WI-2952] The analysis, WITH the vendor that produced it.
+ *
+ * Moved to `@eduagent/schemas` (Gate-1 SHOULD_FIX) — it is returned by this
+ * exported function and crosses the services/ → inngest/functions/ boundary.
+ * Re-exported here so existing imports keep working; see
+ * `packages/schemas/src/learning-profiles.ts` for the full doc comment.
+ */
+export type { AnalyzedSessionTranscript };
+
 export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
   subjectName: string | null,
@@ -2249,7 +2288,7 @@ export async function analyzeSessionTranscript(
     knownStruggles?: Array<{ topic: string; subject: string | null }>;
     suppressedTopics?: string[];
   },
-): Promise<SessionAnalysisOutput | null> {
+): Promise<AnalyzedSessionTranscript | null> {
   const conversationEvents = transcript
     .filter(
       (entry) =>
@@ -2349,7 +2388,17 @@ export async function analyzeSessionTranscript(
     const parsed = JSON.parse(jsonText) as unknown;
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) return null;
-    return filterUnsupportedResolvedTopics(validated.data, transcriptText);
+    return {
+      analysis: filterUnsupportedResolvedTopics(validated.data, transcriptText),
+      // Normalised — see the same guard in learner-input.ts. `provider` is
+      // typed `string` but can arrive undefined at runtime; '' fails closed at
+      // the matrix, which is the safe degradation.
+      author: {
+        provenance: 'llm',
+        producerVendor:
+          typeof result.provider === 'string' ? result.provider : '',
+      },
+    };
   } catch (err) {
     logger.warn('Failed to parse session analysis', {
       error: err instanceof Error ? err.message : String(err),

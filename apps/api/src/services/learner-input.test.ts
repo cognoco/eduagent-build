@@ -47,6 +47,8 @@ beforeEach(() => {
 describe('parseLearnerInput — LLM success path', () => {
   it('extracts interest from "I love dinosaurs"', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: JSON.stringify({
         explanationEffectiveness: null,
         interests: ['dinosaurs'],
@@ -78,11 +80,15 @@ describe('parseLearnerInput — LLM success path', () => {
       null,
       'learner',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'llm', producerVendor: 'anthropic' },
     );
   });
 
   it('extracts communication note from "I prefer short explanations"', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: JSON.stringify({
         explanationEffectiveness: null,
         interests: null,
@@ -111,6 +117,8 @@ describe('parseLearnerInput — LLM success path', () => {
 
   it('tags source as parent when source is "parent"', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: JSON.stringify({
         explanationEffectiveness: null,
         interests: null,
@@ -137,6 +145,8 @@ describe('parseLearnerInput — LLM success path', () => {
       null,
       'parent',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'llm', producerVendor: 'anthropic' },
     );
   });
 });
@@ -160,6 +170,8 @@ describe('parseLearnerInput — [BUG-480] extractFirstJsonObject', () => {
       confidence: 'high',
     };
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: `Sure, here is the analysis: ${JSON.stringify(jsonPayload)} Hope that helps!`,
     } as any);
     mockApplyAnalysis.mockResolvedValueOnce({
@@ -181,6 +193,8 @@ describe('parseLearnerInput — [BUG-480] extractFirstJsonObject', () => {
       null,
       'learner',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'llm', producerVendor: 'anthropic' },
     );
   });
 });
@@ -192,6 +206,8 @@ describe('parseLearnerInput — [BUG-480] extractFirstJsonObject', () => {
 describe('parseLearnerInput — fallback path', () => {
   it('falls back to regex when LLM returns invalid JSON', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: 'Sorry, I cannot help with that.',
     } as any);
     mockApplyAnalysis.mockResolvedValueOnce({
@@ -217,6 +233,8 @@ describe('parseLearnerInput — fallback path', () => {
       null,
       'learner',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'user' },
     );
   });
 
@@ -241,6 +259,8 @@ describe('parseLearnerInput — fallback path', () => {
       null,
       'learner',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'user' },
     );
   });
 
@@ -267,6 +287,8 @@ describe('parseLearnerInput — fallback path', () => {
       null,
       'learner',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'user' },
     );
   });
 
@@ -293,6 +315,8 @@ describe('parseLearnerInput — fallback path', () => {
       null,
       'learner',
       undefined,
+      // [WI-2952] the author surfaced by parseLearnerInputToAnalysis
+      { provenance: 'user' },
     );
   });
 });
@@ -304,6 +328,8 @@ describe('parseLearnerInput — fallback path', () => {
 describe('parseLearnerInput — error path', () => {
   it('returns failure when applyAnalysis throws', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: JSON.stringify({
         explanationEffectiveness: null,
         interests: ['robots'],
@@ -352,6 +378,8 @@ describe('parseLearnerInput structured logging', () => {
   //   3. Raw console.error with loose args is NOT produced (the logger wraps)
   it('emits structured JSON log on applyAnalysis failure — profileId in context', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
+      // [WI-2952] a real route names its vendor; the code now reads it.
+      provider: 'anthropic',
       response: JSON.stringify({
         explanationEffectiveness: null,
         interests: null,
