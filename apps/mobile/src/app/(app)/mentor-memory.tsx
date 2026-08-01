@@ -11,6 +11,7 @@ import {
 import type { InterestContext } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
+import { appendTranscript } from '../../components/common';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -509,6 +510,9 @@ export default function MentorMemoryScreen() {
               activeProfile?.conversationLanguage,
             )}
             onChangeText={setDraft}
+            onAppendTranscript={(finalTranscript) =>
+              setDraft((prev) => appendTranscript(prev, finalTranscript))
+            }
             onSubmit={() => void handleTellMentor()}
           />
         </MemorySection>

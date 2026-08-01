@@ -42,6 +42,15 @@ export function appendTranscript(current: string, transcript: string): string {
   return base ? `${base} ${transcript}` : transcript;
 }
 
+// Module-scoped capture ownership. The native recognizer is a singleton, so
+// every mounted control's hook instance receives the SAME result events; if
+// two controls are mounted (e.g. Tell Mentor + correction on one screen) and
+// both have begun captures, both would otherwise accept the same final
+// transcript. Exactly one control — the one that started the most recent
+// capture — may commit; beginning a capture takes ownership and silently
+// revokes any previous owner's right to commit.
+let activeCaptureOwner: symbol | null = null;
+
 export interface VoiceInputControlProps {
   /**
    * Current draft value of the field this control feeds. Emptying it while a
@@ -97,6 +106,7 @@ export function VoiceInputControl({
   // may do so once: `accepting` is cleared on commit and on every event that
   // invalidates the capture.
   const captureRef = useRef({ accepting: false });
+  const ownerTokenRef = useRef(Symbol('voice-input-capture'));
   const [permissionRecovery, setPermissionRecovery] = useState(false);
 
   const micState: VoiceInputMicState = disabled
@@ -120,10 +130,17 @@ export function VoiceInputControl({
   useEffect(
     () => () => {
       // Read through the ref, not a mount-time copy: by unmount the record
-      // has usually been replaced by a later capture.
+      // has usually been replaced by a later capture. Also actually STOP the
+      // native recognizer — revoking acceptance alone would leave the
+      // microphone live until the engine gives up on its own, and a control
+      // mounted next could collide with that lingering capture.
       captureRef.current.accepting = false;
+      if (activeCaptureOwner === ownerTokenRef.current) {
+        activeCaptureOwner = null;
+      }
+      void stopListening();
     },
-    [],
+    [stopListening],
   );
 
   useEffect(() => {
@@ -158,7 +175,15 @@ export function VoiceInputControl({
     if (!finalTranscript) return;
     const capture = captureRef.current;
     if (!capture.accepting) return;
+    // Ownership gate: only the control that started the most recent capture
+    // may commit — a sibling control's still-accepting capture was revoked
+    // the moment this one began.
+    if (activeCaptureOwner !== ownerTokenRef.current) {
+      capture.accepting = false;
+      return;
+    }
     capture.accepting = false;
+    activeCaptureOwner = null;
     onTranscript(finalTranscript);
     clearTranscript();
   }, [isFinalTranscript, transcript, onTranscript, clearTranscript]);
@@ -184,11 +209,13 @@ export function VoiceInputControl({
   }, [speechStatus, getMicrophonePermissionStatus]);
 
   const beginCapture = useCallback(async (): Promise<void> => {
-    // A new capture supersedes the previous one. Drop whatever the hook
-    // still holds first so words from an invalidated capture cannot land
-    // under the new capture's ownership.
+    // A new capture supersedes the previous one — including a sibling
+    // control's (module-level ownership). Drop whatever the hook still holds
+    // first so words from an invalidated capture cannot land under the new
+    // capture's ownership.
     clearTranscript();
     captureRef.current = { accepting: true };
+    activeCaptureOwner = ownerTokenRef.current;
     await startListening();
   }, [clearTranscript, startListening]);
 
@@ -229,9 +256,9 @@ export function VoiceInputControl({
             busy: micBusy,
             selected: micState === 'listening',
           }}
-          accessibilityValue={{ text: micState }}
           disabled={micPressBlocked}
           onPress={handleMicPress}
+          hitSlop={8}
           className="p-2"
         >
           <Ionicons

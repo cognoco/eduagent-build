@@ -19,7 +19,7 @@ import { MemoryConsentPrompt } from '../../../../components/memory-consent-promp
 import {
   VoiceInputControl,
   appendTranscript,
-} from '../../../../components/common/VoiceInputControl';
+} from '../../../../components/common';
 import { getVoiceLocaleForLanguage } from '../../../../lib/language-locales';
 import {
   CollapsibleMemorySection,
@@ -489,6 +489,9 @@ export default function ChildMentorMemoryScreen() {
               activeProfile?.conversationLanguage,
             )}
             onChangeText={setDraft}
+            onAppendTranscript={(finalTranscript) =>
+              setDraft((prev) => appendTranscript(prev, finalTranscript))
+            }
             onSubmit={() => void handleTellMentor()}
           />
         </MemorySection>

@@ -3,10 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { computeAgeBracket } from '@eduagent/schemas';
 
-import {
-  VoiceInputControl,
-  appendTranscript,
-} from './common/VoiceInputControl';
+import { VoiceInputControl, appendTranscript } from './common';
 
 type TellMentorAudience = 'learner' | 'parent';
 
@@ -19,6 +16,12 @@ interface TellMentorInputProps {
   /** Voice locale resolved from the writing profile's conversation language. */
   voiceLocale?: string;
   onChangeText: (text: string) => void;
+  /**
+   * Preferred voice-append path: the parent applies the final transcript with
+   * a functional state update so a draft edit racing the commit is never
+   * overwritten. Falls back to onChangeText over the render-time value.
+   */
+  onAppendTranscript?: (finalTranscript: string) => void;
   onSubmit: () => void;
 }
 
@@ -73,6 +76,7 @@ export function TellMentorInput({
   isPending,
   voiceLocale,
   onChangeText,
+  onAppendTranscript,
   onSubmit,
 }: TellMentorInputProps) {
   const { t } = useTranslation();
@@ -122,7 +126,9 @@ export function TellMentorInput({
           voiceLocale={voiceLocale}
           testID="tell-mentor-mic"
           onTranscript={(finalTranscript) =>
-            onChangeText(appendTranscript(value, finalTranscript))
+            onAppendTranscript
+              ? onAppendTranscript(finalTranscript)
+              : onChangeText(appendTranscript(value, finalTranscript))
           }
         />
       </View>

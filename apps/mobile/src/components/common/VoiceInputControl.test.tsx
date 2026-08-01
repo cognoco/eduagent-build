@@ -270,6 +270,58 @@ describe('VoiceInputControl', () => {
     expect(onTranscript).not.toHaveBeenCalled();
   });
 
+  it('only the most recently started capture may commit when two controls are mounted', async () => {
+    // The native recognizer is a singleton: both mounted controls' hook
+    // instances receive the same result events. Ownership must be exclusive.
+    const onTranscriptA = jest.fn();
+    const onTranscriptB = jest.fn();
+    const two = () => (
+      <>
+        <VoiceInputControl
+          value=""
+          onTranscript={onTranscriptA}
+          testID="a-mic"
+        />
+        <VoiceInputControl
+          value=""
+          onTranscript={onTranscriptB}
+          testID="b-mic"
+        />
+      </>
+    );
+    const screen = render(two());
+    fireEvent.press(screen.getByTestId('a-mic'));
+    await flushEffects();
+    // B starts a capture while A's is still accepting — B takes ownership.
+    // (The shared mock stays idle so B's press reads its own not-listening
+    // state, as a real second hook instance would.)
+    fireEvent.press(screen.getByTestId('b-mic'));
+    await flushEffects();
+    speechFinal('spoken once');
+    screen.rerender(two());
+    await flushEffects();
+    expect(onTranscriptB).toHaveBeenCalledTimes(1);
+    expect(onTranscriptB).toHaveBeenCalledWith('spoken once');
+    expect(onTranscriptA).not.toHaveBeenCalled();
+  });
+
+  it('stops the native recognizer on unmount', async () => {
+    const screen = renderControl();
+    fireEvent.press(screen.getByTestId('probe-mic'));
+    await flushEffects();
+    speechListening();
+    screen.rerender(
+      <VoiceInputControl
+        value=""
+        onTranscript={onTranscript}
+        testID="probe-mic"
+      />,
+    );
+    screen.unmount();
+    await flushEffects();
+    expect(mockSpeech.stopListening).toHaveBeenCalled();
+  });
+
   it('blocks the mic while disabled', async () => {
     const screen = renderControl({ disabled: true });
     fireEvent.press(screen.getByTestId('probe-mic'));

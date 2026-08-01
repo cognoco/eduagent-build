@@ -1700,8 +1700,11 @@ export default function SessionSummaryScreen() {
                 )}
                 testID="summary-reflection-mic"
                 onTranscript={(finalTranscript) =>
+                  // Clamp to the summarySubmitSchema 2000-char contract:
+                  // TextInput maxLength only bounds native edits, not
+                  // programmatic appends.
                   setSummaryText((prev) =>
-                    appendTranscript(prev, finalTranscript),
+                    appendTranscript(prev, finalTranscript).slice(0, 2000),
                   )
                 }
               />

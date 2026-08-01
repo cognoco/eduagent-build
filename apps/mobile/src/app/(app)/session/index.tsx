@@ -55,7 +55,7 @@ import { FirstSessionGreeting } from '../../../components/session/FirstSessionGr
 import {
   VoiceInputControl,
   appendTranscript,
-} from '../../../components/common/VoiceInputControl';
+} from '../../../components/common';
 import { ReturningSessionGreeting } from '../../../components/session/ReturningSessionGreeting';
 import type { FluencyDrillEvent } from '../../../lib/sse';
 import {
@@ -230,6 +230,8 @@ interface FirstSessionWrapUpCardProps {
   seenCelebrationEventIds: ReadonlySet<string>;
   voiceLocale?: string;
   onChangeText: (value: string) => void;
+  /** Applies the final transcript with a functional update at the state owner. */
+  onAppendTranscript: (finalTranscript: string) => void;
   onSubmit: () => void;
   onMarkCelebrationSeen: (eventId: string) => void;
 }
@@ -243,6 +245,7 @@ function FirstSessionWrapUpCard({
   seenCelebrationEventIds,
   voiceLocale,
   onChangeText,
+  onAppendTranscript,
   onSubmit,
   onMarkCelebrationSeen,
 }: FirstSessionWrapUpCardProps) {
@@ -276,9 +279,7 @@ function FirstSessionWrapUpCard({
           disabled={isSubmitting || hasSubmitted}
           voiceLocale={voiceLocale}
           testID="first-session-reflection-mic"
-          onTranscript={(finalTranscript) =>
-            onChangeText(appendTranscript(value, finalTranscript))
-          }
+          onTranscript={onAppendTranscript}
         />
       </View>
       {hasError ? (
@@ -1989,6 +1990,11 @@ function SessionScreenInner() {
       seenCelebrationEventIds={seenFirstSessionCelebrationIds}
       voiceLocale={languageVoiceLocale}
       onChangeText={setFirstSessionReflectionText}
+      onAppendTranscript={(finalTranscript) =>
+        setFirstSessionReflectionText((prev) =>
+          appendTranscript(prev, finalTranscript),
+        )
+      }
       onSubmit={() => {
         void handleFirstSessionReflectionSubmit();
       }}
