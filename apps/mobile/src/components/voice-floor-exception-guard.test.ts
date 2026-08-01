@@ -252,7 +252,7 @@ describe('WI-2553 — voice-floor exception-ledger coverage guard', () => {
     expect(existsSync(resolve(repoRoot, LEDGER_DOC))).toBe(true);
   });
 
-  it('ledger doc and guard agree on every file and anchor (doc↔guard sync)', () => {
+  it('every guard entry appears in the ledger doc (guard→doc sync)', () => {
     const doc = read(LEDGER_DOC);
     const missing: string[] = [];
     for (const entry of LEDGER) {
@@ -271,6 +271,47 @@ describe('WI-2553 — voice-floor exception-ledger coverage guard', () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it('every surface file and anchor cited in the ledger doc is guarded (doc→guard sync)', () => {
+    // The ledger doc promises every Surfaces-table file and anchor is
+    // guard-asserted. Without this reverse direction, a new disposition added
+    // to the doc alone would pass CI with no enforcement behind it.
+    // Formatting contract (stated in the doc's Coverage guard section): the
+    // first cell of a Surfaces row is the backticked repo-relative path;
+    // every backticked token in the second cell is an anchor.
+    const doc = read(LEDGER_DOC);
+    const problems: string[] = [];
+
+    const guardFiles = new Set(LEDGER.map((e) => e.file));
+    for (const match of doc.matchAll(/`(apps\/[^`]+\.tsx)`/g)) {
+      const citedFile = match[1];
+      if (citedFile !== undefined && !guardFiles.has(citedFile)) {
+        problems.push(
+          `doc cites surface file the guard does not know: ${citedFile}`,
+        );
+      }
+    }
+
+    for (const line of doc.split('\n')) {
+      const row = line.match(/^\|\s*`(apps\/[^`]+\.tsx)`\s*\|(.+)\|\s*$/);
+      const file = row?.[1];
+      const anchorsCell = row?.[2];
+      if (file === undefined || anchorsCell === undefined) continue;
+      const guardedAnchors = new Set(
+        LEDGER.filter((e) => e.file === file).flatMap((e) => e.anchors),
+      );
+      for (const token of anchorsCell.matchAll(/`([^`]+)`/g)) {
+        const anchor = token[1];
+        if (anchor !== undefined && !guardedAnchors.has(anchor)) {
+          problems.push(
+            `doc cites anchor the guard does not know: ${anchor} (${file})`,
+          );
+        }
+      }
+    }
+
+    expect(problems).toEqual([]);
   });
 
   it('every ledgered surface exists and carries its anchors', () => {

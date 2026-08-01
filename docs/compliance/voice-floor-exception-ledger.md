@@ -98,8 +98,8 @@ guard built on the disproved "no text field here" premise cannot return.
 
 | File | Anchors |
 |---|---|
-| `apps/mobile/src/app/create-profile.tsx` | `create-profile-birthdate-input` (web free-text `TextInput`), `create-profile-birthdate` (native picker trigger) |
-| `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx` | `save-basics-birth-year`, `save-basics-parent-birth-year`, `save-basics-child-birth-year` (numeric `TextInput`s, all platforms) |
+| `apps/mobile/src/app/create-profile.tsx` | `create-profile-birthdate-input` (web free-text TextInput), `create-profile-birthdate` (native picker trigger) |
+| `apps/mobile/src/app/(app)/_components/save-wizard/ProfileBasicsStep.tsx` | `save-basics-birth-year`, `save-basics-parent-birth-year`, `save-basics-child-birth-year` (numeric TextInputs, all platforms) |
 
 ### VFX-3b — Profile display name — VOICE PERMITTED (editable draft, confirm before save)
 
@@ -140,7 +140,7 @@ native-language inputs (voice-floor group 4).
 
 | File | Anchors |
 |---|---|
-| `apps/mobile/src/app/(app)/onboarding/pronouns.tsx` | `pronouns-custom-input` (`PRONOUNS_MAX_LENGTH` = 32) |
+| `apps/mobile/src/app/(app)/onboarding/pronouns.tsx` | `pronouns-custom-input` (PRONOUNS_MAX_LENGTH = 32) |
 | `apps/mobile/src/app/(app)/onboarding/language-setup.tsx` | `native-language-other-input` |
 
 ### VFX-5 — Exact DELETE confirmation — TYPED-ONLY (hard exception)
@@ -191,9 +191,14 @@ All three are linked to WI-2553 (origin) and WI-1763 (audit) in Cosmo.
 
 `apps/mobile/src/components/voice-floor-exception-guard.test.ts` enforces:
 
-1. **Doc↔guard sync** — every file path and anchor in this ledger's Surfaces
-   tables appears in the guard's entry table and vice versa; drift in either
-   direction fails.
+1. **Doc↔guard sync, both directions** — every file path and anchor in the
+   guard's entry table appears in this ledger, AND every surface file path
+   (backticked `apps/…tsx` path) and every backticked anchor in this ledger's
+   Surfaces tables appears in the guard's entry table. Drift in either
+   direction fails. Formatting contract for Surfaces tables: the first cell
+   is the backticked repo-relative file path; every backticked token in the
+   second cell is an anchor the guard must know (explanatory notes go in
+   plain text, not backticks).
 2. **Surface reality** — every anchored file exists and contains its anchors,
    so a rename or removal of a ledgered field forces a ledger update.
 3. **Typed-only enforcement, file-scoped** — files whose ledgered inputs are
