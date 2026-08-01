@@ -216,7 +216,7 @@ test('bootstraps with direct journal SQL, push, and post-push replay, never migr
   );
 });
 
-test('reapplies revision-pinned migration-only indexes after schema push', async () => {
+test('reapplies revision-pinned migration-only database objects after schema push', async () => {
   const store = makeStore();
   const timeline = [];
   const { deps } = baseDependencies(store, {
@@ -367,6 +367,44 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
       `expected post-push replay SQL for ${indexName}`,
     );
   }
+  const executableJournalSql = plan.statements
+    .join('\n')
+    .replace(/--.*$/gm, '');
+  const migrationOnlyRlsTables = [
+    ...executableJournalSql.matchAll(
+      /ALTER\s+TABLE\s+("[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY\s*;/gi,
+    ),
+  ].map((match) => match[1]);
+  assert.ok(
+    migrationOnlyRlsTables.length > 0,
+    'expected committed migration-only RLS SQL',
+  );
+  for (const table of new Set(migrationOnlyRlsTables)) {
+    assert.ok(
+      plan.postPushStatements.some((statement) =>
+        statement.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`),
+      ),
+      `expected post-push RLS enablement for ${table}`,
+    );
+  }
+  for (const policyName of [
+    'assessments_profile_isolation',
+    'family_preferences_profile_isolation',
+    'activation_events_profile_isolation',
+  ]) {
+    assert.ok(
+      plan.postPushStatements.some((statement) =>
+        statement.includes(`CREATE POLICY "${policyName}"`),
+      ),
+      `expected post-push policy replay for ${policyName}`,
+    );
+  }
+  assert.ok(
+    plan.postPushStatements.every(
+      (statement) => !/\bCREATE\s+(?:TABLE|TYPE)\b/i.test(statement),
+    ),
+    'post-push replay must not repeat table or enum creation',
+  );
 });
 
 test('records a failed push and refuses to retry it', async () => {
