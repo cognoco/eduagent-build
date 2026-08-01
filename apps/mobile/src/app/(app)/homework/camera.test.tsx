@@ -1402,7 +1402,7 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />, {
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
       wrapper: createWrapper(),
     });
 
@@ -1414,6 +1414,8 @@ describe('CameraScreen', () => {
       getByTestId('subject-picker');
       getByTestId('subject-picker-loading');
     });
+    expect(queryByTestId('camera-subject-input')).toBeNull();
+    expect(queryByTestId('camera-continue-button')).toBeNull();
 
     alertSpy.mockRestore();
   });
@@ -2011,6 +2013,11 @@ describe('CameraScreen', () => {
         rendered.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`).props
           .accessibilityState,
       ).toEqual({ disabled: true });
+      expect(
+        within(
+          rendered.getByTestId('manual-subject-continue-button'),
+        ).getByText('Creating subject...').props.className,
+      ).toContain('text-text-secondary');
     });
     fireEvent.press(
       rendered.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`),

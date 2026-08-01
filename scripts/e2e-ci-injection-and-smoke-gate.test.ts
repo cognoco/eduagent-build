@@ -9158,7 +9158,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           criticalWaitIds.has(command.extendedWaitUntil.visible.id)) ||
         command.assertVisible?.id === 'homework-help-me-solve' ||
         command.assertNotVisible?.id === 'session-subject-resolution' ||
-        command.inputText === 'Solve 3x + 7 = 22';
+        command.inputText === 'Solve 3x + 7 = 22' ||
+        command.inputText === 'Algebra';
       const rawOperator = (
         command: MaestroCommand,
         name: 'runFlow' | 'retry',

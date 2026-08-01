@@ -1659,7 +1659,7 @@ export default function CameraScreen(): React.ReactNode {
                   <Text className="text-body text-text-primary">{s.name}</Text>
                 </Pressable>
               ))}
-            {!subjectsLoadFailed ? (
+            {!subjectsLoading && !subjectsLoadFailed ? (
               <>
                 {/* Manual subject entry — lets user type a subject name */}
                 <Text className="text-body-sm text-text-secondary mt-4 mb-2">
@@ -1696,7 +1696,7 @@ export default function CameraScreen(): React.ReactNode {
                 >
                   <Text
                     className={`text-body font-semibold ${
-                      manualSubjectName.trim()
+                      manualSubjectName.trim() && !subjectResolutionPending
                         ? 'text-white'
                         : 'text-text-secondary'
                     }`}
@@ -1959,7 +1959,8 @@ export default function CameraScreen(): React.ReactNode {
                         >
                           <Text
                             className={`text-body font-semibold ${
-                              manualSubjectName.trim()
+                              manualSubjectName.trim() &&
+                              !subjectResolutionPending
                                 ? 'text-text-inverse'
                                 : 'text-text-secondary'
                             }`}

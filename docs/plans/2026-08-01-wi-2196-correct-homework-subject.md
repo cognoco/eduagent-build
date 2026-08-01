@@ -21,6 +21,9 @@ In scope:
 - `apps/mobile/src/app/(app)/homework/manual.tsx` — replace first-Subject auto-adoption with an explicit existing-or-inline-created Subject choice in the E2E-only manual route.
 - `apps/mobile/src/app/(app)/homework/manual.test.tsx` — cover zero/one/many Subjects, exact-name reuse, creation failure/retry, and one-mutation behavior.
 - `apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml` — prove a seeded unrelated Science Subject does not capture an Algebra homework session; assert problem, selected Subject, session association, and Mentor return.
+- `apps/mobile/e2e-web/flows/v2/v2-homework-manual-entry.spec.ts` — keep the browser-maintained twin aligned with the native Maestro journey.
+- `apps/mobile/src/i18n/locales/{de,en,es,ja,nb,pl,pt}.json` — remove homework keys orphaned when the generic create-Subject exit is retired.
+- `scripts/e2e-ci-injection-and-smoke-gate.test.ts` — protect every critical step and literal in the maintained Maestro journey from optional-flow masking.
 
 Out of scope:
 
