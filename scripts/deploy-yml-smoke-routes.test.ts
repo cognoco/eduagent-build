@@ -4,6 +4,8 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,6 +35,36 @@ const ROUTE_PROBES = [
 ] as const;
 type RouteProbe = (typeof ROUTE_PROBES)[number];
 type SmokeRoute = RouteProbe['route'];
+
+function toBashPath(
+  nativePath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== 'win32') return nativePath;
+
+  const normalized = nativePath.replaceAll('\\', '/');
+  const drivePath = /^([A-Za-z]):\/(.*)$/.exec(normalized);
+  if (!drivePath) {
+    throw new Error(
+      `Cannot convert Windows path to Bash syntax: ${nativePath}`,
+    );
+  }
+  return `/mnt/${drivePath[1]!.toLowerCase()}/${drivePath[2]}`;
+}
+
+function quoteBashWord(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+test('converts a Windows drive path to the Bash mount before composing PATH', () => {
+  expect(toBashPath('C:\\Temp\\fake curl\\bin', 'win32')).toBe(
+    '/mnt/c/Temp/fake curl/bin',
+  );
+});
+
+test('leaves a POSIX fake-tool path unchanged', () => {
+  expect(toBashPath('/tmp/fake-curl/bin', 'linux')).toBe('/tmp/fake-curl/bin');
+});
 
 test('does not use nonexistent or bare auth-short-circuited paths as mounted-route smoke probes', () => {
   expect(deployYaml).not.toContain('/v1/auth/me');
@@ -99,6 +131,7 @@ function runSmokeScript(
 ): { code: number; output: string } {
   const tempDir = mkdtempSync(join(tmpdir(), 'deploy-smoke-routes-'));
   const binDir = join(tempDir, 'bin');
+  const bashBinDir = toBashPath(binDir);
   mkdirSync(binDir);
   const curlPath = join(binDir, 'curl');
   writeFileSync(
@@ -108,16 +141,19 @@ function runSmokeScript(
   );
   chmodSync(curlPath, 0o755);
 
+  const bashScript = [
+    `export PATH=${quoteBashWord(bashBinDir)}:"$PATH"`,
+    `export SIMULATED_HTTP_CODE=${quoteBashWord(httpCode)}`,
+    `export STAGING_API_URL=${quoteBashWord('https://api-stg.example.test')}`,
+    script,
+  ].join('\n');
+
   try {
-    const stdout = execFileSync('bash', ['-c', script], {
-      env: {
-        ...process.env,
-        PATH: `${binDir}:${process.env.PATH ?? ''}`,
-        SIMULATED_HTTP_CODE: httpCode,
-        STAGING_API_URL: 'https://api-stg.example.test',
-      },
+    const stdout = execFileSync('bash', [], {
+      env: process.env,
+      input: bashScript,
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     return { code: 0, output: stdout };
   } catch (err: unknown) {
@@ -126,8 +162,25 @@ function runSmokeScript(
       code: e.status ?? 1,
       output: `${e.stdout ?? ''}${e.stderr ?? ''}`,
     };
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 }
+
+test('removes the temporary fake-curl directory after success and failure', () => {
+  const prefix = 'deploy-smoke-routes-';
+  const before = readdirSync(tmpdir()).filter((entry) =>
+    entry.startsWith(prefix),
+  );
+  const script = extractRunScriptForRoute('/v1/consent-page');
+
+  runSmokeScript(script, '400');
+  runSmokeScript(script, '500');
+
+  expect(
+    readdirSync(tmpdir()).filter((entry) => entry.startsWith(prefix)),
+  ).toEqual(before);
+});
 
 describe.each(ROUTE_PROBES)(
   'deploy.yml staging route smoke for $route',
