@@ -9,6 +9,7 @@ import {
   isExactDevelopmentTarget,
   missingDevelopmentColumns,
 } from './check-development-schema.mjs';
+import { validateDisposableApiIntegrationTarget } from './verify-disposable-integration-target-lib.mjs';
 
 export const DEVELOPMENT_SCHEMA_RECONCILIATION = [
   `
@@ -48,6 +49,10 @@ export async function runDevelopmentSchemaReconciliation({
   developmentHost,
   stagingHost,
   productionHost,
+  integrationDatabaseDisposable,
+  integrationDatabaseHost,
+  integrationDatabaseName,
+  integrationDatabaseTargetId,
   queryCatalog,
   executeStatements,
   stdout,
@@ -88,6 +93,29 @@ export async function runDevelopmentSchemaReconciliation({
     return 1;
   }
 
+  if (expectedDopplerConfig === 'dev_integration') {
+    try {
+      validateDisposableApiIntegrationTarget({
+        DATABASE_URL: databaseUrl,
+        DOPPLER_PROJECT: dopplerProject,
+        DOPPLER_CONFIG: dopplerConfig,
+        DOPPLER_ENVIRONMENT: dopplerEnvironment,
+        INTEGRATION_DATABASE_DISPOSABLE: integrationDatabaseDisposable,
+        INTEGRATION_DATABASE_HOST: integrationDatabaseHost,
+        INTEGRATION_DATABASE_NAME: integrationDatabaseName,
+        INTEGRATION_DATABASE_TARGET_ID: integrationDatabaseTargetId,
+        DATABASE_URL_DEVELOPMENT_HOST: developmentHost,
+        DATABASE_URL_STAGING_HOST: stagingHost,
+        DATABASE_URL_PRODUCTION_HOST: productionHost,
+      });
+    } catch {
+      stderr(
+        'development schema reconciliation unavailable: disposable integration target verification failed',
+      );
+      return 1;
+    }
+  }
+
   try {
     const rows = await queryCatalog(databaseUrl, DEVELOPMENT_SCHEMA_QUERY);
     const incompatible = incompatibleDevelopmentColumns(rows);
@@ -102,7 +130,30 @@ export async function runDevelopmentSchemaReconciliation({
       STATEMENT_BY_COLUMN.get(column),
     );
     if (statements.length > 0) {
-      await executeStatements(databaseUrl, statements);
+      const postMutationRows = await executeStatements(
+        databaseUrl,
+        statements,
+        DEVELOPMENT_SCHEMA_QUERY,
+      );
+      const postMutationMissing = missingDevelopmentColumns(postMutationRows);
+      const postMutationIncompatible =
+        incompatibleDevelopmentColumns(postMutationRows);
+      if (
+        postMutationMissing.length > 0 ||
+        postMutationIncompatible.length > 0
+      ) {
+        const drift = [];
+        if (postMutationMissing.length > 0) {
+          drift.push(`missing ${postMutationMissing.join(', ')}`);
+        }
+        if (postMutationIncompatible.length > 0) {
+          drift.push(`incompatible ${postMutationIncompatible.join(', ')}`);
+        }
+        stderr(
+          `development schema reconciliation failed: post-mutation verification found ${drift.join('; ')}`,
+        );
+        return 1;
+      }
     }
     stdout(
       'development schema reconciliation passed: added or retained retention_cards.last_recall_feedback, subscription.past_due_at, and session_summaries.language_learning_summary',
@@ -114,9 +165,17 @@ export async function runDevelopmentSchemaReconciliation({
   }
 }
 
-async function executeLiveStatements(databaseUrl, statements) {
+async function executeLiveStatements(
+  databaseUrl,
+  statements,
+  verificationQuery,
+) {
   const sql = neon(databaseUrl);
-  return sql.transaction(statements.map((statement) => sql(statement, [])));
+  const results = await sql.transaction([
+    ...statements.map((statement) => sql(statement, [])),
+    sql(verificationQuery, []),
+  ]);
+  return results.at(-1);
 }
 
 async function queryLiveCatalog(databaseUrl, query) {
@@ -138,6 +197,10 @@ async function main() {
     developmentHost: process.env.DATABASE_URL_DEVELOPMENT_HOST,
     stagingHost: process.env.DATABASE_URL_STAGING_HOST,
     productionHost: process.env.DATABASE_URL_PRODUCTION_HOST,
+    integrationDatabaseDisposable: process.env.INTEGRATION_DATABASE_DISPOSABLE,
+    integrationDatabaseHost: process.env.INTEGRATION_DATABASE_HOST,
+    integrationDatabaseName: process.env.INTEGRATION_DATABASE_NAME,
+    integrationDatabaseTargetId: process.env.INTEGRATION_DATABASE_TARGET_ID,
     queryCatalog: queryLiveCatalog,
     executeStatements: executeLiveStatements,
     stdout: console.log,

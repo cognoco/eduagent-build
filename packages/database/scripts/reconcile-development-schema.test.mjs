@@ -2,6 +2,27 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
+const COMPATIBLE_ROWS = [
+  {
+    tableName: 'retention_cards',
+    columnName: 'last_recall_feedback',
+    dataType: 'jsonb',
+    isNullable: 'YES',
+  },
+  {
+    tableName: 'subscription',
+    columnName: 'past_due_at',
+    dataType: 'timestamp with time zone',
+    isNullable: 'YES',
+  },
+  {
+    tableName: 'session_summaries',
+    columnName: 'language_learning_summary',
+    dataType: 'jsonb',
+    isNullable: 'YES',
+  },
+];
+
 async function loadReconciler() {
   try {
     return await import('./reconcile-development-schema.mjs');
@@ -12,23 +33,39 @@ async function loadReconciler() {
 }
 
 async function runReconciler(options = {}) {
+  const expectedDopplerConfig = options.expectedDopplerConfig ?? 'dev';
+  const isIntegrationTarget = expectedDopplerConfig === 'dev_integration';
   const databaseUrl =
-    options.databaseUrl ?? 'postgresql://example.invalid/database';
+    options.databaseUrl ??
+    (isIntegrationTarget
+      ? 'postgresql://integration.example.invalid/wi2922_12345678'
+      : 'postgresql://example.invalid/database');
   const dopplerConfig = Object.hasOwn(options, 'dopplerConfig')
     ? options.dopplerConfig
     : 'dev';
   const dopplerProject = options.dopplerProject ?? 'mentomate';
   const dopplerEnvironment = options.dopplerEnvironment ?? 'dev';
-  const expectedDopplerConfig = options.expectedDopplerConfig ?? 'dev';
-  const developmentHost = options.developmentHost ?? 'example.invalid';
+  const developmentHost =
+    options.developmentHost ??
+    (isIntegrationTarget ? 'development.example.invalid' : 'example.invalid');
   const stagingHost = options.stagingHost ?? 'staging.example.invalid';
   const productionHost = options.productionHost ?? 'production.example.invalid';
+  const integrationDatabaseDisposable =
+    options.integrationDatabaseDisposable ?? 'true';
+  const integrationDatabaseHost =
+    options.integrationDatabaseHost ?? 'integration.example.invalid';
+  const integrationDatabaseName =
+    options.integrationDatabaseName ?? 'wi2922_12345678';
+  const integrationDatabaseTargetId =
+    options.integrationDatabaseTargetId ?? '12345678';
   const rows = options.rows ?? [];
+  const postMutationRows = options.postMutationRows ?? COMPATIBLE_ROWS;
   const { executeError } = options;
   const reconciler = await loadReconciler();
   assert.ok(reconciler, 'development schema reconciler module must exist');
 
   const calls = [];
+  let queryCalls = 0;
   const stdout = [];
   const stderr = [];
   const exitCode = await reconciler.runDevelopmentSchemaReconciliation({
@@ -40,16 +77,28 @@ async function runReconciler(options = {}) {
     developmentHost,
     stagingHost,
     productionHost,
-    queryCatalog: async () => rows,
-    executeStatements: async (url, statements) => {
-      calls.push({ hasDatabaseUrl: Boolean(url), statements });
+    integrationDatabaseDisposable,
+    integrationDatabaseHost,
+    integrationDatabaseName,
+    integrationDatabaseTargetId,
+    queryCatalog: async () => {
+      queryCalls += 1;
+      return rows;
+    },
+    executeStatements: async (url, statements, verificationQuery) => {
+      calls.push({
+        hasDatabaseUrl: Boolean(url),
+        statements,
+        verificationQuery,
+      });
       if (executeError) throw executeError;
+      return postMutationRows;
     },
     stdout: (message) => stdout.push(message),
     stderr: (message) => stderr.push(message),
   });
 
-  return { reconciler, exitCode, calls, stdout, stderr };
+  return { reconciler, exitCode, calls, queryCalls, stdout, stderr };
 }
 
 test('reconciliation contains only the exact approved additive statements', async () => {
@@ -101,6 +150,31 @@ test('integration target refuses the dev identity without executing', async () =
 
   assert.equal(result.exitCode, 1);
   assert.equal(result.calls.length, 0);
+  assert.equal(result.queryCalls, 0);
+});
+
+test('integration target refuses a protected database before catalog access or mutation', async () => {
+  const result = await runReconciler({
+    databaseUrl:
+      'postgresql://example:secret@staging.example.invalid/wi2922_12345678',
+    dopplerConfig: 'dev_integration',
+    expectedDopplerConfig: 'dev_integration',
+    developmentHost: 'development.example.invalid',
+    stagingHost: 'staging.example.invalid',
+    productionHost: 'production.example.invalid',
+    integrationDatabaseHost: 'staging.example.invalid',
+    integrationDatabaseName: 'wi2922_12345678',
+    integrationDatabaseTargetId: '12345678',
+    integrationDatabaseDisposable: 'true',
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.calls.length, 0);
+  assert.equal(result.queryCalls, 0);
+  assert.deepEqual(result.stdout, []);
+  assert.deepEqual(result.stderr, [
+    'development schema reconciliation unavailable: disposable integration target verification failed',
+  ]);
 });
 
 test('development target executes all missing statements together', async () => {
@@ -172,6 +246,33 @@ test('incompatible session summary definition fails closed without mutation', as
   assert.deepEqual(result.stdout, []);
   assert.deepEqual(result.stderr, [
     'development schema reconciliation refused: incompatible session_summaries.language_learning_summary (expected jsonb nullable, found text nullable)',
+  ]);
+});
+
+test('post-mutation verification catches a concurrent incompatible column', async () => {
+  const result = await runReconciler({
+    rows: [],
+    postMutationRows: [
+      COMPATIBLE_ROWS[0],
+      COMPATIBLE_ROWS[1],
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
+        dataType: 'text',
+        isNullable: 'YES',
+      },
+    ],
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.calls.length, 1);
+  assert.match(
+    result.calls[0].verificationQuery,
+    /session_summaries[\s\S]*language_learning_summary/,
+  );
+  assert.deepEqual(result.stdout, []);
+  assert.deepEqual(result.stderr, [
+    'development schema reconciliation failed: post-mutation verification found incompatible session_summaries.language_learning_summary (expected jsonb nullable, found text nullable)',
   ]);
 });
 
