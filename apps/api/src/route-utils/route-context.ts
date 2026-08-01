@@ -16,6 +16,7 @@ import {
   requireProfileId,
   type ProfileMeta,
 } from '../middleware/profile-scope';
+import { BadRequestError } from '../errors';
 
 export interface RouteBindings {
   DATABASE_URL: string;
@@ -26,6 +27,8 @@ export interface RouteVariables {
   user: AuthUser;
   db: Database;
   profileId: string | undefined;
+  /** Server-resolved login -> person binding set by accountMiddleware. */
+  callerPersonId?: string | undefined;
   /** Set by profileScopeMiddleware — carries birthYear, location, consent,
    *  conversationLanguage, isOwner, hasPremiumLlm for route-level gating. */
   profileMeta: ProfileMeta | undefined;
@@ -64,4 +67,15 @@ export function withProfile<E extends RouteEnv>(
     user: c.get('user'),
     profileMeta: c.get('profileMeta'),
   };
+}
+
+/** Returns the authenticated caller's server-resolved person id. */
+export function requireCallerPersonId<E extends RouteEnv>(
+  c: Context<E>,
+): string {
+  const callerPersonId = c.get('callerPersonId');
+  if (!callerPersonId) {
+    throw new BadRequestError('Identity v2 caller person is required.');
+  }
+  return callerPersonId;
 }

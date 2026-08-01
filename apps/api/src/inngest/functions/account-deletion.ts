@@ -1,5 +1,9 @@
 // @inngest-admin: event-profile (accountId from event; all deletion DB ops scoped to that account)
-import type { AccountDeletionTeardownFailedEvent } from '@eduagent/schemas';
+import {
+  accountDeletionTeardownFailedEventSchema,
+  classifyTerminalFailureError,
+  type AccountDeletionTeardownFailedEvent,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
 import {
@@ -50,7 +54,7 @@ export const scheduledDeletion = inngest.createFunction(
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
       const runId = event.data.run_id ?? null;
-      const errorName = error instanceof Error ? error.name : typeof error;
+      const errorName = classifyTerminalFailureError(error);
 
       logger.error('account_deletion.terminal_failure', {
         event: 'account_deletion.terminal_failure',
@@ -78,12 +82,13 @@ export const scheduledDeletion = inngest.createFunction(
         },
       );
 
-      const failureEvent: AccountDeletionTeardownFailedEvent = {
-        accountId,
-        runId,
-        errorName,
-        timestamp: new Date().toISOString(),
-      };
+      const failureEvent: AccountDeletionTeardownFailedEvent =
+        accountDeletionTeardownFailedEventSchema.parse({
+          accountId,
+          runId,
+          errorName,
+          timestamp: new Date().toISOString(),
+        });
       await safeSend(
         () =>
           inngest.send({
