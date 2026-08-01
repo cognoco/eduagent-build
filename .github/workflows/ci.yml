@@ -61,6 +61,12 @@ jobs:
       - name: Run WI-2522 doppler-run Windows contract
         run: pnpm test:doppler-run
 
+      - name: Run WI-2937 store-submission PowerShell contract
+        run: >-
+          pnpm exec jest --config scripts/jest.config.cjs
+          scripts/store-submission-powershell-contract.test.ts
+          --runInBand --no-coverage
+
   main:
     needs: wi2176-windows-orion-contract
     if: ${{ always() }}
