@@ -56,32 +56,35 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 13:11 CEST
+## Live reconciliation — 2026-08-01 13:26 CEST
 
 ### Latest authoritative boundary
 
-- Brief/relation parity remains 41 members. Live slice: 29 Closed, 4 Executing,
-  1 Reviewing, 7 Ready.
+- Brief/relation parity remains 41 members. Live slice: 30 Closed, 4 Executing,
+  7 Ready.
 - WI-2936 is independently Closed/Done at `08d75f40` after evidence-only rework
   removed a non-durable local pointer and accurately recorded 13 successful checks
   plus one intentional skip.
-- WI-2755 PR #2808 landed through the governed gate as `223a9cfe`; landed checks and
-  completion validation passed, execute-complete moved it to Reviewing, and its claim
-  is cleared pending independent QA/review.
+- WI-2755 is independently Closed/Done at `223a9cfe`; fresh QA re-established the
+  DATABASE_URL-only replay twice, focused behavior 5/5, and zero leaked scratch
+  databases/backends. Its three merged/closed branches and worktrees are cleaned.
 - WI-2939 rework PR #2809 landed as `c5cc41fe`. Operator-authorized Option 2 repaired
   the branch-scoped role and only the five `mentomate/dev_integration` keys. No-cache
   preflight passed against the exact disposable DB. The already-ready schema was not
   bootstrapped again. The consumed canonical run produced 147/151 passing suites;
   four failed and terminal detail was not retained. Exact-once recovery comment
   `3af8bce9-1f7c-812d-af48-001d851b5015` blocked a silent rerun. The operator has
-  now authorized Option 2: one full canonical rerun with durable redacted output,
-  exact-target guards, and no schema mutation.
+  then authorized Option 2: one full canonical rerun with durable redacted output.
+  Its preflight refused before Jest because the same branch/name/role now resolves to
+  replacement Neon database ID `4884123`, not missing authorized ID `4883605`. The
+  allowance is unconsumed pending operator successor-target authority.
 - WI-2826 draft PR #2811 at `140c5233` contains only the locally verified eight-file
   instrumentation scope. Its hosted run is untouched. FO-2086 /
   `OCC-1B3E2CB142B3` records stale-local-main change-class over-selection.
-- WI-2921 resumed after WI-2936 closure. Same-owner heartbeats renewed WI-2790,
-  WI-2921, and WI-2939. The four-WIP figure is now treated as throughput guidance;
-  blocked waits do not suppress otherwise safe dispatch.
+- WI-2921 is published normally at exact PR #2718 head `bb8f07df`; local 3-suite/18
+  test contract and exact one-worker/zero-retry Playwright 4/4 are green. Fresh
+  exact-head CI and automated review are running. The four-WIP figure remains
+  throughput guidance; blocked waits do not suppress otherwise safe dispatch.
 
 - The live Brief and membership relation agree on 41 authoritative members.
   The operator retracted WI-2941 from BID-48 and routed it to Nexus / Cosmo
