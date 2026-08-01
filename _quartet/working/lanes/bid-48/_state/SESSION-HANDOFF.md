@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 16:31 CEST
+Last reconciled: 2026-08-01 17:22 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -26,7 +26,20 @@ Last reconciled: 2026-08-01 16:31 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-01 16:31 CEST
+### Latest authoritative boundary — 2026-08-01 17:22 CEST
+
+- WI-2922 is repository-landed through the governed merge gate. Ready-state review
+  found two valid guard defects: a mislabeled `dev_integration` credential could
+  bypass disposable-target identity checks, and a concurrent incompatible column
+  could win between preflight and `IF NOT EXISTS`. Exact head `57dd317c` wires the
+  canonical target validator and post-DDL catalog verification; mutation-sensitive
+  RED 17/2 became GREEN 19/19, the focused family passed 35/35, and database tests
+  passed 320/320. Both Codex threads were resolved with evidence. Full exact-head CI
+  passed; one unrelated V2 manual-homework smoke miss was recorded as FO-2092 /
+  `OCC-462262050B18`, then the single failed-job rerun passed 23/23 V2 and 24/24
+  legacy. The gate verified all 16 logical checks and squash-merged PR #2830 as
+  `01f55639`, now on `origin/main`. Shared-development schema reconciliation remains
+  unperformed and separately operator-gated, so the item remains Executing.
 
 - WI-2643 is repository-landed through the governed merge gate. Exact head
   `fc2de822` passed all 14 checks after the single failed-job rerun cleared the

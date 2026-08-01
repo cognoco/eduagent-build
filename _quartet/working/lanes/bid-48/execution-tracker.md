@@ -56,9 +56,18 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 16:31 CEST
+## Live reconciliation — 2026-08-01 17:22 CEST
 
 ### Latest authoritative boundary
+
+- WI-2922 review rework head `57dd317c` fixes two valid fail-closed gaps with
+  mutation-sensitive RED 17/2 → GREEN 19/19, focused 35/35, and database package
+  320/320. Both Codex threads are resolved. Full CI passed; FO-2092 /
+  `OCC-462262050B18` records an unrelated hosted V2 manual-homework miss, and the
+  single failed-job rerun passed 23/23 V2 plus 24/24 legacy. The governed gate
+  verified 16 logical checks and squash-merged PR #2830 as `01f55639`. No shared
+  development database mutation occurred; WI-2922 remains Executing behind that
+  explicit operator gate.
 
 - WI-2643 exact head `fc2de822` is fully strict-green: all 14 checks passed after
   one bounded failed-job rerun cleared the unrelated staging smoke timeout. A fresh
