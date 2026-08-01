@@ -151,6 +151,12 @@ function buildInProgressTopicIds(input: {
   return ids;
 }
 
+// Server resume kinds backed by a live (resumable) session. getBookSessions()
+// only returns completed/auto_closed sessions, so a live target's topic never
+// appears in inProgressTopicIds — it must still outrank the local fallback.
+const LIVE_RESUME_KINDS: ReadonlySet<LearningResumeTarget['resumeKind']> =
+  new Set(['active_session', 'paused_session']);
+
 function resolveContinueTopicId(input: {
   resumeTarget: LearningResumeTarget | null | undefined;
   inProgressTopicIds: ReadonlySet<string>;
@@ -158,7 +164,8 @@ function resolveContinueTopicId(input: {
 }): string | null {
   if (
     input.resumeTarget?.topicId &&
-    input.inProgressTopicIds.has(input.resumeTarget.topicId)
+    (LIVE_RESUME_KINDS.has(input.resumeTarget.resumeKind) ||
+      input.inProgressTopicIds.has(input.resumeTarget.topicId))
   ) {
     return input.resumeTarget.topicId;
   }
