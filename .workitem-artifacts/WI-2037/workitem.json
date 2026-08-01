@@ -6,7 +6,7 @@
   "type": "Design",
   "reviewTier": "Adversarial",
   "claimant": "codex:builder:WI-2037",
-  "worktree": "C:/Dev/Projects/Products/Apps/eduagent-build/.worktrees/WI-2037",
+  "worktree": ".worktrees/WI-2037",
   "branch": "WI-2037",
   "baseCommit": "503f4759ec49390b838b4f95549a4bbbaddb7845",
   "originMainAtFinalPreflight": "503f4759ec49390b838b4f95549a4bbbaddb7845",
