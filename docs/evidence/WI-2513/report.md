@@ -1,6 +1,7 @@
 # WI-2513 — Design contract: pre-commit retry idempotency for the paid calibration grader
 
-Date: 2026-08-02
+Date: 2026-08-02 (Europe/Berlin local publication date; GitHub's UTC
+timestamps may show Aug 1)
 Status: **Design only.** The operator ruling (2026-07-29) ratified Option C as
 the direction; **explicit architecture approval of this contract is still
 required before ANY implementation** (AC-3). No production code, schema,
@@ -67,9 +68,14 @@ export const reviewCalibrationGrade = inngest.createFunction(
 ```
 
 - **Key:** identical CEL expression to the existing `idempotency` key
-  (line 480) — the serialization queue has exactly the dedupe key's identity
-  granularity, so it covers precisely the executions dedupe can miss. Both
-  fields are required UUIDs on the event schema (`inngest-events.ts:427-433`).
+  (line 480) — the granularity intentionally matches the dedupe key. This also
+  serializes executions for *distinct* `learnerMessageEventId`s in the same
+  session/topic: those are distinct receipts and may legitimately each pay
+  (particularly outside the 24h idempotency window). They queue behind one
+  another rather than being deduplicated — the tradeoff is per-key queue
+  latency, not false deduplication or a lost grade. Changing this granularity
+  is itself an architecture-approval question (§9). Both fields are required
+  UUIDs on the event schema (`inngest-events.ts:427-433`).
 - **Limit/scope:** `1`, `fn` scope (Inngest default) — queue private to this
   function.
 - **Step boundary — no restructuring.** The critical section is already the
@@ -154,9 +160,11 @@ Distinct residuals:
   misses) each carry their own retry budget; the serializer only guarantees
   the first committed result stops later serialized executions from paying.
 
-No data corruption in any case: the insert is `onConflictDoNothing` on the
-deterministic PK, and a lost conflict reloads the canonical row
-(lines 308-320, 358-370). Closing the zombie/pay-then-die window would require
+Row-level invariant in every case above: the deterministic
+`learnerMessageEventId` PK with `onConflictDoNothing` ensures at most one
+`retrieval_events` row per receipt, and a lost conflict reloads the canonical
+row (lines 308-320, 358-370). No broader corruption-prevention claim is made
+for other fields, write paths, or external calls. Closing the zombie/pay-then-die window would require
 provider-side idempotency or Option A's full lease/takeover/fencing protocol
 (§2) — costs the ruling rejected. **The bounded repayments above are the
 operator-accepted residual.** Not residuals: in-window duplicates
@@ -178,10 +186,11 @@ operator-accepted residual.** Not residuals: in-window duplicates
 - **External contracts: zero.** No event-payload, `@eduagent/schemas`, API, or
   mobile-visible change; the delta is Inngest function configuration,
   registered at the next worker sync.
-- **Latency:** none on the common path (distinct keys, distinct queues).
-  Per-key queueing delays only a same-session+topic duplicate — executions
-  idempotency normally drops — so waiting occurs only in the dedupe-miss cases
-  this design exists to serialize.
+- **Latency:** none across distinct session+topic keys (distinct queues).
+  Per-key queueing delays any same-key execution while another is executing —
+  literal duplicates and distinct-`learnerMessageEventId` grades alike (§3);
+  each still runs, so the cost is wait time, never a dropped or
+  falsely-deduplicated grade.
 
 ## 9. Approval gate
 
