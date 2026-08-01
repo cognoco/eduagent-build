@@ -8,6 +8,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  guardianship,
   learningSessions,
   login,
   membership,
@@ -122,6 +123,7 @@ function makeApp(
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integ-now-${RUN_ID}`;
 const seededAccountIds: string[] = [];
+const seededGuardianshipIds: string[] = [];
 const seededProfileIds: string[] = [];
 const seededSupportershipIds: string[] = [];
 
@@ -134,6 +136,7 @@ async function seedProfileInAccount(
   label: string,
   accountId: string,
   isOwner: boolean,
+  credentialed = true,
 ): Promise<string> {
   const profileId = generateUUIDv7();
   const clerkUserId = `${CLERK_PREFIX}-${label}`;
@@ -155,7 +158,7 @@ async function seedProfileInAccount(
   // The legacy test helper intentionally models non-owners as managed people
   // without a login. This attack requires a credentialed learner-role member,
   // so add the real login binding while retaining the non-admin membership.
-  if (!isOwner) {
+  if (!isOwner && credentialed) {
     const [loginRow] = await database
       .insert(login)
       .values({
@@ -385,6 +388,11 @@ async function seedParkedQuestion(
 }
 
 async function cleanup(database: Database): Promise<void> {
+  if (seededGuardianshipIds.length > 0) {
+    await database
+      .delete(guardianship)
+      .where(inArray(guardianship.id, seededGuardianshipIds));
+  }
   if (seededSupportershipIds.length > 0) {
     await database
       .delete(supportership)
@@ -395,6 +403,7 @@ async function cleanup(database: Database): Promise<void> {
     profileIds: seededProfileIds,
   });
   seededSupportershipIds.length = 0;
+  seededGuardianshipIds.length = 0;
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }
@@ -851,6 +860,45 @@ describe('Integration: now routes', () => {
       code: ERROR_CODES.FORBIDDEN,
       message: 'You do not have access to this person.',
     });
+  });
+
+  it('[WI-2565][AC-2] allows an authorized guardian of an uncredentialed charge through both Now endpoints', async () => {
+    const accountId = generateUUIDv7();
+    const guardianPersonId = await seedProfileInAccount(
+      db,
+      'read-authority-guardian',
+      accountId,
+      true,
+    );
+    const chargePersonId = await seedProfileInAccount(
+      db,
+      'read-authority-uncredentialed-charge',
+      accountId,
+      false,
+      false,
+    );
+    const [edge] = await db
+      .insert(guardianship)
+      .values({ guardianPersonId, chargePersonId })
+      .returning({ id: guardianship.id });
+    if (!edge) throw new Error('Failed to seed active guardianship');
+    seededGuardianshipIds.push(edge.id);
+
+    const [chargeLogin] = await db
+      .select({ id: login.id })
+      .from(login)
+      .where(eq(login.personId, chargePersonId))
+      .limit(1);
+    expect(chargeLogin).toBeUndefined();
+
+    const app = makeApp(db, chargePersonId, {
+      callerPersonId: guardianPersonId,
+    });
+    const nowRes = await app.request('/v1/now?scope=self');
+    const overflowRes = await app.request('/v1/now/overflow?scope=self');
+
+    expect(nowRes.status).toBe(200);
+    expect(overflowRes.status).toBe(200);
   });
 
   it('[WI-2518][RGR] rejects a same-account non-owner borrowing the selected profile supportership on both Now endpoints and the hub', async () => {
