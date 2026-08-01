@@ -131,13 +131,10 @@ export default function LinkContractScreen(): React.ReactElement {
           testID: 'visibility-link-wrong-profile-switch',
         }}
         secondaryAction={{
-          // Named destination: this screen's Back fallback is always the
-          // Mentor root (matching visibility-link-back below), so the label
-          // says so instead of a generic "Go Back".
           label: t('common.backTo', {
             destination: t(V2_TAB_TITLE_KEYS.mentor),
           }),
-          onPress: () => goBackOrReplace(router, '/(app)/mentor'),
+          onPress: () => router.replace('/(app)/mentor'),
           testID: 'visibility-link-wrong-profile-back',
         }}
         testID="visibility-link-wrong-profile"

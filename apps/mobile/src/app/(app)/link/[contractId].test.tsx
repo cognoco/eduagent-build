@@ -41,9 +41,10 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  /* gc1-allow: route test controls active person identity for supporter/supportee branches */
+  /* gc1-allow: this route's matrix needs per-test supporter/supportee identity; preserve every real profile export and override only useProfile */
   '../../../lib/profile',
   () => ({
+    ...jest.requireActual('../../../lib/profile'),
     useProfile: () => ({
       activeProfile: mockActiveProfileId
         ? { id: mockActiveProfileId }
@@ -242,7 +243,8 @@ describe('LinkContractScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/profiles');
 
     fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-back'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('returns a historyless wrong-profile invite to the Mentor root via the named Back action', async () => {
@@ -303,6 +305,7 @@ describe('LinkContractScreen', () => {
     await screen.findByTestId('visibility-link-wrong-profile');
     expect(screen.queryByTestId('visibility-contract-card')).toBeNull();
     expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('visibility-link-wrong-profile-switch'));
     expect(mockPush).toHaveBeenCalledWith('/profiles');
