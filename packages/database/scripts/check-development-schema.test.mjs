@@ -12,7 +12,12 @@ async function loadChecker() {
 
 async function runChecker({
   databaseUrl,
+  dopplerProject = 'mentomate',
   dopplerConfig = 'dev',
+  dopplerEnvironment = 'dev',
+  developmentHost = 'example.invalid',
+  stagingHost = 'staging.example.invalid',
+  productionHost = 'production.example.invalid',
   rows = [],
   queryError,
 }) {
@@ -24,7 +29,12 @@ async function runChecker({
   let queryCalls = 0;
   const exitCode = await checker.runDevelopmentSchemaCheck({
     databaseUrl,
+    dopplerProject,
     dopplerConfig,
+    dopplerEnvironment,
+    developmentHost,
+    stagingHost,
+    productionHost,
     queryCatalog: async () => {
       queryCalls += 1;
       if (queryError) throw queryError;
@@ -37,7 +47,7 @@ async function runChecker({
   return { checker, exitCode, queryCalls, stdout, stderr };
 }
 
-test('catalog query requires the retention-feedback and past-due columns', async () => {
+test('catalog query requires every approved development drift column', async () => {
   const checker = await loadChecker();
   assert.ok(checker, 'development schema checker module must exist');
 
@@ -46,6 +56,8 @@ test('catalog query requires the retention-feedback and past-due columns', async
   assert.match(normalized, /column_name = 'last_recall_feedback'/);
   assert.match(normalized, /table_name = 'subscription'/);
   assert.match(normalized, /column_name = 'past_due_at'/);
+  assert.match(normalized, /table_name = 'session_summaries'/);
+  assert.match(normalized, /column_name = 'language_learning_summary'/);
   assert.match(normalized, /data_type AS "dataType"/);
   assert.match(normalized, /is_nullable AS "isNullable"/);
 });
@@ -77,6 +89,12 @@ test('complete development schema returns success', async () => {
         dataType: 'timestamp with time zone',
         isNullable: 'YES',
       },
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
     ],
   });
 
@@ -84,16 +102,16 @@ test('complete development schema returns success', async () => {
   assert.equal(result.queryCalls, 1);
   assert.deepEqual(result.stderr, []);
   assert.deepEqual(result.stdout, [
-    'development schema freshness passed: retention_cards.last_recall_feedback and subscription.past_due_at are present',
+    'development schema freshness passed: retention_cards.last_recall_feedback, subscription.past_due_at, and session_summaries.language_learning_summary are present',
   ]);
 });
 
 for (const { name, rows, expectedDrift } of [
   {
-    name: 'both columns absent',
+    name: 'all approved columns absent',
     rows: [],
     expectedDrift:
-      'missing retention_cards.last_recall_feedback, subscription.past_due_at',
+      'missing retention_cards.last_recall_feedback, subscription.past_due_at, session_summaries.language_learning_summary',
   },
   {
     name: 'retention feedback column absent',
@@ -102,6 +120,12 @@ for (const { name, rows, expectedDrift } of [
         tableName: 'subscription',
         columnName: 'past_due_at',
         dataType: 'timestamp with time zone',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
+        dataType: 'jsonb',
         isNullable: 'YES',
       },
     ],
@@ -113,6 +137,12 @@ for (const { name, rows, expectedDrift } of [
       {
         tableName: 'retention_cards',
         columnName: 'last_recall_feedback',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
         dataType: 'jsonb',
         isNullable: 'YES',
       },
@@ -134,6 +164,12 @@ for (const { name, rows, expectedDrift } of [
         dataType: 'timestamp with time zone',
         isNullable: 'YES',
       },
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
     ],
     expectedDrift:
       'incompatible retention_cards.last_recall_feedback (expected jsonb nullable, found json nullable)',
@@ -153,9 +189,40 @@ for (const { name, rows, expectedDrift } of [
         dataType: 'timestamp with time zone',
         isNullable: 'NO',
       },
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
     ],
     expectedDrift:
       'incompatible subscription.past_due_at (expected timestamp with time zone nullable, found timestamp with time zone non-nullable)',
+  },
+  {
+    name: 'session summary column has an incompatible type',
+    rows: [
+      {
+        tableName: 'retention_cards',
+        columnName: 'last_recall_feedback',
+        dataType: 'jsonb',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'subscription',
+        columnName: 'past_due_at',
+        dataType: 'timestamp with time zone',
+        isNullable: 'YES',
+      },
+      {
+        tableName: 'session_summaries',
+        columnName: 'language_learning_summary',
+        dataType: 'text',
+        isNullable: 'YES',
+      },
+    ],
+    expectedDrift:
+      'incompatible session_summaries.language_learning_summary (expected jsonb nullable, found text nullable)',
   },
 ]) {
   test(`${name} returns actionable reconciliation instructions`, async () => {
@@ -173,6 +240,29 @@ for (const { name, rows, expectedDrift } of [
     ]);
   });
 }
+
+test('development config with a non-development host fails closed without querying', async () => {
+  const result = await runChecker({
+    databaseUrl: 'postgresql://example:secret@staging.example.invalid/database',
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.queryCalls, 0);
+  assert.deepEqual(result.stdout, []);
+  assert.deepEqual(result.stderr, [
+    'development schema freshness unavailable: exact development target verification failed',
+  ]);
+});
+
+test('development config outside the MentoMate development environment fails closed', async () => {
+  const result = await runChecker({
+    databaseUrl: 'postgresql://example:secret@example.invalid/database',
+    dopplerProject: 'other-project',
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.queryCalls, 0);
+});
 
 for (const dopplerConfig of ['dev_integration', 'stg', 'prd', '']) {
   test(`${dopplerConfig} target fails closed without querying`, async () => {
