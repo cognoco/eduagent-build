@@ -80,7 +80,10 @@ draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 ## L3 — Operational
 
 - **Specs** — `docs/specs/` (feature definitions; the `decision-adr-link` ratchet
-  enforces ADR links on significant decision blocks).
+  enforces ADR links on significant decision blocks). Identity authority
+  contract: [13–16 family-join guardian-consent ceremony](specs/2026-07-30-13-16-family-join-guardian-consent-ceremony.md)
+  — provisionally approved with the WI-2037 rewrite of MMT-ADR-0010 and
+  operative for delivery; final ratification is tracked in OPQ-160.
 - **Plans** — `docs/plans/`.
 - **Runbooks** — `docs/runbooks/` (procedures; e.g. `llm-model-vetting.md`).
 - **Registers** — `docs/registers/` — governed data masters + immutable provenance
