@@ -7,7 +7,16 @@ classifier=${0:A:h}/wi2948-classify-playwright-result.zsh
 discriminator=${0:A:h}/wi2948-preload-discriminator.test.mjs
 playwright_config=apps/mobile/playwright.config.ts
 evidence_readme=docs/evidence/WI-2948/README.md
+success_receipt=docs/evidence/WI-2948/ramtop-node22-seeded-signin-receipt.json
 classification_literal='.workitem-artifacts/WI-2948/ramtop-node22-seeded-signin-classification.txt'
+
+validate_wrapper_contract() {
+  local wrapper=$1
+
+  [[ "$(rg -c -F -- '--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY"' "$wrapper")" == "2" ]] &&
+    rg -q -F '[[ -n "${CLERK_SECRET_KEY:-}" ]]' "$wrapper" &&
+    rg -q -F '[[ -z "${CLERK_TESTING_TOKEN:-}" ]]' "$wrapper"
+}
 
 classification_line=$(rg -n -F "$classification_literal" "$target" | cut -d: -f1 || true)
 redirect_line=$(rg -n -F 'exec >"$classification_file"' "$target" | cut -d: -f1 || true)
@@ -52,16 +61,11 @@ if rg -q -F -- '--reporter=' "$target"; then
   exit 1
 fi
 
-rg -q -F -- '--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY"' \
-  "$target" || {
-  print -u2 'proof wrapper does not inject the aligned staging Clerk backend key required by clerkSetup'
+validate_wrapper_contract "$target" || {
+  print -u2 'proof wrapper does not preserve the exact fail-closed Clerk credential boundary'
   exit 1
 }
-
-rg -q -F '[[ -n "${CLERK_SECRET_KEY:-}" ]]' "$target" || {
-  print -u2 'proof wrapper does not fail closed when the aligned staging Clerk backend key is absent'
-  exit 1
-}
+print 'transport canonical pass: exact allowlist and both refusal guards present'
 
 if rg -q -F 'CLERK_SECRET_KEY crossed the allowlisted boundary' "$target"; then
   print -u2 'proof wrapper still rejects the Clerk backend key that clerkSetup requires'
@@ -80,10 +84,39 @@ rg -q -F 'if (!mutant.ok)' "$discriminator" &&
   exit 1
 }
 
-if rg -q -F '[ramtop-node22-seeded-signin-receipt.json]' "$evidence_readme"; then
-  print -u2 'evidence README retains a dead success-receipt link'
+rg -q -F '[ramtop-node22-seeded-signin-receipt.json](ramtop-node22-seeded-signin-receipt.json)' \
+  "$evidence_readme" || {
+  print -u2 'evidence README does not link the tracked success receipt'
   exit 1
-fi
+}
+[[ -f "$success_receipt" ]] || {
+  print -u2 'evidence README success-receipt link is dead'
+  exit 1
+}
+jq -e \
+  --arg pointer "$success_receipt" \
+  '.schema == "wi-2948.ramtop-seeded-signin-receipt.v1"
+    and .artifactPointer == $pointer
+    and .configuredRetries == 0
+    and .configuredWorkers == 1
+    and .globalTeardownReset == "passed"
+    and .summary == {passed: 3, failed: 0, retriesObserved: 0}
+    and (.scenarios | length) == 3
+    and ([.scenarios[] | {seedScenario, storageState}] == [
+      {seedScenario: "onboarding-complete", storageState: "solo-learner"},
+      {seedScenario: "parent-multi-child", storageState: "owner-with-children"},
+      {seedScenario: "v2-account-non-owner-child", storageState: "non-owner-child"}
+    ])
+    and all(.scenarios[]; .outcome == "passed" and .attempts == 1 and .retryIndexes == [0])' \
+  "$success_receipt" >/dev/null || {
+  print -u2 'tracked success receipt does not validate its identity and successful outcomes'
+  exit 1
+}
+[[ "$(shasum -a 256 "$success_receipt" | cut -d' ' -f1)" == \
+  'eca82eb14a1edb2709477d99bc5067557ac83d4b6a8bc7730f05b07715bbc231' ]] || {
+  print -u2 'tracked success receipt hash differs from the reviewed durable evidence'
+  exit 1
+}
 rg -q -F 'exactly `TEST_SEED_SECRET`, `CLERK_PUBLISHABLE_KEY`, and the aligned staging `CLERK_SECRET_KEY`' \
   "$evidence_readme" || {
   print -u2 'evidence README does not state the current three-secret proof boundary'
@@ -131,6 +164,38 @@ if [[ "$classification" == *SENSITIVE* ]]; then
   print -u2 'early-run classification leaked raw error or console material'
   exit 1
 fi
+
+mutant_dir="$fixture_tmp/transport-mutants"
+mkdir -p "$mutant_dir"
+node - "$target" "$mutant_dir" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const [sourcePath, outputDir] = process.argv.slice(2);
+const source = fs.readFileSync(sourcePath, 'utf8');
+const mutations = [
+  ['missing-allowlist', '--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY,CLERK_SECRET_KEY"', '--only-secrets="TEST_SEED_SECRET,CLERK_PUBLISHABLE_KEY"'],
+  ['missing-backend-guard', '[[ -n "${CLERK_SECRET_KEY:-}" ]]', 'true'],
+  ['missing-testing-token-refusal', '[[ -z "${CLERK_TESTING_TOKEN:-}" ]]', 'true'],
+];
+for (const [name, before, after] of mutations) {
+  if (!source.includes(before)) throw new Error(`mutation anchor missing: ${name}`);
+  fs.writeFileSync(path.join(outputDir, `${name}.zsh`), source.replace(before, after));
+}
+NODE
+
+for mutant in "$mutant_dir"/*.zsh; do
+  if validate_wrapper_contract "$mutant"; then
+    print -u2 -- "transport mutation survived: ${mutant:t:r}"
+    exit 1
+  fi
+  print -- "transport mutation killed: ${mutant:t:r}"
+done
+
+validate_wrapper_contract "$target" || {
+  print -u2 'proof wrapper was not restored after the transport mutation cycle'
+  exit 1
+}
+print 'transport canonical restore pass: exact allowlist and both refusal guards present'
 
 fixture_bin="$fixture_tmp/bin"
 fixture_rg="$fixture_bin/rg"
