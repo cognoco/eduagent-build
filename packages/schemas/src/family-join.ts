@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { visibilityContractSchema } from './visibility-contract.ts';
 
 // [WI-1753] Family-join request contracts — the cross-account existing-teen
 // family join. Shared rather than route-local so mobile and API bind to ONE
@@ -40,4 +41,20 @@ export const familyJoinAcceptRequestSchema = z
 
 export type FamilyJoinAcceptRequest = z.infer<
   typeof familyJoinAcceptRequestSchema
+>;
+
+export const familyJoinAcceptResultSchema = z
+  .object({
+    familyOrgId: z.string().uuid(),
+    alreadyMember: z.boolean(),
+    storeCancelNudge: z
+      .object({ originalAppUserId: z.string() })
+      .strict()
+      .nullable(),
+    visibilityContract: visibilityContractSchema.nullable(),
+  })
+  .strict();
+
+export type FamilyJoinAcceptResult = z.infer<
+  typeof familyJoinAcceptResultSchema
 >;

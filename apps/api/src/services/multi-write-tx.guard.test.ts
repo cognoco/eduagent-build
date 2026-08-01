@@ -13,7 +13,10 @@
  * multiple writes on it are intentionally excluded — their callers are
  * responsible for wrapping the whole sequence in a transaction (e.g.
  * `cascadeUndoCreatedAncestors` in family-bridge.ts, called from within
- * `undoCloneFromChild`'s transaction callback).
+ * `undoCloneFromChild`'s transaction callback). The one cross-module helper
+ * that must remain exported is listed in EXPORTED_TRANSACTION_BODY_ALLOWLIST;
+ * its callers already own a wider transaction and its integration coverage
+ * proves rollback of the whole family-join operation.
  *
  * Forward-only ratchet: adding a new exported function with 2+ bare writes to
  * any of the four target files will fail CI before it lands.
@@ -43,6 +46,17 @@ const TARGET_FILES = [
   'apps/api/src/services/family-bridge.ts',
   'apps/api/src/services/session/session-exchange.ts',
 ].map((f) => path.join(REPO_ROOT, f.split('/').join(path.sep)));
+
+// Exact, review-visible exception for an exported transaction body. Do not
+// broaden this to a naming convention or comment-based escape hatch: a new
+// entry requires proving that every caller supplies an already-open tx and
+// that rollback is covered across the complete outer operation.
+const EXPORTED_TRANSACTION_BODY_ALLOWLIST = new Map<string, Set<string>>([
+  [
+    'apps/api/src/services/linking-ceremony.ts',
+    new Set(['initiateLinkInTransaction']),
+  ],
+]);
 
 if (!fs.existsSync(path.join(REPO_ROOT, 'apps/api'))) {
   throw new Error(
@@ -161,7 +175,9 @@ function scanFile(absPath: string): Violation[] {
     ) {
       const name = statement.name?.text ?? '<anonymous>';
       const writes = collectBareWrites(statement, sourceFile);
-      if (writes.length >= 2) {
+      const isAllowlistedTransactionBody =
+        EXPORTED_TRANSACTION_BODY_ALLOWLIST.get(relFile)?.has(name) ?? false;
+      if (writes.length >= 2 && !isAllowlistedTransactionBody) {
         violations.push({ file: relFile, functionName: name, writes });
       }
     }
@@ -204,6 +220,38 @@ describe('multi-write-tx guard — exported functions must wrap 2+ writes in db.
       );
     }
     expect(allViolations).toEqual([]);
+  });
+
+  it('keeps the exported transaction-body exception exact and necessary', () => {
+    expect([...EXPORTED_TRANSACTION_BODY_ALLOWLIST.entries()]).toEqual([
+      [
+        'apps/api/src/services/linking-ceremony.ts',
+        new Set(['initiateLinkInTransaction']),
+      ],
+    ]);
+
+    const linkingSource = fs.readFileSync(TARGET_FILES[1]!, 'utf8');
+    const sourceFile = ts.createSourceFile(
+      TARGET_FILES[1]!,
+      linkingSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    const helper = sourceFile.statements.find(
+      (statement): statement is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(statement) &&
+        statement.name?.text === 'initiateLinkInTransaction',
+    );
+
+    expect(
+      helper?.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword),
+    ).toBe(true);
+    expect(helper?.body).toBeDefined();
+    expect(collectBareWrites(helper!, sourceFile)).toHaveLength(2);
+    expect(
+      linkingSource.slice(helper!.pos, helper!.getStart(sourceFile)),
+    ).toContain('Callers must hold the outer transaction');
   });
 
   // ---------------------------------------------------------------------------
