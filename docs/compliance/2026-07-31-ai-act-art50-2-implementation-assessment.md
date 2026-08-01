@@ -4,7 +4,7 @@
 **Status:** Draft v0.1 — for DPO review
 **Author:** agent-drafted for management review
 **Company:** ZWIZZLY AS, organisation number 811 696 072, Fiskekroken 3B, 0139 Oslo, Norway
-**Owner:** Zuzana Kopečná, Chair of the Board, ZWIZZLY AS
+**Owner:** Zuzana Kopečná, Founder, ZWIZZLY AS
 **Parent record:** [`2026-07-30-eu-ai-act-classification-record.md`](2026-07-30-eu-ai-act-classification-record.md) §10.4
 **Work item:** **WI-2915 — Article 50(2) scoping; priority P1. This document is that scoping.**
 **Scope:** MentoMate application version **1.0.1**, family-only MVP, model set as recorded in the classification record §2.2

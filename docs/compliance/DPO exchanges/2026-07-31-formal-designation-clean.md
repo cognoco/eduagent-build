@@ -57,6 +57,6 @@ The parties confirm that this designation records the independent DPO role and d
 
 | For ZWIZZLY AS | External DPO |
 |---|---|
-| Zuzana Kopečná, Chair of the Board<!-- change: signatory name/title corrected to full legal form "Zuzana Kopečná, Chair of the Board" per the drafting brief. This is NOT sourced from DPO correspondence — his draft had "Zuzana Kopecna, Chair" (no diacritics, no Board qualifier). Flagged for operator confirmation that this is her exact registered title. --> | Stephan Hartmann |
+| Zuzana Kopečná, Founder<!-- change: signatory title ruled by operator 2026-08-01: "Founder" (his draft had "Zuzana Kopecna, Chair", no diacritics). Name spelling corrected to legal form. --> | Stephan Hartmann |
 | Signature: __________________________ | Signature: __________________________ |
 | Date: [FILL: date of signature] | Date: [FILL: date of signature] |
