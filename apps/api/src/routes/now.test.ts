@@ -26,9 +26,34 @@ jest.mock('../services/identity-v2/consent-status-v2', () => ({
   isLlmExchangeConsentAllowed: jest.fn().mockResolvedValue(true),
 }));
 
+// [WI-2565] assertCanReadProfile (GET /now, /now/overflow) calls
+// verifyPersonOwnershipV2, which runs a raw db.select() membership query the
+// stub `db` ({ marker: 'db' }) in this file cannot satisfy. The resolving
+// default models every authorized caller (self, or a guardian holding an
+// active edge over an uncredentialed charge); the [WI-2565] denial tests
+// below override with mockRejectedValueOnce to prove the route fails closed
+// before the feed builders run. The cross-account read attack against a real
+// membership table is covered by the real-DB break test in
+// tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+
+const mockVerifyPersonOwnershipV2 =
+  verifyPersonOwnershipV2 as jest.MockedFunction<
+    typeof verifyPersonOwnershipV2
+  >;
+
 const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
 const CALLER_PERSON_ID = '00000000-0000-4000-8000-000000000102';
+const GUARDIAN_PERSON_ID = '00000000-0000-4000-8000-000000000103';
+const TEST_ACCOUNT_ID = 'test-account-id';
 
 // [WI-2498] `callerPersonId` is the server-resolved caller identity the
 // mentor-notice visibility predicate compares against the selected profile.
@@ -50,6 +75,9 @@ function makeApp(
     } as never;
     c.set('db' as never, { marker: 'db' } as unknown as Database);
     c.set('profileId' as never, PROFILE_ID);
+    // [WI-2565] assertCanReadProfile requires both account and
+    // callerPersonId; absent either it fails closed with 403.
+    c.set('account' as never, { id: TEST_ACCOUNT_ID });
     c.set('callerPersonId' as never, callerPersonId);
     await next();
   });
@@ -67,6 +95,7 @@ function makeApp(
 describe('now routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyPersonOwnershipV2.mockReset().mockResolvedValue(undefined);
     jest.mocked(buildNowFeed).mockResolvedValue({
       scope: 'self',
       cards: [],
@@ -464,5 +493,76 @@ describe('now routes', () => {
         'notice-policy-v1:r11:on:self:consented',
       );
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2565] Read-authority boundary. withProfile proves only organization
+  // membership for the selected profile; these cases prove the routes also
+  // require self-or-guardian read authority (assertCanReadProfile), matching
+  // GET /sessions/:sessionId/summary. Denials must land BEFORE the feed
+  // builders run.
+  // -------------------------------------------------------------------------
+  describe('[WI-2565] read-authority guard', () => {
+    it.each([
+      ['/v1/now', buildNowFeed],
+      ['/v1/now/overflow', buildNowOverflow],
+    ] as const)(
+      '%s allows a learner-self read of their own feed',
+      async (path, build) => {
+        const res = await makeApp().request(`${path}?scope=self`);
+
+        expect(res.status).toBe(200);
+        expect(mockVerifyPersonOwnershipV2).toHaveBeenCalledWith(
+          expect.anything(),
+          PROFILE_ID,
+          TEST_ACCOUNT_ID,
+          PROFILE_ID,
+        );
+        expect(build).toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ['/v1/now', buildNowFeed],
+      ['/v1/now/overflow', buildNowOverflow],
+    ] as const)(
+      '%s allows an authorized guardian of an uncredentialed charge (ownership check resolves)',
+      async (path, build) => {
+        // Caller is a different person than the selected profile; the
+        // resolving verifyPersonOwnershipV2 models an active guardianship
+        // edge over an uncredentialed charge.
+        const res = await makeApp(false, GUARDIAN_PERSON_ID).request(
+          `${path}?scope=self`,
+        );
+
+        expect(res.status).toBe(200);
+        expect(mockVerifyPersonOwnershipV2).toHaveBeenCalledWith(
+          expect.anything(),
+          PROFILE_ID,
+          TEST_ACCOUNT_ID,
+          GUARDIAN_PERSON_ID,
+        );
+        expect(build).toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ['/v1/now', buildNowFeed],
+      ['/v1/now/overflow', buildNowOverflow],
+    ] as const)(
+      '%s rejects an unrelated org member selecting another profile before the feed builder runs',
+      async (path, build) => {
+        mockVerifyPersonOwnershipV2.mockRejectedValueOnce(
+          new Error('caller cannot read selected profile'),
+        );
+
+        const res = await makeApp(false, CALLER_PERSON_ID).request(
+          `${path}?scope=self`,
+        );
+
+        expect(res.status).toBe(403);
+        expect(build).not.toHaveBeenCalled();
+      },
+    );
   });
 });
