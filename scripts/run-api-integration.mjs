@@ -2,7 +2,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -14,6 +14,10 @@ const LOCAL_DATABASE_MARKER = /(^|[_-])(test|tests|integration)([_-]|$)/i;
 const PROTECTED_LABEL = /(^|[._-])(stg|staging|prd|prod|production)([._-]|$)/i;
 const LOOPBACK_ONLY_REPAIR_SUITE =
   'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts';
+const LOOPBACK_ONLY_REPAIR_PATH = resolve(
+  REPO_ROOT,
+  LOOPBACK_ONLY_REPAIR_SUITE,
+);
 const LOCAL_JEST_CONFIG = 'apps/api/jest.integration.config.cjs';
 const REMOTE_JEST_CONFIG = 'apps/api/jest.integration.remote.config.cjs';
 
@@ -207,7 +211,9 @@ function main() {
     if (
       !isLocal &&
       forwardedArgs.some(
-        (arg) => arg.replaceAll('\\', '/') === LOOPBACK_ONLY_REPAIR_SUITE,
+        (arg) =>
+          resolve(REPO_ROOT, arg.replaceAll('\\', '/')) ===
+          LOOPBACK_ONLY_REPAIR_PATH,
       )
     ) {
       refuse('the curriculum dedup repair suite is loopback-only.');

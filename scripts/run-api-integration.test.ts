@@ -420,19 +420,23 @@ describe('run-api-integration.mjs', () => {
     expect(readMarker(pnpmMarker)).toBe('');
   });
 
-  test('explicitly refuses the loopback-only repair suite on a remote target', () => {
-    const result = run(
-      [
-        '--jest',
-        'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts',
-      ],
-      dedicatedDatabase,
-    );
+  test.each([
+    'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts',
+    './apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts',
+    resolve(
+      REPO_ROOT,
+      'apps/api/src/db/curriculum-dedup-index-repair.integration.test.ts',
+    ),
+  ])(
+    'explicitly refuses the loopback-only repair suite on a remote target: %s',
+    (suitePath) => {
+      const result = run(['--jest', suitePath], dedicatedDatabase);
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/repair suite.*loopback-only/i);
-    expect(readPnpmCommands(pnpmLaunchMarker)).not.toContain('exec jest');
-  });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/repair suite.*loopback-only/i);
+      expect(readPnpmCommands(pnpmLaunchMarker)).not.toContain('exec jest');
+    },
+  );
 
   test('remote config preserves base exclusions and separates the loopback suite', () => {
     const baseConfig = require('../apps/api/jest.integration.config.cjs') as {
