@@ -34,6 +34,11 @@ export const REVISION_PINNED_SOURCE_PATHS = Object.freeze([
 const MARKER_SCHEMA = 'zdx_integration_bootstrap';
 const MARKER_TABLE = `${MARKER_SCHEMA}.schema_state`;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/i;
+const REQUIRED_POST_PUSH_INDEX_NAMES = Object.freeze([
+  'curriculum_topics_book_title_lower_uq',
+  'subjects_profile_name_lower_active_uq',
+  'curriculum_books_subject_title_lower_uq',
+]);
 
 function refuse(reason) {
   refuseDisposableIntegrationTarget(reason);
@@ -176,6 +181,10 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
             ...deps.env,
             INTEGRATION_SCHEMA_BOOTSTRAP: WORK_ITEM,
           },
+        });
+        await deps.store.applyDirectSchema({
+          statements: revisionSql.postPushStatements,
+          chainFingerprint: revisionSql.fingerprint,
         });
       } catch {
         try {
@@ -535,6 +544,11 @@ export function loadRevisionSql() {
     .flatMap((migration) => migration.sql)
     .map((statement) => statement.trim())
     .filter(Boolean);
+  const postPushStatements = statements.filter((statement) =>
+    REQUIRED_POST_PUSH_INDEX_NAMES.some((indexName) =>
+      statement.includes(indexName),
+    ),
+  );
   const fingerprint = createHash('sha256')
     .update(
       JSON.stringify(
@@ -542,7 +556,7 @@ export function loadRevisionSql() {
       ),
     )
     .digest('hex');
-  return { statements, fingerprint };
+  return { statements, postPushStatements, fingerprint };
 }
 
 function defaultDependencies(env, target) {
