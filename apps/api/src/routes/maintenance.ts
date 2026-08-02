@@ -110,10 +110,12 @@ async function sendMaintenanceBackfillOrError(
 ): Promise<Response> {
   try {
     // orphan-allow: generic relay — callers pass string-literal event names
-    // (admin/memory-facts-backfill.requested, admin/progress-self-reports-backfill.requested),
-    // both of which have registered handlers (memory-facts-backfill.ts:45,
-    // weekly-self-reports.ts:362). The `name: eventName` indirection is a shared
-    // helper, not an orphan; the literal names are caught by the harvest above.
+    // (admin/memory-facts-backfill.requested, admin/progress-self-reports-backfill.requested,
+    // admin/persisted-learning-text-remediation.requested), all of which have
+    // registered handlers (memory-facts-backfill.ts:45, weekly-self-reports.ts:362,
+    // persisted-learning-text-remediation.ts). The `name: eventName` indirection
+    // is a shared helper, not an orphan; the literal names are caught by the
+    // harvest above.
     // core-send: maintenance backfill endpoints must report real dispatch status.
     await inngest.send({
       name: eventName,
@@ -217,5 +219,24 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       c,
       'maintenance.progress-self-reports-backfill',
       'admin/progress-self-reports-backfill.requested',
+    );
+  })
+  .post('/maintenance/persisted-learning-text-remediation', async (c) => {
+    const environmentRefusal = refuseBackfillByEnvironment(c);
+    if (environmentRefusal) return environmentRefusal;
+
+    if (!(await verifyMaintenanceSecret(c))) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Maintenance secret required',
+      );
+    }
+
+    return sendMaintenanceBackfillOrError(
+      c,
+      'maintenance.persisted-learning-text-remediation',
+      'admin/persisted-learning-text-remediation.requested',
     );
   });
