@@ -348,18 +348,20 @@ export function signalIsObservation(signal: MentorNoticePolicySignal): boolean {
  * Suppressed when any of:
  *   - not hydrated: nothing may render off a projection before the stored
  *     observation is back (the cold-offline-launch case WI-2504 established);
+ *   - [WI-2627] no read has SUCCEEDED this session, WHATEVER the payload
+ *     carries — the state it would be judged against was assembled blind, so it
+ *     cannot stand in for the disable floor the device could not read, and an
+ *     observation of its own does not repair that (it is precisely what a
+ *     pre-rollback reply carries);
  *   - the payload's own observation is malformed;
- *   - [WI-2911] the payload carries NO observation and no read has SUCCEEDED
- *     this session — the state such a payload would be judged against was
- *     assembled blind, so it cannot stand in for the disable floor it could not
- *     read;
  *   - the payload carries NO observation and this device HAS been told the
  *     rollout is off — the cached-resurrection case this store exists for;
  *   - the payload carries an observation, and policy is off at the revision we
  *     hold, or that observation is STRICTLY OLDER than the revision we hold.
  *
- * NOT suppressed when the payload carries no observation and this device has
- * never been told anything: the server's predicate V is the control and has
+ * NOT suppressed when a read has succeeded, the payload carries no observation,
+ * and this device has never been told anything: the server's predicate V is the
+ * control and has
  * already stripped notice data if the flag is off, so a pre-field worker's
  * response (or a legitimately cached projection on a device that has only ever
  * been offline) must keep rendering. Treating that as a disable would blank
@@ -374,25 +376,38 @@ export function noticesSuppressedForPayload(
   observation: MentorNoticePolicyObservation | undefined | unknown,
 ): boolean {
   if (!knowledge.hydrated) return true;
+  // [WI-2627 rework] THE UNTRUSTED-READ GATE. Unconditional, and ABOVE the
+  // signal split — the placement is the fix.
+  //
+  // It sat inside the `absent` branch (added by WI-2911), on the argument that
+  // an unreadable device "is already fail-closed by every other path in this
+  // module". That argument was wrong, and this is the path that disproves it: a
+  // payload carrying a well-formed observation skipped the gate entirely and
+  // was judged against state assembled blind. The sequence is the rollback this
+  // store exists to survive — storage unreadable, so the bootstrap fold holds
+  // revision 0; a pre-rollback reply arrives carrying its own still-valid
+  // revision-3-enabled observation; the fold adopts it; the checks below then
+  // see enabled state and a non-older revision, and let its notice cards paint.
+  // The durable revision-8 disable is on disk the whole time and unreadable.
+  //
+  // The device cannot distinguish that stale reply from a live one, because
+  // distinguishing them is exactly what the floor it cannot read is for. So no
+  // observation is trustworthy while the read is untrusted, whatever its shape
+  // or revision — which is why this cannot be a per-signal check.
+  //
+  // Scope is narrow by construction, and this does NOT blank notices
+  // fleet-wide. It is gated on a read that FAILED, not on an observation being
+  // absent: a response from a worker predating the field carries no
+  // observation, and gating on that would suppress on every such response. An
+  // unbound pair passes `trusted: true` (no key, no read, nothing to fail), so
+  // signed-out and profile-less devices are untouched. The cost is bounded to
+  // devices whose AsyncStorage threw: they show no notices for the rest of the
+  // session and recover on the next successful read at restart. That is the
+  // trade fail-closed names.
+  if (!knowledge.trusted) return true;
   const signal = observationSignal(observation);
   if (signal === 'malformed') return true;
   if (signal === 'absent') {
-    // [WI-2911] THE IN-SESSION FLOOR. A payload with no observation is judged
-    // purely on stored policy state — so while no read has succeeded there is
-    // nothing legitimate to judge it on. Both readings of the bootstrap fail
-    // here: `observed` is true (the failed read folded 'malformed'), so this
-    // would suppress correctly for exactly as long as `state.enabled` stays
-    // false — and one stale observation above revision 0 flips it, because 0 is
-    // what a failed read leaves us holding. That is the resurrection, and it
-    // does not need a malicious payload: any pre-rollback reply in flight or in
-    // cache carries it.
-    //
-    // This is NOT gated on "an observation has arrived". A response from a
-    // worker predating the field carries none, and gating on presence would
-    // blank notices on every such response fleet-wide. It is gated on the read,
-    // so it fires only on a device whose storage is unreadable — a population
-    // that is already fail-closed by every other path in this module.
-    if (!knowledge.trusted) return true;
     return knowledge.observed ? !knowledge.state.enabled : false;
   }
   if (!knowledge.state.enabled) return true;
