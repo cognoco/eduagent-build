@@ -851,8 +851,12 @@ is self-only; there is no per-row visibility flag.
 
 #### Now feed
 The deterministic **ranked feed** on the V2 Mentor tab: `GET /now` returns at
-most one anchor + ≤2 modules (≤3 cards), each a tappable next action, plus
-moment cards. No LLM in the ranking. Card kinds are a closed enum
+most **three cards total** (one anchor + up to two modules), each a tappable
+next action. ⚠ Moment cards (`ledger_moment`) are ranked *within* that
+three-card budget — they share and displace slots, they are never additional
+(`nowResponseSchema` caps `cards` at 3; `buildNowFeed` slices all ranked
+candidates, moments included, to three). No LLM in the ranking. Card kinds are
+a closed enum
 (`billing_alert`, `unfinished_session`, `mentor_notice`, `retention_due`,
 `parked_item`, `needs_deepening`, `challenge_ready`, `ledger_moment`,
 `support_hub_pointer`); reads are scoped `self | supporter-hub | person`.
