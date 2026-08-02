@@ -1,6 +1,6 @@
 # WI-2534 verification evidence
 
-Status: pre-PR verification complete. The implementation is reconciled with `origin/main` at `98f0f1d4396f7a7d3afb8bcb7105ba620ea79bc4`; landing evidence is recorded by the Cosmo execution artifacts after the PR merges.
+Status: pre-PR verification complete. The implementation is reconciled with `origin/main` at `9a2c4ee193f86d47da615f8aca5b31b0264bf828`; landing evidence is recorded by the Cosmo execution artifacts after the PR merges.
 
 ## Fresh-database proof
 
@@ -23,6 +23,7 @@ Status: pre-PR verification complete. The implementation is reconciled with `ori
 | Full mobile unit project | `pnpm test:mobile:unit` | passed, exit 0 in 952.1 seconds |
 | Full database unit project | `pnpm exec nx run @eduagent/database:test` against the isolated database | 35 suites / 329 tests passed |
 | Migration integrity | migration immutability and enum-idempotency guards | passed |
+| Migration rollback | applied the SQL in `0167_wi2534_resumable_family_join.rollback.md` to a cloned disposable database | journey table removed; legacy invite-status and audit-event constraints restored |
 | Internationalization | orphan-key, staleness, hardcoded-JSX, and clinical-copy ratchets | passed after positive-framing correction |
 | Static checks | full TypeScript build, prompt-marker guard, no-Gemini ratchet, and test-only-export ratchet | passed with pre-existing warnings only |
 | Uncommitted-delta change-class gate | `scripts/check-change-class.sh --run --fast` via Git-for-Windows Bash | 5 checks passed, 0 failed, 1 intentionally slow check skipped |

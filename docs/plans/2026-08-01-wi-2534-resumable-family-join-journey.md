@@ -15,6 +15,8 @@ status: completed
 
 ## Settled implementation decisions
 
+These decisions implement [MMT-ADR-0010](../adr/MMT-ADR-0010-family-join-consolidation-primitive.md) under its 2026-08-01 provisional-approval rider; OPQ-160 tracks final ratification without blocking delivery.
+
 - An invite code is a continuation locator, never consent or guardian authority. The authenticated learner's verified login email must match the invited email before the invite can bind to that Person.
 - The invitation email carries the opaque code for manual entry. This repository has no universal/app-link contract, so this item does not invent an unserved URL.
 - `family_join_journey` is the durable workflow owner. It records the bound charge, latest policy posture, supportership decision authority, and terminal state without overloading consent grants or visibility edges as workflow records.
