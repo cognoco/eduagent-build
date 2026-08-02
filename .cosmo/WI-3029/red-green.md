@@ -295,3 +295,69 @@ non-null-assertion warnings only). `pnpm run test:scripts`: 73 suites passed
 (1 skipped), 1222 passed (4 skipped), 1226 total. No `--live`, no provider
 bootstrap, no paid/live call, no deploy, no GitHub thread reply, no merge,
 no Cosmo mutation at any point in this round.
+
+## Mutation-hardening round (fresh exact-head adversarial review, 1 remaining SHOULD)
+
+The prior round's SHOULD-2 test proved the `--list` block's filter
+DEFINITIONS exist (that `scopedFlows`/`scopedProfiles` are built via a
+proper `flowFilter`/`profileFilter` check), but only checked for the
+`scenarioFilter: options.scenarioFilter` substring ANYWHERE in the block —
+not that each derive CALL SITE actually consumes the scoped variables and
+threads the filter. Independently reproduced the surviving mutation: with
+`index.ts`'s `providerDemand` call reverted to raw `FLOWS`, `PROFILES`
+(`budget`'s call left correctly scoped, so `scopedFlows`/`scopedProfiles`
+stay referenced and `tsc`'s unused-local check cannot fire), the existing
+SHOULD-2 test, `nx run api:typecheck --skip-nx-cache`, and `eslint` on
+`index.ts` all stayed clean — confirming the finding. A prior, cruder
+attempt (reverting BOTH derive calls, leaving `scopedFlows`/`scopedProfiles`
+wholly unused) was tried first and DOES fail `tsc` (`TS6133: declared but
+its value is never read`); the true survivor is the partial, single-call
+revert described above, which keeps both variables referenced.
+
+Fix: added call-site-anchored assertions to the SHOULD-2 test. The test now
+slices the `listOnly` block down to each derive call's own text (from
+`deriveEnvelopeBudgetFromMatrix(` / `deriveEnvelopeProviderDemandFromMatrix(`
+to that call's own closing `);`) and asserts, independently per call, that
+its first two arguments are literally `scopedFlows, scopedProfiles,` and
+that its options object contains `scenarioFilter: options.scenarioFilter`.
+The original block-wide filter-definition checks were kept alongside (they
+still prove the scoped variables are built correctly; the new checks prove
+both call sites actually use them).
+
+RED/GREEN/mutation-and-revert proof, all via paired `Edit`/`Edit` on
+`index.ts` (never Bash), `git diff --stat` confirming a byte-identical
+revert before every subsequent step, no live/paid provider call at any
+point:
+
+- **Partial revert, `providerDemand` call only** (the confirmed real
+  survivor): RED against the strengthened test — failed on the new
+  `demandCall` argument-anchor assertion, received text showing
+  `FLOWS,\n  PROFILES,` instead of `scopedFlows,\n  scopedProfiles,`.
+  Reverted; GREEN restored.
+- **Partial revert, `budget` call only** (the symmetric case): RED against
+  the strengthened test — failed on the new `budgetCall` argument-anchor
+  assertion. Reverted; GREEN restored.
+- **`scenarioFilter` dropped from the `budget` call only** (third-party
+  option object shrunk to just `baseline?.flows` positional arg, no options
+  object at all): RED against the strengthened test — failed on the
+  `budgetCall` scenarioFilter assertion. Reverted; GREEN restored.
+
+All three mutations independently fail the strengthened test; all three
+pass cleanly once reverted. `git diff --stat apps/api/eval-llm/index.ts`
+confirmed empty (byte-identical to the committed state) before moving on to
+full-suite verification.
+
+Full verification after landing the strengthened test (no production code
+changed in this round — only the test file):
+
+```text
+scripts/eval-live-gate-independence.test.ts: 15 passed, 15 total
+pnpm run test:scripts: 73 suites passed (1 skipped), 1222 passed (4 skipped), 1226 total
+apps/api/eval-llm/ (all): 27 suites, 322 passed, 9 skipped, 331 total
+```
+
+`nx run api:typecheck --skip-nx-cache` exit 0. `eslint` on `index.ts` and
+`scripts/eval-live-gate-independence.test.ts`: 0 errors (1 pre-existing
+non-null-assertion warning in `index.ts`, unrelated to this change). No
+`--live`, no provider bootstrap, no paid/live call, no deploy, no GitHub
+thread reply, no merge, no Cosmo mutation at any point in this round.

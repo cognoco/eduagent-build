@@ -272,7 +272,44 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     expect(listOnlyBlock).toMatch(
       /PROFILES\.filter\(\s*\(profile\)\s*=>\s*!options\.profileFilter \|\| options\.profileFilter\.has\(profile\.id\)/,
     );
-    expect(listOnlyBlock).toMatch(/scenarioFilter:\s*options\.scenarioFilter/);
+
+    // [WI-3029 adversarial follow-up] The two block-wide checks above only
+    // prove scopedFlows/scopedProfiles are DEFINED via a proper filter
+    // somewhere in the block — they say nothing about which arguments the
+    // two derive CALLS actually pass. A mutation that reverts only ONE call
+    // (e.g. deriveEnvelopeProviderDemandFromMatrix back to raw FLOWS,
+    // PROFILES) while leaving the other call's use of scopedFlows/
+    // scopedProfiles intact keeps every block-wide substring check above
+    // (and the old single scenarioFilter-anywhere-in-block check) green,
+    // and keeps scopedFlows/scopedProfiles referenced so tsc's unused-local
+    // check can't catch it either — it only breaks the numeric report,
+    // which the test's earlier assertions never actually derive from this
+    // source text. Anchor each call SITE individually instead.
+    const budgetCallStart = listOnlyBlock.indexOf(
+      'deriveEnvelopeBudgetFromMatrix(',
+    );
+    expect(budgetCallStart).toBeGreaterThanOrEqual(0);
+    const budgetCall = listOnlyBlock.slice(
+      budgetCallStart,
+      listOnlyBlock.indexOf(');', budgetCallStart),
+    );
+    const demandCallStart = listOnlyBlock.indexOf(
+      'deriveEnvelopeProviderDemandFromMatrix(',
+    );
+    expect(demandCallStart).toBeGreaterThanOrEqual(0);
+    const demandCall = listOnlyBlock.slice(
+      demandCallStart,
+      listOnlyBlock.indexOf(');', demandCallStart),
+    );
+
+    expect(budgetCall).toMatch(
+      /^deriveEnvelopeBudgetFromMatrix\(\s*scopedFlows,\s*scopedProfiles,/,
+    );
+    expect(budgetCall).toMatch(/scenarioFilter:\s*options\.scenarioFilter/);
+    expect(demandCall).toMatch(
+      /^deriveEnvelopeProviderDemandFromMatrix\(\s*scopedFlows,\s*scopedProfiles,/,
+    );
+    expect(demandCall).toMatch(/scenarioFilter:\s*options\.scenarioFilter/);
 
     // Ground the "over-reports" claim numerically with the SAME derive
     // functions the CLI uses, scoped exactly as
