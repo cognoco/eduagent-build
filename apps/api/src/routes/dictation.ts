@@ -22,6 +22,7 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { apiError, validationError } from '../errors';
 import {
@@ -371,6 +372,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // -------------------------------------------------------------------------
   .get('/dictation/streak', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const db = c.get('db');
 
     const result = await getDictationStreak(db, profileId);
@@ -385,6 +390,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // -------------------------------------------------------------------------
   .get('/dictation/history', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const db = c.get('db');
 
     const entries = await getDictationHistory(db, profileId);
