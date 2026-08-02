@@ -448,6 +448,8 @@ jest.mock('../services/identity-v2/consent-status-v2', () => ({
 }));
 
 import { app } from '../index';
+import { getPersonScope } from '../services/identity-v2/profile-v2';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { bookRoutes } from './books';
 import {
   getBooks,
@@ -740,6 +742,65 @@ describe('book routes', () => {
 
       expect(res.status).toBe(400);
     });
+  });
+
+  // ---- [WI-2876] read-authority guard (G13) ----
+  // The header-resolved profileId is only org-checked (getPersonScope); these
+  // cases prove a credentialed caller spoofing another profile via
+  // X-Profile-Id is rejected (403) by assertCanReadProfile BEFORE the book
+  // read runs. GET .../sessions has no service mock in this file (its
+  // getBookSessions is real), so its case asserts the 403 boundary only.
+
+  describe('[WI-2876] read-authority guard', () => {
+    const VICTIM_PROFILE_ID = 'victim-profile-id';
+
+    it.each([
+      ['/v1/library/books', () => mockGetAllProfileBooks],
+      [`/v1/subjects/${SUBJECT_ID}/books`, () => mockGetBooks],
+      [
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+        () => mockGetBookWithTopics,
+      ],
+      [`/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/sessions`, null],
+    ] as const)(
+      '%s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+      async (path, getServiceMock) => {
+        // Header selects another org member's profile...
+        jest.mocked(getPersonScope).mockResolvedValueOnce({
+          profileId: VICTIM_PROFILE_ID,
+          meta: {
+            birthYear: 2014,
+            location: null,
+            consentStatus: null,
+            hasPremiumLlm: false,
+            conversationLanguage: 'en',
+            isOwner: true,
+          },
+        } as Awaited<ReturnType<typeof getPersonScope>>);
+        // ...and the caller (seeded person 'test-profile-id') holds no
+        // self/guardianship authority over it — the real
+        // verifyPersonOwnershipV2 would throw against a real membership
+        // table (covered by wi2416-read-idor.integration.test.ts).
+        jest
+          .mocked(verifyPersonOwnershipV2)
+          .mockRejectedValueOnce(
+            new Error('caller cannot read selected profile'),
+          );
+
+        const res = await app.request(
+          path,
+          { headers: makeAuthHeaders({ 'X-Profile-Id': VICTIM_PROFILE_ID }) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code: string };
+        expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+        if (getServiceMock) {
+          expect(getServiceMock()).not.toHaveBeenCalled();
+        }
+      },
+    );
   });
 
   // ---- DELETE /v1/subjects/:subjectId/books/:bookId ----

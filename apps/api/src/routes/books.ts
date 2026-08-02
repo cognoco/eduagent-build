@@ -20,6 +20,7 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { notFound, NotFoundError, apiError } from '../errors';
 import {
   getBooks,
@@ -53,6 +54,10 @@ type BooksRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    // [WI-2876] Set server-side by accountMiddleware — required by
+    // assertCanReadProfile.
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -76,6 +81,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2876] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { limit, cursor } = c.req.valid('query');
       const result = await getAllProfileBooks(db, profileId, { limit, cursor });
       return c.json(getAllProfileBooksResponseSchema.parse(result));
@@ -87,6 +95,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2876] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('param');
 
       try {
@@ -106,6 +117,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2876] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId, bookId } = c.req.valid('param');
 
       try {
@@ -378,6 +392,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2876] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { bookId } = c.req.valid('param');
 
       const sessions = await getBookSessions(db, profileId, bookId);

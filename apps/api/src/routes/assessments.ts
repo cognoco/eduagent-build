@@ -18,6 +18,7 @@ import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
+import { assertCanReadProfile } from '../services/family-access';
 import {
   createAssessmentIfNoneActive,
   getAssessment,
@@ -44,6 +45,8 @@ const quickCheckSessionParamSchema = z.object({
 // readers of unmetered route handlers.
 type AssessmentRouteEnv = RouteEnv & {
   Variables: RouteEnv['Variables'] & {
+    // [WI-2876] Required by assertCanReadProfile.
+    account: { id: string } | undefined;
     subscriptionId: string | undefined;
     quotaDecrementSource: 'monthly' | 'top_up' | undefined;
     quotaDecrementTopUpCreditId: string | undefined;
@@ -89,6 +92,9 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
 
   .get('/subjects/:subjectId/topics/:topicId/assessments/active', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2876] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -220,6 +226,10 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Get assessment state
   .get('/assessments/:assessmentId', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2876] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge)
+    // before returning the exchangeHistory transcript.
+    await assertCanReadProfile(c, profileId);
     const assessmentId = c.req.param('assessmentId');
 
     const assessment = await getAssessment(db, profileId, assessmentId);

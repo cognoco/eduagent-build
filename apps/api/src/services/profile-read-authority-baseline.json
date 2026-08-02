@@ -1,15 +1,5 @@
 [
   {
-    "file": "apps/api/src/routes/assessments.ts",
-    "method": "get",
-    "route": "/assessments/:assessmentId"
-  },
-  {
-    "file": "apps/api/src/routes/assessments.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/topics/:topicId/assessments/active"
-  },
-  {
     "file": "apps/api/src/routes/billing.ts",
     "method": "get",
     "route": "/subscription"
@@ -23,46 +13,6 @@
     "file": "apps/api/src/routes/billing.ts",
     "method": "get",
     "route": "/usage"
-  },
-  {
-    "file": "apps/api/src/routes/book-suggestions.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/book-suggestions"
-  },
-  {
-    "file": "apps/api/src/routes/book-suggestions.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/book-suggestions/all"
-  },
-  {
-    "file": "apps/api/src/routes/bookmarks.ts",
-    "method": "get",
-    "route": "/bookmarks"
-  },
-  {
-    "file": "apps/api/src/routes/bookmarks.ts",
-    "method": "get",
-    "route": "/bookmarks/session"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/library/books"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books/:bookId"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books/:bookId/sessions"
   },
   {
     "file": "apps/api/src/routes/celebrations.ts",

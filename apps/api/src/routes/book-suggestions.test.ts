@@ -176,7 +176,12 @@ jest.mock('../services/sentry', () => {
 import { Hono } from 'hono';
 import { app } from '../index';
 import { bookSuggestionRoutes } from './book-suggestions';
-import { getUnpickedBookSuggestionsWithTopup } from '../services/suggestions';
+import {
+  getUnpickedBookSuggestionsWithTopup,
+  getUnpickedBookSuggestionsEnvelope,
+  getAllBookSuggestions,
+} from '../services/suggestions';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { ConsentWithdrawnError } from '../services/session';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
@@ -328,6 +333,60 @@ describe('book-suggestions routes', () => {
       );
       expect(res.status).toBe(400);
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2876] read-authority guard (G11). The header-resolved profileId is
+  // only org-checked (getPersonScope); these cases prove a credentialed
+  // caller spoofing another profile via X-Profile-Id is rejected (403) by
+  // assertCanReadProfile BEFORE the suggestions read runs.
+  // -------------------------------------------------------------------------
+
+  describe('[WI-2876] read-authority guard', () => {
+    const VICTIM_PROFILE_ID = 'victim-profile-id';
+
+    it.each([
+      [
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions',
+        () => jest.mocked(getUnpickedBookSuggestionsEnvelope),
+      ],
+      [
+        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/all',
+        () => jest.mocked(getAllBookSuggestions),
+      ],
+    ] as const)(
+      '%s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+      async (path, getServiceMock) => {
+        const serviceMock = getServiceMock();
+        // This file has no global clearAllMocks — clear the service mock's
+        // call log so the not-called assertion below is about THIS request.
+        serviceMock.mockClear();
+        // Header selects another org member's profile...
+        mockGetPersonScope.mockResolvedValueOnce(
+          personScope({ profileId: VICTIM_PROFILE_ID }),
+        );
+        // ...and the caller (seeded person 'test-profile-id') holds no
+        // self/guardianship authority over it — the real
+        // verifyPersonOwnershipV2 would throw against a real membership
+        // table (covered by wi2416-read-idor.integration.test.ts).
+        jest
+          .mocked(verifyPersonOwnershipV2)
+          .mockRejectedValueOnce(
+            new Error('caller cannot read selected profile'),
+          );
+
+        const res = await app.request(
+          path,
+          { headers: makeAuthHeaders({ 'X-Profile-Id': VICTIM_PROFILE_ID }) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code: string };
+        expect(body.code).toBe('FORBIDDEN');
+        expect(serviceMock).not.toHaveBeenCalled();
+      },
+    );
   });
 
   // -------------------------------------------------------------------------

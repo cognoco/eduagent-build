@@ -145,8 +145,11 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
 }));
 
 import { app } from '../index';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { TEST_SESSION_ID } from '@eduagent/test-utils';
+
+const mockVerifyPersonOwnershipV2 = jest.mocked(verifyPersonOwnershipV2);
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -510,6 +513,50 @@ describe('bookmark routes', () => {
       );
       expect(res.status).toBe(401);
     });
+  });
+
+  // ---- [WI-2876] read-authority guard (G12) --------------------------------
+  // The header-resolved profileId is only org-checked (getPersonScope); these
+  // cases prove a credentialed caller spoofing another profile via
+  // X-Profile-Id is rejected (403) by assertCanReadProfile BEFORE the
+  // bookmark read runs.
+
+  describe('[WI-2876] read-authority guard', () => {
+    const VICTIM_PROFILE_ID = 'victim-profile-id';
+
+    it.each([
+      ['/v1/bookmarks', () => mockListBookmarks],
+      [
+        `/v1/bookmarks/session?sessionId=${SESSION_ID}`,
+        () => mockListSessionBookmarks,
+      ],
+    ] as const)(
+      '%s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+      async (path, getServiceMock) => {
+        // Header selects another org member's profile...
+        mockGetPersonScope.mockResolvedValueOnce(
+          personScope({ profileId: VICTIM_PROFILE_ID }),
+        );
+        // ...and the caller (seeded person 'test-profile-id') holds no
+        // self/guardianship authority over it — the real
+        // verifyPersonOwnershipV2 would throw against a real membership
+        // table (covered by wi2416-read-idor.integration.test.ts).
+        mockVerifyPersonOwnershipV2.mockRejectedValueOnce(
+          new Error('caller cannot read selected profile'),
+        );
+
+        const res = await app.request(
+          path,
+          { headers: makeAuthHeaders({ 'X-Profile-Id': VICTIM_PROFILE_ID }) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = await res.json();
+        expect(body.code).toBe('FORBIDDEN');
+        expect(getServiceMock()).not.toHaveBeenCalled();
+      },
+    );
   });
 
   // ---- DELETE /v1/bookmarks/:id --------------------------------------------

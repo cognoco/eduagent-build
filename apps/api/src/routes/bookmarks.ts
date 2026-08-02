@@ -12,6 +12,7 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import {
   createBookmark,
   deleteBookmark,
@@ -28,6 +29,10 @@ type BookmarkRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    // [WI-2876] Set server-side by accountMiddleware — required by
+    // assertCanReadProfile.
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -58,9 +63,13 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     '/bookmarks/session',
     zValidator('query', sessionBookmarksQuerySchema),
     async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2876] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const bookmarks = await listSessionBookmarks(
         c.get('db'),
-        requireProfileId(c.get('profileId')),
+        profileId,
         c.req.valid('query').sessionId,
       );
 
@@ -71,12 +80,17 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     '/bookmarks',
     zValidator('query', bookmarkListQuerySchema),
     async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2876] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { cursor, limit, subjectId, topicId } = c.req.valid('query');
-      const result = await listBookmarks(
-        c.get('db'),
-        requireProfileId(c.get('profileId')),
-        { cursor, limit, subjectId, topicId },
-      );
+      const result = await listBookmarks(c.get('db'), profileId, {
+        cursor,
+        limit,
+        subjectId,
+        topicId,
+      });
 
       return c.json(bookmarkListResponseSchema.parse(result));
     },
