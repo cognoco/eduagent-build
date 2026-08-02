@@ -18,6 +18,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const repoRoot = join(__dirname, '..');
+const BASH =
+  process.platform === 'win32'
+    ? 'C:\\Program Files\\Git\\bin\\bash.exe'
+    : 'bash';
 const yaml = readFileSync(
   join(repoRoot, '.github/workflows/deploy.yml'),
   'utf8',
@@ -224,7 +228,7 @@ function runGuard(
   env: Record<string, string>,
 ): { code: number; output: string } {
   try {
-    const stdout = execFileSync('bash', ['-c', script], {
+    const stdout = execFileSync(BASH, ['-c', script], {
       env: { ...process.env, ...env },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
