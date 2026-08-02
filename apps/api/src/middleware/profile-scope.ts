@@ -67,6 +67,18 @@ export type ProfileScopeEnv = {
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
     /**
+     * [WI-2876] Server-only proof that this middleware resolved caller
+     * authority (self or managed charge, via getPersonScope →
+     * resolvePersonOperationAuthorityV2 [WI-2128]), bound to the exact
+     * profileId it verified — never a bare boolean, so a downstream
+     * profileId rewrite can never reuse a stale proof. Never
+     * request-derived. assertCanReadProfile's fast path skips its duplicate
+     * ownership queries only when this equals the target profileId; routes
+     * reached without this middleware fall back to the full fail-closed
+     * check.
+     */
+    profileAuthorityVerifiedFor: string | undefined;
+    /**
      * [BUG-502 / BUG-487] Set when the auto-resolve path throws a transient
      * error (DB outage). Downstream middleware (consent.ts) reads this sentinel
      * to fail closed rather than treating the absent profileId as an
@@ -144,6 +156,9 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               ...callerScope.meta,
               resolvedVia: 'auto',
             });
+            // [WI-2876] Central authority proven, bound to the exact
+            // verified profile (self by construction on the auto path).
+            c.set('profileAuthorityVerifiedFor', callerScope.profileId);
           } else {
             // [WI-2128] An authenticated account with a login-bound caller but
             // no operable caller scope is an identity-graph mismatch. Do not
@@ -239,6 +254,10 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     // [Issue 901] Explicitly selected + verified profile — eligible for the
     // owner-only gates if it is in fact the owner.
     c.set('profileMeta', { ...scope.meta, resolvedVia: 'explicit-header' });
+    // [WI-2876] Central authority proven, bound to the exact verified
+    // profile (self or managed charge, enforced inside getPersonScope since
+    // WI-2128).
+    c.set('profileAuthorityVerifiedFor', scope.profileId);
     await next();
     return;
   },

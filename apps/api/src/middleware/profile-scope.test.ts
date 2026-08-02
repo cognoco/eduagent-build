@@ -70,7 +70,15 @@ describe('profileScopeMiddleware', () => {
     app.get('/test', (c) => {
       const profileId = c.get('profileId');
       const profileMeta = c.get('profileMeta') ?? null;
-      return c.json({ profileId: profileId ?? null, profileMeta });
+      // [WI-2876] Server-only central-authority proof (bound to the exact
+      // verified profile id) read by assertCanReadProfile's fast path.
+      const profileAuthorityVerifiedFor =
+        c.get('profileAuthorityVerifiedFor') ?? null;
+      return c.json({
+        profileId: profileId ?? null,
+        profileMeta,
+        profileAuthorityVerifiedFor,
+      });
     });
     return app;
   }
@@ -235,6 +243,46 @@ describe('profileScopeMiddleware', () => {
       'test-account-id',
       'valid-profile-id',
     );
+  });
+
+  // [WI-2876] The server-only central-authority proof consumed by
+  // assertCanReadProfile's fast path: stamped ONLY after getPersonScope
+  // successfully resolved authority, and bound to the exact verified
+  // profile id so a downstream profileId rewrite can never reuse it.
+  describe('[WI-2876] profileAuthorityVerifiedFor proof', () => {
+    it('stamps the verified profile id after a verified explicit X-Profile-Id resolution', async () => {
+      const app = createApp();
+      const res = await app.request('/test', {
+        headers: { 'X-Profile-Id': 'valid-profile-id' },
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.profileId).toBe('valid-profile-id');
+      expect(body.profileAuthorityVerifiedFor).toBe('valid-profile-id');
+    });
+
+    it('stamps the verified profile id after a verified auto-resolution of the caller Person', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.profileId).toBe('valid-profile-id');
+      expect(body.profileAuthorityVerifiedFor).toBe('valid-profile-id');
+    });
+
+    it('leaves the proof unset when the middleware skips resolution (no caller context)', async () => {
+      // No callerPersonId → the headerless branch skips getPersonScope
+      // entirely; no profile is installed and no proof may be stamped.
+      const app = createApp('');
+      const res = await app.request('/test');
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.profileId).toBeNull();
+      expect(body.profileAuthorityVerifiedFor).toBeNull();
+    });
   });
 
   it('returns 403 with proper error body when profile does not belong to account', async () => {

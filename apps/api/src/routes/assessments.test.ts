@@ -129,6 +129,7 @@ import {
 import { getSession, ConsentWithdrawnError } from '../services/session';
 import { refundQuotaOrEscalate } from '../services/billing';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
@@ -160,7 +161,11 @@ type TestEnv = {
   };
 };
 
-function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
+function makeApp(opts?: {
+  isOwner?: boolean;
+  profileId?: string;
+  callerPersonId?: string;
+}) {
   const app = new Hono<TestEnv>();
   const profileId = opts?.profileId ?? PROFILE_ID;
   const isOwner = opts?.isOwner ?? true;
@@ -172,9 +177,11 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
     // assertCanWriteProfile, which requires account + callerPersonId.
     // callerPersonId equal to profileId mirrors the legitimate
     // owner-acting-as-self flow (verifyPersonOwnershipV2 is mocked to
-    // succeed at file scope regardless of the stub `db`).
+    // succeed at file scope regardless of the stub `db`). [WI-2876] Pass a
+    // different callerPersonId to model a caller spoofing another profile
+    // via X-Profile-Id.
     c.set('account', { id: 'test-account-id' });
-    c.set('callerPersonId', profileId);
+    c.set('callerPersonId', opts?.callerPersonId ?? profileId);
     c.set('profileMeta', {
       birthYear: 2000,
       location: 'EU',
@@ -204,6 +211,11 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
     }
     if (errName === 'NotFoundError') {
       return c.json({ code: 'NOT_FOUND', message: errMessage }, 404);
+    }
+    // [WI-2876] Mirrors index.ts's global ForbiddenError -> 403 mapping
+    // (assertCanReadProfile fails closed with ForbiddenError).
+    if (errName === 'ForbiddenError') {
+      return c.json({ code: ERROR_CODES.FORBIDDEN, message: errMessage }, 403);
     }
     // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
     if (errName === 'ConsentWithdrawnError') {
@@ -296,6 +308,7 @@ const submitAssessmentAnswerMock = jest.mocked(submitAssessmentAnswer);
 const getSessionMock = jest.mocked(getSession);
 const refundQuotaOrEscalateMock = jest.mocked(refundQuotaOrEscalate);
 const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+const verifyPersonOwnershipV2Mock = jest.mocked(verifyPersonOwnershipV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -438,6 +451,50 @@ describe('GET /v1/assessments/:assessmentId', () => {
       ASSESSMENT_ID,
     );
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2876] Read-authority guard (G9/G10). makeApp mounts the routes without
+// profileScopeMiddleware, so no profileAuthorityVerifiedFor proof exists —
+// these cases prove the guard's own fail-closed fallback rejects (403) a
+// caller with no authority over the installed profile BEFORE the assessment
+// read runs.
+// ---------------------------------------------------------------------------
+
+describe('[WI-2876] read-authority guard', () => {
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  it.each([
+    [
+      `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/assessments/active`,
+      getActiveAssessmentForTopicMock,
+    ],
+    [`/v1/assessments/${ASSESSMENT_ID}`, getAssessmentMock],
+  ] as const)(
+    '%s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+    async (path, serviceMock) => {
+      // Caller's server-resolved person differs from the header-selected
+      // profile and holds no guardianship edge — the real
+      // verifyPersonOwnershipV2 would throw against a real membership table
+      // (covered by tests/integration/wi2416-read-idor.integration.test.ts).
+      verifyPersonOwnershipV2Mock.mockRejectedValueOnce(
+        new Error('caller cannot read selected profile'),
+      );
+
+      const res = await makeApp({
+        callerPersonId: ATTACKER_PERSON_ID,
+      }).request(path);
+
+      expect(res.status).toBe(403);
+      expect(verifyPersonOwnershipV2Mock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'test-account-id',
+        ATTACKER_PERSON_ID,
+      );
+      expect(serviceMock).not.toHaveBeenCalled();
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

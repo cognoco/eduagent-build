@@ -448,6 +448,8 @@ jest.mock('../services/identity-v2/consent-status-v2', () => ({
 }));
 
 import { app } from '../index';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { ForbiddenError } from '../errors';
 import { bookRoutes } from './books';
 import {
   getBooks,
@@ -740,6 +742,84 @@ describe('book routes', () => {
 
       expect(res.status).toBe(400);
     });
+  });
+
+  // ---- [WI-2876] read-authority guard (G13) ----
+  // Direct-mount harness WITHOUT profileScopeMiddleware: no
+  // profileAuthorityVerifiedFor proof exists, so these cases exercise the route
+  // guard's own fail-closed fallback (verifyPersonOwnershipV2) — the
+  // defense-in-depth layer for standalone/direct mounting. In the full app
+  // the same spoof is rejected centrally by profileScopeMiddleware (WI-2128)
+  // before any route runs (see profile-scope.test.ts), so a full-app variant
+  // would have to fabricate a central proof that cannot occur.
+  // GET .../sessions has no service mock in this file (its getBookSessions
+  // is real), so its case asserts the 403 boundary only.
+
+  describe('[WI-2876] read-authority guard', () => {
+    const VICTIM_PROFILE_ID = 'victim-profile-id';
+    const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+    function makeUnprovenApp() {
+      const direct = new Hono();
+      direct.use('*', async (c, next) => {
+        c.set('db' as never, {});
+        c.set('profileId' as never, VICTIM_PROFILE_ID);
+        c.set('user' as never, { id: 'test-user' });
+        c.set('account' as never, { id: 'test-account-id' });
+        c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+        // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+        await next();
+      });
+      direct.onError((err, c) => {
+        if (err instanceof ForbiddenError) {
+          return c.json(
+            { code: ERROR_CODES.FORBIDDEN, message: err.message },
+            403,
+          );
+        }
+        return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+      });
+      direct.route('/v1', bookRoutes);
+      return direct;
+    }
+
+    it.each([
+      ['/v1/library/books', () => mockGetAllProfileBooks],
+      [`/v1/subjects/${SUBJECT_ID}/books`, () => mockGetBooks],
+      [
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
+        () => mockGetBookWithTopics,
+      ],
+      [`/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/sessions`, null],
+    ] as const)(
+      '%s rejects a cross-profile read with 403 via the fallback when no central proof exists',
+      async (path, getServiceMock) => {
+        // The caller's person holds no self/guardianship authority over the
+        // installed profile — the real verifyPersonOwnershipV2 would throw
+        // against a real membership table (covered by
+        // wi2416-read-idor.integration.test.ts).
+        jest
+          .mocked(verifyPersonOwnershipV2)
+          .mockRejectedValueOnce(
+            new Error('caller cannot read selected profile'),
+          );
+
+        const res = await makeUnprovenApp().request(path);
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code: string };
+        expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+        expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+          expect.anything(),
+          VICTIM_PROFILE_ID,
+          'test-account-id',
+          ATTACKER_PERSON_ID,
+        );
+        if (getServiceMock) {
+          expect(getServiceMock()).not.toHaveBeenCalled();
+        }
+      },
+    );
   });
 
   // ---- DELETE /v1/subjects/:subjectId/books/:bookId ----

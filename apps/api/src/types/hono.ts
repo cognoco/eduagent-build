@@ -15,6 +15,12 @@ export type AppVariables = {
   profileId: string | undefined;
   profileMeta: ProfileMeta | undefined;
   /**
+   * [WI-2876] Server-only proof stamped by profileScopeMiddleware after it
+   * resolved caller authority, bound to the exact profileId it verified.
+   * Consumed by assertCanReadProfile's fast path; never request-derived.
+   */
+  profileAuthorityVerifiedFor: string | undefined;
+  /**
    * [BUG-502 / BUG-487] Set by profileScopeMiddleware when auto-resolve throws
    * a transient error. Downstream consent middleware reads this to fail closed.
    */

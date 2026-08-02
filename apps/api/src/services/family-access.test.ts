@@ -19,6 +19,7 @@ import type { Database } from '@eduagent/database';
 import {
   hasParentAccess,
   assertParentAccess,
+  assertCanReadProfile,
   assertChargeNotCredentialed,
   assertCanManageOwnConsent,
   assertOwnerAndParentAccess,
@@ -400,5 +401,120 @@ describe('assertOwnerProfile', () => {
     expect(() => assertOwnerProfile(ctx, 'Owner-only surface.')).toThrow(
       'Owner-only surface.',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2876] assertCanReadProfile central-proof fast path
+//
+// Since WI-2128 (021ab325b), profileScopeMiddleware resolves self-or-managed-
+// charge authority centrally before installing profileId, and stamps the
+// server-only `profileAuthorityVerifiedFor` proof BOUND to the exact profile
+// id it verified. The read guard may skip its own duplicate
+// membership/guardianship/login queries ONLY when that proof names exactly
+// the target profile and the target is still the installed profileId; every
+// other shape must still run the fail-closed verifyPersonOwnershipV2
+// fallback.
+// ---------------------------------------------------------------------------
+
+describe('assertCanReadProfile central-proof fast path', () => {
+  const TARGET_ID = 'target-profile-id';
+  const CALLER_ID = 'caller-person-id';
+
+  /** Database stub that fails the test on ANY query — proves no DB work ran. */
+  function dbThatMustNotBeTouched(): Database {
+    const explode = () => {
+      throw new Error('unexpected DB access on the fast path');
+    };
+    return { select: explode, query: {} } as unknown as Database;
+  }
+
+  /** Database stub for the fallback path: membership select returns no rows,
+   * so verifyPersonOwnershipV2 resolves 'not-member' and throws. */
+  function dbDenyingMembership(): { db: Database; selectSpy: jest.Mock } {
+    const limit = jest.fn().mockResolvedValue([]);
+    const where = jest.fn().mockReturnValue({ limit });
+    const from = jest.fn().mockReturnValue({ where });
+    const selectSpy = jest.fn().mockReturnValue({ from });
+    return { db: { select: selectSpy } as unknown as Database, selectSpy };
+  }
+
+  function makeSource(vars: {
+    db: Database;
+    account?: { id: string };
+    callerPersonId?: string;
+    profileId?: string;
+    profileAuthorityVerifiedFor?: string;
+  }): Parameters<typeof assertCanReadProfile>[0] {
+    return {
+      get: (key: string) => vars[key as keyof typeof vars],
+    } as unknown as Parameters<typeof assertCanReadProfile>[0];
+  }
+
+  it('skips the duplicate ownership query when the proof covers exactly the target profile', async () => {
+    const source = makeSource({
+      db: dbThatMustNotBeTouched(),
+      account: { id: 'acct-1' },
+      callerPersonId: CALLER_ID,
+      profileId: TARGET_ID,
+      profileAuthorityVerifiedFor: TARGET_ID,
+    });
+
+    await expect(
+      assertCanReadProfile(source, TARGET_ID),
+    ).resolves.toBeUndefined();
+  });
+
+  it('[BREAK] a proof bound to a DIFFERENT profile still runs the fallback and denies the spoof', async () => {
+    // The stale-proof shape the id-binding exists to kill: the middleware
+    // verified some other profile, then the read targets TARGET_ID.
+    const { db, selectSpy } = dbDenyingMembership();
+    const source = makeSource({
+      db,
+      account: { id: 'acct-1' },
+      callerPersonId: CALLER_ID,
+      profileId: TARGET_ID,
+      profileAuthorityVerifiedFor: 'some-other-verified-profile',
+    });
+
+    await expect(
+      assertCanReadProfile(source, TARGET_ID),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(selectSpy).toHaveBeenCalled();
+  });
+
+  it('[BREAK] a matching proof for a profile that is no longer installed still runs the fallback', async () => {
+    // Second conjunct: even a proof naming the target is not honored when a
+    // downstream rewrite moved profileId elsewhere.
+    const { db, selectSpy } = dbDenyingMembership();
+    const source = makeSource({
+      db,
+      account: { id: 'acct-1' },
+      callerPersonId: CALLER_ID,
+      profileId: 'rewritten-installed-profile',
+      profileAuthorityVerifiedFor: TARGET_ID,
+    });
+
+    await expect(
+      assertCanReadProfile(source, TARGET_ID),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(selectSpy).toHaveBeenCalled();
+  });
+
+  it('[BREAK] missing proof still runs the fallback and denies the spoof', async () => {
+    const { db, selectSpy } = dbDenyingMembership();
+    const source = makeSource({
+      db,
+      account: { id: 'acct-1' },
+      callerPersonId: CALLER_ID,
+      profileId: TARGET_ID,
+      // profileAuthorityVerifiedFor deliberately absent — standalone/direct
+      // mounting without profileScopeMiddleware.
+    });
+
+    await expect(
+      assertCanReadProfile(source, TARGET_ID),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(selectSpy).toHaveBeenCalled();
   });
 });
