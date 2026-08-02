@@ -1,22 +1,22 @@
 {
   "claims": [
     {
-      "acRef": "AC1",
+      "acRef": "AC-1",
       "description": "scripts/ci-concurrency-contract.test.ts reproduces GitHub's one-running/one-pending replacement behavior on a single shared main-ref group: sha-1 running, sha-2 pending, sha-3 displaces sha-2, retained SHAs = ['sha-1','sha-3']. Groups for both the baseline and the current workflow are produced by one shared GitHub-Actions expression evaluator, so the defect is executed rather than asserted in prose.",
       "pointer": ".cosmo/WI-2981/red-green.md"
     },
     {
-      "acRef": "AC2",
+      "acRef": "AC-2",
       "description": "Groups derived from the parsed .github/workflows/ci.yml give each main push its own ci-main-<sha> group and all three SHAs are retained (['sha-1','sha-2','sha-3']); pull-request heads still share one PR group with cancel-in-progress true so only the newest head survives. The retention assertion is mutation-sensitive: reverting github.sha to github.ref drops sha-2 and fails it.",
       "pointer": "scripts/ci-concurrency-contract.test.ts"
     },
     {
-      "acRef": "AC3",
+      "acRef": "AC-3",
       "description": "No deployment authority, permissions, triggers, or merge-gate settings changed — this rework is test-and-evidence only and `git diff origin/main -- .github/workflows/ci.yml` is empty. pnpm check:github-workflow-security passed and the full scripts suite passed (74 suites, 1248 tests).",
       "pointer": ".cosmo/WI-2981/red-green.md"
     },
     {
-      "acRef": "AC4",
+      "acRef": "AC-4",
       "description": "Cancelled zero-job runs 30688886377, 30688890531, and 30688912863 are recorded, and the equivalent concurrency proof shows no intermediate main SHA loses CI coverage: RED under the pre-fix group line (5 failed / 8 passed, named per test), restored workflow GREEN (13/13). GitHub-hosted rapid-merge execution was not reproduced; the deterministic contract stands in for it.",
       "pointer": ".cosmo/WI-2981/red-green.md"
     }
