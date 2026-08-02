@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, win32 } from 'node:path';
@@ -13,6 +14,7 @@ import {
   REVISION_PINNED_SOURCE_PATHS,
   resolveSpawnCommand,
   validateDisposableApiIntegrationTarget,
+  verifyDisposableApiIntegrationSchema,
 } from './bootstrap-api-integration-schema.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -30,6 +32,13 @@ test('revision pinning watches the disposable-target validation library', () => 
       'packages/database/scripts/verify-disposable-integration-target-lib.mjs',
     ),
   );
+  for (const guardedEntryPoint of [
+    'scripts/run-api-integration.mjs',
+    'scripts/verify-api-integration-schema.mjs',
+    'scripts/run-api-integration-schema-bootstrap.mjs',
+  ]) {
+    assert.ok(REVISION_PINNED_SOURCE_PATHS.includes(guardedEntryPoint));
+  }
 });
 
 function validEnv() {
@@ -273,6 +282,162 @@ test('accepts an already-compatible target idempotently without push', async () 
     store.calls.map(([name]) => name),
     ['inspect', 'fingerprint', 'close'],
   );
+});
+
+test('read-only verification accepts only a current trusted marker without mutation', async () => {
+  const store = makeStore({
+    relations: [
+      { schema: 'public', name: 'guardian_authority_redemptions', kind: 'r' },
+    ],
+    marker: {
+      targetId: TARGET_ID,
+      revision: REVISION,
+      chainFingerprint: CHAIN_FINGERPRINT,
+      fingerprint: 'schema-fingerprint-v1',
+      state: 'ready',
+    },
+  });
+  const { deps } = baseDependencies(store);
+
+  const result = await verifyDisposableApiIntegrationSchema(deps);
+
+  assert.equal(result.revision, REVISION);
+  assert.deepEqual(
+    store.calls.map(([name]) => name),
+    ['inspect', 'fingerprint', 'close'],
+  );
+});
+
+test('read-only verification refuses stale and unmarked non-empty schemas without mutation', async () => {
+  for (const state of [
+    {
+      relations: [{ schema: 'public', name: 'organization', kind: 'r' }],
+      marker: {
+        targetId: TARGET_ID,
+        revision: OTHER_REVISION,
+        chainFingerprint: CHAIN_FINGERPRINT,
+        fingerprint: 'schema-fingerprint-v1',
+        state: 'ready',
+      },
+    },
+    {
+      relations: [{ schema: 'public', name: 'organization', kind: 'r' }],
+      marker: null,
+    },
+    {
+      relations: [{ schema: 'public', name: 'organization', kind: 'r' }],
+      marker: {
+        targetId: TARGET_ID,
+        revision: null,
+        chainFingerprint: CHAIN_FINGERPRINT,
+        fingerprint: null,
+        state: 'failed',
+      },
+    },
+  ]) {
+    const store = makeStore(state);
+    const { deps, pushes } = baseDependencies(store);
+
+    await assert.rejects(
+      verifyDisposableApiIntegrationSchema(deps),
+      /refused before Jest.*operator authorization.*--revision.*--operator-ruling.*--receipt/is,
+    );
+
+    assert.equal(pushes.length, 0);
+    assert.deepEqual(
+      store.calls.map(([name]) => name),
+      ['inspect', 'close'],
+    );
+  }
+});
+
+test('public bootstrap command forwards the exact authority contract through Doppler', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wi3041-command-'));
+  const dopplerMarker = join(directory, 'doppler.log');
+  const receipt = '.workitem-artifacts/WI-2939/wi3041-test.json';
+  const ruling = 'operator:BID-48/WI-3041:approved';
+  try {
+    for (const packageSeparator of [[], ['--']]) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(
+            REPO_ROOT,
+            'scripts',
+            'run-api-integration-schema-bootstrap.mjs',
+          ),
+          ...packageSeparator,
+          '--revision',
+          REVISION,
+          '--operator-ruling',
+          ruling,
+          '--receipt',
+          receipt,
+        ],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            DOPPLER_MARKER: dopplerMarker,
+            NODE_OPTIONS: [
+              process.env.NODE_OPTIONS,
+              '--require=./scripts/__fixtures__/doppler-run/fake-doppler-preload.cjs',
+            ]
+              .filter(Boolean)
+              .join(' '),
+          },
+        },
+      );
+      assert.equal(result.status, 0, result.stderr);
+    }
+
+    assert.deepEqual(
+      readFileSync(dopplerMarker, 'utf8').trim().split('\n'),
+      Array(2).fill(
+        `run --project mentomate --config dev_integration -- ${process.execPath} ${join(REPO_ROOT, 'scripts', 'bootstrap-api-integration-schema.mjs')} --revision ${REVISION} --operator-ruling ${ruling} --receipt ${receipt}`,
+      ),
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('public bootstrap command rejects an incomplete authority contract before Doppler', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wi3041-command-refusal-'));
+  const dopplerMarker = join(directory, 'doppler.log');
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, 'scripts', 'run-api-integration-schema-bootstrap.mjs'),
+        '--revision',
+        REVISION,
+        '--receipt',
+        '.workitem-artifacts/WI-2939/wi3041-test.json',
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          DOPPLER_MARKER: dopplerMarker,
+          NODE_OPTIONS: [
+            process.env.NODE_OPTIONS,
+            '--require=./scripts/__fixtures__/doppler-run/fake-doppler-preload.cjs',
+          ]
+            .filter(Boolean)
+            .join(' '),
+        },
+      },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Usage:.*--operator-ruling.*--receipt/is);
+    assert.equal(existsSync(dopplerMarker), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('rejects an incompatible non-empty target before mutation', async () => {
@@ -601,7 +766,7 @@ test('package scripts expose only the guarded bootstrap path', () => {
 
   assert.equal(
     rootPackage.scripts?.['db:bootstrap:api-integration'],
-    'node scripts/doppler-run.mjs run --project mentomate --config dev_integration -- node scripts/bootstrap-api-integration-schema.mjs',
+    'node scripts/run-api-integration-schema-bootstrap.mjs',
   );
   assert.equal(
     databasePackage.scripts?.['predb:push'],

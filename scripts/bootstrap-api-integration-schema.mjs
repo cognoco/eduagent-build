@@ -30,6 +30,9 @@ export const REVISION_PINNED_SOURCE_PATHS = Object.freeze([
   'apps/api/drizzle',
   'package.json',
   'scripts/bootstrap-api-integration-schema.mjs',
+  'scripts/run-api-integration.mjs',
+  'scripts/verify-api-integration-schema.mjs',
+  'scripts/run-api-integration-schema-bootstrap.mjs',
 ]);
 const MARKER_SCHEMA = 'zdx_integration_bootstrap';
 const MARKER_TABLE = `${MARKER_SCHEMA}.schema_state`;
@@ -159,6 +162,16 @@ function cleanupRequired(reason) {
   refuse(
     `${reason} Destroy and recreate only this disposable target before retrying; ` +
       'do not repair, migrate, or copy data into it.',
+  );
+}
+
+function verificationRefused(reason, revision) {
+  refuse(
+    `Schema drift detected; refused before Jest: ${reason} ` +
+      'No schema mutation was attempted. Obtain named operator authorization for the exact disposable target and revision, ' +
+      `then run pnpm db:bootstrap:api-integration --revision ${revision} ` +
+      '--operator-ruling <ruling-reference> --receipt .workitem-artifacts/WI-2939/<receipt>.json. ' +
+      'A stale, incompatible, or interrupted target must be destroyed and recreated; never repaired or migrated in place.',
   );
 }
 
@@ -308,6 +321,76 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
     };
     await writeReceipt(options.receiptPath, receipt);
     return receipt;
+  } finally {
+    await deps.store.close();
+  }
+}
+
+/**
+ * Verify the trusted bootstrap marker without mutating the target. This is the
+ * only check used by integration-test launchers; bootstrap remains an explicit,
+ * separately authorized command.
+ */
+export async function verifyDisposableApiIntegrationSchema(deps) {
+  const target = validateDisposableApiIntegrationTarget(deps.env);
+  const revision = (await deps.resolveHeadRevision()).toLowerCase();
+  if (!REVISION_PATTERN.test(revision)) {
+    refuse('the checked-out revision is not an exact 40-character commit SHA.');
+  }
+  if (!(await deps.schemaSourcesAreClean())) {
+    refuse('uncommitted schema or bootstrap sources are present.');
+  }
+  const revisionSql = await deps.loadRevisionSql();
+  if (!revisionSql?.fingerprint) {
+    refuse('the revision-pinned migration journal is empty or unreadable.');
+  }
+
+  try {
+    const { relations, marker } = await deps.store.inspect();
+    if (!marker) {
+      verificationRefused(
+        relations.length > 0
+          ? 'the non-empty target has no trusted bootstrap marker.'
+          : 'the empty target has not been bootstrapped.',
+        revision,
+      );
+    }
+    if (
+      typeof marker.targetId !== 'string' ||
+      typeof marker.revision !== 'string' ||
+      typeof marker.chainFingerprint !== 'string' ||
+      typeof marker.state !== 'string' ||
+      typeof marker.fingerprint !== 'string' ||
+      marker.targetId !== target.targetId ||
+      marker.revision.toLowerCase() !== revision ||
+      marker.chainFingerprint !== revisionSql.fingerprint ||
+      marker.state !== 'ready' ||
+      marker.fingerprint.length === 0
+    ) {
+      verificationRefused(
+        'the marker is stale, incompatible, or records an interrupted bootstrap.',
+        revision,
+      );
+    }
+    if (relations.length === 0) {
+      verificationRefused(
+        'the marker says ready but the public schema is empty.',
+        revision,
+      );
+    }
+    const schemaFingerprint = await deps.store.fingerprint();
+    if (schemaFingerprint !== marker.fingerprint) {
+      verificationRefused(
+        'the live schema fingerprint does not match its trusted marker.',
+        revision,
+      );
+    }
+    return {
+      targetId: target.targetId,
+      revision,
+      chainFingerprint: revisionSql.fingerprint,
+      schemaFingerprint,
+    };
   } finally {
     await deps.store.close();
   }
@@ -664,6 +747,24 @@ function defaultDependencies(env, target) {
         );
       }
     },
+  };
+}
+
+export function defaultVerificationDependencies(env) {
+  const target = validateDisposableApiIntegrationTarget(env);
+  return {
+    env,
+    store: new PgBootstrapStore(target.databaseUrl, target.targetId),
+    resolveHeadRevision: async () => gitOutput(['rev-parse', 'HEAD']),
+    loadRevisionSql: async () => loadRevisionSql(),
+    schemaSourcesAreClean: async () =>
+      gitOutput([
+        'status',
+        '--porcelain',
+        '--untracked-files=no',
+        '--',
+        ...REVISION_PINNED_SOURCE_PATHS,
+      ]) === '',
   };
 }
 

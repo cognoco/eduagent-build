@@ -9,6 +9,30 @@ childProcess.spawnSync = function fakePnpmSpawnSync(
   args = [],
   options = {},
 ) {
+  if (
+    command === process.execPath &&
+    args[0]?.endsWith('/scripts/verify-api-integration-schema.mjs') &&
+    process.env.FAKE_SCHEMA_VERIFY_RESULT
+  ) {
+    appendFileSync(
+      process.env.FAKE_SCHEMA_VERIFY_MARKER,
+      `${process.env.FAKE_SCHEMA_VERIFY_RESULT}\n`,
+    );
+    const compatible = process.env.FAKE_SCHEMA_VERIFY_RESULT === 'compatible';
+    const stderr = compatible
+      ? ''
+      : 'Schema drift detected; refused before Jest. No schema mutation was attempted. Obtain named operator authorization.\n';
+    return {
+      pid: 1,
+      output: [null, '', stderr],
+      stdout: '',
+      stderr,
+      status: compatible ? 0 : 1,
+      signal: null,
+      error: undefined,
+    };
+  }
+
   const pnpmCli = process.env.FAKE_PNPM_CLI;
   const viaNode = command === process.execPath && args[0] === pnpmCli;
   const direct = command === pnpmCli;
