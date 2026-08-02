@@ -7,6 +7,7 @@ test('applyExpoPublicEnvOverrides writes API URL and explicit mode-nav flags', (
   const result = applyExpoPublicEnvOverrides(
     [
       'EXPO_PUBLIC_API_URL="http://old.example"',
+      'EXPO_PUBLIC_E2E="false"',
       'EXPO_PUBLIC_ENABLE_MODE_NAV="false"',
       'EXPO_PUBLIC_ENABLE_MODE_NAV_V1="false"',
       'EXPO_PUBLIC_ENABLE_MODE_NAV_V2="false"',
@@ -33,12 +34,13 @@ test('applyExpoPublicEnvOverrides writes API URL and explicit mode-nav flags', (
   assert.match(result, /^EXPO_PUBLIC_OTHER="keep-me"$/m);
 });
 
-test('applyExpoPublicEnvOverrides only writes mode-nav flags explicitly provided by the run', () => {
+test('applyExpoPublicEnvOverrides always enables E2E and only writes mode-nav flags explicitly provided by the run', () => {
   const result = applyExpoPublicEnvOverrides('', {
     EXPO_PUBLIC_API_URL: 'http://127.0.0.1:8787',
+    EXPO_PUBLIC_E2E: 'false',
   });
 
   assert.match(result, /^EXPO_PUBLIC_API_URL="http:\/\/127\.0\.0\.1:8787"$/m);
+  assert.match(result, /^EXPO_PUBLIC_E2E="true"$/m);
   assert.doesNotMatch(result, /EXPO_PUBLIC_ENABLE_MODE_NAV/);
-  assert.doesNotMatch(result, /EXPO_PUBLIC_E2E/);
 });
