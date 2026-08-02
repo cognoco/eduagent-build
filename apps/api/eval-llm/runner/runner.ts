@@ -1,4 +1,9 @@
-import type { FlowDefinition, QualityIssue, Scenario } from './types';
+import type {
+  FlowDefinition,
+  ProviderCallContext,
+  QualityIssue,
+  Scenario,
+} from './types';
 import { PROFILES, type EvalProfile } from '../fixtures/profiles';
 import { writeSnapshot } from './snapshot';
 import {
@@ -263,6 +268,13 @@ export async function runHarness(
 
   const maxLiveCalls = options.maxLiveCalls ?? DEFAULT_MAX_LIVE_CALLS;
   let liveCallsMade = 0;
+  // Threaded to every providerCallCount call below so accounting and
+  // enforcement agree with the preflight demand estimate in budget.ts, which
+  // uses the same options.openrouterModel value. [WI-3029 provider-accounting
+  // correction]
+  const providerCallContext: ProviderCallContext = {
+    openrouterModel: options.openrouterModel,
+  };
   const coverageByFlow = new Map<
     string,
     {
@@ -381,8 +393,20 @@ export async function runHarness(
               // above (before this loop) whenever options.live is true.
               coverageByFlow.get(flow.id)!.attempted++;
             }
-            if (liveCallsMade >= maxLiveCalls) {
-              liveError = `live budget exceeded (${maxLiveCalls} calls); re-run with --max-live-calls to raise`;
+            // [WI-3029 provider-accounting correction] Reserve the flow's
+            // DECLARED total provider-call cost for this item (opener + any
+            // internal judge, e.g. review-continuity-opener's pinned-mentor
+            // judge) BEFORE making any call — not just 1 per outer runLive().
+            // Reject up front when the remaining budget can't cover it, so an
+            // insufficient cap skips the item without an outer call or judge
+            // call ever firing.
+            const predictedProviderCalls =
+              flow.providerCallCount?.(item.input, providerCallContext) ?? 1;
+            if (liveCallsMade + predictedProviderCalls > maxLiveCalls) {
+              liveError =
+                `live budget exceeded (${maxLiveCalls} calls; this item needs ` +
+                `${predictedProviderCalls} more, ${liveCallsMade} already spent); ` +
+                're-run with --max-live-calls to raise';
               summary.skipped.push({
                 flowId: flow.id,
                 profileId: profile.id,
@@ -392,7 +416,7 @@ export async function runHarness(
                 coverageByFlow.get(flow.id)!.budgetSkipped++;
               }
             } else {
-              liveCallsMade++;
+              liveCallsMade += predictedProviderCalls;
               try {
                 liveResponse = await flow.runLive(item.input, messages);
                 summary.liveCallsOk++;

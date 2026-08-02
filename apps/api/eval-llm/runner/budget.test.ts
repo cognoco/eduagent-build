@@ -82,6 +82,37 @@ describe('deriveEnvelopeProviderDemandFromMatrix', () => {
     expect(buildCount).toBe(1);
   });
 
+  it('[provider-accounting] threads providerCallContext through to providerCallCount so pinned-mentor demand differs from unpinned', () => {
+    const flows: EnvelopeMatrixFlow[] = [
+      {
+        id: 'review-continuity-opener',
+        emitsEnvelope: true,
+        buildPromptInput: () => null,
+        enumerateScenarios: () =>
+          Array.from({ length: 10 }, (_, i) => ({
+            scenarioId: `item-${i}`,
+            input: {},
+          })),
+        providerCallCount: (_input, context) =>
+          context.openrouterModel ? 2 : 1,
+      },
+    ];
+
+    expect(deriveEnvelopeProviderDemandFromMatrix(flows, [{}])).toMatchObject({
+      outerRunLiveCalls: 10,
+      providerCalls: 10,
+    });
+
+    expect(
+      deriveEnvelopeProviderDemandFromMatrix(flows, [{}], {
+        providerCallContext: { openrouterModel: 'openai/gpt-oss-120b' },
+      }),
+    ).toMatchObject({
+      outerRunLiveCalls: 10,
+      providerCalls: 20,
+    });
+  });
+
   it("[CodeRabbit] a scenarioFilter that excludes a non-enumerated flow's own id still counts that flow, matching countEnvelopeFlowSamples and the runner", () => {
     // Non-enumerated flows have no real scenarioId — the runner (runner.ts)
     // and countEnvelopeFlowSamples never scenario-filter them. The synthetic
@@ -117,11 +148,12 @@ describe('deriveEnvelopeProviderDemandFromMatrix', () => {
 });
 
 describe('resolveEnvelopeLiveCallCap', () => {
-  it('auto-fits an omitted cap for the live envelope-only path', () => {
+  it('auto-fits an omitted cap for the live envelope-only path when provider demand is below the sample floor', () => {
     expect(
       resolveEnvelopeLiveCallCap(
         { live: true, onlyEnvelopeFlows: true },
         { configuredBudget: 362 },
+        { providerCalls: 300 },
       ),
     ).toBe(362);
   });
@@ -131,7 +163,35 @@ describe('resolveEnvelopeLiveCallCap', () => {
       resolveEnvelopeLiveCallCap(
         { live: true, onlyEnvelopeFlows: true, maxLiveCalls: 400 },
         { configuredBudget: 362 },
+        { providerCalls: 366 },
       ),
     ).toBe(400);
+  });
+
+  it('[provider-accounting] never auto-fits below actual provider-call demand, even when it exceeds the sample-count floor', () => {
+    // The sample floor (362) is a count of ATTEMPTED ITEMS; providerCalls
+    // (366+) counts actual PROVIDER CALLS, which can exceed the sample count
+    // whenever a flow costs more than 1 call/item (internal judges). Auto-
+    // fitting to the smaller sample floor would under-budget the run.
+    expect(
+      resolveEnvelopeLiveCallCap(
+        { live: true, onlyEnvelopeFlows: true },
+        { configuredBudget: 362 },
+        { providerCalls: 366 },
+      ),
+    ).toBe(366);
+  });
+
+  it('[provider-accounting] reflects a pinned-mentor run costing more provider calls than an unpinned one', () => {
+    // Same sample floor, but the caller pre-computed providerCalls with a
+    // pinned-mentor context (376 instead of 366) — the cap must track that,
+    // not silently fall back to the smaller unpinned number.
+    expect(
+      resolveEnvelopeLiveCallCap(
+        { live: true, onlyEnvelopeFlows: true },
+        { configuredBudget: 362 },
+        { providerCalls: 376 },
+      ),
+    ).toBe(376);
   });
 });

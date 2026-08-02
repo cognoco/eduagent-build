@@ -182,6 +182,135 @@ describe('runHarness live budget cap', () => {
   });
 });
 
+describe('runHarness live budget cap [WI-3029 provider-accounting correction]', () => {
+  // A flow whose declared providerCallCount is 2/item (e.g. review-continuity-
+  // opener with the mentor pinned) — before the fix, the runner incremented
+  // its outer-call counter by exactly 1 regardless of this declaration, so
+  // maxLiveCalls only ever capped the number of runLive() invocations, never
+  // the actual provider-call cost.
+  const makeCostlyLiveFlow = (
+    calls: { count: number },
+    costPerItem: number,
+  ): FlowDefinition<{ scenarioId: string }> => ({
+    id: 'test-costly-live-flow',
+    name: 'Test Costly Live Flow',
+    sourceFile: 'test',
+    buildPromptInput: () => null,
+    enumerateScenarios(): Array<Scenario<{ scenarioId: string }>> {
+      return [
+        { scenarioId: 'L1', input: { scenarioId: 'L1' } },
+        { scenarioId: 'L2', input: { scenarioId: 'L2' } },
+        { scenarioId: 'L3', input: { scenarioId: 'L3' } },
+      ];
+    },
+    buildPrompt: (input) => ({ system: `live ${input.scenarioId}` }),
+    runLive: async () => {
+      calls.count++;
+      return '{"ok":true}';
+    },
+    providerCallCount: () => costPerItem,
+  });
+
+  afterEach(async () => {
+    const dir = path.resolve(
+      __dirname,
+      '..',
+      'snapshots',
+      'test-costly-live-flow',
+    );
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  it('reserves the declared provider-call cost per item, not 1 per outer call', async () => {
+    // 3 items × cost 2 = 6 needed; cap is 4 → only 2 items fit (2+2=4), the
+    // 3rd would need 2+2=6 > 4 and must be skipped WITHOUT an outer call.
+    const calls = { count: 0 };
+    const flow = makeCostlyLiveFlow(calls, 2);
+    const summary = await runHarness([flow as FlowDefinition], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+      maxLiveCalls: 4,
+    });
+    expect(calls.count).toBe(2);
+    expect(summary.liveCallsOk).toBe(2);
+    const budgetSkips = summary.skipped.filter((s) =>
+      s.reason.includes('live budget exceeded'),
+    );
+    expect(budgetSkips.length).toBe(1);
+  });
+
+  it('rejects an item before any outer/judge call when the remaining budget cannot cover its declared cost', async () => {
+    // cap=3, cost=2/item: item 1 fits (0+2<=3, liveCallsMade->2); item 2
+    // needs 2 more but 2+2=4>3, so it must be skipped BEFORE runLive is
+    // invoked for it — not after a partial/failed attempt.
+    const calls = { count: 0 };
+    const flow = makeCostlyLiveFlow(calls, 2);
+    const summary = await runHarness([flow as FlowDefinition], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+      maxLiveCalls: 3,
+    });
+    expect(calls.count).toBe(1);
+    expect(summary.liveCallsOk).toBe(1);
+    expect(summary.liveCallsFailed).toBe(0);
+    const budgetSkips = summary.skipped.filter((s) =>
+      s.reason.includes('live budget exceeded'),
+    );
+    expect(budgetSkips.length).toBe(2);
+  });
+
+  it('an exact-fit remaining budget still allows the call (boundary: equal, not only strictly greater)', async () => {
+    // cap=6, cost=2/item, 3 items: 2+2+2=6 exactly fits with no skip.
+    const calls = { count: 0 };
+    const flow = makeCostlyLiveFlow(calls, 2);
+    const summary = await runHarness([flow as FlowDefinition], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+      maxLiveCalls: 6,
+    });
+    expect(calls.count).toBe(3);
+    expect(summary.liveCallsOk).toBe(3);
+    expect(
+      summary.skipped.filter((s) => s.reason.includes('live budget exceeded'))
+        .length,
+    ).toBe(0);
+  });
+
+  it('a flow with no providerCallCount still defaults to cost 1/item (no regression)', async () => {
+    const calls = { count: 0 };
+    const flow: FlowDefinition<{ scenarioId: string }> = {
+      id: 'test-costly-live-flow',
+      name: 'Test Costly Live Flow (no providerCallCount)',
+      sourceFile: 'test',
+      buildPromptInput: () => null,
+      enumerateScenarios(): Array<Scenario<{ scenarioId: string }>> {
+        return [
+          { scenarioId: 'L1', input: { scenarioId: 'L1' } },
+          { scenarioId: 'L2', input: { scenarioId: 'L2' } },
+          { scenarioId: 'L3', input: { scenarioId: 'L3' } },
+        ];
+      },
+      buildPrompt: (input) => ({ system: `live ${input.scenarioId}` }),
+      runLive: async () => {
+        calls.count++;
+        return '{"ok":true}';
+      },
+      // No providerCallCount — must default to cost 1/item.
+    };
+    const summary = await runHarness([flow as FlowDefinition], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+      maxLiveCalls: 2,
+    });
+    expect(calls.count).toBe(2);
+    expect(summary.liveCallsOk).toBe(2);
+  });
+});
+
 describe('runHarness deterministic quality checks', () => {
   afterEach(async () => {
     const dir = path.resolve(

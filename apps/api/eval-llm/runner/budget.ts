@@ -4,6 +4,15 @@ export interface EnvelopeBudgetInput {
   baselineSamples: number;
 }
 
+/** Execution/accounting context passed through to `providerCallCount` — see
+ * the `ProviderCallContext` doc comment in `runner/types.ts` (this is the
+ * same shape, redeclared here so `budget.ts` has no import dependency on
+ * `types.ts`, matching the existing structural-typing convention this file
+ * already uses for `EnvelopeMatrixFlow` vs. `FlowDefinition`). */
+export interface EnvelopeProviderCallContext {
+  openrouterModel?: string;
+}
+
 export interface EnvelopeMatrixFlow {
   id: string;
   emitsEnvelope?: boolean;
@@ -12,11 +21,21 @@ export interface EnvelopeMatrixFlow {
     profile: unknown,
   ): Array<{ scenarioId: string; input: unknown }> | null;
   /** Total provider calls for one matrix item, including internal judges. */
-  providerCallCount?(input: unknown): number;
+  providerCallCount?(
+    input: unknown,
+    context: EnvelopeProviderCallContext,
+  ): number;
 }
 
 export interface EnvelopeMatrixOptions {
   scenarioFilter?: Set<string>;
+  /**
+   * Threaded to every `providerCallCount` call in
+   * `deriveEnvelopeProviderDemandFromMatrix` (ignored by
+   * `countEnvelopeFlowSamples`, which is sample-count-only and never varies
+   * with pinning). Defaults to `{}` (unpinned) when omitted.
+   */
+  providerCallContext?: EnvelopeProviderCallContext;
 }
 
 export interface EnvelopeBudget {
@@ -122,6 +141,8 @@ export function deriveEnvelopeProviderDemandFromMatrix(
   options: EnvelopeMatrixOptions = {},
 ): EnvelopeProviderDemand {
   const byFlow: EnvelopeProviderDemand['flows'] = {};
+  const providerCallContext: EnvelopeProviderCallContext =
+    options.providerCallContext ?? {};
 
   for (const flow of flows) {
     if (!flow.emitsEnvelope) continue;
@@ -138,7 +159,8 @@ export function deriveEnvelopeProviderDemandFromMatrix(
             continue;
           }
           outerRunLiveCalls++;
-          providerCalls += flow.providerCallCount?.(scenario.input) ?? 1;
+          providerCalls +=
+            flow.providerCallCount?.(scenario.input, providerCallContext) ?? 1;
         }
       } else {
         // Non-enumerated flows have no real scenarioId to filter on — the
@@ -150,7 +172,8 @@ export function deriveEnvelopeProviderDemandFromMatrix(
         const input = flow.buildPromptInput(profile);
         if (input === null) continue;
         outerRunLiveCalls++;
-        providerCalls += flow.providerCallCount?.(input) ?? 1;
+        providerCalls +=
+          flow.providerCallCount?.(input, providerCallContext) ?? 1;
       }
     }
     byFlow[flow.id] = {
@@ -183,13 +206,22 @@ export function resolveEnvelopeLiveCallCap(
     maxLiveCalls?: number;
   },
   budget: Pick<EnvelopeBudget, 'configuredBudget'>,
+  providerDemand: Pick<EnvelopeProviderDemand, 'providerCalls'>,
 ): number | undefined {
   if (
     options.live &&
     options.onlyEnvelopeFlows &&
     options.maxLiveCalls === undefined
   ) {
-    return budget.configuredBudget;
+    // `budget.configuredBudget` is a SAMPLE-count floor (attempted items,
+    // +10% headroom) — it does not account for a flow costing more than one
+    // provider call per item (internal judges, or review-continuity-opener's
+    // pinned-mentor judge). `providerDemand.providerCalls` is the actual,
+    // context-aware provider-call total. Auto-fitting to the sample floor
+    // alone would under-budget any matrix where provider calls > samples,
+    // causing exactly the silent mid-run truncation this WI exists to
+    // prevent — so the effective auto-fit cap is never below either number.
+    return Math.max(budget.configuredBudget, providerDemand.providerCalls);
   }
   return options.maxLiveCalls;
 }

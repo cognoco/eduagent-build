@@ -170,6 +170,7 @@ async function main(): Promise<void> {
     const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
       FLOWS,
       PROFILES,
+      { providerCallContext: { openrouterModel: options.openrouterModel } },
     );
     console.log(
       `Envelope matrix demand: required=${budget.requiredSamples} ` +
@@ -179,7 +180,12 @@ async function main(): Promise<void> {
     console.log(
       `Envelope provider demand: outer=${providerDemand.outerRunLiveCalls} ` +
         `internal=${providerDemand.internalProviderCalls} ` +
-        `total=${providerDemand.providerCalls}`,
+        `total=${providerDemand.providerCalls}` +
+        `${
+          options.openrouterModel
+            ? ` (context: mentor pinned via --openrouter-model=${options.openrouterModel})`
+            : ' (context: unpinned/production routing)'
+        }`,
     );
     for (const [flowId, demand] of Object.entries(budget.flows)) {
       console.log(
@@ -265,28 +271,61 @@ async function main(): Promise<void> {
 
   if (options.live && options.onlyEnvelopeFlows) {
     const baseline = await readBaseline();
+    const preflightFlows = FLOWS.filter(
+      (flow) => !options.flowFilter || options.flowFilter.has(flow.id),
+    );
+    const preflightProfiles = PROFILES.filter(
+      (profile) =>
+        !options.profileFilter || options.profileFilter.has(profile.id),
+    );
     const budget = deriveEnvelopeBudgetFromMatrix(
-      FLOWS.filter(
-        (flow) => !options.flowFilter || options.flowFilter.has(flow.id),
-      ),
-      PROFILES.filter(
-        (profile) =>
-          !options.profileFilter || options.profileFilter.has(profile.id),
-      ),
+      preflightFlows,
+      preflightProfiles,
       baseline?.flows,
       { scenarioFilter: options.scenarioFilter },
     );
-    options.maxLiveCalls = resolveEnvelopeLiveCallCap(options, budget);
+    // [WI-3029 provider-accounting correction] `budget.configuredBudget` is a
+    // SAMPLE-count floor (attempted items, +10% headroom) — it does NOT
+    // account for a flow costing more than one provider call per item
+    // (internal judges, or review-continuity-opener's pinned-mentor judge).
+    // `providerDemand.providerCalls` is the actual, context-aware provider-
+    // call total for THIS invocation's --openrouter-model state. The
+    // effective floor — for both auto-fit and the explicit-cap rejection
+    // below — is never below either number, or a pinned-mentor run with an
+    // omitted/undersized --max-live-calls would silently truncate mid-run.
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      preflightFlows,
+      preflightProfiles,
+      {
+        scenarioFilter: options.scenarioFilter,
+        providerCallContext: { openrouterModel: options.openrouterModel },
+      },
+    );
+    const effectiveFloor = Math.max(
+      budget.configuredBudget,
+      providerDemand.providerCalls,
+    );
+    options.maxLiveCalls = resolveEnvelopeLiveCallCap(
+      options,
+      budget,
+      providerDemand,
+    );
     if (
       options.maxLiveCalls !== undefined &&
-      options.maxLiveCalls < budget.configuredBudget
+      options.maxLiveCalls < effectiveFloor
     ) {
       clearZeroDriftReceipt();
       console.error(
         `Envelope matrix requires ${budget.requiredSamples} samples plus ` +
-          `${budget.headroomSamples} headroom calls (configured floor=${budget.configuredBudget}; ` +
-          `baseline=${budget.baselineSamples}); supplied ` +
-          `--max-live-calls=${options.maxLiveCalls} is below the configured floor.`,
+          `${budget.headroomSamples} headroom calls (sample floor=${budget.configuredBudget}; ` +
+          `baseline=${budget.baselineSamples}); context-aware provider-call demand ` +
+          `is ${providerDemand.providerCalls} calls` +
+          `${
+            options.openrouterModel
+              ? ` (mentor pinned via --openrouter-model=${options.openrouterModel})`
+              : ' (unpinned/production routing)'
+          }; supplied --max-live-calls=${options.maxLiveCalls} is below the ` +
+          `effective floor of ${effectiveFloor}.`,
       );
       process.exit(2);
     }

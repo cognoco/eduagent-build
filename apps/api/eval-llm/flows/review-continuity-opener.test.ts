@@ -103,4 +103,24 @@ describe('reviewContinuityOpenerFlow', () => {
       ),
     ).not.toThrow();
   });
+
+  describe('providerCallCount [WI-3029 provider-accounting correction]', () => {
+    const providerCallCount = reviewContinuityOpenerFlow.providerCallCount!;
+    const profile = profileFor('verbatim-solid');
+    const scenario = enumerate(profile)!.find(
+      (s) => s.scenarioId === 'verbatim-solid',
+    )!;
+
+    it('costs 1 provider call/item when the mentor is unpinned (judge never runs)', () => {
+      expect(providerCallCount(scenario.input, {})).toBe(1);
+    });
+
+    it('costs 2 provider calls/item when the mentor is pinned via --openrouter-model (opener + judge)', () => {
+      expect(
+        providerCallCount(scenario.input, {
+          openrouterModel: 'openai/gpt-oss-120b',
+        }),
+      ).toBe(2);
+    });
+  });
 });

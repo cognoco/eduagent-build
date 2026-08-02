@@ -102,7 +102,19 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       PROFILES,
       baseline!.flows,
     );
-    expect(Number(cap![1])).toBe(budget.configuredBudget);
+    // [WI-3029 provider-accounting correction] The weekly step is unpinned
+    // (no --openrouter-model), so its provider-call demand (366) exceeds the
+    // sample-count floor (362) purely from internal judges — the workflow's
+    // explicit --max-live-calls must track the LARGER, context-aware
+    // provider-call floor, not the raw sample count, or the weekly gate would
+    // start truncating its own run every week.
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+    );
+    expect(Number(cap![1])).toBe(
+      Math.max(budget.configuredBudget, providerDemand.providerCalls),
+    );
 
     const evidence = readFileSync(
       join(repoRoot, '.github/workflows/eval-live.yml'),
@@ -204,17 +216,31 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
         readFileSync(join(repoRoot, 'apps/api/eval-llm/baseline.json'), 'utf8'),
       )!.flows,
     );
-    expect(parsed.maxLiveCalls).toBeUndefined();
-    expect(resolveEnvelopeLiveCallCap(parsed, budget)).toBe(
+    // [WI-3029 provider-accounting correction] The auto-fit cap is now
+    // never below the context-aware provider-call demand either — with the
+    // review-continuity-opener judge accounted for, unpinned demand (366)
+    // exceeds the sample-count floor (362), so 366 is the real expectation,
+    // not the raw sample floor.
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+    );
+    const expectedCap = Math.max(
       budget.configuredBudget,
+      providerDemand.providerCalls,
     );
-    expect(resolveEnvelopeLiveCallCap(parsed, budget)).not.toBe(20);
-    expect(source).toContain(
-      'options.maxLiveCalls = resolveEnvelopeLiveCallCap(options, budget);',
+    expect(parsed.maxLiveCalls).toBeUndefined();
+    expect(resolveEnvelopeLiveCallCap(parsed, budget, providerDemand)).toBe(
+      expectedCap,
     );
-    const autoFitPosition = source.indexOf(
-      'options.maxLiveCalls = resolveEnvelopeLiveCallCap(options, budget);',
+    expect(resolveEnvelopeLiveCallCap(parsed, budget, providerDemand)).not.toBe(
+      20,
     );
+    const autoFitMatch = source.match(
+      /options\.maxLiveCalls\s*=\s*resolveEnvelopeLiveCallCap\(\s*options,\s*budget,\s*providerDemand,?\s*\);/,
+    );
+    expect(autoFitMatch).not.toBeNull();
+    const autoFitPosition = autoFitMatch!.index!;
     expect(autoFitPosition).toBeGreaterThanOrEqual(0);
     expect(autoFitPosition).toBeLessThan(
       source.indexOf('bootstrapLlmProviders();'),
