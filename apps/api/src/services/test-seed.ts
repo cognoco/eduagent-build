@@ -1567,6 +1567,30 @@ async function seedV2AccountNonOwnerChild(
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  // Account middleware provisions the organization's initial trial on every
+  // authenticated request and resolves its payer through the admin membership.
+  // Keep the E2E child learner-only, but preserve that organization invariant
+  // with a separate non-credentialed adult owner.
+  const ownerProfileId = generateUUIDv7();
+  await db.insert(person).values({
+    id: ownerProfileId,
+    displayName: 'Test Account Owner',
+    birthDate: '1985-01-01',
+    residenceJurisdiction: 'ROW',
+    conversationLanguageConfirmedAt: CONFIRMED_CONVERSATION_LANGUAGE_AT,
+  });
+  await writeLegacyProfileIfPresent(db, ownerProfileId, accountId, {
+    displayName: 'Test Account Owner',
+    birthYear: 1985,
+    isOwner: true,
+  });
+  await db.insert(membership).values({
+    personId: ownerProfileId,
+    organizationId: accountId,
+    roles: ['admin'],
+  });
+
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Test Child',
     birthYear: LEARNER_BIRTH_YEAR,
