@@ -217,7 +217,7 @@ jobs:
                 ``,
                 `Triage: re-run to rule out provider flakiness; if drift is real and`,
                 `intentional, re-baseline with`,
-                `\`doppler run -- pnpm eval:llm -- --live --update-baseline\` and commit.`,
+                `\`doppler run -- pnpm eval:llm -- --live --only-envelope-flows --update-baseline\` and commit.`,
                 ``,
                 `If the failing step was the **Teaching-session live gate**, read the`,
                 `quality-issue codes in the run output first — the gate fails closed,`,

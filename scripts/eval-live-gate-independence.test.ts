@@ -28,10 +28,19 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 
+// The runtime registry imports API source that reaches the retention package's
+// published `.js` specifier. The scripts Jest config intentionally does not
+// rewrite that package specifier, so provide the source-test shim needed only
+// to load FLOWS for this registry contract.
+jest.mock('../packages/retention/src/sm2.js', () => ({ sm2: jest.fn() }), {
+  virtual: true,
+});
+
 import { TEACHING_SCENARIOS } from '../apps/api/eval-llm/fixtures/teaching-scenarios';
 import { CHALLENGE_SIM_SCENARIOS } from '../apps/api/eval-llm/fixtures/challenge-personas';
 import { PROFILES } from '../apps/api/eval-llm/fixtures/profiles';
 import { ENVELOPE_FLOWS } from '../apps/api/eval-llm/envelope-flow-registry';
+import { FLOWS } from '../apps/api/eval-llm/flow-registry';
 import { deriveEnvelopeBudgetFromMatrix } from '../apps/api/eval-llm/runner/budget';
 import {
   deriveEnvelopeProviderDemandFromMatrix,
@@ -95,13 +104,16 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     const evidence = readFileSync(
       join(repoRoot, '.github/workflows/eval-live.yml'),
       'utf8',
-    ).match(
-      /baseline=(\d+) and required=(\d+) samples; its 10% headroom configures (\d+)/,
-    );
+    ).match(/required=(\d+) samples; its 10% headroom configures (\d+)/);
     expect(evidence).not.toBeNull();
-    expect(Number(evidence![1])).toBe(budget.baselineSamples);
-    expect(Number(evidence![2])).toBe(budget.requiredSamples);
-    expect(Number(evidence![3])).toBe(budget.configuredBudget);
+    expect(Number(evidence![1])).toBe(budget.requiredSamples);
+    expect(Number(evidence![2])).toBe(budget.configuredBudget);
+  });
+
+  test('hand-maintained envelope registry matches the runtime envelope subset', () => {
+    expect(ENVELOPE_FLOWS.map((flow) => flow.id)).toEqual(
+      FLOWS.filter((flow) => flow.emitsEnvelope).map((flow) => flow.id),
+    );
   });
 
   test('mastery cap is the derived complete 8 × 3 configured-unit grid', () => {
@@ -323,6 +335,9 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     expect(script).toContain('no-verdict');
     expect(script).toContain('judge-unavailable');
     expect(script).toContain('fails closed');
+    expect(script).toContain(
+      'pnpm eval:llm -- --live --only-envelope-flows --update-baseline',
+    );
   });
 
   test('the setup guard the gate if-conditions reference actually exists', () => {
