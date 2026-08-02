@@ -46,7 +46,16 @@ function isSessionClose(request: Request, sessionId: string): boolean {
 }
 
 async function openManualEntryFromMentor(page: Page): Promise<void> {
-  await pressableClick(page.getByTestId('mentor-bar-homework-chip'));
+  const homeworkChip = page.getByTestId('mentor-bar-homework-chip');
+  // WI-3024: under E2E the chip is disabled while the subjects index loads
+  // (mentor.tsx hostedManualHomeworkUnavailable). A tap that beats that query
+  // silently no-ops on the disabled Pressable and manual entry never mounts.
+  // RN-web expresses the disabled Pressable as aria-disabled, which
+  // toBeEnabled does not consult — wait on the attribute itself.
+  await expect(homeworkChip).not.toHaveAttribute('aria-disabled', 'true', {
+    timeout: 30_000,
+  });
+  await pressableClick(homeworkChip);
   await expect(page.getByTestId('homework-entry-mode-manual')).toBeVisible({
     timeout: 30_000,
   });

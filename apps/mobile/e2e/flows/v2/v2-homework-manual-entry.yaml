@@ -27,6 +27,13 @@ tags:
     enabled: true
 
 # The manual-entry cancel escape returns to a usable Mentor surface.
+# WI-3024: the chip is disabled under E2E while the subjects index loads —
+# wait for enabled before tapping, or the tap silently no-ops.
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-bar-homework-chip'
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
@@ -44,6 +51,12 @@ tags:
     enabled: true
 
 # Enter one manual problem from the same Mentor surface.
+# WI-3024: same enabled-wait as above.
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-bar-homework-chip'
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
