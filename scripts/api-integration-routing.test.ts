@@ -230,14 +230,17 @@ describe('API co-located integration routing', () => {
     expect(pkg.scripts?.['test:api:integration:ci']).toBe(
       'node scripts/run-api-integration.mjs --nx',
     );
+    expect(pkg.scripts?.['test:api:integration:cross-package:ci']).toBe(
+      'node scripts/run-api-integration.mjs --cross-package',
+    );
   });
 
   it('keeps the cross-package target and exposes an unambiguous API co-located target', () => {
     const project = readJson<NxProject>('apps/api/project.json');
     const targets = project.targets ?? {};
 
-    expect(targets['test:integration']?.options?.command).toContain(
-      'run-api-integration.mjs --cross-package',
+    expect(targets['test:integration']?.options?.command).toBe(
+      'pnpm run test:api:integration:cross-package:ci',
     );
     expect(targets['integration-api']?.options?.command).toBe(
       'node scripts/run-api-integration.mjs --jest',

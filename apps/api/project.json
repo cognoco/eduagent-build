@@ -29,7 +29,7 @@
     "test:integration": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node scripts/run-api-integration.mjs --cross-package",
+        "command": "pnpm run test:api:integration:cross-package:ci",
         "cwd": "."
       }
     },

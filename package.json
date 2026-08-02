@@ -15,6 +15,7 @@
     "test:api:unit": "jest --config apps/api/jest.config.cjs --runInBand",
     "test:api:integration": "node scripts/run-api-integration.mjs",
     "test:api:integration:ci": "node scripts/run-api-integration.mjs --nx",
+    "test:api:integration:cross-package:ci": "node scripts/run-api-integration.mjs --cross-package",
     "typecheck:integration": "tsx scripts/check-integration-typecheck.ts",
     "test:mobile:unit": "node --max-old-space-size=6144 ./node_modules/jest/bin/jest.js --config apps/mobile/jest.config.cjs --runInBand --forceExit",
     "test:v2-parity": "node scripts/run-v2-parity.cjs",

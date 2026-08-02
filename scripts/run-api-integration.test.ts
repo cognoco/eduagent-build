@@ -197,7 +197,7 @@ describe('run-api-integration.mjs', () => {
       'node scripts/run-api-integration.mjs --jest',
     );
     expect(project.targets?.['test:integration']?.options?.command).toBe(
-      'node scripts/run-api-integration.mjs --cross-package',
+      'pnpm run test:api:integration:cross-package:ci',
     );
   });
 
