@@ -15,7 +15,7 @@
       "task-id": "thread-goal:root-direct-poll"
     },
     {
-      "target": "Every PR referenced by a non-Closed BID-48 member plus recently landed completion evidence, currently eduagent-build #2733/#2811/#2830/#2833/#2846; checks, reviews, merge state, and origin/main",
+      "target": "Every PR referenced by a non-Closed BID-48 member plus recently landed completion evidence, currently eduagent-build #2811/#2878/#2880; checks, reviews, merge state, and origin/main",
       "purpose": "enforce strict-green landing and landed completion evidence",
       "command": "gh PR/check/review queries and git fetch/rev-parse",
       "task-id": "thread-goal:root-direct-poll"
@@ -43,6 +43,12 @@
       "purpose": "track the separately owned seed/reset remediation through its next completion and review; WI-2795 must not react to transient Ready/claim fields",
       "command": "direct Cosmo page trail and completion/review event polling, with BID-33/PgM status reconciliation",
       "task-id": "inline-direct-poll"
+    },
+    {
+      "target": "operator gates for PR #2880 approval, WI-2826 hosted target at 787e254b, and WI-2923 dev-only Clerk application",
+      "purpose": "resume ordinary lifecycle work immediately when the distinct approval, named hosted grant, or exact application identifiers land",
+      "command": "direct GitHub review polling plus Cosmo page/ruling comments and operator relay reconciliation",
+      "task-id": "thread-goal:root-direct-poll"
     }
   ]
 }

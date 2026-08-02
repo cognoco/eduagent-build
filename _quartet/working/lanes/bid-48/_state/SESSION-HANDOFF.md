@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-02 10:16 CEST
+Last reconciled: 2026-08-02 20:12 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -23,6 +23,30 @@ Last reconciled: 2026-08-02 10:16 CEST
   (42 members).
 
 ## Current frontier — supersedes stale per-item positions below
+
+### Latest authoritative boundary — 2026-08-02 20:12 CEST
+
+- PgM confirmed its GitHub identity is also PR #2880's author identity, so it cannot
+  supply WI-2643's required non-author approval. The operator holds the verified
+  one-click approval package for exact head `861bc62d`; all checks remain green and
+  merge state is clean. Hold for a distinct operator approval, then rerun the
+  sanctioned merge gate. No admin bypass is authorized.
+- WI-2826 PR #2811 is published at exact head `787e254b`; all current checks are
+  green. PgM routed the bounded hosted-diagnostics request to the operator at that
+  immutable revision. No hosted run or target provisioning may occur before a named
+  grant. The fallback permits BID-48 to provision a disposable target only after
+  formal admission and a contemporaneous Brief amendment.
+- PgM adopted WI-2923's shared-instance analysis: Clerk instance `ins_39wc…` must
+  not be mutated for development. A separate development-only Clerk application is
+  routed to the operator for provisioning. Doppler/Worker binding authority will be
+  requested only after its exact identifiers exist. PR #2878 remains at `c39f0dc7`.
+- WI-2795 remains monitoring-only against external WI-2788's next completion/review
+  event. BID-48 will not react to transient claim/Stage fields or take over BID-33's
+  rework.
+- Docker Engine and its socket, containerd, and ubuntu-fan are inactive and disabled
+  after WI-2826's local push-gate work. They remain on-demand only.
+- Direct live relation query remains 35 Closed, 3 Executing, and 4 Ready across all
+  42 authoritative members. Brief/relation parity remains intact; BID-48 is Running.
 
 ### Latest authoritative boundary — 2026-08-02 10:08 CEST
 

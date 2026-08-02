@@ -56,9 +56,29 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-02 10:16 CEST
+## Live reconciliation — 2026-08-02 20:12 CEST
 
 ### Latest authoritative boundary
+
+- WI-2643 PR #2880 is clean and fully green at exact head `861bc62d`. PgM cannot
+  provide the required non-author approval because its GitHub identity resolves to
+  the author. The operator has the verified approval package; after a distinct
+  approval lands, rerun the sanctioned merge gate. No admin bypass.
+- WI-2826 PR #2811 is published and fully green at exact head `787e254b`. Its combined
+  hosted-diagnostics grant is routed to the operator and bound to that revision.
+  Hold until the operator names the target. Provisioning the disposable fallback is
+  allowed only after formal discovered-work admission and Brief amendment.
+- WI-2923's shared Clerk instance `ins_39wc…` is explicitly excluded from dev
+  mutation. The operator is provisioning a separate dev-only application; wait for
+  its identifiers before requesting Doppler/Worker bindings. PR #2878 remains at
+  `c39f0dc7`.
+- WI-2795 continues direct monitoring of WI-2788's next completion/review event; no
+  BID-48 takeover or routing intervention is warranted.
+- Docker services are inactive and boot-disabled after the WI-2826 local gate.
+- Live slice remains 35 Closed, 3 Executing, and 4 Ready across 42 authoritative
+  members. Brief/relation parity remains intact and the batch is Running.
+
+### Previous authoritative boundary — 2026-08-02 10:16 CEST
 
 - WI-2922 is independently Closed/Done. Global review verified landed ancestry,
   required checks, exact 35/35, independent pre-fix 14-failure reconstruction and

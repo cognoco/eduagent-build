@@ -1,7 +1,8 @@
 # BID-48 bounded hosted diagnostics authorization package
 
-Prepared: 2026-08-01
-Status: awaiting operator-named target and explicit grant
+Prepared: 2026-08-01; reconciled: 2026-08-02
+Status: routed by PgM to the operator at exact revision `787e254b`; awaiting the
+operator-named target and explicit grant
 PgM ruling: package WI-2826, WI-2798, WI-2800, and WI-2805 under one shared
 authorization; keep WI-2923 and WI-2795 separate.
 
@@ -29,9 +30,14 @@ is not inferred from this package; naming one of those requires an explicit ruli
 
 ## Preconditions
 
-- WI-2826 PR #2811 currently remains draft at `140c5233099d35d62e2c8ef250a44cd6a1dc3071`.
-  The operator grant must bind a later live-verified immutable revision if that head
-  changes. The run may not silently follow a moving branch.
+- WI-2826 PR #2811 remains draft at exact head
+  `787e254bc9d9f7f8852e66cb04273ffcb9d4c3fe`, with all current checks green. The
+  routed operator package is bound to that immutable revision. If the head changes,
+  this authorization request must be re-bound; the run may not follow a moving
+  branch.
+- PgM routed a fallback under which BID-48 may provision the disposable target only
+  if the work is formally admitted as discovered work and the Batch Brief is amended
+  at admission. The fallback is not authority to provision before that admission.
 - The target preflight must match the operator-named identity before any scenario
   begins. A mismatch consumes no run and performs no mutation.
 - Existing target credentials must be obtained through the estate secret contract;
