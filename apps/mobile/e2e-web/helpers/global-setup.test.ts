@@ -101,6 +101,7 @@ describe('resolveClerkPublishableKey', () => {
 
   it('binds the resolved local key before invoking Clerk setup', async () => {
     process.env.CLERK_SECRET_KEY = 'sk_test_local';
+    delete process.env.CLERK_AUDIENCE;
     delete process.env.CLERK_PUBLISHABLE_KEY;
     delete process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
     jest.mocked(dotenv.config).mockImplementation((options) => {
@@ -133,6 +134,7 @@ describe('resolveClerkPublishableKey', () => {
 
   it('binds the local API Clerk identity when no runner identity is supplied', async () => {
     delete process.env.CLERK_SECRET_KEY;
+    delete process.env.CLERK_AUDIENCE;
     delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
     jest.mocked(dotenv.config).mockImplementation((options) => {
       if (String(options?.path).endsWith('.dev.vars')) {
