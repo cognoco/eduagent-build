@@ -26,6 +26,24 @@ const roleNames = {
 };
 let client;
 
+function assertDisposableAdminDatabase(target) {
+  let parsed;
+  try {
+    parsed = new URL(target);
+  } catch {
+    throw new Error('WI1628_ADMIN_DATABASE_URL must be a parseable URL');
+  }
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+  if (
+    !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname) ||
+    !/(^|[_-])(test|integration)([_-]|$)/i.test(databaseName)
+  ) {
+    throw new Error(
+      'WI1628_ADMIN_DATABASE_URL must be a loopback disposable test database',
+    );
+  }
+}
+
 async function capabilitiesFor(roleName) {
   await client.query(`SET ROLE "${roleName}"`);
   try {
@@ -38,8 +56,10 @@ async function capabilitiesFor(roleName) {
 
 before(async () => {
   if (!databaseUrl) return;
+  assertDisposableAdminDatabase(databaseUrl);
   client = new Client({ connectionString: databaseUrl });
   await client.connect();
+  await client.query('BEGIN');
   await client.query('DROP SCHEMA IF EXISTS wi1628_guard CASCADE');
   for (const roleName of Object.values(roleNames)) {
     await client.query(`DROP ROLE IF EXISTS "${roleName}"`);
@@ -100,12 +120,17 @@ before(async () => {
 
 after(async () => {
   if (!client) return;
-  await client.query('RESET ROLE');
-  await client.query('DROP SCHEMA IF EXISTS wi1628_guard CASCADE');
-  for (const roleName of Object.values(roleNames)) {
-    await client.query(`DROP ROLE IF EXISTS "${roleName}"`);
+  try {
+    await client.query('RESET ROLE');
+  } catch {
+    // ROLLBACK below is the authoritative cleanup for an aborted transaction.
   }
-  await client.end();
+  try {
+    await client.query('ROLLBACK');
+  } finally {
+    await client.end();
+    client = undefined;
+  }
 });
 
 test(
@@ -192,10 +217,13 @@ test(
       `SET SESSION AUTHORIZATION "${roleNames.adminOptionLogin}"`,
     );
     try {
+      await client.query('SAVEPOINT denied_set_role');
       await assert.rejects(
         client.query(`SET ROLE "${roleNames.adminOptionTarget}"`),
         /permission denied/i,
       );
+      await client.query('ROLLBACK TO SAVEPOINT denied_set_role');
+      await client.query('RELEASE SAVEPOINT denied_set_role');
       await client.query(
         `GRANT "${roleNames.adminOptionTarget}" TO "${roleNames.adminOptionLogin}" WITH SET TRUE`,
       );

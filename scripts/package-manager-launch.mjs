@@ -3,7 +3,7 @@ export function packageManagerLaunch(pnpmCli, nodeExecutable) {
   if (!normalized) {
     throw new Error('npm_execpath is required');
   }
-  return /\.(?:c?js)$/i.test(normalized)
+  return /\.(?:[cm]?js)$/i.test(normalized)
     ? { binary: nodeExecutable, args: [normalized] }
     : { binary: normalized, args: [] };
 }

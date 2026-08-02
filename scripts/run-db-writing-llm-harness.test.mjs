@@ -27,6 +27,27 @@ test('maps a Windows pnpm JavaScript launcher through node.exe', () => {
   );
 });
 
+test('maps a pnpm ESM launcher through the Node executable', () => {
+  assert.deepEqual(
+    packageManagerLaunch('/opt/pnpm/bin/pnpm.mjs', '/usr/local/bin/node'),
+    {
+      binary: '/usr/local/bin/node',
+      args: ['/opt/pnpm/bin/pnpm.mjs'],
+    },
+  );
+});
+
+test('rejects an unsupported inner harness before command dispatch', () => {
+  const result = spawnSync(
+    process.execPath,
+    [HARNESS, '--inner', 'scripts/unapproved-harness.ts'],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsupported harness.*unapproved-harness/i);
+});
+
 test('inner harness launches tsx through the pinned npm_execpath', () => {
   const fixtureDir = mkdtempSync(path.join(tmpdir(), 'wi1628-pnpm-'));
   const fakePnpm = path.join(fixtureDir, 'fake-pnpm.cjs');

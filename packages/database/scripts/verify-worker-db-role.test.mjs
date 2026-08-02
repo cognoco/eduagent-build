@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   assertDistinctDatabaseCredentials,
+  assertMigratorDatabaseTarget,
   assertWorkerDatabaseCapabilities,
   assertWorkerDatabaseTarget,
 } from './verify-worker-db-role-lib.mjs';
@@ -176,6 +177,39 @@ test('requires the Worker URL and validates its protected environment host', () 
   );
 });
 
+test('requires the migrator credential to target the Worker database', () => {
+  assert.doesNotThrow(() =>
+    assertMigratorDatabaseTarget({
+      workerDatabaseUrl: 'postgresql://app@staging.example/app',
+      migratorDatabaseUrl: 'postgresql://owner@staging.example/app',
+    }),
+  );
+  assert.throws(
+    () =>
+      assertMigratorDatabaseTarget({
+        workerDatabaseUrl: 'postgresql://app@staging.example/app',
+        migratorDatabaseUrl: 'postgresql://owner@other.example/app',
+      }),
+    /MIGRATOR_DATABASE_URL.*same database/i,
+  );
+  assert.throws(
+    () =>
+      assertMigratorDatabaseTarget({
+        workerDatabaseUrl: 'postgresql://app@staging.example/app',
+        migratorDatabaseUrl: 'postgresql://owner@staging.example/other',
+      }),
+    /MIGRATOR_DATABASE_URL.*same database/i,
+  );
+  assert.throws(
+    () =>
+      assertMigratorDatabaseTarget({
+        workerDatabaseUrl: 'postgresql://app@staging.example:5432/app',
+        migratorDatabaseUrl: 'postgresql://owner@staging.example:6543/app',
+      }),
+    /MIGRATOR_DATABASE_URL.*same database/i,
+  );
+});
+
 test('protected workflows verify the Worker role before migration or secret sync', () => {
   const deploy = readFileSync(
     path.join(REPO_ROOT, '.github/workflows/deploy.yml'),
@@ -186,13 +220,22 @@ test('protected workflows verify the Worker role before migration or secret sync
     'utf8',
   );
 
-  const deployVerify = deploy.indexOf('verify-worker-db-role.mjs');
-  const deployMigrate = deploy.indexOf('drizzle-kit migrate', deployVerify);
-  const deployPostMigrateVerify = deploy.indexOf(
+  const apiDeployStart = deploy.indexOf('\n  api-deploy:');
+  const apiDeployEnd = deploy.indexOf(
+    '\n  mobile-confirm-production:',
+    apiDeployStart,
+  );
+  assert.ok(apiDeployStart >= 0, 'api-deploy job is missing');
+  assert.ok(apiDeployEnd > apiDeployStart, 'api-deploy job boundary is missing');
+  const apiDeploy = deploy.slice(apiDeployStart, apiDeployEnd);
+
+  const deployVerify = apiDeploy.indexOf('verify-worker-db-role.mjs');
+  const deployMigrate = apiDeploy.indexOf('drizzle-kit migrate', deployVerify);
+  const deployPostMigrateVerify = apiDeploy.indexOf(
     'verify-worker-db-role.mjs',
     deployVerify + 1,
   );
-  const deploySync = deploy.indexOf('pnpm secrets:sync "$SYNC_TARGET"');
+  const deploySync = apiDeploy.indexOf('pnpm secrets:sync "$SYNC_TARGET"');
   assert.ok(deployVerify >= 0, 'deploy Worker-role verifier is missing');
   assert.ok(deployVerify < deployMigrate, 'role verifier must precede migrate');
   assert.ok(

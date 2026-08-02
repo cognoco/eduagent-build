@@ -229,6 +229,12 @@ describe('run-api-integration.mjs', () => {
       command: process.execPath,
       prefixArgs: ['/opt/pnpm/pnpm.js'],
     },
+    {
+      name: 'POSIX pnpm.mjs CLI',
+      pnpmCli: '/opt/pnpm/pnpm.mjs',
+      command: process.execPath,
+      prefixArgs: ['/opt/pnpm/pnpm.mjs'],
+    },
   ])(
     'launches $name through npm_execpath with exact forwarded arguments',
     ({ pnpmCli, command, prefixArgs }) => {

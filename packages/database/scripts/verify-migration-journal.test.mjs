@@ -20,6 +20,10 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const DEPLOY_YML = path.join(REPO_ROOT, '.github/workflows/deploy.yml');
+const PRE_LAUNCH_CHECKLIST = path.join(
+  REPO_ROOT,
+  'docs/pre-launch-checklist.md',
+);
 
 const migrations = [
   { idx: 0, tag: '0000_first', when: 100, hash: 'hash-0', sql: '' },
@@ -98,6 +102,20 @@ test('rejects duplicate live journal rows for the same migration', () => {
         ],
       }),
     /journal.*duplicate.*hash-0/i,
+  );
+});
+
+test('rejects duplicate hashes in the committed migration chain', () => {
+  assert.throws(
+    () =>
+      reconcileMigrationJournal({
+        migrations: [
+          { idx: 0, tag: '0000_first', when: 100, hash: 'same-hash' },
+          { idx: 1, tag: '0001_second', when: 200, hash: 'same-hash' },
+        ],
+        appliedRows: [],
+      }),
+    /committed migrations.*0000_first.*0001_second.*same-hash/i,
   );
 });
 
@@ -429,6 +447,32 @@ test('ignores DDL-looking text inside SQL comments, strings, and dollar blocks',
   assert.deepEqual(findUnsupportedDdlStatements(source), []);
 });
 
+test('closes a standard SQL string after a trailing backslash', () => {
+  const source = String.raw`
+    INSERT INTO audit_log(message) VALUES ('C:\');
+    CREATE TABLE "after_backslash" (id integer);
+  `;
+
+  assert.deepEqual(
+    extractDdlProbes(source).map((probe) => probe.description),
+    ['table public.after_backslash'],
+  );
+  assert.deepEqual(findUnsupportedDdlStatements(source), []);
+});
+
+test('keeps backslash escapes inside PostgreSQL E-strings', () => {
+  const source = String.raw`
+    INSERT INTO audit_log(message) VALUES (E'it\'s okay');
+    CREATE TABLE "after_escape_string" (id integer);
+  `;
+
+  assert.deepEqual(
+    extractDdlProbes(source).map((probe) => probe.description),
+    ['table public.after_escape_string'],
+  );
+  assert.deepEqual(findUnsupportedDdlStatements(source), []);
+});
+
 test('ignores DDL-looking defaults inside a top-level CREATE TABLE', () => {
   const source = `
     CREATE TABLE actual_events (
@@ -496,4 +540,25 @@ test('deploy preflight runs after target verification and before migrate', () =>
     'journal check must follow target check',
   );
   assert.ok(journalIndex < migrateIndex, 'journal check must precede migrate');
+});
+
+test('manual migration checklist requires both preflights before migrate', () => {
+  const checklist = readFileSync(PRE_LAUNCH_CHECKLIST, 'utf8');
+  const targetIndex = checklist.indexOf('scripts/verify-db-target.mjs');
+  const journalIndex = checklist.indexOf(
+    'scripts/verify-migration-journal.mjs',
+  );
+  const migrateIndex = checklist.indexOf('exec drizzle-kit migrate');
+
+  assert.ok(targetIndex >= 0, 'manual target verifier is missing');
+  assert.ok(journalIndex >= 0, 'manual journal verifier is missing');
+  assert.ok(migrateIndex >= 0, 'manual migration command is missing');
+  assert.ok(
+    targetIndex < journalIndex,
+    'manual journal check must follow target check',
+  );
+  assert.ok(
+    journalIndex < migrateIndex,
+    'manual journal check must precede migrate',
+  );
 });

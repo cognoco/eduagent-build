@@ -108,6 +108,30 @@ export function assertDistinctDatabaseCredentials({
   }
 }
 
+export function assertMigratorDatabaseTarget({
+  workerDatabaseUrl,
+  migratorDatabaseUrl,
+}) {
+  let workerTarget;
+  let migratorTarget;
+  try {
+    workerTarget = new URL(workerDatabaseUrl);
+    migratorTarget = new URL(migratorDatabaseUrl);
+  } catch {
+    throw new Error(
+      'MIGRATOR_DATABASE_URL must target the same database as WORKER_DATABASE_URL',
+    );
+  }
+  if (
+    migratorTarget.host.toLowerCase() !== workerTarget.host.toLowerCase() ||
+    migratorTarget.pathname !== workerTarget.pathname
+  ) {
+    throw new Error(
+      'MIGRATOR_DATABASE_URL must target the same database as WORKER_DATABASE_URL',
+    );
+  }
+}
+
 export function assertWorkerDatabaseTarget({
   deployEnv,
   workerDatabaseUrl,

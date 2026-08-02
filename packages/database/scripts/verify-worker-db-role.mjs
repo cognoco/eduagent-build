@@ -15,6 +15,7 @@ import {
 } from './database-role-capabilities.mjs';
 import {
   assertDistinctDatabaseCredentials,
+  assertMigratorDatabaseTarget,
   assertWorkerDatabaseCapabilities,
   assertWorkerDatabaseTarget,
   parseExpectedBypassRls,
@@ -33,6 +34,10 @@ async function main() {
     workerDatabaseUrl,
     stagingHost: process.env.DATABASE_URL_STAGING_HOST,
     productionHost: process.env.DATABASE_URL_PRODUCTION_HOST,
+  });
+  assertMigratorDatabaseTarget({
+    workerDatabaseUrl,
+    migratorDatabaseUrl,
   });
   assertDistinctDatabaseCredentials({
     workerDatabaseUrl,

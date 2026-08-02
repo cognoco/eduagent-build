@@ -88,6 +88,15 @@ describe('[WI-1628] protected Worker database credential split', () => {
     expect(resolveSyncTargets()).toEqual({ envs: ['dev'] });
   });
 
+  it.each(['stg', 'prd'])(
+    'rejects the %s target when the Worker app credential is missing',
+    (envKey) => {
+      expect(resolveSyncTargets([envKey])).toMatchObject({
+        error: expect.stringMatching(/WORKER_DATABASE_URL/),
+      });
+    },
+  );
+
   it('refuses to fan one protected credential across multiple targets', () => {
     expect(
       resolveSyncTargets(['stg', 'prd'], 'postgresql://single-worker-app-role'),

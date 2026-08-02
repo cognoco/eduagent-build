@@ -3,9 +3,17 @@ function normalizedTimestamp(value) {
 }
 
 export function reconcileMigrationJournal({ migrations, appliedRows }) {
-  const byHash = new Map(
-    migrations.map((migration) => [migration.hash, migration]),
-  );
+  const byHash = new Map();
+  for (const migration of migrations) {
+    const existing = byHash.get(migration.hash);
+    if (existing) {
+      throw new Error(
+        `Committed migrations ${existing.tag} and ${migration.tag} share ` +
+          `duplicate hash "${migration.hash}"`,
+      );
+    }
+    byHash.set(migration.hash, migration);
+  }
   const appliedIndices = new Set();
   const appliedHashes = new Set();
 
@@ -71,10 +79,20 @@ function schemaName(capturedSchema) {
   return capturedSchema || 'public';
 }
 
+function quoteUsesBackslashEscapes(source, quoteIndex) {
+  const prefix = source[quoteIndex - 1];
+  const beforePrefix = source[quoteIndex - 2];
+  return (
+    (prefix === 'E' || prefix === 'e') &&
+    (!beforePrefix || !/[a-z0-9_$]/i.test(beforePrefix))
+  );
+}
+
 function splitTopLevelSqlStatements(source) {
   const statements = [];
   let current = '';
   let inSingleQuote = false;
+  let singleQuoteUsesBackslashEscapes = false;
   let inDoubleQuote = false;
   let dollarTag = null;
   let lineComment = false;
@@ -115,7 +133,7 @@ function splitTopLevelSqlStatements(source) {
     }
     if (inSingleQuote) {
       current += character;
-      if (character === '\\' && next) {
+      if (singleQuoteUsesBackslashEscapes && character === '\\' && next) {
         current += next;
         index += 1;
       } else if (character === "'" && next === "'") {
@@ -123,6 +141,7 @@ function splitTopLevelSqlStatements(source) {
         index += 1;
       } else if (character === "'") {
         inSingleQuote = false;
+        singleQuoteUsesBackslashEscapes = false;
       }
       continue;
     }
@@ -151,6 +170,10 @@ function splitTopLevelSqlStatements(source) {
     }
     if (character === "'") {
       inSingleQuote = true;
+      singleQuoteUsesBackslashEscapes = quoteUsesBackslashEscapes(
+        source,
+        index,
+      );
       current += character;
       continue;
     }
@@ -187,6 +210,7 @@ function splitTopLevelSqlStatements(source) {
 function maskSqlLiteralBodies(source) {
   let masked = '';
   let inSingleQuote = false;
+  let singleQuoteUsesBackslashEscapes = false;
   let inDoubleQuote = false;
   let dollarTag = null;
 
@@ -208,7 +232,7 @@ function maskSqlLiteralBodies(source) {
     }
     if (inSingleQuote) {
       masked += blank(character);
-      if (character === '\\' && next) {
+      if (singleQuoteUsesBackslashEscapes && character === '\\' && next) {
         masked += blank(next);
         index += 1;
       } else if (character === "'" && next === "'") {
@@ -216,6 +240,7 @@ function maskSqlLiteralBodies(source) {
         index += 1;
       } else if (character === "'") {
         inSingleQuote = false;
+        singleQuoteUsesBackslashEscapes = false;
       }
       continue;
     }
@@ -232,6 +257,10 @@ function maskSqlLiteralBodies(source) {
 
     if (character === "'") {
       inSingleQuote = true;
+      singleQuoteUsesBackslashEscapes = quoteUsesBackslashEscapes(
+        source,
+        index,
+      );
       masked += ' ';
       continue;
     }
