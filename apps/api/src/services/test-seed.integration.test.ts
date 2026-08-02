@@ -40,6 +40,7 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
+import { ensureInitialTrialSubscriptionV2 } from './billing/billing-v2';
 import { resetDatabase, seedScenario, SEED_CLERK_PREFIX } from './test-seed';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -231,6 +232,43 @@ const RUN = !!process.env.DATABASE_URL;
       expect(requestsAfter).toEqual([]);
       expect(personAfter).toEqual([]);
       expect(orgAfter).toEqual([]);
+    });
+
+    it('[WI-2788] gives the credentialed non-owner child a distinct admin payer anchor', async () => {
+      const prefix = `wi2788-non-owner-${generateUUIDv7()}-`;
+      const email = `${prefix}child@example.com`;
+
+      try {
+        const result = await seedScenario(
+          db,
+          'v2-account-non-owner-child',
+          email,
+        );
+        const memberships = await db
+          .select({ personId: membership.personId, roles: membership.roles })
+          .from(membership)
+          .where(eq(membership.organizationId, result.accountId));
+        const childMembership = memberships.find(
+          (row) => row.personId === result.profileId,
+        );
+        const adminMemberships = memberships.filter((row) =>
+          row.roles.includes('admin'),
+        );
+
+        expect(childMembership?.roles).toEqual(['learner']);
+        expect(adminMemberships).toHaveLength(1);
+        expect(adminMemberships[0]?.personId).not.toBe(result.profileId);
+
+        await expect(
+          ensureInitialTrialSubscriptionV2(db, result.accountId),
+        ).resolves.toMatchObject({
+          accountId: result.accountId,
+          tier: 'plus',
+          status: 'trial',
+        });
+      } finally {
+        await resetDatabase(db, {}, { prefix, preserveClerkUsers: true });
+      }
     });
 
     it.each([

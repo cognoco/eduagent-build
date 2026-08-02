@@ -647,7 +647,7 @@ describe('seedScenario', () => {
     },
   );
 
-  it('[WI-2554] seeds a credentialed learner-only person without an admin role or managed-child guardianship', async () => {
+  it('[WI-2554] seeds a credentialed learner-only person with a distinct admin payer anchor', async () => {
     const db = createMockDb();
     const result = await seedScenario(
       db,
@@ -680,8 +680,17 @@ describe('seedScenario', () => {
         roles: ['learner'],
       }),
     );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        organizationId: result.accountId,
+        roles: ['admin'],
+      }),
+    );
     expect(insertedRows).not.toContainEqual(
-      expect.objectContaining({ roles: expect.arrayContaining(['admin']) }),
+      expect.objectContaining({
+        personId: result.profileId,
+        roles: expect.arrayContaining(['admin']),
+      }),
     );
     expect(insertedRows).not.toContainEqual(
       expect.objectContaining({
