@@ -16,6 +16,7 @@ describe('resolveClerkPublishableKey', () => {
   const originalClerkKey = process.env.CLERK_PUBLISHABLE_KEY;
   const originalExpoKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const originalClerkSecret = process.env.CLERK_SECRET_KEY;
+  const originalClerkAudience = process.env.CLERK_AUDIENCE;
   const originalSkipLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API;
   const originalPhaseFile = process.env.PLAYWRIGHT_PRELOAD_PHASE_FILE;
   let phaseDir: string | undefined;
@@ -35,6 +36,11 @@ describe('resolveClerkPublishableKey', () => {
       delete process.env.CLERK_SECRET_KEY;
     } else {
       process.env.CLERK_SECRET_KEY = originalClerkSecret;
+    }
+    if (originalClerkAudience === undefined) {
+      delete process.env.CLERK_AUDIENCE;
+    } else {
+      process.env.CLERK_AUDIENCE = originalClerkAudience;
     }
     if (originalSkipLocalApi === undefined) {
       delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
@@ -101,8 +107,14 @@ describe('resolveClerkPublishableKey', () => {
       if (String(options?.path).endsWith('.dev.vars')) {
         Object.assign(options?.processEnv ?? {}, {
           CLERK_SECRET_KEY: 'sk_test_local',
+          CLERK_AUDIENCE: 'development-api',
         });
-        return { parsed: { CLERK_SECRET_KEY: 'sk_test_local' } };
+        return {
+          parsed: {
+            CLERK_SECRET_KEY: 'sk_test_local',
+            CLERK_AUDIENCE: 'development-api',
+          },
+        };
       }
       process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_expo';
       return { parsed: { EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_expo' } };
@@ -126,8 +138,14 @@ describe('resolveClerkPublishableKey', () => {
       if (String(options?.path).endsWith('.dev.vars')) {
         Object.assign(options?.processEnv ?? {}, {
           CLERK_SECRET_KEY: 'sk_test_local_api',
+          CLERK_AUDIENCE: 'development-api',
         });
-        return { parsed: { CLERK_SECRET_KEY: 'sk_test_local_api' } };
+        return {
+          parsed: {
+            CLERK_SECRET_KEY: 'sk_test_local_api',
+            CLERK_AUDIENCE: 'development-api',
+          },
+        };
       }
       process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_expo';
       return { parsed: { EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_expo' } };
@@ -136,6 +154,7 @@ describe('resolveClerkPublishableKey', () => {
     await globalSetup();
 
     expect(process.env.CLERK_SECRET_KEY).toBe('sk_test_local_api');
+    expect(process.env.CLERK_AUDIENCE).toBe('development-api');
     expect(clerkSetup).toHaveBeenCalledTimes(1);
   });
 
@@ -182,6 +201,27 @@ describe('resolveClerkPublishableKey', () => {
 
     await expect(globalSetup()).rejects.toThrow(
       /Local API CLERK_SECRET_KEY is unavailable/i,
+    );
+    expect(clerkSetup).not.toHaveBeenCalled();
+  });
+
+  it('rejects an omitted local API audience before Clerk setup', async () => {
+    process.env.CLERK_SECRET_KEY = 'sk_test_local_api';
+    delete process.env.CLERK_AUDIENCE;
+    delete process.env.PLAYWRIGHT_SKIP_LOCAL_API;
+    jest.mocked(dotenv.config).mockImplementation((options) => {
+      if (String(options?.path).endsWith('.dev.vars')) {
+        Object.assign(options?.processEnv ?? {}, {
+          CLERK_SECRET_KEY: 'sk_test_local_api',
+        });
+        return { parsed: { CLERK_SECRET_KEY: 'sk_test_local_api' } };
+      }
+      process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_expo';
+      return { parsed: { EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_expo' } };
+    });
+
+    await expect(globalSetup()).rejects.toThrow(
+      /Local API CLERK_AUDIENCE is unavailable/i,
     );
     expect(clerkSetup).not.toHaveBeenCalled();
   });

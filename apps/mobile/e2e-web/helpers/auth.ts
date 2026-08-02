@@ -2,6 +2,7 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
+import { assertDevelopmentClerkTokenAudience } from './clerk-audience';
 import { pressableClick } from './pressable';
 
 export interface SignInOptions {
@@ -183,6 +184,13 @@ export async function markPreAuthIntroSeen(page: Page): Promise<boolean> {
     : undefined;
 
   if (!userId) return false;
+
+  if (process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1') {
+    assertDevelopmentClerkTokenAudience(
+      sessionCookie.value,
+      process.env.CLERK_AUDIENCE,
+    );
+  }
 
   await page.evaluate(() => {
     window.localStorage.setItem(
