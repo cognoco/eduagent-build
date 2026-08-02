@@ -2,6 +2,7 @@ import { clerkSetup } from '@clerk/testing/playwright';
 import dotenv from 'dotenv';
 import path from 'node:path';
 
+import { alignPlaywrightClerkAudience } from './clerk-audience';
 import { alignPlaywrightClerkSecret } from './clerk-secret-identity';
 import { recordPreloadPhase } from './preload-phase';
 
@@ -34,6 +35,7 @@ export default async function globalSetup() {
       path: path.join(process.cwd(), 'apps', 'mobile', '.env.local'),
     });
     alignPlaywrightClerkSecret(process.env);
+    alignPlaywrightClerkAudience(process.env);
     process.env.CLERK_PUBLISHABLE_KEY = resolveClerkPublishableKey(process.env);
     await clerkSetup();
     recordPreloadPhase('global-setup-completed');

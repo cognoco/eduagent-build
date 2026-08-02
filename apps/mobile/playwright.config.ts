@@ -156,7 +156,10 @@ export default defineConfig({
             command: 'pnpm --dir ../api exec wrangler dev --port 8787',
             cwd: mobileDir,
             url: `${apiBaseUrl}/v1/health`,
-            reuseExistingServer: !process.env.CI,
+            // WI-2923: the audience preflight reads the same .dev.vars that
+            // starts this Worker. Reusing an older process could validate the
+            // new file while exercising stale in-memory Clerk bindings.
+            reuseExistingServer: false,
             stdout: 'pipe' as const,
             stderr: 'pipe' as const,
             timeout: 120_000,
