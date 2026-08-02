@@ -608,13 +608,16 @@ export function ChatShell({
   useEffect(() => {
     if (discardedRef.current) return;
     if (!ownCaptureRef.current) return;
-    if (!isListening && transcript.trim()) {
+    if (isListening) return;
+    if (transcript.trim()) {
       setPendingTranscript(transcript);
-      // The engine has fully settled: this capture is consumed. Close the
-      // acceptance window so a foreign capture's transcript cannot land here.
-      if (speechStatus === 'idle' || speechStatus === 'error') {
-        ownCaptureRef.current = false;
-      }
+    }
+    // The engine has fully settled: this capture is consumed — whether or
+    // not it produced text. Closing the window on the empty case too is what
+    // keeps a LATER foreign capture (parking-lot / drafted-note mic) from
+    // folding its transcript into this composer's pending message.
+    if (speechStatus === 'idle' || speechStatus === 'error') {
+      ownCaptureRef.current = false;
     }
   }, [isListening, transcript, speechStatus]);
 

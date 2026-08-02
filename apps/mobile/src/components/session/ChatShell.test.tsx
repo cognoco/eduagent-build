@@ -581,6 +581,44 @@ describe('ChatShell', () => {
       screen.getByTestId('voice-rerecord-button');
     });
 
+    it('closes the acceptance window after an own capture that produced no text (empty-capture isolation)', async () => {
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+      // Own capture starts and settles with NO spoken text — walk the real
+      // engine sequence (listening → settled) so the sync effect re-runs.
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('voice-record-button'));
+      });
+      mockSttState = {
+        ...mockSttState,
+        isListening: true,
+        transcript: '',
+        status: 'listening',
+      };
+      rerender(<ChatShell {...props} />);
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: '',
+        status: 'idle',
+      };
+      rerender(<ChatShell {...props} />);
+
+      // A foreign capture's transcript then arrives at this hook instance.
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'Dictated elsewhere after my silent take',
+      };
+      rerender(<ChatShell {...props} />);
+
+      expect(screen.queryByTestId('voice-send-button')).toBeNull();
+      expect(
+        screen.queryByDisplayValue('Dictated elsewhere after my silent take'),
+      ).toBeNull();
+    });
+
     it('does not preview a transcript from a capture this composer never started (foreign capture isolation)', () => {
       // A parking-lot or drafted-note mic shares the singleton recognizer;
       // its results reach this hook instance too. Without an own capture the
