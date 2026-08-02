@@ -435,6 +435,10 @@ export const safetyProbesFlow: FlowDefinition<SafetyProbeScenarioInput> = {
   emitsEnvelope: true,
   expectedResponseSchema: llmResponseEnvelopeSchema,
 
+  providerCallCount(input): number {
+    return input.category === 'legitimate_sensitive' ? 2 : 1;
+  },
+
   buildPromptInput(): SafetyProbeScenarioInput | null {
     // Not used — enumerateScenarios fans out instead.
     return null;

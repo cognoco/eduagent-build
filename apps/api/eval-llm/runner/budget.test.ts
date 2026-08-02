@@ -1,4 +1,10 @@
-import { deriveEnvelopeBudget, type EnvelopeBudgetInput } from './budget';
+import {
+  deriveEnvelopeBudget,
+  deriveEnvelopeProviderDemandFromMatrix,
+  resolveEnvelopeLiveCallCap,
+  type EnvelopeBudgetInput,
+  type EnvelopeMatrixFlow,
+} from './budget';
 
 describe('deriveEnvelopeBudget', () => {
   const flows: EnvelopeBudgetInput[] = [
@@ -18,5 +24,79 @@ describe('deriveEnvelopeBudget', () => {
         'flow-b': { baselineSamples: 1, requiredSamples: 2 },
       },
     });
+  });
+});
+
+describe('deriveEnvelopeProviderDemandFromMatrix', () => {
+  it('includes flow-declared internal provider calls in sequential demand', () => {
+    const flows: EnvelopeMatrixFlow[] = [
+      {
+        id: 'safety-probes',
+        emitsEnvelope: true,
+        buildPromptInput: () => null,
+        enumerateScenarios: () => [
+          { scenarioId: 'ordinary', input: { category: 'jailbreak' } },
+          {
+            scenarioId: 'sensitive',
+            input: { category: 'legitimate_sensitive' },
+          },
+        ],
+        providerCallCount: (input) =>
+          input.category === 'legitimate_sensitive' ? 2 : 1,
+      },
+    ];
+
+    expect(deriveEnvelopeProviderDemandFromMatrix(flows, [{}])).toEqual({
+      outerRunLiveCalls: 2,
+      internalProviderCalls: 1,
+      providerCalls: 3,
+      flows: {
+        'safety-probes': {
+          outerRunLiveCalls: 2,
+          internalProviderCalls: 1,
+          providerCalls: 3,
+        },
+      },
+    });
+  });
+
+  it('evaluates a non-enumerated prompt input once per profile', () => {
+    let buildCount = 0;
+    const flows: EnvelopeMatrixFlow[] = [
+      {
+        id: 'single-input',
+        emitsEnvelope: true,
+        buildPromptInput: () => {
+          buildCount++;
+          return { scenarioId: `item-${buildCount}` };
+        },
+      },
+    ];
+
+    expect(deriveEnvelopeProviderDemandFromMatrix(flows, [{}])).toMatchObject({
+      outerRunLiveCalls: 1,
+      providerCalls: 1,
+    });
+    expect(buildCount).toBe(1);
+  });
+});
+
+describe('resolveEnvelopeLiveCallCap', () => {
+  it('auto-fits an omitted cap for the live envelope-only path', () => {
+    expect(
+      resolveEnvelopeLiveCallCap(
+        { live: true, onlyEnvelopeFlows: true },
+        { configuredBudget: 362 },
+      ),
+    ).toBe(362);
+  });
+
+  it('preserves an explicit cap for the caller to validate', () => {
+    expect(
+      resolveEnvelopeLiveCallCap(
+        { live: true, onlyEnvelopeFlows: true, maxLiveCalls: 400 },
+        { configuredBudget: 362 },
+      ),
+    ).toBe(400);
   });
 });

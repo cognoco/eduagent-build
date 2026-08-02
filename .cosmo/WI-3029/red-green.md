@@ -34,3 +34,19 @@ mastery grid requires 216 configured units and estimates 192 expected provider c
 
 No live eval, paid provider call, workflow dispatch, deploy, or environment
 mutation was performed.
+
+## Review regressions
+
+Red review tests first failed because the provider-demand and omitted-cap
+helpers were not exported. Green review verification then passed:
+
+```text
+apps/api/eval-llm/runner/budget.test.ts: 5 passed
+scripts/eval-live-gate-independence.test.ts: 13 passed
+```
+
+The executable envelope flow contract derives `329` outer invocations plus
+`31` legitimate-sensitive safety judges and `6` language-quality judges for
+`366` sequential provider calls. The omitted-cap contract resolves the
+envelope configured cap before `bootstrapLlmProviders()` and before
+`runHarness`, so the runner's default `20` cannot be reached.

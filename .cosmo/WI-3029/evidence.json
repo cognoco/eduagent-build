@@ -27,12 +27,12 @@
     },
     {
       "acRef": "AC-6",
-      "description": "Workflow comments record sequential estimated provider demand and gate-specific caps with explicit timeout uncertainty.",
+      "description": "Workflow comments record matrix-derived envelope provider demand including internal judge calls, sequential estimated provider demand, and gate-specific caps with explicit timeout uncertainty.",
       "pointer": ".github/workflows/eval-live.yml"
     },
     {
       "acRef": "AC-7",
-      "description": "Deterministic workflow-contract and changed-count tests pin derived relationships without a fixed envelope-only assertion.",
+      "description": "Deterministic workflow-contract tests pin derived provider-demand relationships, omitted-cap preflight ordering, runtime order, and changed counts without a fixed envelope-only assertion.",
       "pointer": "scripts/eval-live-gate-independence.test.ts"
     }
   ],

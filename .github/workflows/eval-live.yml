@@ -44,11 +44,14 @@ jobs:
     runs-on: ubuntu-latest
     # Sequential-demand contract (WI-3029): envelope matrix reports
     # baseline=305 and required=329 samples; its 10% headroom configures 362.
-    # Teaching remains 5 runLive invocations (≈85 internal calls). Mastery is
-    # an 8-scenario × 3-run grid: 216 governed configured units and 192
-    # expected provider calls. The comparable estimated provider demand is
-    # 329 + 85 + 192 = 606; configured caps remain gate-specific because these
-    # units are heterogeneous and must not be added across gates. No paid
+    # Envelope provider demand: 329 outer runLive invocations + 37 internal judge
+    # calls (31 legitimate_sensitive safety probes + 6 language-quality samples)
+    # = 366 provider calls. Teaching remains 5 runLive invocations (≈85
+    # internal calls). Mastery is an 8-scenario × 3-run grid: 216 governed
+    # configured units and 192 expected provider calls. The comparable estimated
+    # provider demand is 366 + 85 + 192 = 643; configured caps remain
+    # gate-specific because these units are heterogeneous and must not be added
+    # across gates. No paid
     # full-run P90 is retained yet, so 180 minutes is an explicit conservative
     # timeout with queue/latency uncertainty; reverify it from the first
     # operator-authorized run evidence before tightening.

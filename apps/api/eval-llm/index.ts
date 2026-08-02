@@ -78,7 +78,11 @@ import {
   type Baseline,
 } from './runner/metrics';
 import { PROFILES } from './fixtures/profiles';
-import { deriveEnvelopeBudgetFromMatrix } from './runner/budget';
+import {
+  deriveEnvelopeBudgetFromMatrix,
+  deriveEnvelopeProviderDemandFromMatrix,
+  resolveEnvelopeLiveCallCap,
+} from './runner/budget';
 import { evaluateGates } from './runner/gates';
 import {
   bootstrapLlmProviders,
@@ -162,10 +166,19 @@ async function main(): Promise<void> {
       PROFILES,
       baseline?.flows,
     );
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      FLOWS,
+      PROFILES,
+    );
     console.log(
       `Envelope matrix demand: required=${budget.requiredSamples} ` +
         `baseline=${budget.baselineSamples} configured=${budget.configuredBudget} ` +
         `headroom=${budget.headroomSamples} (${budget.headroomRate * 100}%)`,
+    );
+    console.log(
+      `Envelope provider demand: outer=${providerDemand.outerRunLiveCalls} ` +
+        `internal=${providerDemand.internalProviderCalls} ` +
+        `total=${providerDemand.providerCalls}`,
     );
     for (const [flowId, demand] of Object.entries(budget.flows)) {
       console.log(
@@ -262,6 +275,7 @@ async function main(): Promise<void> {
       baseline?.flows,
       { scenarioFilter: options.scenarioFilter },
     );
+    options.maxLiveCalls = resolveEnvelopeLiveCallCap(options, budget);
     if (
       options.maxLiveCalls !== undefined &&
       options.maxLiveCalls < budget.configuredBudget

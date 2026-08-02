@@ -104,6 +104,9 @@ export interface FlowDefinition<Input = unknown> {
    */
   runLive?(input: Input, messages: PromptMessages): Promise<string>;
 
+  /** Total provider calls for one live item, including internal judge calls. */
+  providerCallCount?(input: Input): number;
+
   /**
    * Optional: expected response shape for live runs. When set, Tier 2 runs
    * parse the response as JSON and validate against this schema; any

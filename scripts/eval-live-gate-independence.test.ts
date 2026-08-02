@@ -33,6 +33,11 @@ import { CHALLENGE_SIM_SCENARIOS } from '../apps/api/eval-llm/fixtures/challenge
 import { PROFILES } from '../apps/api/eval-llm/fixtures/profiles';
 import { ENVELOPE_FLOWS } from '../apps/api/eval-llm/envelope-flow-registry';
 import { deriveEnvelopeBudgetFromMatrix } from '../apps/api/eval-llm/runner/budget';
+import {
+  deriveEnvelopeProviderDemandFromMatrix,
+  resolveEnvelopeLiveCallCap,
+} from '../apps/api/eval-llm/runner/budget';
+import { parseCliArgs } from '../apps/api/eval-llm/runner/runner';
 import { parseBaseline } from '../apps/api/eval-llm/runner/metrics';
 import { deriveMasteryBudget } from '../apps/api/eval-llm/runner/sim-budget';
 
@@ -117,8 +122,44 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       join(repoRoot, '.github/workflows/eval-live.yml'),
       'utf8',
     );
-    expect(workflow).toContain('329 + 85 + 192 = 606');
-    expect(workflow).toContain('configured caps remain gate-specific');
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+    );
+    const masteryBudget = deriveMasteryBudget({
+      scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
+      runs: 3,
+    });
+    const teachingProviderCalls = TEACHING_SCENARIOS.length * 17;
+    const workflowComments = workflow.replace(/^\s*#\s?/gm, '');
+    const providerEvidence = workflowComments.match(
+      /Envelope provider demand:\s+(\d+) outer runLive invocations\s+\+ (\d+) internal judge\s+calls \((\d+) legitimate_sensitive safety probes \+ (\d+) language-quality samples\)\s*=\s*(\d+) provider calls/,
+    );
+    expect(providerEvidence).not.toBeNull();
+    expect(Number(providerEvidence![1])).toBe(providerDemand.outerRunLiveCalls);
+    expect(Number(providerEvidence![2])).toBe(
+      providerDemand.internalProviderCalls,
+    );
+    expect(Number(providerEvidence![3])).toBe(
+      providerDemand.flows['safety-probes'].internalProviderCalls,
+    );
+    expect(Number(providerEvidence![4])).toBe(
+      providerDemand.flows['language-quality'].internalProviderCalls,
+    );
+    expect(Number(providerEvidence![5])).toBe(providerDemand.providerCalls);
+    const totalEvidence = workflowComments.match(
+      /provider demand is (\d+) \+ (\d+) \+ (\d+) = (\d+)/,
+    );
+    expect(totalEvidence).not.toBeNull();
+    expect(Number(totalEvidence![1])).toBe(providerDemand.providerCalls);
+    expect(Number(totalEvidence![2])).toBe(teachingProviderCalls);
+    expect(Number(totalEvidence![3])).toBe(masteryBudget.expectedProviderCalls);
+    expect(Number(totalEvidence![4])).toBe(
+      providerDemand.providerCalls +
+        teachingProviderCalls +
+        masteryBudget.expectedProviderCalls,
+    );
+    expect(workflowComments).toMatch(/configured caps remain\s+gate-specific/);
     const baseline = parseBaseline(
       readFileSync(join(repoRoot, 'apps/api/eval-llm/baseline.json'), 'utf8'),
     );
@@ -127,16 +168,49 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       PROFILES,
       baseline!.flows,
     );
-    const masteryBudget = deriveMasteryBudget({
-      scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
-      runs: 3,
-    });
     const mixedTotal =
       envelopeBudget.configuredBudget +
       TEACHING_SCENARIOS.length * 17 +
       masteryBudget.configuredUnits;
     expect(workflow).not.toContain(
       `${mixedTotal} configured units across the three gates`,
+    );
+  });
+
+  test('omitted envelope cap is auto-fitted before the runner default can apply', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/api/eval-llm/index.ts'),
+      'utf8',
+    );
+    const parsed = parseCliArgs([
+      '--live',
+      '--check-baseline',
+      '--only-envelope-flows',
+    ]).options;
+    const budget = deriveEnvelopeBudgetFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+      parseBaseline(
+        readFileSync(join(repoRoot, 'apps/api/eval-llm/baseline.json'), 'utf8'),
+      )!.flows,
+    );
+    expect(parsed.maxLiveCalls).toBeUndefined();
+    expect(resolveEnvelopeLiveCallCap(parsed, budget)).toBe(
+      budget.configuredBudget,
+    );
+    expect(resolveEnvelopeLiveCallCap(parsed, budget)).not.toBe(20);
+    expect(source).toContain(
+      'options.maxLiveCalls = resolveEnvelopeLiveCallCap(options, budget);',
+    );
+    const autoFitPosition = source.indexOf(
+      'options.maxLiveCalls = resolveEnvelopeLiveCallCap(options, budget);',
+    );
+    expect(autoFitPosition).toBeGreaterThanOrEqual(0);
+    expect(autoFitPosition).toBeLessThan(
+      source.indexOf('bootstrapLlmProviders();'),
+    );
+    expect(autoFitPosition).toBeLessThan(
+      source.indexOf('const summary: RunSummary = await runHarness'),
     );
   });
 
