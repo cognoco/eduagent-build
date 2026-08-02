@@ -14,6 +14,11 @@ function restoreEnvironment(): void {
   jest.resetModules();
 }
 
+function cleanupRuntime(root: string): void {
+  restoreEnvironment();
+  rmSync(root, { recursive: true, force: true });
+}
+
 function prepareRuntime(
   options: {
     apiSecret?: string;
@@ -59,7 +64,7 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
         'X-Test-Secret': 'api-local-secret',
       });
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      cleanupRuntime(root);
     }
   });
 
@@ -68,7 +73,7 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
     try {
       expect(() => load()).not.toThrow();
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      cleanupRuntime(root);
     }
   });
 
@@ -83,7 +88,7 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
         'X-Test-Secret': 'api-local-secret',
       });
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      cleanupRuntime(root);
     }
   });
 
@@ -106,7 +111,7 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
       expect(message).not.toContain(apiSecret);
       expect(message).not.toContain(runnerSecret);
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      cleanupRuntime(root);
     }
   });
 
@@ -121,7 +126,7 @@ describe('local Playwright test-seed secret contract (WI-2921)', () => {
         'X-Test-Secret': 'staging-runner-secret',
       });
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      cleanupRuntime(root);
     }
   });
 });
