@@ -122,6 +122,8 @@ async function scrubIfUnchanged(
 export async function remediateMentorNotices(
   db: Database,
 ): Promise<SurfaceRemediationReport[]> {
+  // scope-allow: system remediation job intentionally scans and scrubs across
+  // all profiles; the sweep is defined by the offending text, not by an owner.
   const rows = await db
     .select({
       id: mentorNotices.id,
@@ -138,6 +140,8 @@ export async function remediateMentorNotices(
   let conceptsScrubbed = 0;
   for (const target of concepts.remediate) {
     const updated = await scrubIfUnchanged(() =>
+      // scope-allow: guarded by the row id plus its exact prior text; the job is
+      // deliberately cross-profile.
       db
         .update(mentorNotices)
         .set({ concept: REDACTED_PLACEHOLDER, status: 'faded' })
@@ -160,6 +164,8 @@ export async function remediateMentorNotices(
   let hintsScrubbed = 0;
   for (const target of hints.remediate) {
     const updated = await scrubIfUnchanged(() =>
+      // scope-allow: guarded by the row id plus its exact prior text; the job is
+      // deliberately cross-profile.
       db
         .update(mentorNotices)
         .set({ correctionHint: null })
@@ -202,6 +208,8 @@ export async function remediateMentorNotices(
 export async function remediateTopicNotes(
   db: Database,
 ): Promise<SurfaceRemediationReport> {
+  // scope-allow: system remediation job intentionally scans and scrubs across
+  // all profiles; the sweep is defined by the offending text, not by an owner.
   const rows = await db
     .select({ id: topicNotes.id, text: topicNotes.content })
     .from(topicNotes);
@@ -211,6 +219,8 @@ export async function remediateTopicNotes(
   let scrubbed = 0;
   for (const target of result.remediate) {
     const updated = await scrubIfUnchanged(() =>
+      // scope-allow: guarded by the row id plus its exact prior text; the job is
+      // deliberately cross-profile.
       db
         .update(topicNotes)
         .set({ content: REDACTED_PLACEHOLDER })
@@ -244,6 +254,8 @@ export async function remediateTopicNotes(
 export async function remediateNeedsDeepening(
   db: Database,
 ): Promise<SurfaceRemediationReport> {
+  // scope-allow: system remediation job intentionally scans and scrubs across
+  // all profiles; the sweep is defined by the offending text, not by an owner.
   const rows = await db
     .select({
       id: needsDeepeningTopics.id,
@@ -257,6 +269,8 @@ export async function remediateNeedsDeepening(
   let scrubbed = 0;
   for (const target of result.remediate) {
     const updated = await scrubIfUnchanged(() =>
+      // scope-allow: guarded by the row id plus its exact prior text; the job is
+      // deliberately cross-profile.
       db
         .update(needsDeepeningTopics)
         .set({ misconception: null })
