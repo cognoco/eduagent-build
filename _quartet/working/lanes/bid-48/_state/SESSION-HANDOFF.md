@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-01 22:30 CEST
+Last reconciled: 2026-08-02 10:08 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,9 +19,47 @@ Last reconciled: 2026-08-01 22:30 CEST
   Cosmo Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 remains
   Backlog/Active in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains
   Closed / Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live authoritative slice at checkpoint: 34 Closed, 3 Executing, 5 Ready (42 members).
+- Live authoritative slice at checkpoint: 34 Closed, 2 Executing, 1 Reviewing,
+  1 In Review, and 4 Ready (42 members).
 
 ## Current frontier — supersedes stale per-item positions below
+
+### Latest authoritative boundary — 2026-08-02 10:08 CEST
+
+- The operator-authorized `DATABASE_URL_DEVELOPMENT_HOST` pin was added as the only
+  Doppler `mentomate/dev` configuration change. WI-2922 then reconciled the one
+  missing nullable `jsonb` session-summary column on the exact shared-development
+  database, passed post-check, actual idempotent rerun, focused 35/35 guards, and a
+  real `parent-multi-child` seed/cleanup proof. Sanctioned completion moved WI-2922
+  to Reviewing at landed `01f55639`; a distinct adversarial reviewer is active.
+  Missing-host-guard evidence is FO-2095 / `OCC-C4E7133CB2C3`.
+- WI-2643 applied the explicitly authorized least-privilege development-integration
+  role setup, passed focused 9/9 and full 610-pass integration verification, and
+  completed at landed `695634b3`. The automatic preflight bounced twice solely
+  because three green PR-head contexts were not copied to the squash SHA. That
+  evidence-mapping defect is FO-2096 / `OCC-5D7C77F1A810`. Under the operator's
+  standing equivalent-gate bypass, the Shepherd preserved both refusal IDs and
+  moved the item directly into a distinct independent review claim; no code or
+  database mutation was part of the lifecycle repair.
+- PgM corrected the external WI-2788 status: BID-33 executor
+  `shepherd:codex:heavy-singles` completed at `2a97b284`, then the authoritative
+  preflight bounced it with `AC_EVIDENCE_UNMAPPED` for AC-2..AC-10. The executor is
+  live remediating. BID-48 withdrew its routing concern and monitors WI-2795 against
+  WI-2788's next completion/review event, not transient Stage or claim fields.
+- WI-2826's PgM-approved AC re-target is implemented locally at `787e254b` with
+  3 suites/15 tests, lint, formatting, and mobile typecheck green. Push is blocked
+  by the broad pre-push hook refusing the default shared staging database fallback;
+  no staging credential or `--no-verify` was used. The separate hosted run still
+  awaits an operator-named disposable development/preview target.
+- WI-2923 is properly claimed and has repository-only diagnostics published in
+  draft PR #2878 at `c39f0dc7`; its push gate passed TypeScript plus 33 API suites /
+  1,127 tests. No Clerk, Doppler, deployment, staging, or production mutation has
+  occurred. FO-2094 / `OCC-5FB5D6557BEE` records that the baseline has no `azp`
+  validation despite the AC saying it must remain enforced. The item still awaits
+  its separate shared-development audience-alignment authorization and live proof.
+- Direct live relation query returns 34 Closed, 2 Executing, 1 Reviewing, 1 In
+  Review, and 4 Ready across the same 42 authoritative members. Brief/relation
+  membership remains reconciled; BID-48 remains Running.
 
 ### Latest authoritative boundary — 2026-08-01 22:30 CEST
 

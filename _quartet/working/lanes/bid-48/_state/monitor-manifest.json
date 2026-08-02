@@ -40,8 +40,8 @@
     },
     {
       "target": "external WI-2788",
-      "purpose": "track the separately owned database seed/reset variants that bound WI-2795's diagnostic scope",
-      "command": "direct Cosmo Work Item and Delivery Batch queries",
+      "purpose": "track the separately owned seed/reset remediation through its next completion and review; WI-2795 must not react to transient Ready/claim fields",
+      "command": "direct Cosmo page trail and completion/review event polling, with BID-33/PgM status reconciliation",
       "task-id": "inline-direct-poll"
     }
   ]

@@ -56,9 +56,36 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-01 22:30 CEST
+## Live reconciliation — 2026-08-02 10:08 CEST
 
 ### Latest authoritative boundary
+
+- WI-2922 is Reviewing at landed `01f55639` after the exact operator-authorized
+  shared-development schema reconciliation. Only the approved non-secret host pin
+  was added to Doppler; only the missing nullable `jsonb` column was added; post-check,
+  actual idempotent rerun, focused 35/35 guards, and real seed/cleanup proof passed.
+  Distinct adversarial review is active. FO-2095 / `OCC-C4E7133CB2C3` preserves the
+  previously missing host-guard occurrence.
+- WI-2643 is In Review under distinct reviewer identity after the authorized
+  least-privilege development-integration role setup passed focused 9/9 and full
+  610-pass integration verification. Ordinary completion bounced twice solely on
+  the squash-SHA/PR-head check-context mapping wedge; both refusals and FO-2096 /
+  `OCC-5D7C77F1A810` are preserved in the operator-authorized bypass audit comment.
+- PgM confirms external WI-2788 is not idle: BID-33 completed it at `2a97b284`, the
+  preflight returned it to rework for unmapped AC-2..AC-10 evidence, and its executor
+  is remediating. WI-2795 monitoring is bound to WI-2788's next completion/review,
+  not its transient claim or Ready fields.
+- WI-2826 has corrected local head `787e254b` with local verification green, but its
+  push gate refuses the default shared-staging database fallback. No bypass or
+  staging access occurred. The hosted proof still awaits a named disposable target.
+- WI-2923 repository diagnostics are published in draft PR #2878 at `c39f0dc7`; the
+  push gate passed TypeScript and 33 suites / 1,127 tests. No shared configuration
+  mutation occurred; its item-specific development audience-alignment gate remains.
+  FO-2094 / `OCC-5FB5D6557BEE` records the baseline `azp`-validation discrepancy.
+- Live slice: 34 Closed, 2 Executing, 1 Reviewing, 1 In Review, 4 Ready across 42
+  authoritative members. Brief/relation parity remains intact and the batch is Running.
+
+### Previous authoritative boundary — 2026-08-01 22:30 CEST
 
 - PgM accepted the landed WI-2958 falsifier, ruled Superseded by WI-2939, released the
   expired claim under the wedge-repair precedent, applied pinned triage close, and
