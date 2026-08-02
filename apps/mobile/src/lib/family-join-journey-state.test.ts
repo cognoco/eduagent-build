@@ -9,6 +9,7 @@ import {
 
 describe('family-join journey continuation', () => {
   const originalPlatformOs = Platform.OS;
+  const accountA = 'account-a';
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', {
@@ -18,16 +19,16 @@ describe('family-join journey continuation', () => {
   });
 
   it('round-trips the opaque code and the learner-owned visibility choice', async () => {
-    await saveFamilyJoinContinuation({
-      version: 1,
+    await saveFamilyJoinContinuation(accountA, {
+      version: 2,
       role: 'learner',
       token: 'one-time-family-code',
       supportershipDecision: 'decline',
       lastStatus: 'awaiting_guardian',
     });
 
-    await expect(readFamilyJoinContinuation()).resolves.toEqual({
-      version: 1,
+    await expect(readFamilyJoinContinuation(accountA)).resolves.toEqual({
+      version: 2,
       role: 'learner',
       token: 'one-time-family-code',
       supportershipDecision: 'decline',
@@ -45,15 +46,15 @@ describe('family-join journey continuation', () => {
       }),
     );
 
-    await expect(readFamilyJoinContinuation()).resolves.toBeNull();
+    await expect(readFamilyJoinContinuation(accountA)).resolves.toBeNull();
     await expect(
       SecureStore.getItemAsync(FAMILY_JOIN_JOURNEY_KEY),
     ).resolves.toBeNull();
   });
 
   it('clears the code after a terminal result or safe exit', async () => {
-    await saveFamilyJoinContinuation({
-      version: 1,
+    await saveFamilyJoinContinuation(accountA, {
+      version: 2,
       role: 'guardian',
       token: 'one-time-family-code',
       supportershipDecision: 'accept',
@@ -61,7 +62,22 @@ describe('family-join journey continuation', () => {
     });
 
     await clearFamilyJoinContinuation();
-    await expect(readFamilyJoinContinuation()).resolves.toBeNull();
+    await expect(readFamilyJoinContinuation(accountA)).resolves.toBeNull();
+  });
+
+  it('rejects and removes continuation state owned by another account', async () => {
+    await saveFamilyJoinContinuation(accountA, {
+      version: 2,
+      role: 'learner',
+      token: 'account-a-family-code',
+      supportershipDecision: 'accept',
+      lastStatus: 'awaiting_guardian',
+    });
+
+    await expect(readFamilyJoinContinuation('account-b')).resolves.toBeNull();
+    await expect(
+      SecureStore.getItemAsync(FAMILY_JOIN_JOURNEY_KEY),
+    ).resolves.toBeNull();
   });
 
   it('never persists the bearer-style continuation code in web plaintext storage', async () => {
@@ -71,9 +87,9 @@ describe('family-join journey continuation', () => {
     });
     await SecureStore.setItemAsync(FAMILY_JOIN_JOURNEY_KEY, 'old-web-value');
 
-    await expect(readFamilyJoinContinuation()).resolves.toBeNull();
-    await saveFamilyJoinContinuation({
-      version: 1,
+    await expect(readFamilyJoinContinuation(accountA)).resolves.toBeNull();
+    await saveFamilyJoinContinuation(accountA, {
+      version: 2,
       role: 'learner',
       token: 'must-not-enter-local-storage',
       supportershipDecision: 'accept',

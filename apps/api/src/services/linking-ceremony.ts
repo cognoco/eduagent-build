@@ -404,6 +404,10 @@ export async function acceptLinkForSupporteeByGuardianInTransaction(
           supportVisibilityContracts.supporteePersonId,
           input.supporteePersonId,
         ),
+        eq(
+          supportVisibilityContracts.contractVersion,
+          contract.contractVersion,
+        ),
         inArray(supportVisibilityContracts.status, ['pending', 'restamped']),
         isNull(supportVisibilityContracts.supporteeAcceptedAt),
       ),
@@ -411,6 +415,11 @@ export async function acceptLinkForSupporteeByGuardianInTransaction(
     .returning();
   if (!updated) {
     const winner = await readContractById(db, input.contractId);
+    if (winner.contractVersion !== contract.contractVersion) {
+      throw new ConflictError(
+        'This visibility contract changed. Review the current version before accepting.',
+      );
+    }
     if (winner.supporteeAcceptedAt !== null) return winner;
     throw new ConflictError('This visibility contract cannot be accepted.');
   }

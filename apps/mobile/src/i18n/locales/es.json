@@ -4697,20 +4697,19 @@
     },
     "visibility": {
       "title": "Visibilidad del aprendizaje",
-      "description": "Elige por separado si el adulto que te invita puede convertirse en tu mentor y ver los resúmenes de aprendizaje acordados.",
-      "guardianDescription": "Elige si autorizas la parte del aprendiz en esta relación de apoyo. El mentor que invita aún debe aceptar por separado.",
-      "accept": "Permitir visibilidad del mentor",
+      "description": "Elige por separado si el adulto que te invita puede convertirse en tu persona de apoyo y ver los resúmenes de aprendizaje acordados.",
+      "guardianDescription": "Elige si autorizas la parte del aprendiz en esta relación de apoyo. La persona de apoyo que invita aún debe aceptar por separado.",
+      "accept": "Permitir visibilidad de la persona de apoyo",
       "acceptDescription": "Inicia un acuerdo de visibilidad por separado. No se verán datos de aprendizaje hasta que ambas partes acepten.",
       "decline": "Mantener el aprendizaje privado",
-      "declineDescription": "Únete al plan familiar sin crear visibilidad para el mentor."
+      "declineDescription": "Únete al plan familiar sin crear visibilidad para la persona de apoyo."
     },
     "continue": "Revisar invitación",
     "decline": "Mantener mi cuenta separada",
     "safeExit": "Salir de forma segura",
     "awaitingGuardian": {
       "title": "Un tutor verificado debe continuar",
-      "message": "El cambio de familia está en pausa. Un tutor puede usar este código después de iniciar sesión en este u otro dispositivo. El código por sí solo no otorga ninguna autoridad.",
-      "continueAsGuardian": "Continuar como tutor"
+      "message": "El cambio de familia está en pausa. Un tutor puede usar este código después de iniciar sesión en este u otro dispositivo. El código por sí solo no otorga ninguna autoridad."
     },
     "guardian": {
       "title": "Paso del tutor",
@@ -4722,16 +4721,16 @@
     },
     "guardianFinished": {
       "title": "Paso del tutor completado",
-      "message": "El aprendiz debe volver a iniciar sesión y finalizar el cambio de familia. El mentor que invita todavía tiene una aceptación de visibilidad por separado."
+      "message": "El aprendiz debe volver a iniciar sesión y finalizar el cambio de familia. La persona de apoyo que invita todavía tiene una aceptación de visibilidad por separado."
     },
     "ready": {
       "title": "Listo para unirte",
-      "message": "El consentimiento requerido está actualizado. Confirma el cambio de familia ahora; la visibilidad del mentor sigue siendo un acuerdo bilateral independiente.",
+      "message": "El consentimiento requerido está actualizado. Confirma el cambio de familia ahora; la visibilidad de la persona de apoyo sigue siendo un acuerdo bilateral independiente.",
       "join": "Unirse a la familia"
     },
     "complete": {
       "title": "Cambio de familia completado",
-      "message": "Tu cuenta y tu historial de aprendizaje están ahora en el plan familiar. Cualquier visibilidad del mentor sigue limitada a su contrato aceptado por separado."
+      "message": "Tu cuenta y tu historial de aprendizaje están ahora en el plan familiar. Cualquier visibilidad de la persona de apoyo sigue limitada a su contrato aceptado por separado."
     },
     "terminal": {
       "expired": {

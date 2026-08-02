@@ -4897,8 +4897,7 @@
     "safeExit": "Wyjdź bezpiecznie",
     "awaitingGuardian": {
       "title": "Zweryfikowany opiekun musi kontynuować",
-      "message": "Przenoszenie do rodziny jest wstrzymane. Opiekun może użyć tego kodu po zalogowaniu się na tym lub innym urządzeniu. Sam kod nie nadaje żadnych uprawnień.",
-      "continueAsGuardian": "Kontynuuj jako opiekun"
+      "message": "Przenoszenie do rodziny jest wstrzymane. Opiekun może użyć tego kodu po zalogowaniu się na tym lub innym urządzeniu. Sam kod nie nadaje żadnych uprawnień."
     },
     "guardian": {
       "title": "Krok opiekuna",

@@ -95,7 +95,6 @@ describe('useFamilyJoinJourney', () => {
     expect(JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body))).toEqual({
       token: 'family-code',
       verificationHandle: 'single-use-provider-handle',
-      authorizeSupportership: true,
     });
     expect(String(mockFetch.mock.calls[1]?.[0])).toContain(
       '/family-join/journey/guardian/complete',
@@ -131,6 +130,45 @@ describe('useFamilyJoinJourney', () => {
 
     await act(async () => {
       await result.current.finalize.mutateAsync({ token: 'family-code' });
+    });
+
+    for (const key of [
+      ['profiles'],
+      ['consent-status'],
+      ['scopes'],
+      ['subscription'],
+    ]) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    }
+  });
+
+  it('invalidates joined state when start recovers an already-completed journey', async () => {
+    for (const key of [
+      ['profiles'],
+      ['consent-status'],
+      ['scopes'],
+      ['subscription'],
+    ]) {
+      queryClient.setQueryData(key, { stale: true });
+    }
+    mockFetch.setRoute('/family-join/journey', {
+      status: 'joined',
+      familyOrgId: FAMILY_ORG_ID,
+      alreadyMember: true,
+      storeCancelNudge: null,
+      supportershipAuthority: 'learner',
+      supportershipDecision: 'decline',
+      visibilityContract: null,
+    });
+    const { result } = renderHook(() => useFamilyJoinJourney(), { wrapper });
+
+    await act(async () => {
+      await result.current.start.mutateAsync({
+        token: 'family-code',
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'decline',
+      });
     });
 
     for (const key of [

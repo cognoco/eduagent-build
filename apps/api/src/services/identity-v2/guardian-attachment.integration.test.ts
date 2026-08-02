@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { and, eq, or, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -896,7 +896,7 @@ function assertion(
       ).toBe(true);
     });
 
-    it('[WI-2986] recovers the original authority after response loss without redeeming the handle twice', async () => {
+    it('[WI-2534] recovers pre-assent-binding authority after response loss without redeeming the handle twice', async () => {
       const adult = await seedIdentity('adult-response-loss', 40, ROUTE_AS_OF);
       const learner = await seedIdentity(
         'learner-response-loss',
@@ -929,13 +929,62 @@ function assertion(
         request,
         env,
       );
+      expect(first.status).toBe(200);
+      const [reservation] = await db
+        .select()
+        .from(guardianAuthorityRedemptions)
+        .where(
+          and(
+            eq(guardianAuthorityRedemptions.guardianPersonId, adult.personId),
+            eq(guardianAuthorityRedemptions.chargePersonId, learner.personId),
+          ),
+        );
+      if (!reservation) throw new Error('authority reservation was not issued');
+      const bindingBase = {
+        guardianPersonId: reservation.guardianPersonId,
+        chargePersonId: reservation.chargePersonId,
+        organizationId: reservation.organizationId,
+        jurisdiction: reservation.jurisdiction,
+        policyVersion: reservation.policyVersion,
+        authorizationForm: reservation.authorizationForm,
+      };
+      const requiredAssuranceLevel = ['SELF_DECLARED', 'VERIFIED'].find(
+        (candidate) =>
+          createHmac('sha256', TOKEN_SECRET)
+            .update(
+              JSON.stringify({
+                ...bindingBase,
+                requiredAssuranceLevel: candidate,
+                purposeSetDigest: reservation.purposeSetDigest,
+                learnerAssentAt: null,
+              }),
+              'utf8',
+            )
+            .digest('hex') === reservation.commandBindingDigest,
+      );
+      if (!requiredAssuranceLevel) {
+        throw new Error('current authority command binding was not recognized');
+      }
+      const legacyCommandBindingDigest = createHmac('sha256', TOKEN_SECRET)
+        .update(
+          JSON.stringify({
+            ...bindingBase,
+            requiredAssuranceLevel,
+            purposeSetDigest: reservation.purposeSetDigest,
+          }),
+          'utf8',
+        )
+        .digest('hex');
+      await db
+        .update(guardianAuthorityRedemptions)
+        .set({ commandBindingDigest: legacyCommandBindingDigest })
+        .where(eq(guardianAuthorityRedemptions.id, reservation.id));
       const second = await app.request(
         '/v1/consent/guardian-attachment/initiate',
         request,
         env,
       );
 
-      expect(first.status).toBe(200);
       expect(second.status).toBe(200);
       await expect(second.json()).resolves.toEqual(await first.json());
       expect(verifierRequestCount - callsBefore).toBe(1);

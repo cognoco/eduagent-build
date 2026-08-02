@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useTranslation } from 'react-i18next';
 import type {
   FamilyJoinJourneyResult,
@@ -28,6 +29,7 @@ type JourneyRole = 'learner' | 'guardian';
 
 export default function FamilyJoinScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const { userId } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{
     code?: string | string[];
@@ -52,7 +54,15 @@ export default function FamilyJoinScreen(): React.ReactElement {
 
   useEffect(() => {
     let active = true;
-    void readFamilyJoinContinuation()
+    if (!userId) {
+      void clearFamilyJoinContinuation().finally(() => {
+        if (active) setHydrating(false);
+      });
+      return () => {
+        active = false;
+      };
+    }
+    void readFamilyJoinContinuation(userId)
       .then((continuation) => {
         if (!active || !continuation) return;
         if (!parameterCode) setToken(continuation.token);
@@ -69,7 +79,7 @@ export default function FamilyJoinScreen(): React.ReactElement {
     return () => {
       active = false;
     };
-  }, [parameterCode, verificationHandle]);
+  }, [parameterCode, userId, verificationHandle]);
 
   const busy =
     journey.start.isPending ||
@@ -87,8 +97,12 @@ export default function FamilyJoinScreen(): React.ReactElement {
         next.status === 'awaiting_guardian' ||
         next.status === 'ready_to_join'
       ) {
-        await saveFamilyJoinContinuation({
-          version: 1,
+        if (!userId) {
+          await clearFamilyJoinContinuation();
+          return;
+        }
+        await saveFamilyJoinContinuation(userId, {
+          version: 2,
           role: owner,
           token: token.trim(),
           supportershipDecision: decision,
@@ -99,7 +113,7 @@ export default function FamilyJoinScreen(): React.ReactElement {
       }
       setResult(next);
     },
-    [token],
+    [token, userId],
   );
 
   const startOrResume = useCallback(async () => {
@@ -160,7 +174,10 @@ export default function FamilyJoinScreen(): React.ReactElement {
   ]);
 
   const finalize = useCallback(async () => {
-    if (!supportershipDecision) return;
+    if (!supportershipDecision) {
+      setError(new Error(t('familyJoinJourney.errors.completeDecisions')));
+      return;
+    }
     setError(null);
     try {
       const next = await journey.finalize.mutateAsync({ token: token.trim() });
@@ -168,7 +185,7 @@ export default function FamilyJoinScreen(): React.ReactElement {
     } catch (caught) {
       setError(caught);
     }
-  }, [journey.finalize, recordResult, supportershipDecision, token]);
+  }, [journey.finalize, recordResult, supportershipDecision, t, token]);
 
   const decline = useCallback(async () => {
     if (!token.trim()) return;
@@ -249,15 +266,9 @@ export default function FamilyJoinScreen(): React.ReactElement {
         title={t('familyJoinJourney.awaitingGuardian.title')}
         message={t('familyJoinJourney.awaitingGuardian.message')}
         code={token}
-        actionLabel={t('familyJoinJourney.awaitingGuardian.continueAsGuardian')}
+        actionLabel={t('familyJoinJourney.safeExit')}
         actionTestID="family-join-guardian-handoff"
-        onAction={() => {
-          setRole('guardian');
-          setSupportershipDecision(null);
-          setResult(null);
-        }}
-        secondaryLabel={t('familyJoinJourney.safeExit')}
-        onSecondary={exit}
+        onAction={exit}
       />
     );
   }

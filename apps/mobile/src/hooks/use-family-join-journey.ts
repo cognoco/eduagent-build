@@ -4,7 +4,7 @@ import {
   guardianAttachmentInitiationResultSchema,
   type FamilyJoinDeclineRequest,
   type FamilyJoinFinalizeRequest,
-  type FamilyJoinGuardianInitiationRequest,
+  type FamilyJoinGuardianCompletionRequest,
   type FamilyJoinJourneyRequest,
   type FamilyJoinJourneyResult,
 } from '@eduagent/schemas';
@@ -12,7 +12,12 @@ import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 
-type GuardianJourneyInput = FamilyJoinGuardianInitiationRequest;
+type GuardianJourneyInput = Omit<
+  FamilyJoinGuardianCompletionRequest,
+  'authorityToken'
+> & {
+  verificationHandle: string;
+};
 
 export function useFamilyJoinJourney() {
   const client = useApiClient();
@@ -51,6 +56,7 @@ export function useFamilyJoinJourney() {
         'POST /family-join/journey',
       );
     },
+    onSuccess: invalidateJoinedState,
   });
 
   const guardian = useMutation<
@@ -63,7 +69,10 @@ export function useFamilyJoinJourney() {
       const initiatedResponse = await client[
         'family-join'
       ].journey.guardian.initiate.$post({
-        json: input,
+        json: {
+          token: input.token,
+          verificationHandle: input.verificationHandle,
+        },
       });
       await assertOk(initiatedResponse);
       const initiated = await parseJson(
@@ -87,6 +96,7 @@ export function useFamilyJoinJourney() {
         'POST /family-join/journey/guardian/complete',
       );
     },
+    onSuccess: invalidateJoinedState,
   });
 
   const finalize = useMutation<
@@ -126,6 +136,7 @@ export function useFamilyJoinJourney() {
         'POST /family-join/journey/decline',
       );
     },
+    onSuccess: invalidateJoinedState,
   });
 
   return { start, guardian, finalize, decline };

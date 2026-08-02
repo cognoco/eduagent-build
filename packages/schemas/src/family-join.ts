@@ -164,7 +164,6 @@ export const familyJoinGuardianInitiationRequestSchema = z
   .object({
     token: z.string().trim().min(1),
     verificationHandle: z.string().trim().min(16).max(4096),
-    authorizeSupportership: z.boolean(),
   })
   .strict();
 export type FamilyJoinGuardianInitiationRequest = z.infer<

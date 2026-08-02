@@ -7,6 +7,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 import {
+  clearFamilyJoinContinuation,
   readFamilyJoinContinuation,
   saveFamilyJoinContinuation,
 } from '../../lib/family-join-journey-state';
@@ -15,6 +16,11 @@ import FamilyJoinScreen from './family-join';
 const mockFetch = createRoutedMockFetch();
 const mockReplace = jest.fn();
 let mockParams: Record<string, string | undefined> = {};
+const ACCOUNT_ID = 'clerk-account-a';
+
+jest.mock('@clerk/expo', () => ({
+  useAuth: () => ({ userId: ACCOUNT_ID }),
+}));
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
@@ -57,10 +63,11 @@ function renderScreen() {
 }
 
 describe('FamilyJoinScreen', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockFetch.mockClear();
     mockParams = {};
+    await clearFamilyJoinContinuation();
   });
 
   it('keeps family movement, destination processing, and visibility as separate learner decisions', async () => {
@@ -94,15 +101,18 @@ describe('FamilyJoinScreen', () => {
       destinationProcessingAssent: true,
       supportershipDecision: 'decline',
     });
-    await expect(readFamilyJoinContinuation()).resolves.toMatchObject({
-      role: 'learner',
-      token: 'family-code',
-      supportershipDecision: 'decline',
-      lastStatus: 'awaiting_guardian',
-    });
+    await expect(readFamilyJoinContinuation(ACCOUNT_ID)).resolves.toMatchObject(
+      {
+        role: 'learner',
+        token: 'family-code',
+        supportershipDecision: 'decline',
+        lastStatus: 'awaiting_guardian',
+      },
+    );
 
     await user.press(screen.getByTestId('family-join-guardian-handoff'));
-    expect(screen.getByTestId('family-join-guardian-form')).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)');
+    expect(screen.queryByTestId('family-join-guardian-form')).toBeNull();
   });
 
   it('lets the same or an alternate signed-in guardian finish after provider return', async () => {
@@ -138,7 +148,6 @@ describe('FamilyJoinScreen', () => {
     expect(JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body))).toEqual({
       token: 'family-code',
       verificationHandle: 'single-use-provider-handle',
-      authorizeSupportership: true,
     });
     expect(JSON.parse(String(mockFetch.mock.calls[1]?.[1]?.body))).toEqual({
       token: 'family-code',
@@ -181,12 +190,12 @@ describe('FamilyJoinScreen', () => {
     await user.press(screen.getByTestId('family-join-finalize'));
 
     await waitFor(() => screen.getByTestId('family-join-complete'));
-    await expect(readFamilyJoinContinuation()).resolves.toBeNull();
+    await expect(readFamilyJoinContinuation(ACCOUNT_ID)).resolves.toBeNull();
   });
 
   it('restores a relaunch, handles expiry, and safely exits without retaining the code', async () => {
-    await saveFamilyJoinContinuation({
-      version: 1,
+    await saveFamilyJoinContinuation(ACCOUNT_ID, {
+      version: 2,
       role: 'learner',
       token: 'restored-family-code',
       supportershipDecision: 'decline',
@@ -205,10 +214,26 @@ describe('FamilyJoinScreen', () => {
     await user.press(screen.getByTestId('family-join-processing-accept'));
     await user.press(screen.getByTestId('family-join-start'));
     await waitFor(() => screen.getByTestId('family-join-terminal'));
-    await expect(readFamilyJoinContinuation()).resolves.toBeNull();
+    await expect(readFamilyJoinContinuation(ACCOUNT_ID)).resolves.toBeNull();
 
     await user.press(screen.getByTestId('family-join-exit'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)');
+  });
+
+  it('lets the learner decline from the form and clears the continuation', async () => {
+    mockFetch.setRoute('/family-join/journey/decline', {
+      status: 'declined',
+    });
+    const screen = renderScreen();
+    await waitFor(() => screen.getByTestId('family-join-learner-form'));
+    fireEvent.changeText(screen.getByTestId('family-join-code'), 'family-code');
+
+    await userEvent.setup().press(screen.getByTestId('family-join-decline'));
+
+    await waitFor(() => screen.getByTestId('family-join-terminal'));
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ token: 'family-code' });
+    await expect(readFamilyJoinContinuation(ACCOUNT_ID)).resolves.toBeNull();
   });
 
   it('keeps all learner decisions selected when policy drift requires a retry', async () => {

@@ -4243,8 +4243,7 @@
     "safeExit": "Exit safely",
     "awaitingGuardian": {
       "title": "A verified guardian must continue",
-      "message": "The family move is paused. A guardian can use this code after signing in on this or another device. The code alone grants no authority.",
-      "continueAsGuardian": "Continue as guardian"
+      "message": "The family move is paused. A guardian can use this code after signing in on this or another device. The code alone grants no authority."
     },
     "guardian": {
       "title": "Guardian step",

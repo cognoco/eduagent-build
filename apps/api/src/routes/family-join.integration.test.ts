@@ -803,7 +803,6 @@ describe('family-join routes (integration)', () => {
       {
         token: issued.token,
         verificationHandle: `route-verification-${randomUUID()}`,
-        authorizeSupportership: false,
       },
       guardian,
     );
@@ -871,7 +870,7 @@ describe('family-join routes (integration)', () => {
       declineParent,
       decliningLearner.email,
     );
-    await post(
+    const declineStarted = await post(
       '/v1/family-join/journey',
       {
         token: declineInvite.token,
@@ -881,6 +880,10 @@ describe('family-join routes (integration)', () => {
       },
       decliningLearner,
     );
+    expect(declineStarted.status).toBe(200);
+    await expect(declineStarted.json()).resolves.toMatchObject({
+      status: 'ready_to_join',
+    });
     const declined = await post(
       '/v1/family-join/journey/decline',
       { token: declineInvite.token },
@@ -901,7 +904,7 @@ describe('family-join routes (integration)', () => {
       withdrawParent,
       withdrawLearner.email,
     );
-    await post(
+    const withdrawStarted = await post(
       '/v1/family-join/journey',
       {
         token: withdrawInvite.token,
@@ -911,6 +914,10 @@ describe('family-join routes (integration)', () => {
       },
       withdrawLearner,
     );
+    expect(withdrawStarted.status).toBe(200);
+    await expect(withdrawStarted.json()).resolves.toMatchObject({
+      status: 'ready_to_join',
+    });
     const withdrawn = await post(
       `/v1/family-join/invites/${withdrawInvite.inviteId}/withdraw`,
       {},

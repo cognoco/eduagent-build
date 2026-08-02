@@ -77,6 +77,8 @@ import {
 const FAMILY_JOIN_INVITE_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const FAMILY_JOIN_INVITE_RATE_LIMIT_MAX = 30;
 const FAMILY_JOIN_INVITE_MAP_MAX_ENTRIES = 10_000;
+const FAMILY_JOIN_JOURNEY_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const FAMILY_JOIN_JOURNEY_RATE_LIMIT_MAX = 120;
 
 const familyJoinInviteLimiter = createSlidingWindowRateLimiter({
   windowMs: FAMILY_JOIN_INVITE_RATE_LIMIT_WINDOW_MS,
@@ -90,10 +92,17 @@ const familyJoinGuardianLimiter = createSlidingWindowRateLimiter({
   maxEntries: FAMILY_JOIN_INVITE_MAP_MAX_ENTRIES,
 });
 
+const familyJoinJourneyLimiter = createSlidingWindowRateLimiter({
+  windowMs: FAMILY_JOIN_JOURNEY_RATE_LIMIT_WINDOW_MS,
+  max: FAMILY_JOIN_JOURNEY_RATE_LIMIT_MAX,
+  maxEntries: FAMILY_JOIN_INVITE_MAP_MAX_ENTRIES,
+});
+
 /** Test-only reset of the in-memory invite limiter (mirrors consent). */
 export function __resetFamilyJoinInviteRateLimit(): void {
   familyJoinInviteLimiter.reset();
   familyJoinGuardianLimiter.reset();
+  familyJoinJourneyLimiter.reset();
 }
 
 type FamilyJoinRouteEnv = {
@@ -159,6 +168,15 @@ function guardianJourneyRateLimited(c: Context<FamilyJoinRouteEnv>): boolean {
   );
 }
 
+function familyJourneyRateLimited(c: Context<FamilyJoinRouteEnv>): boolean {
+  return familyJoinJourneyLimiter.isLimited(
+    resolveRateLimitIp(
+      c.req.header('cf-connecting-ip'),
+      c.req.header('x-forwarded-for'),
+    ),
+  );
+}
+
 export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
   .post(
     '/family-join/invite',
@@ -216,6 +234,11 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
     zValidator('json', familyJoinJourneyRequestSchema),
     async (c) => {
       const { db, callerPersonId } = withCaller(c);
+      if (familyJourneyRateLimited(c)) {
+        throw new RateLimitedError(
+          'Too many family journey attempts. Please try again later.',
+        );
+      }
       const result = await startOrResumeFamilyJoinJourney(db, {
         ...c.req.valid('json'),
         callerPersonId,

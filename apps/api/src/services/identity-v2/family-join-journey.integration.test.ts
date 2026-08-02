@@ -42,11 +42,7 @@ const AS_OF = new Date('2026-08-01T12:00:00.000Z');
 // Keep ordinary fixtures live independent of the wall-clock date on which the
 // suite runs; expiry-specific cases pass an explicit boundary instead.
 const LIVE_INVITE_EXPIRES_AT = new Date('2099-01-01T00:00:00.000Z');
-const POLICY_EFFECTIVE_AT = new Date(
-  AS_OF.getTime() -
-    1 -
-    (Number.parseInt(randomUUID().slice(0, 8), 16) % 3_600_000),
-);
+const POLICY_EFFECTIVE_AT = new Date(AS_OF.getTime() - 1);
 const POLICY_VERSION = `wi2534-${randomUUID()}`;
 const CLOSED_GATES = {
   externalPrivacyLegalReview: true,
@@ -145,7 +141,6 @@ async function completeGuardianJourney(
     callerPersonId: guardian.personId,
     token: issued.token,
     verificationHandle: `guardian-fixture-${randomUUID()}`,
-    authorizeSupportership,
     verifierUrl: 'https://guardian-verifier.test/verify',
     verifierKey: 'guardian-verifier-test-key',
     tokenSecret: 'wi2534-guardian-authority-secret-at-least-32-chars',
@@ -362,6 +357,38 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('returns a controlled conflict when another invite already owns the learner active-journey slot', async () => {
+    const firstInviter = await identity('active-first-inviter', 1980);
+    const secondInviter = await identity('active-second-inviter', 1980);
+    const learner = await identity('active-journey-learner', 2012);
+    const first = await invite(
+      firstInviter.personId,
+      firstInviter.organizationId,
+      learner.email,
+    );
+    const second = await invite(
+      secondInviter.personId,
+      secondInviter.organizationId,
+      learner.email,
+    );
+    const request = {
+      callerPersonId: learner.personId,
+      familyMembershipDecision: 'accept' as const,
+      destinationProcessingAssent: true,
+      supportershipDecision: 'accept' as const,
+      asOf: AS_OF,
+    };
+
+    await expect(
+      startOrResumeFamilyJoinJourney(db, { ...request, token: first.token }),
+    ).resolves.toMatchObject({ status: 'awaiting_guardian' });
+    await expect(
+      startOrResumeFamilyJoinJourney(db, { ...request, token: second.token }),
+    ).rejects.toThrow(
+      'An unfinished family join already exists for this learner.',
+    );
+  });
+
   it('lets only the invited learner decline and clears unresolved destination consent', async () => {
     const inviter = await identity('decline-inviter', 1980);
     const learner = await identity('decline-learner', 2012);
@@ -473,7 +500,53 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
     ).resolves.toEqual({ status: 'withdrawn' });
   });
 
-  it.each(['decline', 'withdraw', 'expire'] as const)(
+  it('preserves the approved destination consent set when a completed guardian step resumes under the same posture', async () => {
+    const inviter = await identity('preserved-resume-inviter', 1980);
+    const learner = await identity('preserved-resume-learner', 2012);
+    const guardian = await identity('preserved-resume-guardian', 1978);
+    const { issued, completed } = await completeGuardianJourney(
+      inviter,
+      learner,
+      guardian,
+      false,
+    );
+    expect(completed.status).toBe('ready_to_join');
+    const requestWhere = and(
+      eq(consentRequest.chargePersonId, learner.personId),
+      eq(consentRequest.organizationId, inviter.organizationId),
+    );
+    const before = await db.query.consentRequest.findMany({
+      where: requestWhere,
+    });
+    expect(before).toHaveLength(CONSENT_PURPOSES.length);
+    expect(before.every((request) => request.status === 'approved')).toBe(true);
+
+    await expect(
+      startOrResumeFamilyJoinJourney(db, {
+        callerPersonId: learner.personId,
+        token: issued.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'decline',
+        asOf: new Date(AS_OF.getTime() + 1_000),
+      }),
+    ).resolves.toMatchObject({ status: 'ready_to_join' });
+
+    const after = await db.query.consentRequest.findMany({
+      where: requestWhere,
+    });
+    const comparable = (requests: Array<(typeof after)[number]>) =>
+      requests
+        .map(({ id, status, consentGrantId }) => ({
+          id,
+          status,
+          consentGrantId,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    expect(comparable(after)).toEqual(comparable(before));
+  });
+
+  it.each(['decline', 'withdraw', 'expire', 'decline_expired'] as const)(
     'revokes journey-created consent and visibility when a guardian-completed join ends by %s',
     async (terminalAction) => {
       const inviter = await identity(`${terminalAction}-cleanup-inviter`, 1980);
@@ -531,16 +604,22 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
           .update(familyJoinInvite)
           .set({ tokenExpiresAt: new Date(AS_OF.getTime() + 1_000) })
           .where(eq(familyJoinInvite.id, issued.row.id));
-        await expect(
-          startOrResumeFamilyJoinJourney(db, {
-            callerPersonId: learner.personId,
-            token: issued.token,
-            familyMembershipDecision: 'accept',
-            destinationProcessingAssent: true,
-            supportershipDecision: 'accept',
-            asOf: terminalAt,
-          }),
-        ).resolves.toEqual({ status: 'expired' });
+        const expiredResult =
+          terminalAction === 'decline_expired'
+            ? declineFamilyJoinJourney(db, {
+                callerPersonId: learner.personId,
+                token: issued.token,
+                asOf: terminalAt,
+              })
+            : startOrResumeFamilyJoinJourney(db, {
+                callerPersonId: learner.personId,
+                token: issued.token,
+                familyMembershipDecision: 'accept',
+                destinationProcessingAssent: true,
+                supportershipDecision: 'accept',
+                asOf: terminalAt,
+              });
+        await expect(expiredResult).resolves.toEqual({ status: 'expired' });
       }
 
       await expect(
@@ -570,6 +649,13 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
           supporteePersonId: learner.personId,
         }),
       ).rejects.toBeInstanceOf(ForbiddenError);
+      if (terminalAction === 'expire' || terminalAction === 'decline_expired') {
+        await expect(
+          db.query.familyJoinJourney.findFirst({
+            where: eq(familyJoinJourney.inviteId, issued.row.id),
+          }),
+        ).resolves.toBeUndefined();
+      }
     },
   );
 
@@ -665,7 +751,6 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
       callerPersonId: guardian.personId,
       token: issued.token,
       verificationHandle: `wi2534-${randomUUID()}`,
-      authorizeSupportership: true,
       verifierUrl: 'https://guardian-verifier.test/v1/verify',
       verifierKey: 'guardian-verifier-test-key',
       tokenSecret: 'wi2534-guardian-authority-secret-at-least-32-chars',

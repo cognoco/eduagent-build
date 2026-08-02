@@ -198,12 +198,7 @@ export async function startOrResumeFamilyJoinJourney(
       invite.tokenExpiresAt.getTime() <= asOf.getTime()
     ) {
       if (existing && existing.state !== 'joined') {
-        await retireFamilyJoinArtifacts(
-          tx,
-          existing,
-          asOf,
-          'family_join_expired',
-        );
+        await expireUnfinishedFamilyJoinJourney(tx, existing, asOf);
       }
       return { status: 'expired' };
     }
@@ -224,10 +219,11 @@ export async function startOrResumeFamilyJoinJourney(
       policy,
       input.supportershipDecision,
     );
-    if (
-      existing?.guardianCompletedAt &&
-      !preservesGuardianCompletion(existing, posture)
-    ) {
+    const preserveGuardianCompletion = preservesGuardianCompletion(
+      existing,
+      posture,
+    );
+    if (existing?.guardianCompletedAt && !preserveGuardianCompletion) {
       await invalidateJourneyAuthority(
         tx,
         existing,
@@ -235,12 +231,14 @@ export async function startOrResumeFamilyJoinJourney(
         'family_join_posture_recomputed',
       );
     }
-    await syncDestinationConsentRequests(tx, {
-      chargePersonId: input.callerPersonId,
-      familyOrgId: invite.familyOrgId,
-      posture,
-      regimeKey: policy.regimeKey,
-    });
+    if (!preserveGuardianCompletion) {
+      await syncDestinationConsentRequests(tx, {
+        chargePersonId: input.callerPersonId,
+        familyOrgId: invite.familyOrgId,
+        posture,
+        regimeKey: policy.regimeKey,
+      });
+    }
 
     const values = resumedPosture(existing, posture, asOf);
     let journey: FamilyJoinJourney;
@@ -253,6 +251,21 @@ export async function startOrResumeFamilyJoinJourney(
       if (!updated) throw new ConflictError(FAMILY_JOIN_UNAVAILABLE);
       journey = updated;
     } else {
+      const activeJourney = await tx.query.familyJoinJourney.findFirst({
+        where: and(
+          eq(familyJoinJourney.chargePersonId, input.callerPersonId),
+          inArray(familyJoinJourney.state, [
+            'awaiting_guardian',
+            'ready_to_join',
+          ]),
+        ),
+        columns: { id: true },
+      });
+      if (activeJourney) {
+        throw new ConflictError(
+          'An unfinished family join already exists for this learner.',
+        );
+      }
       const [created] = await tx
         .insert(familyJoinJourney)
         .values({
@@ -300,7 +313,6 @@ export interface InitiateFamilyJoinGuardianVerificationInput extends Omit<
   'chargePersonId' | 'destinationOrganizationId' | 'expectedLearnerAssentAt'
 > {
   token: string;
-  authorizeSupportership: boolean;
 }
 
 export async function initiateFamilyJoinGuardianVerification(
@@ -574,12 +586,7 @@ export async function finalizeFamilyJoinJourney(
       invite.tokenExpiresAt.getTime() <= asOf.getTime()
     ) {
       if (journey.state !== 'joined') {
-        await retireFamilyJoinArtifacts(
-          tx,
-          journey,
-          asOf,
-          'family_join_expired',
-        );
+        await expireUnfinishedFamilyJoinJourney(tx, journey, asOf);
       }
       return { status: 'expired' } as const;
     }
@@ -765,6 +772,9 @@ export async function declineFamilyJoinJourney(
       !invite.tokenExpiresAt ||
       invite.tokenExpiresAt.getTime() <= asOf.getTime()
     ) {
+      if (existing && existing.state !== 'joined') {
+        await expireUnfinishedFamilyJoinJourney(tx, existing, asOf);
+      }
       return { status: 'expired' };
     }
     if (
@@ -1018,10 +1028,10 @@ async function retireFamilyJoinArtifacts(
   db: Database,
   journey: FamilyJoinJourney,
   asOf: Date,
-  reason: Exclude<
-    JourneyAuthorityInvalidationReason,
-    'family_join_posture_recomputed'
-  >,
+  reason:
+    | 'family_join_declined'
+    | 'family_join_withdrawn'
+    | 'family_join_expired',
 ): Promise<void> {
   await invalidateJourneyAuthority(db, journey, asOf, reason);
   await clearDestinationConsentRequests(
@@ -1029,6 +1039,25 @@ async function retireFamilyJoinArtifacts(
     journey.chargePersonId,
     journey.familyOrgId,
   );
+}
+
+async function expireUnfinishedFamilyJoinJourney(
+  db: Database,
+  journey: FamilyJoinJourney,
+  asOf: Date,
+): Promise<void> {
+  await retireFamilyJoinArtifacts(db, journey, asOf, 'family_join_expired');
+  await db
+    .delete(familyJoinJourney)
+    .where(
+      and(
+        eq(familyJoinJourney.id, journey.id),
+        inArray(familyJoinJourney.state, [
+          'awaiting_guardian',
+          'ready_to_join',
+        ]),
+      ),
+    );
 }
 
 async function invalidateJourneyAuthority(

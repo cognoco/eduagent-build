@@ -4709,8 +4709,7 @@
     "safeExit": "Avslutt trygt",
     "awaitingGuardian": {
       "title": "En verifisert foresatt må fortsette",
-      "message": "Familieflyttingen er satt på pause. En foresatt kan bruke denne koden etter å ha logget inn på denne eller en annen enhet. Koden alene gir ingen autoritet.",
-      "continueAsGuardian": "Fortsett som foresatt"
+      "message": "Familieflyttingen er satt på pause. En foresatt kan bruke denne koden etter å ha logget inn på denne eller en annen enhet. Koden alene gir ingen autoritet."
     },
     "guardian": {
       "title": "Steg for foresatt",

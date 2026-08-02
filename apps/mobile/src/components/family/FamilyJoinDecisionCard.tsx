@@ -18,6 +18,7 @@ export function FamilyJoinDecisionCard({
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       accessibilityLabel={title}
+      accessibilityHint={description}
       className={`min-h-[72px] rounded-card border px-4 py-3 ${
         selected ? 'border-primary bg-primary/10' : 'border-border bg-surface'
       }`}

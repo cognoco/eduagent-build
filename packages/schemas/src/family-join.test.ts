@@ -118,9 +118,15 @@ describe('family-join resumable journey contracts [WI-2534]', () => {
       initiation.safeParse({
         token: 'opaque-invite-code',
         verificationHandle: 'provider-handle-at-least-16-characters',
-        authorizeSupportership: true,
       }).success,
     ).toBe(true);
+    expect(
+      initiation.safeParse({
+        token: 'opaque-invite-code',
+        verificationHandle: 'provider-handle-at-least-16-characters',
+        authorizeSupportership: true,
+      }).success,
+    ).toBe(false);
     expect(
       completion.safeParse({
         token: 'opaque-invite-code',

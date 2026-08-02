@@ -4709,8 +4709,7 @@
     "safeExit": "Sair em segurança",
     "awaitingGuardian": {
       "title": "Um tutor verificado deve continuar",
-      "message": "A mudança de família está em pausa. Um tutor pode usar este código após iniciar sessão neste ou noutro dispositivo. O código por si só não concede qualquer autoridade.",
-      "continueAsGuardian": "Continuar como tutor"
+      "message": "A mudança de família está em pausa. Um tutor pode usar este código após iniciar sessão neste ou noutro dispositivo. O código por si só não concede qualquer autoridade."
     },
     "guardian": {
       "title": "Passo do tutor",

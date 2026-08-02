@@ -4709,8 +4709,7 @@
     "safeExit": "Sicher beenden",
     "awaitingGuardian": {
       "title": "Verifizierter Vormund muss fortfahren",
-      "message": "Der Familienwechsel ist pausiert. Ein Vormund kann diesen Code nach der Anmeldung auf diesem oder einem anderen Gerät verwenden. Der Code allein gewährt keine Befugnis.",
-      "continueAsGuardian": "Als Vormund fortfahren"
+      "message": "Der Familienwechsel ist pausiert. Ein Vormund kann diesen Code nach der Anmeldung auf diesem oder einem anderen Gerät verwenden. Der Code allein gewährt keine Befugnis."
     },
     "guardian": {
       "title": "Schritt für Vormund",

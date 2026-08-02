@@ -31,6 +31,7 @@ import {
   consentGrant,
   createDatabase,
   familyJoinInvite,
+  familyJoinJourney,
   login,
   membership,
   organization,
@@ -299,6 +300,83 @@ const APP_URL = 'https://example.test';
             appUrl: APP_URL,
           }),
         ).rejects.toBeInstanceOf(ConflictError);
+      },
+      30_000,
+    );
+
+    itGraph.each([
+      { inviteStatus: 'declined', journeyState: 'declined' },
+      { inviteStatus: 'withdrawn', journeyState: 'withdrawn' },
+      { inviteStatus: 'bound', journeyState: null },
+    ] as const)(
+      'reissues a $inviteStatus slot after terminal or expiry cleanup',
+      async ({ inviteStatus, journeyState }) => {
+        const { personId, orgId } = await seedInviter();
+        const invitedEmail = `recover_${randomUUID()}@example.test`;
+        await initiateFamilyJoinInvite(db, {
+          inviterPersonId: personId,
+          familyOrgId: orgId,
+          invitedEmail,
+          appUrl: APP_URL,
+        });
+        const original = await db.query.familyJoinInvite.findFirst({
+          where: eq(familyJoinInvite.familyOrgId, orgId),
+        });
+        expect(original).toBeDefined();
+        if (!original) return;
+
+        const terminalAt = new Date();
+        if (journeyState) {
+          await db.insert(familyJoinJourney).values({
+            inviteId: original.id,
+            chargePersonId: personId,
+            familyOrgId: orgId,
+            state: journeyState,
+            jurisdiction: 'NO',
+            policyVersion: 'test-policy-v1',
+            authorizationForm: 'self',
+            learnerAssentedAt: null,
+            learnerSupportershipPreference: null,
+            supportershipAuthority: 'learner',
+            supportershipDecision: null,
+            declinedAt: journeyState === 'declined' ? terminalAt : null,
+            withdrawnAt: journeyState === 'withdrawn' ? terminalAt : null,
+          });
+        }
+        await db
+          .update(familyJoinInvite)
+          .set({
+            status: inviteStatus,
+            tokenExpiresAt:
+              inviteStatus === 'bound'
+                ? new Date(terminalAt.getTime() - 1_000)
+                : original.tokenExpiresAt,
+          })
+          .where(eq(familyJoinInvite.id, original.id));
+
+        await initiateFamilyJoinInvite(db, {
+          inviterPersonId: personId,
+          familyOrgId: orgId,
+          invitedEmail,
+          appUrl: APP_URL,
+        });
+
+        const reopened = await db.query.familyJoinInvite.findFirst({
+          where: eq(familyJoinInvite.id, original.id),
+        });
+        expect(reopened).toMatchObject({
+          id: original.id,
+          status: 'pending',
+          invitedEmail,
+          resendCount: 0,
+          recipientChangeCount: 0,
+        });
+        expect(reopened?.token).not.toBe(original.token);
+        await expect(
+          db.query.familyJoinJourney.findFirst({
+            where: eq(familyJoinJourney.inviteId, original.id),
+          }),
+        ).resolves.toBeUndefined();
       },
       30_000,
     );
