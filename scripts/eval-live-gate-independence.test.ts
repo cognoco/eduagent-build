@@ -32,9 +32,11 @@ import { parse } from 'yaml';
 // published `.js` specifier. The scripts Jest config intentionally does not
 // rewrite that package specifier, so provide the source-test shim needed only
 // to load FLOWS for this registry contract.
-jest.mock('../packages/retention/src/sm2.js', () => ({ sm2: jest.fn() }), {
-  virtual: true,
-});
+jest.mock(
+  '../packages/retention/src/sm2.js', // gc1-allow: scripts Jest cannot resolve the retention package published .js specifier and a virtual shim is required to load FLOWS for the registry contract
+  () => ({ sm2: jest.fn() }),
+  { virtual: true },
+);
 
 import { TEACHING_SCENARIOS } from '../apps/api/eval-llm/fixtures/teaching-scenarios';
 import { CHALLENGE_SIM_SCENARIOS } from '../apps/api/eval-llm/fixtures/challenge-personas';
