@@ -266,7 +266,7 @@ describe('API co-located integration routing', () => {
     const instructions = readFileSync(join(repoRoot, 'AGENTS.md'), 'utf8');
 
     expect(instructions).toContain(
-      'the API co-located suite is `pnpm run test:api:integration:ci`',
+      'API co-located suite: `pnpm run test:api:integration:ci`',
     );
     expect(instructions).not.toContain(
       'the API co-located suite is `pnpm exec nx run api:integration-api`',
