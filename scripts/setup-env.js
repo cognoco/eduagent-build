@@ -472,18 +472,6 @@ function main() {
   console.log(
     '\n   \x1b[90mTo regenerate after secret changes:\x1b[0m pnpm env:sync\n',
   );
-
-  // Sync secrets to Cloudflare Workers (non-fatal — skips if wrangler not authenticated)
-  try {
-    const { syncSecrets } = require('./sync-secrets');
-    syncSecrets(['stg']);
-  } catch (err) {
-    console.log(
-      '\x1b[33m[Doppler]\x1b[0m Cloudflare Workers sync skipped:',
-      err.message,
-    );
-    console.log('   To sync manually: pnpm secrets:sync\n');
-  }
 }
 
 if (require.main === module) {

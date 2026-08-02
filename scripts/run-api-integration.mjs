@@ -20,6 +20,7 @@ const LOOPBACK_ONLY_REPAIR_PATH = resolve(
 );
 const LOCAL_JEST_CONFIG = 'apps/api/jest.integration.config.cjs';
 const REMOTE_JEST_CONFIG = 'apps/api/jest.integration.remote.config.cjs';
+const CROSS_PACKAGE_JEST_CONFIG = 'tests/integration/jest.config.cjs';
 
 function refuse(reason) {
   throw new Error(`API integration launch refused before Jest: ${reason}`);
@@ -252,6 +253,20 @@ function main() {
       'nx',
       'run',
       'api:integration-api',
+    ]);
+  }
+
+  if (mode === '--cross-package') {
+    assertDatabaseContract();
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
+      'exec',
+      'jest',
+      '--config',
+      CROSS_PACKAGE_JEST_CONFIG,
+      '--no-coverage',
+      ...forwardedArgs,
     ]);
   }
 

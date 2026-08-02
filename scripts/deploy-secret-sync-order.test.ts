@@ -76,7 +76,16 @@ describe('deploy.yml api-deploy step ordering', () => {
       /doppler run -p mentomate -c "\$SYNC_TARGET" -- \\\n\s+node scripts\/check-clerk-key-alignment\.mjs/,
     );
     expect(run).toContain('RETENTION_PURGE_ENABLED must be true');
-    expect(run).toContain('SKIP_DOPPLER_SYNC cannot be used for production');
+    expect(run).toContain(
+      'SKIP_DOPPLER_SYNC cannot be used for protected staging or production',
+    );
+    const skipBlock = run.slice(
+      run.indexOf('if [ "${SKIP_DOPPLER_SYNC:-false}" = "true" ]'),
+      run.indexOf('# Map wrangler env names'),
+    );
+    expect(skipBlock).toContain('exit 1');
+    expect(skipBlock).not.toContain('exit 0');
+    expect(skipBlock).not.toContain('operator must have run');
     expect(retentionCheck).toBeGreaterThanOrEqual(0);
     expect(clerkAlignmentCheck).toBeGreaterThanOrEqual(0);
     expect(workerSync).toBeGreaterThan(clerkAlignmentCheck);

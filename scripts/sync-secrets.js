@@ -4,13 +4,14 @@
  * Syncs secrets from Doppler to Cloudflare Workers.
  *
  * Usage (standalone):
- *   pnpm secrets:sync           # Sync all environments (dev, stg, prd)
+ *   pnpm secrets:sync           # Sync dev only
  *   pnpm secrets:sync dev       # Sync dev only
  *   pnpm secrets:sync stg       # Sync staging only
  *   pnpm secrets:sync prd       # Sync production only
  *
- * Also called automatically by setup-env.js (postinstall / pnpm env:sync).
- * When called as a module, failures are non-fatal — the caller decides.
+ * setup-env.js does not call this module: local env generation must never
+ * mutate a protected Worker. Sanctioned workflows may import it and decide
+ * how to surface failures.
  *
  * Prerequisites:
  *   - Doppler CLI installed and authenticated (doppler login)
@@ -22,8 +23,9 @@
  *   2. Filters out non-Worker secrets (DOPPLER_*, EXPO_*, CLOUDFLARE_*, etc.)
  *   3. Pushes to the corresponding Cloudflare Worker via wrangler secret bulk
  *
- * This is a manual sync — run it whenever you change secrets in Doppler.
- * There is no auto-sync integration between Doppler and Cloudflare Workers.
+ * Dev and staging use explicit sync/deploy paths. Production also has the
+ * guarded scheduled reconciliation workflow documented in
+ * docs/runbooks/production-worker-secret-sync.md.
  */
 
 const { execSync, spawnSync } = require('child_process');
@@ -186,6 +188,34 @@ function prepareWorkerSecrets(envKey, secrets, workerDatabaseUrl) {
 
   filtered.DATABASE_URL = workerDatabaseUrl;
   return { filtered, excluded };
+}
+
+function resolveSyncTargets(targets, workerDatabaseUrl) {
+  const explicitTargets = targets && targets.length > 0;
+  const envs = explicitTargets ? [...targets] : ['dev'];
+  const unknown = envs.filter((target) => !Object.hasOwn(ENV_MAP, target));
+  if (unknown.length > 0) {
+    return {
+      error: `Unknown environment target(s): ${unknown.join(', ')}. Use: dev, stg, prd`,
+    };
+  }
+
+  const protectedTargets = envs.filter(
+    (target) => target === 'stg' || target === 'prd',
+  );
+  if (protectedTargets.length > 0 && (!explicitTargets || envs.length !== 1)) {
+    return {
+      error:
+        'Protected Worker sync requires exactly one explicit target: stg or prd',
+    };
+  }
+  if (protectedTargets.length === 1 && !workerDatabaseUrl) {
+    return {
+      error: 'WORKER_DATABASE_URL is required for protected Worker secret sync',
+    };
+  }
+
+  return { envs };
 }
 
 function validateApiSentryProject(secrets) {
@@ -396,11 +426,19 @@ function syncEnvironment(envKey, configPath) {
 
 /**
  * Sync secrets to Cloudflare Workers.
- * @param {string[]} targets - Environments to sync ('dev', 'stg', 'prd'). Defaults to all.
+ * @param {string[]} targets - Environments to sync ('dev', 'stg', 'prd'). Defaults to dev.
  * @returns {{ ok: boolean, results: Record<string, boolean> }}
  */
 function syncSecrets(targets) {
-  const envs = targets && targets.length > 0 ? targets : ['dev', 'stg', 'prd'];
+  const selection = resolveSyncTargets(
+    targets,
+    process.env.WORKER_DATABASE_URL,
+  );
+  if (selection.error) {
+    console.error(`\x1b[31m[sync]\x1b[0m ${selection.error}`);
+    return { ok: false, results: {} };
+  }
+  const envs = selection.envs;
   const configPath = process.env.WRANGLER_SYNC_CONFIG;
 
   console.log(
@@ -455,6 +493,7 @@ module.exports = {
   isWranglerAuthenticated,
   isRenderedWranglerToml,
   prepareWorkerSecrets,
+  resolveSyncTargets,
   shouldSkipSync,
   syncSecrets,
   validateApiSentryProject,

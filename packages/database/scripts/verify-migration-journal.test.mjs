@@ -87,6 +87,20 @@ test('rejects a hash whose created_at does not match the committed journal', () 
   );
 });
 
+test('rejects duplicate live journal rows for the same migration', () => {
+  assert.throws(
+    () =>
+      reconcileMigrationJournal({
+        migrations,
+        appliedRows: [
+          { hash: 'hash-0', created_at: '100' },
+          { hash: 'hash-0', created_at: '100' },
+        ],
+      }),
+    /journal.*duplicate.*hash-0/i,
+  );
+});
+
 test('extracts catalog probes for every recurring collision shape', () => {
   const probes = extractDdlProbes(`
     CREATE TABLE "activation_events" ("id" uuid);
@@ -173,6 +187,34 @@ test('extracts catalog probes for every recurring collision shape', () => {
       name: 'pg_trgm',
       description: 'extension pg_trgm',
     },
+  ]);
+});
+
+test('extracts every effect from a multi-action ALTER TABLE statement', () => {
+  const statement = `
+    ALTER TABLE "profiles"
+      ADD COLUMN "new_flag" boolean,
+      ADD CONSTRAINT "profiles_new_flag_check"
+        CHECK (new_flag IS NOT NULL);
+  `;
+
+  assert.deepEqual(
+    extractDdlProbes(statement).map((probe) => probe.description),
+    [
+      'column public.profiles.new_flag',
+      'constraint public.profiles.profiles_new_flag_check',
+    ],
+  );
+  assert.deepEqual(findUnsupportedDdlStatements(statement), []);
+});
+
+test('fails closed when any action in a multi-action ALTER TABLE is unsupported', () => {
+  const statement = `ALTER TABLE "profiles"
+    ADD COLUMN "new_flag" boolean,
+    ALTER COLUMN "conversation_language" SET DEFAULT 'en';`;
+
+  assert.deepEqual(findUnsupportedDdlStatements(statement), [
+    `ALTER TABLE "profiles" ADD COLUMN "new_flag" boolean, ALTER COLUMN "conversation_language" SET DEFAULT 'en'`,
   ]);
 });
 
@@ -289,16 +331,17 @@ test('fails closed for pending DDL whose catalog effect is not understood', () =
     findUnsupportedDdlStatements(`
       ALTER TABLE "profiles"
         ALTER COLUMN "conversation_language" SET DEFAULT 'en';
-      DROP INDEX IF EXISTS "legacy_profile_idx";
+      DROP SCHEMA IF EXISTS legacy_schema;
     `),
     [
       'ALTER TABLE "profiles" ALTER COLUMN "conversation_language" SET DEFAULT \'en\'',
+      'DROP SCHEMA IF EXISTS legacy_schema',
     ],
   );
   assert.deepEqual(
     findUnsupportedDdlStatements('DROP INDEX IF EXISTS "legacy_profile_idx";'),
     [],
-    'an explicitly idempotent drop cannot collide and stays non-blocking',
+    'a supported drop is represented by a negative-effect catalog probe',
   );
   assert.deepEqual(
     findUnsupportedDdlStatements(`
@@ -319,6 +362,114 @@ test('fails closed for pending DDL whose catalog effect is not understood', () =
   );
   assert.match(verifier, /findUnsupportedDdlStatements\(migration\.sql\)/);
   assert.match(verifier, /cannot safely verify pending DDL/i);
+});
+
+test('probes chain-established objects before a pending idempotent drop', () => {
+  const appliedMigrations = [
+    {
+      sql: 'CREATE INDEX "legacy_profile_idx" ON "profiles" ("id");',
+    },
+  ];
+  const pendingMigration = {
+    sql: 'DROP INDEX IF EXISTS "legacy_profile_idx";',
+  };
+
+  assert.deepEqual(
+    pendingMigrationDdlProbes({ appliedMigrations, pendingMigration }),
+    [
+      {
+        kind: 'relation',
+        schema: 'public',
+        name: 'legacy_profile_idx',
+        expectedExists: true,
+        optionalWhenUnestablished: true,
+        description: 'pre-drop index public.legacy_profile_idx',
+      },
+    ],
+  );
+  assert.deepEqual(
+    pendingMigrationDdlProbes({
+      appliedMigrations: [],
+      pendingMigration,
+    }),
+    [],
+    'an IF EXISTS cleanup for an object never established by the chain is unknowable and may remain a no-op',
+  );
+});
+
+test('probes an unquoted chain-established index before a pending drop', () => {
+  const appliedMigrations = [
+    {
+      sql: 'CREATE INDEX legacy_profile_idx ON profiles (id);',
+    },
+  ];
+  const pendingMigration = {
+    sql: 'DROP INDEX IF EXISTS legacy_profile_idx;',
+  };
+
+  assert.equal(
+    pendingMigrationDdlProbes({ appliedMigrations, pendingMigration }).length,
+    1,
+  );
+});
+
+test('ignores DDL-looking text inside SQL comments, strings, and dollar blocks', () => {
+  const source = `
+    -- DROP INDEX ghost_line_comment;
+    /* CREATE TABLE ghost_block_comment (id integer); */
+    INSERT INTO audit_log(message) VALUES ('CREATE TYPE ghost_string AS ENUM (''x'')');
+    DO $body$ BEGIN RAISE NOTICE 'DROP TABLE ghost_dollar'; END $body$;
+    CREATE INDEX live_profile_idx ON profiles (id);
+  `;
+
+  assert.deepEqual(
+    extractDdlProbes(source).map((probe) => probe.name),
+    ['live_profile_idx'],
+  );
+  assert.deepEqual(findUnsupportedDdlStatements(source), []);
+});
+
+test('ignores DDL-looking defaults inside a top-level CREATE TABLE', () => {
+  const source = `
+    CREATE TABLE actual_events (
+      id integer,
+      note text DEFAULT 'DROP TABLE ghost_literal'
+    );
+  `;
+
+  assert.deepEqual(
+    extractDdlProbes(source).map((probe) => probe.name),
+    ['actual_events'],
+  );
+  assert.deepEqual(findUnsupportedDdlStatements(source), []);
+});
+
+test('fails closed on CREATE FUNCTION instead of probing DDL-looking body text', () => {
+  const source = `
+    CREATE FUNCTION actual_function() RETURNS void AS $body$
+    BEGIN
+      EXECUTE 'CREATE TABLE ghost_function (id integer)';
+    END
+    $body$ LANGUAGE plpgsql;
+  `;
+
+  assert.deepEqual(extractDdlProbes(source), []);
+  assert.match(findUnsupportedDdlStatements(source)[0], /^CREATE FUNCTION/i);
+});
+
+test('retains enum labels while safely classifying supported ALTER TYPE DDL', () => {
+  const source = `
+    ALTER TYPE "public"."mood" ADD VALUE IF NOT EXISTS 'happy';
+  `;
+
+  assert.deepEqual(
+    extractDdlProbes(source).map((probe) => ({
+      kind: probe.kind,
+      value: probe.value,
+    })),
+    [{ kind: 'enum-value', value: 'happy' }],
+  );
+  assert.deepEqual(findUnsupportedDdlStatements(source), []);
 });
 
 test('deploy preflight runs after target verification and before migrate', () => {

@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { packageManagerLaunch } from './package-manager-launch.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCRIPT = fileURLToPath(import.meta.url);
 const DOPPLER_WRAPPER = join(REPO_ROOT, 'scripts', 'doppler-run.mjs');
 const INTEGRATION_GUARD = join(REPO_ROOT, 'scripts', 'run-api-integration.mjs');
+const PACKAGE_JSON = join(REPO_ROOT, 'package.json');
 const ALLOWED_HARNESSES = new Set([
   'scripts/enduser-session-pass.ts',
   'scripts/premium-routing-pass.ts',
@@ -39,6 +43,33 @@ function run(binary, args) {
   return result.status ?? 1;
 }
 
+function assertPinnedPnpm() {
+  const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8'));
+  const match = /^pnpm@(.+)$/.exec(packageJson.packageManager ?? '');
+  if (!match) {
+    refuse('package.json must declare packageManager as pnpm@<version>');
+  }
+
+  let launch;
+  try {
+    launch = packageManagerLaunch(process.env.npm_execpath, process.execPath);
+  } catch {
+    refuse('npm_execpath is required; run the canonical pnpm harness command');
+  }
+  const version = spawnSync(launch.binary, [...launch.args, '--version'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
+  if (
+    version.error ||
+    version.status !== 0 ||
+    version.stdout.trim() !== match[1]
+  ) {
+    refuse(`npm_execpath must resolve repository-pinned pnpm ${match[1]}`);
+  }
+  return launch;
+}
+
 function validateHarness(target) {
   if (!ALLOWED_HARNESSES.has(target)) {
     refuse(`unsupported harness "${target}"`);
@@ -58,7 +89,13 @@ function main() {
     if (guardStatus !== 0) {
       return guardStatus;
     }
-    return run('corepack', ['pnpm', 'exec', 'tsx', resolve(REPO_ROOT, target)]);
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
+      'exec',
+      'tsx',
+      resolve(REPO_ROOT, target),
+    ]);
   }
 
   const target = validateHarness(modeOrTarget);
@@ -68,7 +105,7 @@ function main() {
     '--project',
     'mentomate',
     '--config',
-    'integration',
+    'dev_integration',
     '--',
     process.execPath,
     DOPPLER_WRAPPER,

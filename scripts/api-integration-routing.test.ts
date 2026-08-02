@@ -237,7 +237,7 @@ describe('API co-located integration routing', () => {
     const targets = project.targets ?? {};
 
     expect(targets['test:integration']?.options?.command).toContain(
-      'tests/integration/jest.config.cjs',
+      'run-api-integration.mjs --cross-package',
     );
     expect(targets['integration-api']?.options?.command).toBe(
       'node scripts/run-api-integration.mjs --jest',

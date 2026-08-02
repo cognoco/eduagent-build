@@ -7,6 +7,7 @@
 
 import { neon } from '@neondatabase/serverless';
 
+import { DATABASE_ROLE_CAPABILITIES_QUERY } from './database-role-capabilities.mjs';
 import { assertReadOnlyCapabilities } from './verify-db-read-only-lib.mjs';
 
 async function main() {
@@ -15,62 +16,7 @@ async function main() {
   }
 
   const sql = neon(process.env.DATABASE_URL);
-  const [capabilities] = await sql`
-    SELECT
-      role.rolsuper AS is_superuser,
-      (
-        role.rolcreatedb
-        OR has_database_privilege(current_user, current_database(), 'CREATE')
-      ) AS can_create_database,
-      EXISTS (
-        SELECT 1
-        FROM pg_namespace namespace
-        WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-          AND namespace.nspname NOT LIKE 'pg_toast%'
-          AND has_schema_privilege(current_user, namespace.oid, 'CREATE')
-      ) AS can_create_schema,
-      EXISTS (
-        SELECT 1
-        FROM pg_class object
-        INNER JOIN pg_namespace namespace
-          ON namespace.oid = object.relnamespace
-        WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-          AND namespace.nspname NOT LIKE 'pg_toast%'
-          AND pg_has_role(current_user, object.relowner, 'MEMBER')
-      ) AS owns_application_objects,
-      EXISTS (
-        SELECT 1
-        FROM pg_class object
-        INNER JOIN pg_namespace namespace
-          ON namespace.oid = object.relnamespace
-        WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-          AND namespace.nspname NOT LIKE 'pg_toast%'
-          AND object.relkind IN ('r', 'p', 'v', 'm', 'f')
-          AND (
-            has_table_privilege(current_user, object.oid, 'INSERT')
-            OR has_table_privilege(current_user, object.oid, 'UPDATE')
-            OR has_table_privilege(current_user, object.oid, 'DELETE')
-            OR has_table_privilege(current_user, object.oid, 'TRUNCATE')
-            OR has_table_privilege(current_user, object.oid, 'TRIGGER')
-            OR has_table_privilege(current_user, object.oid, 'REFERENCES')
-          )
-      ) AS has_table_writes,
-      EXISTS (
-        SELECT 1
-        FROM pg_class object
-        INNER JOIN pg_namespace namespace
-          ON namespace.oid = object.relnamespace
-        WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-          AND namespace.nspname NOT LIKE 'pg_toast%'
-          AND object.relkind = 'S'
-          AND (
-            has_sequence_privilege(current_user, object.oid, 'USAGE')
-            OR has_sequence_privilege(current_user, object.oid, 'UPDATE')
-          )
-      ) AS has_sequence_writes
-    FROM pg_roles role
-    WHERE role.rolname = current_user
-  `;
+  const [capabilities] = await sql(DATABASE_ROLE_CAPABILITIES_QUERY);
 
   if (!capabilities) {
     throw new Error('Could not resolve current PostgreSQL role capabilities');

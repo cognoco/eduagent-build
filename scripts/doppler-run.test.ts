@@ -304,11 +304,11 @@ describe('Windows-facing package-script dispatch (WI-2522)', () => {
     expect(result.status).toBe(CHILD_BOUNDARY_EXIT);
   });
 
-  test('pnpm test:integration reaches doppler with the cross-package integration command', () => {
+  test('pnpm test:integration reaches the guarded cross-package integration command', () => {
     const result = packageScriptTest('test:integration');
 
     expect(result.stdout).toContain(
-      'ARGS:run -- jest --config tests/integration/jest.config.cjs --no-coverage',
+      'ARGS:run --project mentomate --config dev_integration --',
     );
     expect(result.stdout).toContain(
       'CHILD_STARTED:["jest","--config","tests/integration/jest.config.cjs","--no-coverage"]',

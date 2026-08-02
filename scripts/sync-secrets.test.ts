@@ -14,6 +14,7 @@ const {
   findMissingSecretNames,
   isRenderedWranglerToml,
   prepareWorkerSecrets,
+  resolveSyncTargets,
   shouldSkipSync,
   validateApiSentryProject,
 } = require('./sync-secrets.js') as {
@@ -40,6 +41,10 @@ const {
     excluded: string[];
     error?: string;
   };
+  resolveSyncTargets: (
+    targets?: string[],
+    workerDatabaseUrl?: string,
+  ) => { envs?: string[]; error?: string };
   shouldSkipSync: (isRendered: boolean, configPath?: string) => boolean;
   validateApiSentryProject: (secrets: Record<string, string>) => {
     valid: boolean;
@@ -79,6 +84,19 @@ describe('[WI-2788] empty Worker secret preflight', () => {
 });
 
 describe('[WI-1628] protected Worker database credential split', () => {
+  it('defaults the no-argument command to dev only', () => {
+    expect(resolveSyncTargets()).toEqual({ envs: ['dev'] });
+  });
+
+  it('refuses to fan one protected credential across multiple targets', () => {
+    expect(
+      resolveSyncTargets(['stg', 'prd'], 'postgresql://single-worker-app-role'),
+    ).toMatchObject({ error: expect.stringMatching(/exactly one explicit/i) });
+    expect(
+      resolveSyncTargets(['dev', 'stg'], 'postgresql://single-worker-app-role'),
+    ).toMatchObject({ error: expect.stringMatching(/exactly one explicit/i) });
+  });
+
   it.each(['stg', 'prd'])(
     'replaces the Doppler %s DATABASE_URL with the CI-only Worker app credential',
     (envKey) => {

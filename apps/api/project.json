@@ -29,7 +29,7 @@
     "test:integration": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec jest --config tests/integration/jest.config.cjs",
+        "command": "node scripts/run-api-integration.mjs --cross-package",
         "cwd": "."
       }
     },

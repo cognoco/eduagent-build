@@ -47,6 +47,7 @@ Last updated: 2026-05-29
   - [ ] `DATABASE_URL_PRODUCTION_APP` — production Worker application role; data access without schema DDL/ownership
   - [ ] `DATABASE_URL_STAGING_HOST`
   - [ ] `DATABASE_URL_PRODUCTION_HOST`
+  - [ ] Repository variable `WORKER_DATABASE_BYPASSRLS_EXPECTED` — exact reviewed Worker posture, `true` or `false`; verifier rejects an unset or mismatched value
   - [ ] `EXPO_TOKEN`
   - [ ] `DOPPLER_TOKEN_STG` — config-scoped Doppler service token for staging; used by `deploy.yml` Doppler→Worker sync step
   - [ ] `DOPPLER_TOKEN_PRD` — config-scoped Doppler service token for production; used by `deploy.yml` Doppler→Worker sync step
@@ -57,7 +58,9 @@ Last updated: 2026-05-29
   - `deploy.yml` verifies the selected target and live migration journal/schema effects before running committed migrations
   - Do not run `drizzle-kit push` against staging or production
   - If deploying outside `deploy.yml`, point `DATABASE_URL` at production Neon and run `pnpm exec drizzle-kit migrate` before deploying the Workers bundle
-  - Two-key hold: before merging the credential split, provision both GitHub `*_APP` secrets, verify those roles can perform required application data writes but no schema DDL/ownership, then rotate Doppler `stg` / `prd` `DATABASE_URL` to read-only roles
+  - Two-key activation order: provision both GitHub `*_APP` secrets and the reviewed `WORKER_DATABASE_BYPASSRLS_EXPECTED` variable; verify the candidate roles; **leave Doppler unchanged**; land/deploy the overlay code; prove both Workers use the app roles and remain healthy; only then rotate Doppler `stg` / `prd` `DATABASE_URL` to read-only roles
+  - Keep the post-land/pre-rotation interval bounded and pause lane execution during it. Before the overlay lands, the existing scheduled production workflow still copies Doppler `DATABASE_URL`; rotating Doppler first would replace the live Worker credential with a read-only URL and break writes.
+  - Rollback before Doppler rotation: revert the overlay deployment and confirm Worker health. Rollback after rotation: leave Doppler read-only, restore the last approved Worker application credential through the protected `*_APP` secret, dispatch the guarded sync, and verify health; never point a lane-visible URL back at the Worker.
   - [ ] Rule the Worker RLS posture: deliberately reviewed temporary `BYPASSRLS` application role with no ownership/DDL/admin capability, or defer the credential swap until complete policies + scoped GUC wiring exist
   - [ ] Against staging, capture catalog capability evidence, authenticated seeded-profile read/create/update/delete smoke, a negative cross-profile access check, and proof that migration/DDL/ownership operations are refused
 

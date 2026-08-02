@@ -28,7 +28,15 @@ read/write smoke, and a negative cross-profile access check.
   all dispatch refs, so a scheduled sync cannot race a production deployment.
 - SHA-pinned third-party actions and checksum-verified Doppler CLI.
 - Hard failure when the Doppler token, Cloudflare API token, account ID, or
-  Worker application database URL is missing.
+  Worker/migrator database URL or reviewed BYPASSRLS posture is missing.
+- Catalog-only preflight verifies the production host, rejects identical or
+  same-role migration/Worker credentials, rejects Worker ownership, schema
+  CREATE, CREATEROLE, replication, other migration/admin capabilities, and any
+  `SET ROLE` path to those capabilities. A reachable membership with
+  `ADMIN OPTION` is also rejected because it can change its own `SET` option.
+  The verifier additionally requires `SELECT`, `INSERT`, `UPDATE`, and
+  `DELETE` on every application table plus `USAGE` and `UPDATE` on every
+  application sequence.
 - Explicit temporary Wrangler config and Worker name; no committed Cloudflare
   identifiers and no unrelated KV identifiers in the job.
 - Post-upload key-name verification confirms every non-empty Doppler-managed
@@ -120,22 +128,27 @@ retains it and schedules no deletion.
 
 ## Manual Remediation
 
-1. Confirm `DOPPLER_TOKEN_PRD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`, and
-   `DATABASE_URL_PRODUCTION_APP` are present in GitHub Actions secrets.
+1. Confirm `DOPPLER_TOKEN_PRD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`,
+   `DATABASE_URL_PRODUCTION`, `DATABASE_URL_PRODUCTION_APP`, both database host
+   hints, and the reviewed `WORKER_DATABASE_BYPASSRLS_EXPECTED` repository
+   variable are present.
 2. Dispatch `Production Worker Secret Sync` from `main`.
 3. Confirm the sync step targets `mentomate-api-prd` and the health step returns
    HTTP 200 with `status=ok`.
-4. If Actions is unavailable, use PowerShell only after the four credentials
+4. If Actions is unavailable, use PowerShell only after the credentials
    above are explicitly loaded into the current shell through the approved
    machine secret flow:
 
    ```powershell
-   $env:DOPPLER_TOKEN = $env:DOPPLER_TOKEN_PRD
-   $env:CLOUDFLARE_ACCOUNT_ID = $env:CF_ACCOUNT_ID
-   $env:WORKER_DATABASE_URL = $env:DATABASE_URL_PRODUCTION_APP
-   $env:WRANGLER_SYNC_CONFIG = Join-Path $env:TEMP 'wrangler-secret-sync.jsonc'
-   Set-Content -LiteralPath $env:WRANGLER_SYNC_CONFIG -Value '{"name":"mentomate-api-prd"}'
-   pnpm secrets:sync prd
+    $env:DOPPLER_TOKEN = $env:DOPPLER_TOKEN_PRD
+    $env:CLOUDFLARE_ACCOUNT_ID = $env:CF_ACCOUNT_ID
+    $env:DEPLOY_ENV = 'production'
+    $env:MIGRATOR_DATABASE_URL = $env:DATABASE_URL_PRODUCTION
+    $env:WORKER_DATABASE_URL = $env:DATABASE_URL_PRODUCTION_APP
+    $env:WRANGLER_SYNC_CONFIG = Join-Path $env:TEMP 'wrangler-secret-sync.jsonc'
+    Set-Content -LiteralPath $env:WRANGLER_SYNC_CONFIG -Value '{"name":"mentomate-api-prd"}'
+    node packages/database/scripts/verify-worker-db-role.mjs
+    pnpm secrets:sync prd
    ```
 
 5. Confirm the command reports both sync and key-name verification success.

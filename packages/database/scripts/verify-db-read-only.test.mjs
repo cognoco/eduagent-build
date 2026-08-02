@@ -18,10 +18,15 @@ const REPO_ROOT = path.resolve(__dirname, '../../..');
 const readOnlyCapabilities = {
   is_superuser: false,
   can_create_database: false,
+  can_create_role: false,
+  can_replicate: false,
+  bypasses_rls: false,
   can_create_schema: false,
   owns_application_objects: false,
   has_table_writes: false,
   has_sequence_writes: false,
+  has_forbidden_set_role_path: false,
+  has_role_admin_path: false,
 };
 
 test('accepts a role limited to connect, schema usage, and reads', () => {
@@ -31,10 +36,15 @@ test('accepts a role limited to connect, schema usage, and reads', () => {
 for (const [capability, message] of [
   ['is_superuser', /superuser/i],
   ['can_create_database', /database create/i],
+  ['can_create_role', /role create/i],
+  ['can_replicate', /replication/i],
+  ['bypasses_rls', /row-level security/i],
   ['can_create_schema', /schema create/i],
   ['owns_application_objects', /owns application objects/i],
   ['has_table_writes', /table write/i],
   ['has_sequence_writes', /sequence write/i],
+  ['has_forbidden_set_role_path', /SET ROLE/i],
+  ['has_role_admin_path', /role ADMIN/i],
 ]) {
   test(`rejects a role with ${capability}`, () => {
     assert.throws(
@@ -85,11 +95,37 @@ test('DB-writing LLM harnesses use the disposable integration DB wrapper', () =>
     path.join(REPO_ROOT, 'scripts/run-db-writing-llm-harness.mjs'),
     'utf8',
   );
-  assert.match(wrapper, /'--config',\s*'integration'/);
+  assert.match(wrapper, /'--config',\s*'dev_integration'/);
   assert.match(wrapper, /'--config',\s*'stg'/);
   assert.match(wrapper, /--preserve-env=/);
   assert.match(wrapper, /--check-only/);
 });
+
+test('developer database tools and cross-package tests select non-protected configs explicitly', () => {
+  const packageJson = JSON.parse(
+    readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'),
+  );
+
+  for (const scriptName of ['db:generate:dev', 'db:studio:dev']) {
+    expectDevConfig(packageJson.scripts[scriptName], scriptName);
+  }
+  assert.match(
+    packageJson.scripts['test:integration'],
+    /--project mentomate --config dev_integration/,
+  );
+  assert.match(
+    packageJson.scripts['test:integration'],
+    /run-api-integration\.mjs --cross-package/,
+  );
+});
+
+function expectDevConfig(command, scriptName) {
+  assert.match(
+    command,
+    /--project mentomate --config dev/,
+    `${scriptName} must select mentomate/dev explicitly`,
+  );
+}
 
 test('protected Worker syncs receive a separate application database credential', () => {
   const deployWorkflow = readFileSync(
@@ -115,8 +151,8 @@ test('protected Worker syncs receive a separate application database credential'
         /WORKER_DATABASE_URL:\s*\$\{\{\s*secrets\.DATABASE_URL_PRODUCTION_APP\s*\}\}/g,
       ),
     ].length,
-    3,
-    'assert, bulk sync, and deletion rollback must all receive the app URL',
+    4,
+    'assert, role verifier, bulk sync, and deletion rollback must all receive the app URL',
   );
 });
 
