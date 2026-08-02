@@ -1,0 +1,18 @@
+{
+  "pageId": "39f8bce9-1f7c-8169-bb17-eabccc7f0260",
+  "id": "WI-2128",
+  "name": "Bind joined learner credentials to their own person instead of the family owner",
+  "description": "CLASSIFICATION: mandatory launch safety/identity blocker introduced by the net-new cross-account family-join path, not unfinished V0/V1 product work. Preserve and reuse the working pre-join Clerk-subject-to-Person resolution and V0/V1 learner shell; diagnose why organization membership changes allow owner-person selection, then repair that boundary without redesigning identity.",
+  "acceptanceCriteria": "ROOT-CAUSE GATE (must be completed before Ready): trace one synthetic learner and owner from Clerk subject through callerPersonId, organization membership, profile selection, omitted/explicit X-Profile-Id, shell contract, and cache restoration before and after family join; identify the first authority decision that substitutes the owner Person. Enumerate variants: fresh web context, token refresh, sign-out/in, native cold start, omitted header, learner header, owner/sibling/unrelated header, and stale local selection.\n\nMINIMUM LAUNCH OUTCOME: the learner credential always resolves to its own Person and learner shell after joining; owner credentials retain owner capabilities; non-owned profile headers and owner-only API/UI capabilities fail closed; the learner Person, history, membership, valid support relationship, and billing state are preserved. Add a real-database red-green security regression with two synthetic Clerk subjects plus privacy-safe telemetry for resolution mismatches. Contain the join feature until this passes independent adversarial review.\n\nDEFERRED/FOLLOW-UP: broad migration tooling for populations that never used the launch-dark family-join path and generalized identity observability beyond the affected resolution seam; capture separately if diagnosis proves it necessary.",
+  "riskImpact": "P0 credential-confusion and privilege-escalation risk. A joined learner can be rendered as the family owner. No family-join release or supporter visibility work may bypass this gate.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P0",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:builder:WI-2128",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

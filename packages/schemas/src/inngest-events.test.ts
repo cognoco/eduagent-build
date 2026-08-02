@@ -79,15 +79,17 @@ describe('mentor notice lifecycle event schemas', () => {
 
 describe('billing alert delivery failure event schema', () => {
   it('accepts controlled delivery failure reasons', () => {
-    expect(
-      billingAlertDeliveryFailedEventSchema.safeParse({
-        alertId: validUuid,
-        subscriptionId: validUuid,
-        channel: 'email',
-        reason: 'resend_api_error_503',
-        timestamp: '2026-07-11T10:00:00.000Z',
-      }).success,
-    ).toBe(true);
+    for (const reason of ['resend_api_error_503', 'non_production_recipient']) {
+      expect(
+        billingAlertDeliveryFailedEventSchema.safeParse({
+          alertId: validUuid,
+          subscriptionId: validUuid,
+          channel: 'email',
+          reason,
+          timestamp: '2026-07-11T10:00:00.000Z',
+        }).success,
+      ).toBe(true);
+    }
   });
 
   it('rejects uncontrolled reason text that could contain PII', () => {

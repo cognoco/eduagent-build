@@ -5,6 +5,7 @@ import type { Database } from '@eduagent/database';
 import { languageProgressSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertCanReadProfile } from '../services/family-access';
 import { getCurrentLanguageProgress } from '../services/language-curriculum';
 import { notFound } from '../errors';
 
@@ -14,6 +15,10 @@ type LanguageProgressRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    // [WI-2877] Set server-side by accountMiddleware — required by
+    // assertCanReadProfile.
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -29,6 +34,10 @@ export const languageProgressRoutes = new Hono<LanguageProgressRouteEnv>().get(
   async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const { subjectId } = c.req.valid('param');
     const progress = await getCurrentLanguageProgress(db, profileId, subjectId);
 

@@ -2445,6 +2445,8 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
       render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
       screen.getByTestId('create-subject-name');
+      // WI-2550: the shared transcription-only mic renders with the name field.
+      screen.getByTestId('create-subject-name-mic');
       expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
     });
   });

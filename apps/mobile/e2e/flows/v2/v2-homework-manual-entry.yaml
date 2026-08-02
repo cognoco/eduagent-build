@@ -1,4 +1,5 @@
-# WI-2236: V2 Mentor manual-entry homework round trip
+# WI-2236 / WI-2196: V2 Mentor manual-entry homework round trip with the
+# correct inline-created Subject when an unrelated Subject already exists.
 #
 # Case: trial-active learner with guaranteed metering allowance opens homework
 # from Mentor, cancels one manual draft, then enters exactly one visible
@@ -26,6 +27,13 @@ tags:
     enabled: true
 
 # The manual-entry cancel escape returns to a usable Mentor surface.
+# WI-3024: the chip is disabled under E2E while the subjects index loads —
+# wait for enabled before tapping, or the tap silently no-ops.
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-bar-homework-chip'
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
@@ -43,6 +51,12 @@ tags:
     enabled: true
 
 # Enter one manual problem from the same Mentor surface.
+# WI-3024: same enabled-wait as above.
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-bar-homework-chip'
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
@@ -61,12 +75,37 @@ tags:
     id: 'result-text-input'
     text: 'Solve 3x + 7 = 22'
 
-# The route receives Mentor's active subject or deterministically adopts the
-# first active subject after its own query resolves. Readiness is a hard gate.
+# Mentor supplies the unrelated seeded Science subject. Keep the problem draft,
+# open the chooser, and create the correct synthetic Algebra subject inline.
 - extendedWaitUntil:
     visible:
       id: 'homework-subject-resolution-ready'
     timeout: 60000
+- assertVisible:
+    id: 'homework-subject-resolution-name'
+    text: 'Science'
+- tapOn:
+    id: 'homework-change-subject'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-subject-name-input'
+    timeout: 15000
+- tapOn:
+    id: 'homework-subject-name-input'
+- inputText: 'Algebra'
+- hideKeyboard
+- assertVisible:
+    id: 'homework-subject-name-input'
+    text: 'Algebra'
+- tapOn:
+    id: 'homework-subject-resolve-button'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-subject-resolution-ready'
+    timeout: 60000
+- assertVisible:
+    id: 'homework-subject-resolution-name'
+    text: 'Algebra'
 - assertVisible:
     id: 'confirm-button'
     enabled: true

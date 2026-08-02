@@ -32,7 +32,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
@@ -45,6 +45,7 @@ import {
   login,
   membership,
   organization,
+  pendingClerkErasure,
   person,
   subscription,
   supportership,
@@ -52,18 +53,45 @@ import {
 } from '@eduagent/database';
 import {
   cancelDeletionV2,
+  assertClerkIdentityBootstrapAllowedTx,
+  attemptPersonIfNoConsentErasureV2,
+  clerkErasureDigest,
   deleteArchivedPersonIfStillEligibleV2,
+  deleteExpiredClerkErasureFences,
   deletePersonIfConsentWithdrawnV2,
   deletePersonIfNoConsentV2,
   deletePersonV2,
   executeDeletionV2,
+  ensurePendingClerkErasures,
+  getOrganizationErasureSnapshotV2,
+  getPersonErasureSnapshotV2,
+  markPendingClerkErasuresComplete,
   scheduleDeletionV2,
 } from './deletion-v2';
+import * as deletionV2Module from './deletion-v2';
+import { createIdentityGraph } from './identity-graph';
 import { scheduledDeletion } from '../../inngest/functions/account-deletion';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { ConflictError } from '../../errors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
+const NON_DATE_FAKEABLE_APIS = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+] as const;
 
 (RUN ? describe : describe.skip)(
   'executeDeletionV2 GDPR gaps (WI-849, integration)',
@@ -71,6 +99,7 @@ const RUN = !!process.env.DATABASE_URL;
     let db: Database;
     const personIds: string[] = [];
     const orgIds: string[] = [];
+    const clerkUserIds: string[] = [];
 
     beforeAll(() => {
       db = createDatabase(process.env.DATABASE_URL!);
@@ -80,6 +109,16 @@ const RUN = !!process.env.DATABASE_URL;
       // Defensive teardown: executeDeletionV2 removes most of this on the happy
       // path, but a RED revert run (or an early assertion failure) can leave
       // rows behind. Clear children before parents; both edge directions.
+      if (clerkUserIds.length > 0) {
+        await db
+          .delete(pendingClerkErasure)
+          .where(
+            inArray(
+              pendingClerkErasure.clerkUserIdDigest,
+              clerkUserIds.map(clerkErasureDigest),
+            ),
+          );
+      }
       for (const pid of personIds) {
         await db
           .delete(consentGrant)
@@ -113,6 +152,7 @@ const RUN = !!process.env.DATABASE_URL;
       }
       personIds.length = 0;
       orgIds.length = 0;
+      clerkUserIds.length = 0;
     });
 
     // -----------------------------------------------------------------------
@@ -173,6 +213,352 @@ const RUN = !!process.env.DATABASE_URL;
       return p!.id;
     }
 
+    it('[WI-2788] captures every organization login in one stable erasure snapshot', async () => {
+      const getOrganizationErasureSnapshotV2 = (
+        deletionV2Module as unknown as {
+          getOrganizationErasureSnapshotV2?: (
+            database: Database,
+            organizationId: string,
+          ) => Promise<{
+            personIds: string[];
+            clerkUserIds: string[];
+            loginEmails: string[];
+          }>;
+        }
+      ).getOrganizationErasureSnapshotV2;
+      expect(getOrganizationErasureSnapshotV2).toBeDefined();
+      if (!getOrganizationErasureSnapshotV2) return;
+
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const [secondPerson] = await db
+        .insert(person)
+        .values({
+          displayName: 'Second Member',
+          birthDate: '1992-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(secondPerson!.id);
+      await db.insert(membership).values({
+        personId: secondPerson!.id,
+        organizationId: orgId,
+        roles: ['learner'],
+      });
+      await db.insert(login).values([
+        {
+          personId: ownerId,
+          clerkUserId: `clerk-owner-a-${ownerId}`,
+          email: `owner-a-${ownerId}@example.com`,
+        },
+        {
+          personId: ownerId,
+          clerkUserId: `clerk-owner-b-${ownerId}`,
+          email: `owner-b-${ownerId}@example.com`,
+        },
+        {
+          personId: secondPerson!.id,
+          clerkUserId: `clerk-member-${secondPerson!.id}`,
+          email: `member-${secondPerson!.id}@example.com`,
+        },
+      ]);
+      clerkUserIds.push(
+        `clerk-owner-a-${ownerId}`,
+        `clerk-owner-b-${ownerId}`,
+        `clerk-member-${secondPerson!.id}`,
+      );
+
+      const snapshot = await getOrganizationErasureSnapshotV2(db, orgId);
+
+      expect(snapshot.personIds).toEqual([ownerId, secondPerson!.id].sort());
+      expect(snapshot.clerkUserIds).toEqual(
+        [
+          `clerk-owner-a-${ownerId}`,
+          `clerk-owner-b-${ownerId}`,
+          `clerk-member-${secondPerson!.id}`,
+        ].sort(),
+      );
+      expect(snapshot.loginEmails).toEqual(
+        [
+          `owner-a-${ownerId}@example.com`,
+          `owner-b-${ownerId}@example.com`,
+          `member-${secondPerson!.id}@example.com`,
+        ].sort(),
+      );
+    });
+
+    it('[WI-2788] purges expired Clerk fences in bounded batches and retains pending or active-grace fences', async () => {
+      const rawIds = [
+        `clerk-cleanup-expired-a-${Date.now()}`,
+        `clerk-cleanup-expired-b-${Date.now()}`,
+        `clerk-cleanup-expired-c-${Date.now()}`,
+        `clerk-cleanup-grace-${Date.now()}`,
+        `clerk-cleanup-pending-${Date.now()}`,
+      ];
+      clerkUserIds.push(...rawIds);
+      const setDigest = clerkErasureDigest(rawIds.join(':'));
+      const now = Date.now();
+      await db.insert(pendingClerkErasure).values([
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[0]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(0),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[1]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(0),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[2]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(0),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[3]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(now + 60 * 60 * 1000),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[4]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: null,
+        },
+      ]);
+
+      const firstBatch = await deleteExpiredClerkErasureFences(db, 2);
+      expect(firstBatch).toBeGreaterThanOrEqual(1);
+      expect(firstBatch).toBeLessThanOrEqual(2);
+      let deleted = firstBatch;
+      for (let batch = 0; batch < 20; batch += 1) {
+        const count = await deleteExpiredClerkErasureFences(db, 2);
+        deleted += count;
+        if (count < 2) break;
+      }
+      expect(deleted).toBeGreaterThanOrEqual(3);
+      const survivors = await db
+        .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+        .from(pendingClerkErasure)
+        .where(
+          inArray(
+            pendingClerkErasure.clerkUserIdDigest,
+            rawIds.map(clerkErasureDigest),
+          ),
+        );
+      expect(survivors.map((row) => row.digest).sort()).toEqual(
+        rawIds.slice(3).map(clerkErasureDigest).sort(),
+      );
+    });
+
+    it('[WI-2788] computes completion grace from the database clock', async () => {
+      const clerkUserId = `clerk-complete-clock-${Date.now()}`;
+      clerkUserIds.push(clerkUserId);
+      const digest = clerkErasureDigest(clerkUserId);
+      await db.insert(pendingClerkErasure).values({
+        clerkUserIdDigest: digest,
+        erasureSetDigest: digest,
+        releaseAfter: null,
+      });
+
+      jest.useFakeTimers({ doNotFake: [...NON_DATE_FAKEABLE_APIS] });
+      jest.setSystemTime(new Date('2000-01-01T00:00:00.000Z'));
+      try {
+        await markPendingClerkErasuresComplete(db, [clerkUserId]);
+      } finally {
+        jest.useRealTimers();
+      }
+
+      const [row] = await db
+        .select({
+          releaseAfter: pendingClerkErasure.releaseAfter,
+          databaseNow: sql<Date>`clock_timestamp()`,
+        })
+        .from(pendingClerkErasure)
+        .where(eq(pendingClerkErasure.clerkUserIdDigest, digest));
+      expect(row?.releaseAfter).toBeInstanceOf(Date);
+      const databaseNow = new Date(
+        row!.databaseNow as unknown as string,
+      ).getTime();
+      expect(row!.releaseAfter!.getTime()).toBeGreaterThan(databaseNow);
+      expect(row!.releaseAfter!.getTime()).toBeLessThanOrEqual(
+        databaseNow + 16 * 60 * 1000,
+      );
+    });
+
+    it('[WI-2788] evaluates active-grace bootstrap fences against the database clock', async () => {
+      const clerkUserId = `clerk-bootstrap-clock-${Date.now()}`;
+      clerkUserIds.push(clerkUserId);
+      const digest = clerkErasureDigest(clerkUserId);
+      await db.insert(pendingClerkErasure).values({
+        clerkUserIdDigest: digest,
+        erasureSetDigest: digest,
+        releaseAfter: sql`clock_timestamp() + interval '1 hour'`,
+      });
+
+      jest.useFakeTimers({ doNotFake: [...NON_DATE_FAKEABLE_APIS] });
+      jest.setSystemTime(new Date('2100-01-01T00:00:00.000Z'));
+      try {
+        await expect(
+          db.transaction((tx) =>
+            assertClerkIdentityBootstrapAllowedTx(
+              tx as unknown as Database,
+              clerkUserId,
+            ),
+          ),
+        ).rejects.toBeInstanceOf(ConflictError);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('[WI-2788] rejects a stale erasure reservation after its expired identity rebinds', async () => {
+      const clerkUserId = `clerk-stale-reservation-${Date.now()}`;
+      clerkUserIds.push(clerkUserId);
+      const digest = clerkErasureDigest(clerkUserId);
+      await db.insert(pendingClerkErasure).values({
+        clerkUserIdDigest: digest,
+        erasureSetDigest: digest,
+        releaseAfter: new Date(0),
+      });
+
+      await expect(
+        deleteExpiredClerkErasureFences(db),
+      ).resolves.toBeGreaterThanOrEqual(1);
+      const rebound = await createIdentityGraph(db, {
+        clerkUserId,
+        verifiedEmail: `stale-reservation-${Date.now()}@example.com`,
+        displayName: 'Rebound Owner',
+        birthYear: 1990,
+        location: 'EU',
+      });
+      personIds.push(rebound.personId);
+      orgIds.push(rebound.organizationId);
+
+      await expect(ensurePendingClerkErasures(db, [clerkUserId])).resolves.toBe(
+        false,
+      );
+      await expect(
+        db.query.login.findFirst({
+          where: eq(login.clerkUserId, clerkUserId),
+          columns: { id: true },
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('[WI-2788] aborts whole-organization deletion when the external snapshot changes', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      await db.insert(login).values({
+        personId: ownerId,
+        clerkUserId: `clerk-first-${ownerId}`,
+        email: `first-${ownerId}@example.com`,
+      });
+      clerkUserIds.push(`clerk-first-${ownerId}`);
+      const snapshot = await getOrganizationErasureSnapshotV2(db, orgId);
+      await db.insert(login).values({
+        personId: ownerId,
+        clerkUserId: `clerk-second-${ownerId}`,
+        email: `second-${ownerId}@example.com`,
+      });
+      clerkUserIds.push(`clerk-second-${ownerId}`);
+
+      const result = await (
+        executeDeletionV2 as unknown as (
+          database: Database,
+          input: {
+            organizationId: string;
+            ownerEmail: null;
+            reason: 'user_initiated';
+            deletedBy: string;
+            expectedSnapshot: typeof snapshot;
+          },
+        ) => Promise<string>
+      )(db, {
+        organizationId: orgId,
+        ownerEmail: null,
+        reason: 'user_initiated',
+        deletedBy: ownerId,
+        expectedSnapshot: snapshot,
+      });
+
+      expect(result).toBe('snapshot_changed');
+      expect(
+        await db.query.person.findFirst({
+          where: eq(person.id, ownerId),
+          columns: { id: true },
+        }),
+      ).toBeDefined();
+    });
+
+    it('[WI-2788] reserves every Clerk identity before whole-organization deletion commits', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const [secondPerson] = await db
+        .insert(person)
+        .values({
+          displayName: 'Second Member',
+          birthDate: '1992-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(secondPerson!.id);
+      await db.insert(membership).values({
+        personId: secondPerson!.id,
+        organizationId: orgId,
+        roles: ['learner'],
+      });
+      const ids = [
+        `clerk-owner-a-${ownerId}`,
+        `clerk-owner-b-${ownerId}`,
+        `clerk-member-${secondPerson!.id}`,
+      ];
+      clerkUserIds.push(...ids);
+      await db.insert(login).values([
+        {
+          personId: ownerId,
+          clerkUserId: ids[0]!,
+          email: `owner-a-${ownerId}@example.com`,
+        },
+        {
+          personId: ownerId,
+          clerkUserId: ids[1]!,
+          email: `owner-b-${ownerId}@example.com`,
+        },
+        {
+          personId: secondPerson!.id,
+          clerkUserId: ids[2]!,
+          email: `member-${secondPerson!.id}@example.com`,
+        },
+      ]);
+      const snapshot = await getOrganizationErasureSnapshotV2(db, orgId);
+
+      await expect(
+        executeDeletionV2(db, {
+          organizationId: orgId,
+          ownerEmail: snapshot.loginEmails[0] ?? null,
+          expectedSnapshot: snapshot,
+          reason: 'user_initiated',
+          deletedBy: ownerId,
+        }),
+      ).resolves.toBe('deleted');
+
+      const guards = await db
+        .select({
+          digest: pendingClerkErasure.clerkUserIdDigest,
+          releaseAfter: pendingClerkErasure.releaseAfter,
+        })
+        .from(pendingClerkErasure)
+        .where(
+          inArray(
+            pendingClerkErasure.clerkUserIdDigest,
+            ids.map(clerkErasureDigest),
+          ),
+        );
+      expect(guards.map((row) => row.digest).sort()).toEqual(
+        ids.map(clerkErasureDigest).sort(),
+      );
+      expect(guards.every((row) => row.releaseAfter instanceof Date)).toBe(
+        true,
+      );
+    });
+
     // -----------------------------------------------------------------------
     // [WI-1128, port of Bug #494] TOCTOU cancellation-race guard, ported from
     // the legacy deletion.integration.test.ts (services/deletion.ts is
@@ -215,6 +601,53 @@ const RUN = !!process.env.DATABASE_URL;
         columns: { id: true },
       });
       expect(owner).toBeDefined();
+    });
+
+    it('[WI-2788] writes a cancellation stamp newer than a future-skewed schedule', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const futureSchedule = new Date(Date.now() + 60_000);
+      await db
+        .update(organization)
+        .set({ deletionScheduledAt: futureSchedule, deletionCancelledAt: null })
+        .where(eq(organization.id, orgId));
+
+      await expect(cancelDeletionV2(db, orgId)).resolves.toBe('cancelled');
+      const stamps = await db.query.organization.findFirst({
+        where: eq(organization.id, orgId),
+        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+      });
+      expect(stamps?.deletionCancelledAt?.getTime()).toBeGreaterThan(
+        futureSchedule.getTime(),
+      );
+
+      await expect(
+        executeDeletionV2(db, {
+          organizationId: orgId,
+          ownerEmail: null,
+          reason: 'user_initiated',
+          deletedBy: ownerId,
+        }),
+      ).resolves.toBe('cancelled');
+    });
+
+    it('[WI-2788] writes a reschedule stamp newer than the prior cancellation', async () => {
+      const { orgId } = await seedScheduledOrgWithOwner();
+      const futureCancellation = new Date(Date.now() + 60_000);
+      await db
+        .update(organization)
+        .set({ deletionCancelledAt: futureCancellation })
+        .where(eq(organization.id, orgId));
+
+      await expect(scheduleDeletionV2(db, orgId)).resolves.toMatchObject({
+        scheduledNow: true,
+      });
+      const stamps = await db.query.organization.findFirst({
+        where: eq(organization.id, orgId),
+        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+      });
+      expect(stamps?.deletionScheduledAt?.getTime()).toBeGreaterThan(
+        futureCancellation.getTime(),
+      );
     });
 
     // -----------------------------------------------------------------------
@@ -324,6 +757,214 @@ const RUN = !!process.env.DATABASE_URL;
         columns: { id: true },
       });
       expect(remainingSub).toBeUndefined();
+    });
+
+    describe('[WI-2788] person-scoped deletion preserves an organization admin', () => {
+      async function addAdmin(orgId: string, displayName: string) {
+        const [admin] = await db
+          .insert(person)
+          .values({
+            displayName,
+            birthDate: '1990-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(admin!.id);
+        await db.insert(membership).values({
+          personId: admin!.id,
+          organizationId: orgId,
+          roles: ['admin'],
+        });
+        return admin!.id;
+      }
+
+      async function addLearner(orgId: string, displayName: string) {
+        const [learner] = await db
+          .insert(person)
+          .values({
+            displayName,
+            birthDate: '2012-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning();
+        personIds.push(learner!.id);
+        await db.insert(membership).values({
+          personId: learner!.id,
+          organizationId: orgId,
+          roles: ['learner'],
+        });
+        return learner!.id;
+      }
+
+      it('erases the organization when the target is its only person/admin', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+
+        await deletePersonV2(db, ownerId, 'user_initiated', ownerId);
+
+        expect(
+          await db.query.person.findFirst({
+            where: eq(person.id, ownerId),
+            columns: { id: true },
+          }),
+        ).toBeUndefined();
+        expect(
+          await db.query.organization.findFirst({
+            where: eq(organization.id, orgId),
+            columns: { id: true },
+          }),
+        ).toBeUndefined();
+      });
+
+      it('returns external cleanup targets when day-30 no-consent erases an org-of-one', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        await db.insert(login).values([
+          {
+            personId: ownerId,
+            clerkUserId: `clerk-a-${ownerId}`,
+            email: `a-${ownerId}@example.com`,
+          },
+          {
+            personId: ownerId,
+            clerkUserId: `clerk-b-${ownerId}`,
+            email: `b-${ownerId}@example.com`,
+          },
+        ]);
+        clerkUserIds.push(`clerk-a-${ownerId}`, `clerk-b-${ownerId}`);
+        const snapshot = await getPersonErasureSnapshotV2(db, ownerId);
+
+        const result = await attemptPersonIfNoConsentErasureV2(
+          db,
+          ownerId,
+          snapshot,
+        );
+
+        expect(result).toMatchObject({
+          status: 'deleted',
+          organizationId: orgId,
+          organizationDeleted: true,
+          clerkUserIds: [`clerk-a-${ownerId}`, `clerk-b-${ownerId}`],
+        });
+
+        await expect(
+          attemptPersonIfNoConsentErasureV2(db, ownerId, snapshot),
+        ).resolves.toMatchObject({
+          status: 'already_deleted',
+          organizationDeleted: true,
+          clerkUserIds: [`clerk-a-${ownerId}`, `clerk-b-${ownerId}`],
+        });
+
+        const guards = await db
+          .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+          .from(pendingClerkErasure)
+          .where(
+            inArray(
+              pendingClerkErasure.clerkUserIdDigest,
+              snapshot.clerkUserIds.map(clerkErasureDigest),
+            ),
+          );
+        expect(guards).toHaveLength(2);
+      });
+
+      it('[WI-2788] blocks same-Clerk bootstrap after DB erasure and before external cleanup', async () => {
+        const { ownerId } = await seedScheduledOrgWithOwner();
+        const clerkUserId = `clerk-replay-${ownerId}`;
+        clerkUserIds.push(clerkUserId);
+        await db.insert(login).values({
+          personId: ownerId,
+          clerkUserId,
+          email: `replay-${ownerId}@example.com`,
+        });
+        const snapshot = await getPersonErasureSnapshotV2(db, ownerId);
+
+        await expect(
+          attemptPersonIfNoConsentErasureV2(db, ownerId, snapshot),
+        ).resolves.toMatchObject({ status: 'deleted' });
+        await expect(
+          createIdentityGraph(db, {
+            clerkUserId,
+            verifiedEmail: `rebound-${ownerId}@example.com`,
+            displayName: 'Rebound Owner',
+            birthYear: 1990,
+            location: 'EU',
+          }),
+        ).rejects.toBeInstanceOf(ConflictError);
+        expect(
+          await db.query.login.findFirst({
+            where: eq(login.clerkUserId, clerkUserId),
+            columns: { id: true },
+          }),
+        ).toBeUndefined();
+      });
+
+      it('performs no deletion when the durable external snapshot changed', async () => {
+        const { ownerId } = await seedScheduledOrgWithOwner();
+        await db.insert(login).values({
+          personId: ownerId,
+          clerkUserId: `clerk-first-${ownerId}`,
+          email: `first-${ownerId}@example.com`,
+        });
+        clerkUserIds.push(`clerk-first-${ownerId}`);
+        const staleSnapshot = await getPersonErasureSnapshotV2(db, ownerId);
+        await db.insert(login).values({
+          personId: ownerId,
+          clerkUserId: `clerk-second-${ownerId}`,
+          email: `second-${ownerId}@example.com`,
+        });
+        clerkUserIds.push(`clerk-second-${ownerId}`);
+
+        await expect(
+          attemptPersonIfNoConsentErasureV2(db, ownerId, staleSnapshot),
+        ).resolves.toMatchObject({ status: 'snapshot_changed' });
+        expect(
+          await db.query.person.findFirst({
+            where: eq(person.id, ownerId),
+            columns: { id: true },
+          }),
+        ).toBeDefined();
+      });
+
+      it('refuses to delete the last admin while another member remains', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        await addLearner(orgId, 'Remaining Learner');
+
+        await expect(
+          deletePersonV2(db, ownerId, 'user_initiated', ownerId),
+        ).rejects.toBeInstanceOf(ConflictError);
+
+        const owner = await db.query.person.findFirst({
+          where: eq(person.id, ownerId),
+          columns: { id: true },
+        });
+        expect(owner).toBeDefined();
+      });
+
+      it('serializes concurrent deletes of two admins and preserves exactly one', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        const secondAdminId = await addAdmin(orgId, 'Second Admin');
+        await addLearner(orgId, 'Remaining Learner');
+
+        const results = await Promise.allSettled([
+          deletePersonV2(db, ownerId, 'user_initiated', ownerId),
+          deletePersonV2(db, secondAdminId, 'user_initiated', secondAdminId),
+        ]);
+
+        expect(
+          results.filter((result) => result.status === 'fulfilled'),
+        ).toHaveLength(1);
+        const [rejected] = results.filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === 'rejected',
+        );
+        expect(rejected?.reason).toBeInstanceOf(ConflictError);
+
+        const remainingAdmins = await db.query.membership.findMany({
+          where: eq(membership.organizationId, orgId),
+          columns: { personId: true, roles: true },
+        });
+        expect(
+          remainingAdmins.filter((row) => row.roles.includes('admin')),
+        ).toHaveLength(1);
+      });
     });
 
     // -----------------------------------------------------------------------

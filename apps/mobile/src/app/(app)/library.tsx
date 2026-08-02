@@ -35,6 +35,7 @@ import {
   type LibraryRetentionTopic,
 } from '../../hooks/use-library-context';
 import { useProfile } from '../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { formatApiError } from '../../lib/format-api-error';
 import {
@@ -1031,6 +1032,9 @@ function LibraryScreenContent({
           value={searchQuery}
           onChangeText={handleSearchChange}
           placeholder={t('library.search.placeholder')}
+          voiceLocale={getVoiceLocaleForLanguage(
+            activeProfile?.conversationLanguage,
+          )}
         />
       </View>
 

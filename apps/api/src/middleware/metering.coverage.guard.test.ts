@@ -238,6 +238,162 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it('[WI-2989] classifies recall consent after deterministic cooldown and claim exits', () => {
+    expect(
+      ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+        ({ id }) => id === 'retention.recall-test',
+      ),
+    ).toBeUndefined();
+
+    const routeBoundary = GRANULAR_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'retention.recall-test',
+    );
+    expect(routeBoundary).toBeDefined();
+    if (!routeBoundary) return;
+
+    expect(routeBoundary.routeServiceCallTokens).toContain(
+      'processRecallTest(',
+    );
+    const serviceBoundary = routeBoundary.serviceBoundaries[0] as
+      | ((typeof routeBoundary.serviceBoundaries)[number] & {
+          preConsentBranchTokens?: readonly string[];
+        })
+      | undefined;
+    expect(serviceBoundary).toBeDefined();
+    if (!serviceBoundary) return;
+
+    expect(serviceBoundary.preConsentBranchTokens).toEqual([
+      'if (!canRetestTopic(state, lastTestAt)) {',
+      "if (attemptMode !== 'dont_remember') {",
+      'if (!claimed) {',
+    ]);
+    const serviceSource = sliceBetweenTokens(
+      readRepoFile(serviceBoundary.serviceFile),
+      serviceBoundary.serviceStartToken,
+      serviceBoundary.serviceEndToken,
+    );
+    const gateIndex = serviceSource.indexOf(serviceBoundary.consentGateToken);
+    for (const token of serviceBoundary.preConsentBranchTokens ?? []) {
+      expect(serviceSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(serviceSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+  });
+
+  it('[WI-2990] classifies quick-check consent after ownership hiding and before dispatch', () => {
+    const routeBoundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'assessments.quick-check',
+    );
+    expect(routeBoundary).toBeDefined();
+    if (!routeBoundary) return;
+
+    expect(routeBoundary.classification).toBe('route-owned');
+    expect(routeBoundary.preConsentBranchTokens).toEqual([
+      'const session = await getSession(',
+      "if (!session) return notFound(c, 'Session not found');",
+    ]);
+    expect(routeBoundary.consentGateToken).toBe('await assertLlmConsent(');
+    expect(routeBoundary.llmDispatchTokens).toEqual([
+      'await evaluateQuickCheckAnswer(',
+    ]);
+    expect(routeBoundary.llmCallSiteFile).toBe(
+      'apps/api/src/services/assessments.ts',
+    );
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(routeBoundary.routeFile),
+      routeBoundary.routeStartToken,
+      routeBoundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(routeBoundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of routeBoundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of routeBoundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+    expect(LLM_CALL_SITE_FILES).toContain(routeBoundary.llmCallSiteFile);
+  });
+
+  it('[WI-2987] classifies dictation review consent after deterministic rate and prompt-budget exits', () => {
+    const boundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'dictation.review',
+    ) as
+      | ((typeof ROUTE_OWNED_LLM_CONSENT_BOUNDARIES)[number] & {
+          preConsentBranchTokens?: readonly string[];
+          consentGateToken?: string;
+          llmDispatchTokens?: readonly string[];
+        })
+      | undefined;
+    expect(boundary).toBeDefined();
+    if (!boundary) return;
+
+    expect(boundary).toMatchObject({
+      classification: 'route-owned',
+      preConsentBranchTokens: [
+        'const rateLimited = await checkAndLogRateLimit(',
+        'if (rateLimited) {',
+        'if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: ['const result = await reviewDictation({'],
+    });
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(boundary.routeFile),
+      boundary.routeStartToken,
+      boundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(boundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of boundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of boundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+  });
+
+  it('[WI-2988] classifies homework OCR consent after deterministic upload validation and before provider dispatch', () => {
+    const boundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'homework.ocr',
+    );
+    expect(boundary).toMatchObject({
+      classification: 'route-owned',
+      preConsentBranchTokens: [
+        "const contentLengthHeader = c.req.header('content-length');",
+        'if (!(file instanceof File)) {',
+        '!OCR_CONSTRAINTS.acceptedMimeTypes.includes(',
+        'if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: [
+        'provider = getOcrProvider(',
+        'const result = await provider.extractText(',
+      ],
+      llmCallSiteFile: 'apps/api/src/services/ocr.ts',
+    });
+    if (!boundary) return;
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(boundary.routeFile),
+      boundary.routeStartToken,
+      boundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(boundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of boundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of boundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+    expect(LLM_CALL_SITE_FILES).toContain(boundary.llmCallSiteFile);
+  });
+
   it('requires an explicit rationale for every remaining route-entry gate', () => {
     for (const boundary of ROUTE_OWNED_LLM_CONSENT_BOUNDARIES) {
       expect({

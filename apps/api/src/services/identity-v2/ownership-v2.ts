@@ -46,6 +46,51 @@ import { login, membership, type Database } from '@eduagent/database';
 import { ForbiddenError } from '@eduagent/schemas';
 import { isGuardianOf } from './guardianship';
 
+export type PersonOperationAuthorityV2 =
+  | 'self'
+  | 'managed-charge'
+  | 'not-member'
+  | 'credentialed-charge'
+  | 'no-authority';
+
+/**
+ * Resolve whether the authenticated caller may operate as `personId`.
+ *
+ * Membership only proves that a Person exists in the same organization. It
+ * does not grant authority to impersonate that Person. Operation is limited to
+ * self, or an active guardian edge to a charge that has no Login.
+ */
+export async function resolvePersonOperationAuthorityV2(
+  db: Database,
+  personId: string,
+  organizationId: string,
+  callerPersonId: string,
+): Promise<PersonOperationAuthorityV2> {
+  const [member] = await db
+    .select({ personId: membership.personId })
+    .from(membership)
+    .where(
+      and(
+        eq(membership.personId, personId),
+        eq(membership.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!member) return 'not-member';
+
+  if (callerPersonId === personId) return 'self';
+  if (!(await isGuardianOf(db, callerPersonId, personId))) {
+    return 'no-authority';
+  }
+
+  const [credential] = await db
+    .select({ personId: login.personId })
+    .from(login)
+    .where(eq(login.personId, personId))
+    .limit(1);
+  return credential ? 'credentialed-charge' : 'managed-charge';
+}
+
 /**
  * Verify the authenticated caller has WRITE authority over `personId` before a
  * settings / learner-profile write. The v2 twin of
@@ -67,38 +112,22 @@ export async function verifyPersonOwnershipV2(
   organizationId: string,
   callerPersonId: string,
 ): Promise<void> {
-  // Defense-in-depth: the target must still be a member of the caller's org.
-  const [member] = await db
-    .select({ personId: membership.personId })
-    .from(membership)
-    .where(
-      and(
-        eq(membership.personId, personId),
-        eq(membership.organizationId, organizationId),
-      ),
-    )
-    .limit(1);
-  if (!member) {
+  const authority = await resolvePersonOperationAuthorityV2(
+    db,
+    personId,
+    organizationId,
+    callerPersonId,
+  );
+  if (authority === 'not-member') {
     throw new Error(`Person ${personId} not found for organization`);
   }
-
-  // Write authority: self OR an authorized guardianship edge. Membership alone
-  // is existence-visibility, not write authority (canon §2A.4).
-  if (callerPersonId === personId) {
-    return; // self-ownership is intrinsic
+  if (authority === 'self' || authority === 'managed-charge') {
+    return;
   }
-  if (await isGuardianOf(db, callerPersonId, personId)) {
-    const [credential] = await db
-      .select({ personId: login.personId })
-      .from(login)
-      .where(eq(login.personId, personId))
-      .limit(1);
-    if (credential) {
-      throw new ForbiddenError(
-        `WI-787 credentialed-charge suppression: guardian writes to credentialed charge ${personId} are blocked`,
-      );
-    }
-    return; // guardian operate/manage over the managed charge
+  if (authority === 'credentialed-charge') {
+    throw new ForbiddenError(
+      `WI-787 credentialed-charge suppression: guardian writes to credentialed charge ${personId} are blocked`,
+    );
   }
   throw new Error(
     `Person ${callerPersonId} lacks write authority over person ${personId}`,

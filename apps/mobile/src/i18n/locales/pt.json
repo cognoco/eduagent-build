@@ -2116,8 +2116,6 @@
     "whichSubject": "Para qual matéria é isso?",
     "loadingSubjects": "Carregando suas matérias...",
     "selectSubjectLabel": "Selecionar {{name}}",
-    "createNewSubject": "Criar Nova Matéria",
-    "createNewSubjectLabel": "Criar uma nova matéria",
     "orTypeSubject": "Ou digite o nome de uma matéria:",
     "subjectInputPlaceholder": "ex: Biologia, História...",
     "typeSubjectLabel": "Digite o nome de uma matéria",
@@ -2129,7 +2127,6 @@
     "manualInputPlaceholder": "Digite seu problema aqui...",
     "typeManuallyLabel": "Digite seu problema manualmente",
     "noSubjectsYet": "Você ainda não tem nenhuma matéria.",
-    "createSubject": "Criar uma matéria",
     "continueWithProblemLabel": "Continuar com o problema digitado",
     "continueArrow": "Continuar →",
     "tryCameraAgain": "Tentar a câmera novamente",
@@ -4260,7 +4257,6 @@
     },
     "search": {
       "placeholder": "Pesquisar tópicos",
-      "micLabel": "Pesquisar por voz",
       "noResults": "Nenhum tópico corresponde a essa pesquisa."
     },
     "notes": {
@@ -4268,7 +4264,6 @@
       "authorSelf": "Minhas notas",
       "authorMentor": "Salvo do mentor",
       "addNote": "Adicionar uma nota",
-      "micLabel": "Adicionar nota por voz",
       "empty": "Ainda não há notas. Anote uma ideia sobre esta matéria.",
       "saveErrorTitle": "Não foi possível salvar a nota",
       "emptyTopic": "Ainda não há notas. Anote um pensamento sobre este tópico."
@@ -4583,7 +4578,10 @@
       "existingTeenInviteSending": "A enviar…",
       "existingTeenInviteSentTitle": "Convite a caminho",
       "existingTeenInviteSentMessage": "Se esse e-mail pertencer a uma conta MentoMate, enviámos um convite. Peça-lhe para abrir o MentoMate e aceitá-lo.",
-      "existingTeenInviteErrorTitle": "Não foi possível enviar o convite"
+      "existingTeenInviteErrorTitle": "Não foi possível enviar o convite",
+      "wrongProfileTitle": "Este convite é para um perfil específico",
+      "wrongProfileMessage": "Este convite só pode ser aberto com o perfil para o qual foi enviado. Escolha esse perfil e, em seguida, abra o convite novamente.",
+      "wrongProfileSwitch": "Escolher perfil"
     }
   },
   "supporterColdStart": {

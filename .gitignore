@@ -279,6 +279,8 @@ apps/api/.notion-*.json
 # fingerprints + package name and Google recommends committing this file.
 # GoogleService-Info.plist will be committed once Apple enrollment completes.
 apps/mobile/GoogleService-Info.plist
+# Legacy local submit material is never created by the current path. Retain this
+# ignore-only guard so an old operator-created credential cannot be staged.
 apps/mobile/.eas-submit/
 .stash-backup/
 

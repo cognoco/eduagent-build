@@ -88,20 +88,18 @@ async function runFreeformFiling({
   }
 
   if (alreadyFiled) {
-    // [CR-FIL-CONSISTENCY-02] Look up topicTitle and bookId from the existing
+    // [CR-FIL-CONSISTENCY-02] Look up bookId from the existing
     // topic row so the early-exit payload matches the success-path payload shape.
     // The session row already carries topicId when filedAt is set.
     // Step result is JSON-serialized by Inngest so undefined fields become
     // optional in the inferred type. We assert FilingInfo to restore the
-    // explicit structure — both bookId and topicTitle are always present as
-    // keys (possibly undefined in value) on every code path.
+    // explicit structure — bookId is always present as a JSON-stable key,
+    // with null representing the valid no-topic case.
     type FilingInfo = {
-      topicTitle: string | undefined;
-      bookId: string | undefined;
+      bookId: string | null;
     };
     const noFilingInfo: FilingInfo = {
-      topicTitle: undefined,
-      bookId: undefined,
+      bookId: null,
     };
     const filedTopicId = sessionSnapshot.topicId;
     const existingFilingInfo: FilingInfo = filedTopicId
@@ -120,7 +118,7 @@ async function runFreeformFiling({
           // unsafe and must be revisited.
           const topic = await db.query.curriculumTopics.findFirst({
             where: eq(curriculumTopics.id, filedTopicId),
-            columns: { title: true, bookId: true },
+            columns: { bookId: true },
           });
           if (!topic) return noFilingInfo;
           // [CR-FIL-LOOKUP-07] topic.bookId is the FK value already on the
@@ -128,10 +126,7 @@ async function runFreeformFiling({
           // pointless round trip, and worse, it leaks `bookId: undefined`
           // to the payload if the book row was soft-deleted while the
           // topic still references it. Trust the FK value.
-          return {
-            topicTitle: topic.title,
-            bookId: topic.bookId,
-          };
+          return { bookId: topic.bookId };
         })) as FilingInfo)
       : noFilingInfo;
 
@@ -140,7 +135,7 @@ async function runFreeformFiling({
       name: 'app/filing.completed',
       data: {
         bookId: existingFilingInfo.bookId,
-        topicTitle: existingFilingInfo.topicTitle,
+        topicId: filedTopicId,
         profileId,
         sessionId,
         timestamp,
@@ -226,7 +221,7 @@ async function runFreeformFiling({
     name: 'app/filing.completed',
     data: {
       bookId: filingResult.bookId,
-      topicTitle: filingResult.topicTitle,
+      topicId: filingResult.topicId,
       profileId,
       sessionId,
       timestamp,

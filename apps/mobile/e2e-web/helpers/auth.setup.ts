@@ -3,6 +3,7 @@ import path from 'node:path';
 import { test as setup } from '@playwright/test';
 import { authScenarios } from '../fixtures/scenarios';
 import { signIn } from './auth';
+import { recordPreloadPhase } from './preload-phase';
 import { authStateDir } from './runtime';
 import { seedScenario } from './test-seed';
 
@@ -24,6 +25,7 @@ for (const scenario of Object.values(authScenarios)) {
   setup(
     `seed ${scenario.seedScenario} and capture ${scenario.key} storage state`,
     async ({ page }) => {
+      recordPreloadPhase('setup-test-body-entered');
       const seeded = await seedScenario({
         scenario: scenario.seedScenario,
         email: scenario.email,

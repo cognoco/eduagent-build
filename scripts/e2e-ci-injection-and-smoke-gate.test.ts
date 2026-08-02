@@ -386,6 +386,74 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     expect(result.status).toBe(expected);
   });
 
+  it('runs one fail-closed Clerk instance preflight before every credential-consuming lane', () => {
+    const runSmoke = jobs['run-smoke'];
+    expect(runSmoke).toBeDefined();
+    const preflightSteps = (runSmoke.steps ?? []).filter(
+      (step) => step.name === 'Verify staging Clerk instance alignment',
+    );
+    expect(preflightSteps).toHaveLength(1);
+
+    const [preflightStep] = preflightSteps;
+    const stepNames = (runSmoke.steps ?? []).map((step) => step.name);
+    const preflightScript = String(preflightStep?.run ?? '');
+    const checkerSteps = (runSmoke.steps ?? []).filter((step) =>
+      String(step.run ?? '').includes(
+        'node scripts/check-clerk-key-alignment.mjs',
+      ),
+    );
+
+    expect(preflightStep?.id).toBe('clerk-preflight');
+    expect(preflightStep?.['continue-on-error']).not.toBe(true);
+    expect(preflightScript).toContain(
+      'node scripts/check-clerk-key-alignment.mjs',
+    );
+    expect(preflightScript).toContain(
+      '--preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"',
+    );
+    expect(checkerSteps).toEqual([preflightStep]);
+    expect(
+      stepNames.indexOf('Verify staging Clerk instance alignment'),
+    ).toBeLessThan(stepNames.indexOf('Run V2 release Playwright gate'));
+  });
+
+  it.each([
+    'Run V2 release Playwright gate',
+    'Run required-stable legacy Playwright smoke',
+    'Run advisory legacy Playwright smoke',
+  ])(
+    'a Clerk instance mismatch blocks %s before it exports the backend key',
+    (stepName) => {
+      const host = 'whole-iguana-9.clerk.accounts.dev';
+      const clerkKey = (prefix: string, keyHost: string) =>
+        `${prefix}_${Buffer.from(`${keyHost}$`).toString('base64')}`;
+      const mismatch = spawnSync(
+        process.execPath,
+        [join(repoRoot, 'scripts', 'check-clerk-key-alignment.mjs')],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CLERK_SECRET_KEY: clerkKey(
+              'sk_test',
+              'wrong-instance.clerk.accounts.dev',
+            ),
+            CLERK_PUBLISHABLE_KEY: clerkKey('pk_test', host),
+            EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: clerkKey('pk_test', host),
+            CLERK_JWKS_URL: `https://${host}/.well-known/jwks.json`,
+          },
+        },
+      );
+      expect(mismatch.status).toBe(1);
+
+      const laneStep = stepNamed(jobs['run-smoke'], stepName);
+      expect(String(laneStep?.run ?? '')).toContain('export CLERK_SECRET_KEY=');
+      expect(String(laneStep?.if ?? '').replace(/\s+/g, '')).toContain(
+        "steps.clerk-preflight.outcome=='success'",
+      );
+    },
+  );
+
   it('runs V2 first and partitions legacy smoke into required and advisory lanes', () => {
     const runSmoke = jobs['run-smoke'];
     expect(runSmoke).toBeDefined();
@@ -401,6 +469,10 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     const advisoryStep = stepNamed(
       runSmoke,
       'Run advisory legacy Playwright smoke',
+    );
+    const probeSummaryStep = stepNamed(
+      runSmoke,
+      'Stop and summarize runner-to-edge phase probe',
     );
     const resetStep = stepNamed(
       runSmoke,
@@ -420,20 +492,25 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
 
     expect(v2Step).toBeDefined();
     expect(v2Step?.['continue-on-error']).not.toBe(true);
-    expect(v2Script).toContain('node scripts/check-clerk-key-alignment.mjs');
     expect(v2Script).toContain(
       '--preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"',
     );
-    expect(
-      v2Script.indexOf('node scripts/check-clerk-key-alignment.mjs'),
-    ).toBeLessThan(v2Script.indexOf('playwright-seed-scenario-guard.ts'));
+    expect(v2Script).not.toContain(
+      'node scripts/check-clerk-key-alignment.mjs',
+    );
     expect(v2Script).toContain('pnpm run test:e2e:web:v2');
     expect(v2Script).not.toContain('pnpm run test:e2e:web:smoke');
     expect(v2Script).toContain('playwright-staging-gate.cjs --decide');
+    expect(v2Script).toContain("grep '^GATE_STATE='");
+    expect(v2Script).toContain("grep '^GATE_REASON='");
+    expect(v2Script).toContain('CANARY_PREFLIGHT_REASON=\\${PRE_REASON}');
     expect(classifyCommand).toBeDefined();
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
 
     expect(resolveStep?.['continue-on-error']).not.toBe(true);
+    expect(String(resolveStep?.if).replace(/\s+/g, '')).toContain(
+      'always()&&!cancelled()',
+    );
     expect(resolveScript).toContain('run-smoke-lanes.cjs validate');
     expect(resolveScript).toContain('run-smoke-lanes.cjs core');
     expect(resolveScript).toContain('run-smoke-lanes.cjs advisory');
@@ -472,6 +549,12 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
       'PLAYWRIGHT_ARTIFACT_LANE=legacy-advisory',
     );
     expect(advisoryScript).toContain('pnpm run test:e2e:web:smoke -- advisory');
+    expect(String(probeSummaryStep?.if).replace(/\s+/g, '')).toMatch(
+      /^\$\{\{always\(\)\}\}$|^always\(\)$/,
+    );
+    expect(String(resetStep?.if).replace(/\s+/g, '')).toMatch(
+      /^\$\{\{always\(\)\}\}$|^always\(\)$/,
+    );
 
     // WI-2594: the "Upload V2/legacy Playwright artifacts" steps were
     // removed (both trees record fill-step values, e.g. seeded login
@@ -8916,7 +8999,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     });
   });
 
-  it('[WI-2236] hard-gates the exact guaranteed properties of the manual homework case', () => {
+  it('[WI-2196][WI-2236] hard-gates the exact guaranteed properties of the correct-subject manual homework case', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml'),
       'utf8',
@@ -8978,9 +9061,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             text: 'Solve 3x + 7 = 22',
           }),
       );
-      const subjectReadiness = items.findIndex(
+      const exactTypedSubject = items.findIndex(
         (command, index) =>
           index > exactTypedProblem &&
+          command.optional !== true &&
+          command.inputText === 'Algebra',
+      );
+      const subjectReadiness = items.findIndex(
+        (command, index) =>
+          index > exactTypedSubject &&
           command.optional !== true &&
           command.extendedWaitUntil?.timeout === 60_000 &&
           exactSelector(command.extendedWaitUntil.visible, {
@@ -8988,7 +9077,22 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           }),
       );
 
-      return exactTypedProblem >= 0 && subjectReadiness > exactTypedProblem;
+      const correctSubject = items.findIndex(
+        (command, index) =>
+          index > subjectReadiness &&
+          command.optional !== true &&
+          exactSelector(command.assertVisible, {
+            id: 'homework-subject-resolution-name',
+            text: 'Algebra',
+          }),
+      );
+
+      return (
+        exactTypedProblem >= 0 &&
+        exactTypedSubject > exactTypedProblem &&
+        subjectReadiness > exactTypedSubject &&
+        correctSubject > subjectReadiness
+      );
     };
     const containsOptionalTrue = (value: unknown): boolean => {
       if (Array.isArray(value)) return value.some(containsOptionalTrue);
@@ -9118,11 +9222,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const criticalTapIds = new Set([
         'mentor-bar-homework-chip',
         'manual-entry-cancel',
+        'homework-change-subject',
+        'homework-subject-name-input',
+        'homework-subject-resolve-button',
         'confirm-button',
         'homework-help-me-solve',
       ]);
       const criticalWaitIds = new Set([
         'homework-entry-mode-manual',
+        'homework-subject-name-input',
         'homework-subject-resolution-ready',
         'session-screen',
       ]);
@@ -9133,7 +9241,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           criticalWaitIds.has(command.extendedWaitUntil.visible.id)) ||
         command.assertVisible?.id === 'homework-help-me-solve' ||
         command.assertNotVisible?.id === 'session-subject-resolution' ||
-        command.inputText === 'Solve 3x + 7 = 22';
+        command.inputText === 'Solve 3x + 7 = 22' ||
+        command.inputText === 'Algebra';
       const rawOperator = (
         command: MaestroCommand,
         name: 'runFlow' | 'retry',
@@ -9188,8 +9297,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const exactProblemInputs = matchingIndices(
         (command) => command.inputText === 'Solve 3x + 7 = 22',
       );
+      const changeSubjectTaps = tapTargets('homework-change-subject');
+      const subjectInputWaits = waitTargets('homework-subject-name-input');
+      const subjectInputTaps = tapTargets('homework-subject-name-input');
+      const exactSubjectInputs = matchingIndices(
+        (command) => command.inputText === 'Algebra',
+      );
+      const resolveSubjectTaps = tapTargets('homework-subject-resolve-button');
       const subjectReadinessWaits = waitTargets(
         'homework-subject-resolution-ready',
+      );
+      const scienceResolutions = matchingIndices((command) =>
+        exactSelector(command.assertVisible, {
+          id: 'homework-subject-resolution-name',
+          text: 'Science',
+        }),
+      );
+      const algebraResolutions = matchingIndices((command) =>
+        exactSelector(command.assertVisible, {
+          id: 'homework-subject-resolution-name',
+          text: 'Algebra',
+        }),
       );
       const confirms = tapTargets('confirm-button');
       const sessionArrivals = waitTargets('session-screen');
@@ -9203,7 +9331,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         manualMarkers.length !== 2 ||
         cancels.length !== 1 ||
         exactProblemInputs.length !== 1 ||
-        subjectReadinessWaits.length !== 1 ||
+        changeSubjectTaps.length !== 1 ||
+        subjectInputWaits.length !== 1 ||
+        subjectInputTaps.length !== 1 ||
+        exactSubjectInputs.length !== 1 ||
+        resolveSubjectTaps.length !== 1 ||
+        subjectReadinessWaits.length !== 2 ||
+        scienceResolutions.length !== 1 ||
+        algebraResolutions.length !== 1 ||
         confirms.length !== 1 ||
         sessionArrivals.length !== 1 ||
         enabledHelpActions.length !== 1 ||
@@ -9239,6 +9374,19 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ) ||
         !cancels.every((index) => exactTapAt(index, 'manual-entry-cancel')) ||
         !exactProblemInputs.every((index) => items[index]!.optional !== true) ||
+        !changeSubjectTaps.every((index) =>
+          exactTapAt(index, 'homework-change-subject'),
+        ) ||
+        !subjectInputWaits.every((index) =>
+          hardWaitAt(index, 'homework-subject-name-input', 15_000),
+        ) ||
+        !subjectInputTaps.every((index) =>
+          exactTapAt(index, 'homework-subject-name-input'),
+        ) ||
+        !exactSubjectInputs.every((index) => items[index]!.optional !== true) ||
+        !resolveSubjectTaps.every((index) =>
+          exactTapAt(index, 'homework-subject-resolve-button'),
+        ) ||
         !subjectReadinessWaits.every((index) =>
           hardWaitAt(index, 'homework-subject-resolution-ready', 60_000),
         ) ||
@@ -9275,7 +9423,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       const [firstManualMarker, secondManualMarker] = manualMarkers;
       const cancel = cancels[0]!;
       const exactProblemInput = exactProblemInputs[0]!;
-      const subjectReadiness = subjectReadinessWaits[0]!;
+      const initialSubjectReadiness = subjectReadinessWaits[0]!;
+      const scienceResolution = scienceResolutions[0]!;
+      const changeSubject = changeSubjectTaps[0]!;
+      const subjectInputWait = subjectInputWaits[0]!;
+      const subjectInputTap = subjectInputTaps[0]!;
+      const exactSubjectInput = exactSubjectInputs[0]!;
+      const resolveSubject = resolveSubjectTaps[0]!;
+      const subjectReadiness = subjectReadinessWaits[1]!;
+      const algebraResolution = algebraResolutions[0]!;
       const confirm = confirms[0]!;
       const sessionArrival = sessionArrivals[0]!;
       const enabledHelpAction = enabledHelpActions[0]!;
@@ -9308,8 +9464,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         secondHomeworkLaunch > cancel &&
         secondManualMarker > secondHomeworkLaunch &&
         exactProblemInput > secondManualMarker &&
-        subjectReadiness > exactProblemInput &&
-        confirm > subjectReadiness &&
+        initialSubjectReadiness > exactProblemInput &&
+        scienceResolution > initialSubjectReadiness &&
+        changeSubject > scienceResolution &&
+        subjectInputWait > changeSubject &&
+        subjectInputTap > subjectInputWait &&
+        exactSubjectInput > subjectInputTap &&
+        resolveSubject > exactSubjectInput &&
+        subjectReadiness > resolveSubject &&
+        algebraResolution > subjectReadiness &&
+        confirm > algebraResolution &&
         sessionArrival > confirm &&
         enabledHelpAction > sessionArrival &&
         subjectResolutionAbsent > enabledHelpAction &&

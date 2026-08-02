@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 
 import { pendingNotices, type Database } from '@eduagent/database';
 import type { PendingNotice, PendingNoticeType } from '@eduagent/schemas';
@@ -36,6 +36,8 @@ export async function recordPendingNotice(
     type: PendingNoticeType;
     childName: string;
     sourceId?: string;
+    /** False prepares an invisible notice that must be activated after work succeeds. */
+    ready?: boolean;
   },
 ): Promise<string> {
   const payloadJson: PendingNoticePayload = { childName: input.childName };
@@ -48,6 +50,7 @@ export async function recordPendingNotice(
       ownerProfileId: input.ownerProfileId,
       type: input.type,
       payloadJson,
+      readyAt: input.ready === false ? null : new Date(),
     })
     .onConflictDoNothing({
       target: [
@@ -75,6 +78,46 @@ export async function recordPendingNotice(
   return existing.id;
 }
 
+/** Publish a prepared notice only after its irreversible work has completed. */
+export async function activatePendingNotice(
+  db: Database,
+  ownerProfileId: string,
+  noticeId: string,
+): Promise<boolean> {
+  const rows = await db
+    .update(pendingNotices)
+    .set({ readyAt: new Date() })
+    .where(
+      and(
+        eq(pendingNotices.id, noticeId),
+        eq(pendingNotices.ownerProfileId, ownerProfileId),
+      ),
+    )
+    .returning({ id: pendingNotices.id });
+  return rows.length > 0;
+}
+
+/**
+ * Bound retention for child-name payloads prepared by a run that exhausted
+ * retries before activation. Ready notices follow the normal seen/read path;
+ * recent prepared notices remain available for live Inngest retries.
+ */
+export async function deleteStalePreparedNotices(
+  db: Database,
+): Promise<number> {
+  // scope-allow: retention cleanup intentionally deletes stale hidden notices across profiles.
+  const rows = await db
+    .delete(pendingNotices)
+    .where(
+      and(
+        isNull(pendingNotices.readyAt),
+        lte(pendingNotices.createdAt, sql`now() - interval '7 days'`),
+      ),
+    )
+    .returning({ id: pendingNotices.id });
+  return rows.length;
+}
+
 /**
  * Rehydrates the child name captured in a pending notice. Used by deletion
  * flows where the profile row is already gone and the notice payload is the
@@ -97,6 +140,22 @@ export async function getPendingNoticeChildName(
   return row ? parsePayload(row.payloadJson).childName : null;
 }
 
+/** Remove a prepared notice when its guarded deletion does not proceed. */
+export async function deletePendingNotice(
+  db: Database,
+  ownerProfileId: string,
+  noticeId: string,
+): Promise<void> {
+  await db
+    .delete(pendingNotices)
+    .where(
+      and(
+        eq(pendingNotices.id, noticeId),
+        eq(pendingNotices.ownerProfileId, ownerProfileId),
+      ),
+    );
+}
+
 export async function listPendingNotices(
   db: Database,
   ownerProfileId: string,
@@ -104,6 +163,7 @@ export async function listPendingNotices(
   const rows = await db.query.pendingNotices.findMany({
     where: and(
       eq(pendingNotices.ownerProfileId, ownerProfileId),
+      isNotNull(pendingNotices.readyAt),
       isNull(pendingNotices.seenAt),
     ),
     orderBy: (table, { asc }) => [asc(table.createdAt)],

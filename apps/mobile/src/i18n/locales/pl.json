@@ -2166,8 +2166,6 @@
     "whichSubject": "Do jakiego przedmiotu to należy?",
     "loadingSubjects": "Ładowanie Twoich przedmiotów...",
     "selectSubjectLabel": "Wybierz {{name}}",
-    "createNewSubject": "Utwórz nowy przedmiot",
-    "createNewSubjectLabel": "Utwórz nowy przedmiot",
     "orTypeSubject": "Lub wpisz nazwę przedmiotu:",
     "subjectInputPlaceholder": "np. Biologia, Historia...",
     "typeSubjectLabel": "Wpisz nazwę przedmiotu",
@@ -2179,7 +2177,6 @@
     "manualInputPlaceholder": "Wpisz tutaj swój problem...",
     "typeManuallyLabel": "Wpisz swój problem ręcznie",
     "noSubjectsYet": "Nie masz jeszcze żadnych przedmiotów.",
-    "createSubject": "Utwórz przedmiot",
     "continueWithProblemLabel": "Kontynuuj z wpisanym problemem",
     "continueArrow": "Kontynuuj →",
     "tryCameraAgain": "Spróbuj ponownie z aparatem",
@@ -4428,7 +4425,6 @@
     },
     "search": {
       "placeholder": "Szukaj tematów",
-      "micLabel": "Szukaj głosem",
       "noResults": "Brak tematów pasujących do wyszukiwania."
     },
     "notes": {
@@ -4436,7 +4432,6 @@
       "authorSelf": "Moje notatki",
       "authorMentor": "Zapisane od mentora",
       "addNote": "Dodaj notatkę",
-      "micLabel": "Dodaj notatkę głosowo",
       "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu.",
       "saveErrorTitle": "Nie można zapisać notatki",
       "emptyTopic": "Jeszcze brak notatek. Zapisz myśl na ten temat."
@@ -4753,7 +4748,10 @@
       "existingTeenInviteSending": "Wysyłanie…",
       "existingTeenInviteSentTitle": "Zaproszenie wysłane",
       "existingTeenInviteSentMessage": "Jeśli ten e-mail jest powiązany z kontem MentoMate, wysłaliśmy zaproszenie. Poproś o otwarcie MentoMate i zaakceptowanie go.",
-      "existingTeenInviteErrorTitle": "Nie udało się wysłać zaproszenia"
+      "existingTeenInviteErrorTitle": "Nie udało się wysłać zaproszenia",
+      "wrongProfileTitle": "To zaproszenie jest dla konkretnego profilu",
+      "wrongProfileMessage": "To zaproszenie można otworzyć tylko z profilu, na który zostało wysłane. Wybierz ten profil, a następnie ponownie otwórz zaproszenie.",
+      "wrongProfileSwitch": "Wybierz profil"
     }
   },
   "supporterColdStart": {

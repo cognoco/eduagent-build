@@ -21,8 +21,8 @@ describe('createOwnerJourneyPhaseDiagnostics', () => {
   }
 
   it.each([
-    ['seed-request', '/v1/__test/seed', 'seed-response'],
-    ['clerk-lookup', '/v1/users', 'clerk-email-address'],
+    ['seed-request', '/v1/__test/seed', 'server-owned-seed-response'],
+    ['seed-backoff', '/v1/__test/seed', 'server-owned-seed-response'],
     ['sign-in-readiness', '/mentor', 'mentor-screen'],
     [
       ownerEntryPhase('journal', 'leaf-ready'),
@@ -70,24 +70,6 @@ describe('createOwnerJourneyPhaseDiagnostics', () => {
 
     expect(output).toEqual([
       '[V2 owner journey] phase=seed-request elapsedMs=0 statusClass=2xx pathname=/v1/__test/seed',
-    ]);
-    expect(output.join('\n')).not.toContain(forbidden);
-
-    diagnostics.dispose();
-  });
-
-  it('normalizes opaque Clerk verification identifiers out of the pathname', () => {
-    const { diagnostics, output } = captureDiagnostics();
-    const forbidden = 'credential-sentinel-DO-NOT-EMIT';
-
-    diagnostics.enter({
-      phase: 'clerk-verification',
-      url: `https://api.clerk.com/v1/email_addresses/${forbidden}`,
-      readinessMarker: 'clerk-email-verification',
-    });
-
-    expect(output).toEqual([
-      '[V2 owner journey] phase=clerk-verification elapsedMs=0 pathname=/v1/email_addresses/:id readiness=clerk-email-verification',
     ]);
     expect(output.join('\n')).not.toContain(forbidden);
 

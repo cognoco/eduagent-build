@@ -19,6 +19,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
 import {
+  familyJoinAcceptResultSchema,
   familyJoinAcceptRequestSchema,
   familyJoinInviteRequestSchema,
 } from '@eduagent/schemas';
@@ -61,6 +62,7 @@ export function __resetFamilyJoinInviteRateLimit(): void {
 type FamilyJoinRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
+    ENVIRONMENT?: string;
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
@@ -132,6 +134,7 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
         familyOrgId,
         invitedEmail,
         emailOptions: {
+          environment: c.env.ENVIRONMENT,
           resendApiKey: c.env.RESEND_API_KEY,
           emailFrom: c.env.EMAIL_FROM,
         },
@@ -189,10 +192,13 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
         optInSupportership,
       });
 
-      return c.json({
-        familyOrgId: result.familyOrgId,
-        alreadyMember: result.alreadyMember,
-        storeCancelNudge: result.storeCancelNudge,
-      });
+      return c.json(
+        familyJoinAcceptResultSchema.parse({
+          familyOrgId: result.familyOrgId,
+          alreadyMember: result.alreadyMember,
+          storeCancelNudge: result.storeCancelNudge,
+          visibilityContract: result.visibilityContract,
+        }),
+      );
     },
   );

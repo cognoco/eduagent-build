@@ -29,6 +29,23 @@ jest.mock(
   },
 );
 
+// Internal-helper exception: this orchestration test invokes the function
+// directly, outside the Inngest HTTP boundary that installs request-scoped
+// environment bindings. Keep the real helper module and override only the
+// environment so the real sendEmail path may target the captured test address.
+jest.mock(
+  '../helpers' /* gc1-allow: request-scoped environment binding */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepEnvironment: () => 'production',
+    };
+  },
+);
+
 import { accountSecurityNotification } from './account-security-notification';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
@@ -214,8 +231,23 @@ describe('account-security-notification Inngest function [CRITICAL-2a]', () => {
         .fn()
         .mockResolvedValue(new Response('nope', { status: 500 }));
       await expect(executeHandler(securityEvent(), 'evt-1')).rejects.toThrow(
-        /account-security-notification send failed/,
+        /account-security-notification transient send failure/,
       );
+    });
+
+    it('does not retry a permanent Resend rejection', async () => {
+      globalThis.fetch = jest.fn().mockResolvedValue(
+        new Response(JSON.stringify({ name: 'validation_error' }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      await expect(
+        executeHandler(securityEvent(), 'evt-permanent'),
+      ).resolves.toMatchObject({
+        result: { ok: false, reason: 'resend_api_error' },
+      });
     });
 
     it('degrades without throwing when RESEND_API_KEY is absent', async () => {

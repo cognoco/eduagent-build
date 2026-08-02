@@ -52,6 +52,10 @@ import {
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../components/common';
 import { ReturningSessionGreeting } from '../../../components/session/ReturningSessionGreeting';
 import type { FluencyDrillEvent } from '../../../lib/sse';
 import {
@@ -224,7 +228,10 @@ interface FirstSessionWrapUpCardProps {
   reflectionTotalXp: number | null;
   celebrationEventId: string;
   seenCelebrationEventIds: ReadonlySet<string>;
+  voiceLocale?: string;
   onChangeText: (value: string) => void;
+  /** Applies the final transcript with a functional update at the state owner. */
+  onAppendTranscript: (finalTranscript: string) => void;
   onSubmit: () => void;
   onMarkCelebrationSeen: (eventId: string) => void;
 }
@@ -236,7 +243,9 @@ function FirstSessionWrapUpCard({
   reflectionTotalXp,
   celebrationEventId,
   seenCelebrationEventIds,
+  voiceLocale,
   onChangeText,
+  onAppendTranscript,
   onSubmit,
   onMarkCelebrationSeen,
 }: FirstSessionWrapUpCardProps) {
@@ -264,6 +273,15 @@ function FirstSessionWrapUpCard({
         editable={!isSubmitting && !hasSubmitted}
         className="mt-3 min-h-20 rounded-xl border border-border px-3 py-2 text-text-primary"
       />
+      <View className="mt-2">
+        <VoiceInputControl
+          value={value}
+          disabled={isSubmitting || hasSubmitted}
+          voiceLocale={voiceLocale}
+          testID="first-session-reflection-mic"
+          onTranscript={onAppendTranscript}
+        />
+      </View>
       {hasError ? (
         <Text className="mt-2 text-xs text-danger">
           {t('sessionSummary.saveError')}
@@ -1928,6 +1946,7 @@ function SessionScreenInner() {
         fallbackPrompt={draftedNote.fallbackPrompt}
         onSave={handleSaveDraftedNote}
         onSkip={handleSkipDraftedNote}
+        voiceLocale={languageVoiceLocale}
       />
     </View>
   ) : null;
@@ -1970,7 +1989,13 @@ function SessionScreenInner() {
       reflectionTotalXp={firstSessionReflectionTotalXp}
       celebrationEventId={`first-session-wrap-up:${firstSessionWrapUp.sessionId}`}
       seenCelebrationEventIds={seenFirstSessionCelebrationIds}
+      voiceLocale={languageVoiceLocale}
       onChangeText={setFirstSessionReflectionText}
+      onAppendTranscript={(finalTranscript) =>
+        setFirstSessionReflectionText((prev) =>
+          appendTranscript(prev, finalTranscript),
+        )
+      }
       onSubmit={() => {
         void handleFirstSessionReflectionSubmit();
       }}
@@ -2005,6 +2030,7 @@ function SessionScreenInner() {
       handleTypeSubject={handleTypeSubject}
       setPendingSubjectResolution={setPendingSubjectResolution}
       router={router}
+      voiceLocale={languageVoiceLocale}
       effectiveMode={effectiveMode}
       homeworkProblemsState={homeworkProblemsState}
       currentProblemIndex={currentProblemIndex}
@@ -2215,6 +2241,7 @@ function SessionScreenInner() {
         onClose={() => setShowParkingLot(false)}
         parkingLotDraft={parkingLotDraft}
         setParkingLotDraft={setParkingLotDraft}
+        voiceLocale={languageVoiceLocale}
         handleSaveParkingLot={handleSaveParkingLot}
         parkingLot={parkingLot}
         addParkingLotItem={addParkingLotItem}

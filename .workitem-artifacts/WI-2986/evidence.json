@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The persisted redemption schema stores only HMAC digests and bound non-secret authority fields, constrains issued completeness, and uniquely serializes one verifier handle and one provider evidence identity.",
+      "pointer": "packages/database/src/schema/guardian-authority-redemptions.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The verifier service commits an issued receipt before returning, reconstructs exact retries, validates receipts during attachment, rejects mutated or concurrent attempts, bounds provider calls with a timeout, emits structured failure outcomes, and releases only undecided reservations for retry.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment-verifier.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Real PostgreSQL regressions cover ordinary success, response loss and exact retry, concurrent duplicate redemption across two connections, mutated tuples, provider success followed by lost persistence, token-without-receipt rejection, and transport failure followed by successful same-handle retry.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The mobile callback retains the minted authority token after initiation so attachment failure retries do not attempt to consume the provider handle again.",
+      "pointer": "apps/mobile/src/app/(app)/guardian-attachment.test.tsx"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The complete migration sequence including the durable redemption table replayed against a disposable PostgreSQL database and the repository prepush gate passed.",
+      "pointer": "pnpm prepush"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+}

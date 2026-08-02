@@ -138,7 +138,7 @@ describe('[WI-1691] blocked-safety digest atomic dedupe (integration)', () => {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
       return { sent: true, messageId: 'email-1' };
     });
-    const config = { to: 'operator@example.test' };
+    const config = { to: 'operator@example.test', environment: 'production' };
 
     await expect(
       Promise.all([

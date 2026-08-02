@@ -43,9 +43,27 @@ jest.mock('../services/account', () => {
   };
 });
 
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: '01914d6a-0000-7000-8000-000000000001',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
 // [WI-867] v2 profile-scope seam continuity mock.
 // Echo profileId back so route handlers receive the X-Profile-Id the caller sent.
-const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
 const mockGetPersonScope = jest
   .fn()
   .mockImplementation((_db: unknown, profileId?: string) =>
@@ -55,7 +73,6 @@ jest.mock(
   '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
   () => ({
     ...jest.requireActual('../services/identity-v2/profile-v2'),
-    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
     getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
   }),
 );
@@ -97,9 +114,11 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
 
 import { app } from '../index';
 import { nudgeRoutes } from './nudges';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
 import {
   ConsentRequiredError,
+  ERROR_CODES,
   ForbiddenError,
   RateLimitedError,
 } from '@eduagent/schemas';
@@ -136,7 +155,6 @@ beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
   // [WI-867] Restore v2 seam defaults after clearAllMocks.
-  mockFindOwnerPersonScope.mockResolvedValue(null);
   mockGetPersonScope.mockImplementation((_db: unknown, profileId?: string) =>
     Promise.resolve(personScope({ profileId: profileId ?? 'test-profile-id' })),
   );
@@ -443,5 +461,74 @@ describe('[WI-159 / DS-070] nudges proxy-mode guard', () => {
     });
     expect(res.status).toBe(403);
     expect(mockMarkAllNudgesRead).not.toHaveBeenCalled();
+  });
+});
+
+// ---- [WI-2877] read-authority guard (G20) ----
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so the attack below is a credentialed
+// non-owner request traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the case mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+
+describe('[WI-2877] read-authority guard', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', nudgeRoutes);
+    return direct;
+  }
+
+  it('GET /nudges rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    // The caller's person holds no self/guardianship authority over the
+    // header-selected profile.
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+
+    const res = await makeUnprovenApp().request('/nudges', {
+      headers: { 'X-Profile-Id': VICTIM_PROFILE_ID },
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+    expect(mockListUnreadNudges).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,91 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The definition-of-done baseline and bounded execution record are preserved.",
+      "pointer": ".workitem-artifacts/WI-2990/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Consent-ordering behavior is covered across every externally visible quick-check variant.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Invalid request-schema input returns 400 before session lookup, consent enforcement, or dispatch.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Missing and scoped-hidden sessions retain 404 under withdrawn consent without LLM dispatch.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "An existing topic-scoped session returns consent-denied 403 before context lookup or LLM dispatch.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "An existing topicless session uses the same consent boundary and returns 403 before general dispatch.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Active-consent topic and topicless paths dispatch exactly once while preserving context and response behavior.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-8",
+      "description": "The final quick-check boundary is represented by structural coverage.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts"
+    },
+    {
+      "acRef": "AC-9",
+      "description": "The manifest and guard encode scoped lookup before consent and consent before a metered LLM callsite while retaining route-owned metering.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts"
+    },
+    {
+      "acRef": "AC-10",
+      "description": "The complete regression-proof record is preserved as a tracked artifact.",
+      "pointer": ".workitem-artifacts/WI-2990/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-11",
+      "description": "Focused regressions cover both hidden-session exits, both existing-session consent denials, and both active-consent dispatch contexts.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-12",
+      "description": "The exact focused command, exit codes, counts, failure parity, and restoration hashes are recorded for all four phases.",
+      "pointer": ".workitem-artifacts/WI-2990/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-13",
+      "description": "The live-AC routed validation command and exact outcome are recorded.",
+      "pointer": ".workitem-artifacts/WI-2990/verification.md"
+    },
+    {
+      "acRef": "AC-14",
+      "description": "Scope and authority limits are documented against the final diff.",
+      "pointer": ".workitem-artifacts/WI-2990/verification.md"
+    },
+    {
+      "acRef": "AC-15",
+      "description": "The implementation remains within the four expected collision files plus lifecycle evidence.",
+      "pointer": ".workitem-artifacts/WI-2990/verification.md"
+    },
+    {
+      "acRef": "AC-16",
+      "description": "Ownership hiding, lookup, response, routing, metering, and all prohibited surfaces remain unchanged.",
+      "pointer": ".workitem-artifacts/WI-2990/verification.md"
+    },
+    {
+      "acRef": "AC-17",
+      "description": "The exact-head adversarial review requirement is recorded as an external landing gate whose authoritative state remains on the PR.",
+      "pointer": ".workitem-artifacts/WI-2990/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-01",
+  "redGreenPointer": ".workitem-artifacts/WI-2990/red-green-revert.md"
+}

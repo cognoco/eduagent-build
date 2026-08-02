@@ -17,7 +17,10 @@ module.exports = {
       { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' },
     ],
   },
-  setupFilesAfterEnv: [join(__dirname, '../../tests/integration/api-setup.ts')],
+  setupFilesAfterEnv: [
+    join(__dirname, '../../tests/integration/api-database-env-setup.ts'),
+    join(__dirname, '../../tests/integration/api-setup.ts'),
+  ],
   passWithNoTests: true,
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { computeAgeBracket } from '@eduagent/schemas';
 
+import { VoiceInputControl, appendTranscript } from './common';
+
 type TellMentorAudience = 'learner' | 'parent';
 
 interface TellMentorInputProps {
@@ -11,7 +13,17 @@ interface TellMentorInputProps {
   childName?: string;
   value: string;
   isPending?: boolean;
+  /** Voice locale resolved from the writing profile's conversation language. */
+  voiceLocale?: string;
+  /** Data-scope identity for the voice capture (e.g. the child profile id). */
+  voiceScopeKey?: string | number;
   onChangeText: (text: string) => void;
+  /**
+   * Preferred voice-append path: the parent applies the final transcript with
+   * a functional state update so a draft edit racing the commit is never
+   * overwritten. Falls back to onChangeText over the render-time value.
+   */
+  onAppendTranscript?: (finalTranscript: string) => void;
   onSubmit: () => void;
 }
 
@@ -64,7 +76,10 @@ export function TellMentorInput({
   childName,
   value,
   isPending,
+  voiceLocale,
+  voiceScopeKey,
   onChangeText,
+  onAppendTranscript,
   onSubmit,
 }: TellMentorInputProps) {
   const { t } = useTranslation();
@@ -107,6 +122,20 @@ export function TellMentorInput({
         testID="tell-mentor-input-field"
         className="bg-background rounded-card px-4 py-3 text-body text-text-primary min-h-[96px]"
       />
+      <View className="mt-2">
+        <VoiceInputControl
+          value={value}
+          disabled={isPending}
+          voiceLocale={voiceLocale}
+          scopeKey={voiceScopeKey}
+          testID="tell-mentor-mic"
+          onTranscript={(finalTranscript) =>
+            onAppendTranscript
+              ? onAppendTranscript(finalTranscript)
+              : onChangeText(appendTranscript(value, finalTranscript))
+          }
+        />
+      </View>
       <Pressable
         onPress={onSubmit}
         disabled={disabled}

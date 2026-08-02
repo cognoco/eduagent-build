@@ -17,6 +17,7 @@ import {
   topicUnskipResponseSchema,
   challengeCurriculumResponseSchema,
   explainTopicResponseSchema,
+  computeAgeBracketFromDate,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -39,6 +40,7 @@ import {
 import {
   assertOwnerProfile,
   assertCallerIsAccountOwner,
+  assertCanReadProfile,
 } from '../services/family-access';
 import {
   cloneTopicFromChild,
@@ -133,6 +135,10 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   .get('/subjects/:subjectId/curriculum', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const curriculum = await getCurriculum(db, profileId, subjectId);
     return c.json(getCurriculumResponseSchema.parse({ curriculum }));
@@ -213,11 +219,22 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         await assertLlmConsent(db, profileId);
       }
       try {
+        const profileMeta = c.get('profileMeta');
         const result = await addCurriculumTopic(
           db,
           profileId,
           subjectId,
           input,
+          {
+            ageBracket:
+              profileMeta == null
+                ? undefined
+                : computeAgeBracketFromDate(
+                    profileMeta.birthYear,
+                    profileMeta.birthMonth ?? undefined,
+                    profileMeta.birthDay ?? undefined,
+                  ),
+          },
         );
         return c.json(curriculumTopicAddResponseSchema.parse(result));
       } catch (error) {
@@ -241,11 +258,22 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
       await assertLlmConsent(db, profileId);
       try {
+        const profileMeta = c.get('profileMeta');
         const curriculum = await challengeCurriculum(
           db,
           profileId,
           subjectId,
           feedback,
+          {
+            ageBracket:
+              profileMeta == null
+                ? undefined
+                : computeAgeBracketFromDate(
+                    profileMeta.birthYear,
+                    profileMeta.birthMonth ?? undefined,
+                    profileMeta.birthDay ?? undefined,
+                  ),
+          },
         );
         return c.json(challengeCurriculumResponseSchema.parse({ curriculum }));
       } catch (error) {
@@ -288,6 +316,10 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   .get('/subjects/:subjectId/curriculum/topics/:topicId/explain', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
     // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
@@ -303,6 +335,14 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             profileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            profileMeta == null
+              ? undefined
+              : computeAgeBracketFromDate(
+                  profileMeta.birthYear,
+                  profileMeta.birthMonth ?? undefined,
+                  profileMeta.birthDay ?? undefined,
+                ),
         },
       );
       return c.json(explainTopicResponseSchema.parse({ explanation }));

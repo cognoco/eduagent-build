@@ -117,6 +117,7 @@ export interface GranularLlmConsentServiceBoundary {
   serviceFile: string;
   serviceStartToken: string;
   serviceEndToken: string;
+  preConsentBranchTokens?: readonly string[];
   consentGateToken: string;
   llmDispatchToken: string;
   llmCallSiteFile: string;
@@ -136,6 +137,10 @@ export interface RouteOwnedLlmConsentBoundary {
   routeFile: string;
   routeStartToken: string;
   routeEndToken: string;
+  preConsentBranchTokens?: readonly string[];
+  consentGateToken?: string;
+  llmDispatchTokens?: readonly string[];
+  llmCallSiteFile?: string;
   classification:
     | 'route-owned'
     | 'route-discriminant'
@@ -177,9 +182,16 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
       routeFile: 'apps/api/src/routes/dictation.ts',
       routeStartToken: "'/dictation/review'",
       routeEndToken: '',
-      classification: 'independent-mixed-residue',
+      classification: 'route-owned',
       rationale:
-        'Rate-limit and payload-size branches still follow the route gate.',
+        'Validated, rate-eligible, in-budget requests gate immediately before the review LLM path.',
+      preConsentBranchTokens: [
+        'const rateLimited = await checkAndLogRateLimit(',
+        'if (rateLimited) {',
+        'if (promptCharCount > DICTATION_REVIEW_MAX_PROMPT_CHARS) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: ['const result = await reviewDictation({'],
     },
     {
       id: 'curriculum.topic-preview',
@@ -214,9 +226,21 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
       routeFile: 'apps/api/src/routes/homework.ts',
       routeStartToken: ".post('/ocr'",
       routeEndToken: '',
-      classification: 'independent-mixed-residue',
+      classification: 'route-owned',
       rationale:
-        'Content-length, multipart, MIME, and file-size returns still follow the route gate.',
+        'Validated image uploads gate after deterministic Content-Length, multipart, MIME, and file-size exits and before provider construction or dispatch.',
+      preConsentBranchTokens: [
+        "const contentLengthHeader = c.req.header('content-length');",
+        'if (!(file instanceof File)) {',
+        '!OCR_CONSTRAINTS.acceptedMimeTypes.includes(',
+        'if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: [
+        'provider = getOcrProvider(',
+        'const result = await provider.extractText(',
+      ],
+      llmCallSiteFile: 'apps/api/src/services/ocr.ts',
     },
     {
       id: 'quiz.round-generation',
@@ -246,22 +270,20 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
         'The validated classifier request directly invokes its LLM-backed service.',
     },
     {
-      id: 'retention.recall-test',
-      routeFile: 'apps/api/src/routes/retention.ts',
-      routeStartToken: "'/retention/recall-test'",
-      routeEndToken: "'/retention/relearn'",
-      classification: 'independent-mixed-residue',
-      rationale:
-        "The 'dont_remember' discriminant bypasses the gate, but standard cooldown and lost-claim returns still follow it.",
-    },
-    {
       id: 'assessments.quick-check',
       routeFile: 'apps/api/src/routes/assessments.ts',
       routeStartToken: "'/sessions/:sessionId/quick-check'",
       routeEndToken: '',
-      classification: 'independent-mixed-residue',
+      preConsentBranchTokens: [
+        'const session = await getSession(',
+        "if (!session) return notFound(c, 'Session not found');",
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: ['await evaluateQuickCheckAnswer('],
+      llmCallSiteFile: 'apps/api/src/services/assessments.ts',
+      classification: 'route-owned',
       rationale:
-        'The deterministic missing-session response still follows the route gate.',
+        'The scoped missing-session return precedes the route-owned consent boundary shared by topic-scoped and general quick-check dispatches.',
     },
     {
       id: 'filing.request',
@@ -380,6 +402,28 @@ export const GRANULAR_LLM_CONSENT_BOUNDARIES: readonly GranularLlmConsentBoundar
           consentGateToken: 'deps.assertLlmConsent(',
           llmDispatchToken: 'deps.evaluateAssessmentAnswer(',
           llmCallSiteFile: 'apps/api/src/services/assessments.ts',
+        },
+      ],
+    },
+    {
+      id: 'retention.recall-test',
+      routeFile: 'apps/api/src/routes/retention.ts',
+      routeStartToken: "'/retention/recall-test'",
+      routeEndToken: "'/retention/relearn'",
+      routeServiceCallTokens: ['processRecallTest('],
+      serviceBoundaries: [
+        {
+          serviceFile: 'apps/api/src/services/retention-data.ts',
+          serviceStartToken: 'export async function processRecallTest(',
+          serviceEndToken: 'export async function startRelearn(',
+          preConsentBranchTokens: [
+            'if (!canRetestTopic(state, lastTestAt)) {',
+            "if (attemptMode !== 'dont_remember') {",
+            'if (!claimed) {',
+          ],
+          consentGateToken: 'await assertLlmConsent(',
+          llmDispatchToken: 'await evaluateRecallQuality(',
+          llmCallSiteFile: 'apps/api/src/services/retention-data.ts',
         },
       ],
     },

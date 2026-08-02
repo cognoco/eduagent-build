@@ -14,10 +14,12 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockSetUser = jest.fn();
 const mockSetTag = jest.fn();
+const mockSetLevel = jest.fn();
 
 const mockScope = {
   setUser: mockSetUser,
   setTag: mockSetTag,
+  setLevel: mockSetLevel,
 };
 
 jest.mock('@sentry/cloudflare', () => ({
@@ -43,6 +45,16 @@ describe('captureException', () => {
     expect(mockCaptureException).toHaveBeenCalledWith(error);
     expect(mockSetUser).not.toHaveBeenCalled();
     expect(mockSetTag).not.toHaveBeenCalled();
+    expect(mockSetLevel).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] captures a handled exception at warning level', () => {
+    const error = new Error('handled fallback');
+
+    captureException(error, { level: 'warning' });
+
+    expect(mockSetLevel).toHaveBeenCalledWith('warning');
+    expect(mockCaptureException).toHaveBeenCalledWith(error);
   });
 
   it('sets user when userId is provided', () => {
@@ -375,6 +387,37 @@ describe('scrubSentryEvent', () => {
     const scrubbed = scrubSentryEvent(event);
 
     expect(scrubbed.message).toBe('billing.trial_expiry_failed');
+  });
+
+  it('[WI-2788] strips Drizzle parameters from messages and exception values', () => {
+    const clerkId = 'user_synthetic_regression_value';
+    const rowId = '550e8400-e29b-41d4-a716-446655440000';
+    const drizzleMessage =
+      `Failed query: select * from login where clerk_user_id = $1\r\n` +
+      `params: ${clerkId},${rowId}`;
+    const event = {
+      message: drizzleMessage,
+      exception: {
+        values: [
+          { type: 'DrizzleQueryError', value: drizzleMessage },
+          {
+            type: 'Error',
+            value: `cause detail\nparams: ${rowId}`,
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+    const serialized = JSON.stringify(scrubbed);
+
+    expect(serialized).not.toContain(clerkId);
+    expect(serialized).not.toContain(rowId);
+    expect(scrubbed.message).toContain('Failed query: select * from login');
+    expect(scrubbed.message).toContain('params: [redacted]');
+    expect(scrubbed.exception?.values?.[1]?.value).toBe(
+      'cause detail\nparams: [redacted]',
+    );
   });
 
   // [WI-2353] Red-green regression: @sentry/cloudflare's default

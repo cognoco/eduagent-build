@@ -77,6 +77,7 @@ let mockSubjects: Array<{
   subjectName: string;
   status: 'active';
 }>;
+let mockSubjectsIndexIsLoading: boolean;
 let mockScopeContext: {
   activeScope: { kind: 'me' } | { kind: 'supporter-hub' } | PersonScope;
   availableScopes: PersonScope[];
@@ -114,7 +115,7 @@ jest.mock(
       ...actual,
       useSubjectsIndex: () => ({
         subjects: mockSubjects,
-        isLoading: false,
+        isLoading: mockSubjectsIndexIsLoading,
         isError: false,
         refetch: jest.fn(),
       }),
@@ -270,6 +271,7 @@ describe('MentorScreen', () => {
         status: 'active',
       },
     ];
+    mockSubjectsIndexIsLoading = false;
     mockNowFeed = {
       data: feed([card()]),
       fallbackFeed: null,
@@ -387,6 +389,44 @@ describe('MentorScreen', () => {
     process.env.EXPO_PUBLIC_E2E = 'true';
     renderMentorScreen();
 
+    fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/homework/manual',
+      params: {
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+        subjectId: 'subject-0',
+        subjectName: 'Mathematics',
+      },
+    });
+  });
+
+  it('[WI-3001] waits for the Subject index before the hosted manual-homework handoff', () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    mockSubjects = [];
+    mockSubjectsIndexIsLoading = true;
+    const rendered = renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
+
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('mentor-bar-homework-chip').props.accessibilityState,
+    ).toEqual({ disabled: true });
+
+    mockSubjects = [
+      {
+        subjectId: 'subject-0',
+        subjectName: 'Mathematics',
+        status: 'active',
+      },
+    ];
+    mockSubjectsIndexIsLoading = false;
+    rendered.result.rerender(<MentorScreen />);
+    expect(
+      screen.getByTestId('mentor-bar-homework-chip').props.accessibilityState,
+    ).toEqual({ disabled: false });
     fireEvent.press(screen.getByTestId('mentor-bar-homework-chip'));
 
     expect(mockPush).toHaveBeenCalledWith({

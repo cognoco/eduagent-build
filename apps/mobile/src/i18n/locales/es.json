@@ -2089,8 +2089,6 @@
     "whichSubject": "¿Para qué materia es esto?",
     "loadingSubjects": "Cargando tus materias...",
     "selectSubjectLabel": "Seleccionar {{name}}",
-    "createNewSubject": "Crear nueva materia",
-    "createNewSubjectLabel": "Crear una nueva materia",
     "orTypeSubject": "O escribe el nombre de una materia:",
     "subjectInputPlaceholder": "p. ej., Biología, Historia...",
     "typeSubjectLabel": "Escribe el nombre de una materia",
@@ -2102,7 +2100,6 @@
     "manualInputPlaceholder": "Escribe tu problema aquí...",
     "typeManuallyLabel": "Escribir tu problema manualmente",
     "noSubjectsYet": "Aún no tienes ninguna materia.",
-    "createSubject": "Crear una materia",
     "continueWithProblemLabel": "Continuar con el problema escrito",
     "continueArrow": "Continuar →",
     "tryCameraAgain": "Probar cámara de nuevo",
@@ -4260,7 +4257,6 @@
     },
     "search": {
       "placeholder": "Buscar temas",
-      "micLabel": "Buscar por voz",
       "noResults": "Ningún tema coincide con esa búsqueda."
     },
     "notes": {
@@ -4268,7 +4264,6 @@
       "authorSelf": "Mis notas",
       "authorMentor": "Guardado del mentor",
       "addNote": "Añadir una nota",
-      "micLabel": "Añadir una nota por voz",
       "empty": "Aún no hay notas. Apunta alguna idea sobre esta asignatura.",
       "saveErrorTitle": "No se pudo guardar la nota",
       "emptyTopic": "Aún no hay notas. Escribe algo sobre este tema."
@@ -4583,7 +4578,10 @@
       "existingTeenInviteSending": "Enviando…",
       "existingTeenInviteSentTitle": "Invitación en camino",
       "existingTeenInviteSentMessage": "Si ese correo pertenece a una cuenta de MentoMate, le hemos enviado una invitación. Pídele que abra MentoMate y la acepte.",
-      "existingTeenInviteErrorTitle": "No se pudo enviar la invitación"
+      "existingTeenInviteErrorTitle": "No se pudo enviar la invitación",
+      "wrongProfileTitle": "Esta invitación es para un perfil específico",
+      "wrongProfileMessage": "Esta invitación solo se puede abrir con el perfil al que se envió. Elige ese perfil y vuelve a abrir la invitación.",
+      "wrongProfileSwitch": "Elegir perfil"
     }
   },
   "supporterColdStart": {

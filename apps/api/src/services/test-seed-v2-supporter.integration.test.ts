@@ -381,7 +381,7 @@ function createIntegrationDb(): Database {
       expect(seeded.ids.managedChildEdgeId).toBeTruthy();
     });
 
-    it('[WI-2584 route boundary] authenticated GET /v1/profiles returns the schema-valid supporter and Managed Child with no child Login, learner-only membership, and a fully accepted edge', async () => {
+    it('[WI-2128 route boundary] authenticated GET /v1/profiles returns only the supporter because Supportership does not grant operate-as authority', async () => {
       const [
         supporterLogin,
         managedChildLogin,
@@ -461,20 +461,15 @@ function createIntegrationDb(): Database {
 
       const body = await response.json();
       const parsed = profileListResponseSchema.parse(body);
-      expect(parsed.profiles).toHaveLength(2);
-      expect(parsed.profiles).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: seeded.ids.supporterPersonId,
-            displayName: 'Test Supporter',
-            isOwner: true,
-          }),
-          expect.objectContaining({
-            id: seeded.ids.managedChildPersonId,
-            displayName: 'Managed Child',
-            isOwner: false,
-          }),
-        ]),
+      expect(parsed.profiles).toEqual([
+        expect.objectContaining({
+          id: seeded.ids.supporterPersonId,
+          displayName: 'Test Supporter',
+          isOwner: true,
+        }),
+      ]);
+      expect(parsed.profiles.map(({ id }) => id)).not.toContain(
+        seeded.ids.managedChildPersonId,
       );
     });
 

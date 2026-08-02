@@ -1,8 +1,7 @@
 import { scheduledDeletion } from './account-deletion';
-import { inngest } from '../client';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
-import * as safeNonCore from '../../services/safe-non-core';
 import * as sentry from '../../services/sentry';
+import { NonRetriableError } from 'inngest';
 
 const mockGetStepDatabase = jest.fn();
 const mockGetStepClerkSecretKey = jest.fn();
@@ -21,6 +20,31 @@ const mockExecuteDeletionV2 = jest.fn();
 const mockGetOrganizationOwnerClerkUserIdV2 = jest.fn();
 const mockGetOrganizationOwnerEmailV2 = jest.fn();
 const mockGetSubscriptionStoreTeardownTargetsV2 = jest.fn();
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
+const mockGetOrganizationErasureSnapshotV2 = jest.fn(
+  async (db: unknown, organizationId: unknown) => {
+    const clerkUserId = await mockGetOrganizationOwnerClerkUserIdV2(
+      db,
+      organizationId,
+    );
+    const ownerEmail = await mockGetOrganizationOwnerEmailV2(
+      db,
+      organizationId,
+    );
+    return {
+      organizationExists: true,
+      organizationId,
+      personIds: ['person-owner'],
+      clerkUserIds: clerkUserId ? [clerkUserId] : [],
+      loginEmails: ownerEmail ? [ownerEmail] : [],
+      subscriptionStoreTeardownTargets:
+        await mockGetSubscriptionStoreTeardownTargetsV2(db, organizationId),
+    };
+  },
+);
 
 jest.mock(
   '../helpers' /* gc1-allow: getStepDatabase/getStepClerkSecretKey wrap Inngest step-level binding acquisition; must be intercepted to inject test doubles without a real Neon connection or CF env */,
@@ -53,12 +77,18 @@ jest.mock(
       isDeletionCancelledV2: (...args: unknown[]) =>
         mockIsDeletionCancelledV2(...args),
       executeDeletionV2: (...args: unknown[]) => mockExecuteDeletionV2(...args),
+      getOrganizationErasureSnapshotV2: (db: unknown, organizationId: string) =>
+        mockGetOrganizationErasureSnapshotV2(db, organizationId),
       getOrganizationOwnerClerkUserIdV2: (...args: unknown[]) =>
         mockGetOrganizationOwnerClerkUserIdV2(...args),
       getOrganizationOwnerEmailV2: (...args: unknown[]) =>
         mockGetOrganizationOwnerEmailV2(...args),
       getSubscriptionStoreTeardownTargetsV2: (...args: unknown[]) =>
         mockGetSubscriptionStoreTeardownTargetsV2(...args),
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
     };
   },
 );
@@ -163,12 +193,52 @@ describe('scheduledDeletion', () => {
     });
 
     expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
-    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
-      organizationId: 'acc-1',
-      ownerEmail: 'owner@example.com',
-      reason: 'user_initiated',
-      deletedBy: null,
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        organizationId: 'acc-1',
+        ownerEmail: 'owner@example.com',
+        reason: 'user_initiated',
+        deletedBy: null,
+      }),
+    );
+  });
+
+  it('[WI-2788] uses the explicit owner email consistently across a snapshot retry', async () => {
+    mockGetOrganizationErasureSnapshotV2
+      .mockResolvedValueOnce({
+        organizationExists: true,
+        organizationId: 'acc-1',
+        personIds: ['person-owner', 'person-member'],
+        clerkUserIds: ['clerk-member', 'clerk-owner'],
+        loginEmails: ['member@example.com', 'owner@example.com'],
+        subscriptionStoreTeardownTargets: [],
+      })
+      .mockResolvedValueOnce({
+        organizationExists: true,
+        organizationId: 'acc-1',
+        personIds: ['person-owner', 'person-member'],
+        clerkUserIds: ['clerk-member', 'clerk-owner'],
+        loginEmails: ['another-member@example.com', 'owner@example.com'],
+        subscriptionStoreTeardownTargets: [],
+      });
+    mockExecuteDeletionV2
+      .mockResolvedValueOnce('snapshot_changed')
+      .mockResolvedValueOnce('deleted');
+
+    const { step } = createInngestStepRunner();
+    await (scheduledDeletion as any).fn({
+      event: { data: { accountId: 'acc-1' } },
+      step,
     });
+
+    expect(mockExecuteDeletionV2).toHaveBeenCalledTimes(2);
+    expect(mockExecuteDeletionV2.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ ownerEmail: 'owner@example.com' }),
+    );
+    expect(mockExecuteDeletionV2.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({ ownerEmail: 'owner@example.com' }),
+    );
   });
 
   it('calls getStepDatabase inside each step.run closure', async () => {
@@ -181,13 +251,11 @@ describe('scheduledDeletion', () => {
       step,
     });
 
-    // [WI-867] v2 adds capture-owner-email step (pre-reads owner email for
-    // executeDeletionV2). v1 short-circuited that step before acquiring a DB
-    // connection, so count was 4. v2 path: check-account-exists,
-    // capture-clerk-user-id, capture-owner-email, check-cancellation,
-    // capture-subscription-store-teardown-targets, delete-account-data = 6.
-    // delete-clerk-user uses getStepClerkSecretKey.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
+    // Existing durable scalar steps remain DB-backed for rollback/resume ABI
+    // compatibility. The complete snapshot, reserve, destructive-boundary
+    // revalidation, and release add four more DB reads to the six historical
+    // reads. Clerk deletion also uses the secret binding.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(10);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
@@ -356,6 +424,36 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
       accountId: 'acc-gone',
     });
   });
+
+  it('[WI-2788] refreshes the complete snapshot once after atomic snapshot drift', async () => {
+    mockExecuteDeletionV2
+      .mockResolvedValueOnce('snapshot_changed')
+      .mockResolvedValueOnce('deleted');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-drift' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'deleted', accountId: 'acc-drift' });
+    expect(mockGetOrganizationErasureSnapshotV2).toHaveBeenCalledTimes(2);
+    expect(mockExecuteDeletionV2).toHaveBeenCalledTimes(2);
+  });
+
+  it('[WI-2788] stops for operator reconciliation after a second snapshot drift', async () => {
+    mockExecuteDeletionV2.mockResolvedValue('snapshot_changed');
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+
+    await expect(
+      handler({ event: { data: { accountId: 'acc-drift' } }, step }),
+    ).rejects.toBeInstanceOf(NonRetriableError);
+    expect(mockExecuteDeletionV2).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -406,6 +504,119 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
     });
   });
 
+  it('[WI-2788] erases every Clerk identity captured for the organization', async () => {
+    mockGetOrganizationErasureSnapshotV2.mockResolvedValueOnce({
+      organizationExists: true,
+      organizationId: 'acc-1',
+      personIds: ['person-a', 'person-b'],
+      clerkUserIds: ['clerk_user_a', 'clerk_user_b'],
+      loginEmails: ['a@example.com', 'b@example.com'],
+      subscriptionStoreTeardownTargets: [],
+    });
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    await handler({ event: { data: { accountId: 'acc-1' } }, step });
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_user_a',
+      clerkSecretKey: 'sk_test_step',
+    });
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_user_b',
+      clerkSecretKey: 'sk_test_step',
+    });
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledWith(mockDb, [
+      'clerk_user_a',
+      'clerk_user_b',
+    ]);
+    expect(mockMarkPendingClerkErasuresComplete).toHaveBeenCalledWith(mockDb, [
+      'clerk_user_a',
+      'clerk_user_b',
+    ]);
+  });
+
+  it('[WI-2788] keeps every erasure fence pending when one Clerk deletion fails', async () => {
+    mockGetOrganizationErasureSnapshotV2.mockResolvedValueOnce({
+      organizationExists: true,
+      organizationId: 'acc-1',
+      personIds: ['person-a', 'person-b'],
+      clerkUserIds: ['clerk_user_a', 'clerk_user_b'],
+      loginEmails: ['a@example.com', 'b@example.com'],
+      subscriptionStoreTeardownTargets: [],
+    });
+    mockDeleteClerkUser
+      .mockResolvedValueOnce({ deleted: true })
+      .mockRejectedValueOnce(new Error('synthetic Clerk outage'));
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+
+    await expect(
+      handler({ event: { data: { accountId: 'acc-1' } }, step }),
+    ).rejects.toThrow('synthetic Clerk outage');
+    expect(mockMarkPendingClerkErasuresComplete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] revalidates a memoized reservation before deleting a rebound Clerk identity', async () => {
+    mockEnsurePendingClerkErasures.mockResolvedValueOnce(false);
+
+    const { step } = createInngestStepRunner({
+      // Models a sleeping run whose original reservation step completed before
+      // its finite fence expired and the Clerk identity rebound.
+      runResults: { 'reserve-clerk-users': true },
+    });
+    const handler = (scheduledDeletion as any).fn;
+
+    await expect(
+      handler({ event: { data: { accountId: 'acc-1' } }, step }),
+    ).rejects.toBeInstanceOf(NonRetriableError);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledTimes(1);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledWith(mockDb, [
+      'clerk_user_abc',
+    ]);
+    expect(mockDeleteClerkUser).not.toHaveBeenCalled();
+    expect(mockMarkPendingClerkErasuresComplete).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] resumes origin/main-shaped durable step receipts without losing Clerk cleanup', async () => {
+    const { step, runNames } = createInngestStepRunner({
+      runResults: {
+        'capture-clerk-user-id': 'clerk_legacy_sleeping_run',
+        'capture-owner-email': 'legacy@example.com',
+        'capture-subscription-store-teardown-targets': [],
+        'capture-organization-erasure-v2': {
+          organizationExists: false,
+          organizationId: 'acc-legacy',
+          personIds: [],
+          clerkUserIds: [],
+          loginEmails: [],
+          subscriptionStoreTeardownTargets: [],
+        },
+        'delete-account-data': 'already_deleted',
+        // This is the OLD memoized result shape. The versioned executor must
+        // never consume it as the new multi-user array result.
+        'delete-clerk-user': { deleted: true },
+      },
+    });
+
+    const handler = (scheduledDeletion as any).fn;
+    await expect(
+      handler({ event: { data: { accountId: 'acc-legacy' } }, step }),
+    ).resolves.toEqual({
+      status: 'already_deleted',
+      accountId: 'acc-legacy',
+    });
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_legacy_sleeping_run',
+      clerkSecretKey: 'sk_test_step',
+    });
+    expect(runNames()).toContain('delete-clerk-users-v2');
+    expect(runNames()).not.toContain('delete-clerk-user');
+  });
+
   it('captures the Clerk id BEFORE executeDeletion removes the row', async () => {
     const callOrder: string[] = [];
     // [WI-867] v2: getOrganizationOwnerClerkUserIdV2 replaces getAccountClerkUserId.
@@ -438,15 +649,21 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
     expect(mockDeleteClerkUser).not.toHaveBeenCalled();
   });
 
-  it('does NOT erase the Clerk user when the row was already gone', async () => {
-    // [WI-867] v2: executeDeletionV2 returning 'already_deleted' — same gate.
+  it('finishes Clerk erasure when the DB commit landed but its step receipt was lost', async () => {
+    // The initial existence check and memoized snapshot succeeded. A later
+    // `already_deleted` therefore means the irreversible DB step may have
+    // committed before Inngest persisted its receipt; external cleanup must
+    // resume from the snapshot instead of being skipped.
     mockExecuteDeletionV2.mockResolvedValue('already_deleted');
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
     await handler({ event: { data: { accountId: 'acc-1' } }, step });
 
-    expect(mockDeleteClerkUser).not.toHaveBeenCalled();
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk_user_abc',
+      clerkSecretKey: 'sk_test_step',
+    });
   });
 
   it('skips Clerk erasure when the account has no Clerk credential', async () => {
@@ -598,7 +815,6 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
   });
 
   it('[BREAK] declares an onFailure handler', () => {
@@ -614,7 +830,9 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
+    const { step } = createInngestStepRunner();
 
     const clerkOutage = new Error('Clerk delete failed with status 503');
     const result = await onFailure({
@@ -625,6 +843,7 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
         },
       },
       error: clerkOutage,
+      step,
     });
 
     expect(result).toEqual({
@@ -644,18 +863,14 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     );
   });
 
-  it('[BREAK WI-2346] safeSends a PII-minimized account deletion teardown dead-letter event', async () => {
+  it('[BREAK WI-2994] durably sends a PII-minimized account deletion teardown dead-letter event', async () => {
     jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
-    const safeSendSpy = jest
-      .spyOn(safeNonCore, 'safeSend')
-      .mockResolvedValue(undefined);
-    const inngestSendSpy = jest
-      .spyOn(inngest, 'send')
-      .mockResolvedValue({ ids: [] });
+    const { step, sendEventCalls } = createInngestStepRunner();
 
     const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
     const maliciousError = new Error(
       'Clerk response contained private context',
@@ -670,35 +885,140 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
         },
       },
       error: maliciousError,
+      step,
     });
 
-    expect(safeSendSpy).toHaveBeenCalledTimes(1);
-    const call = safeSendSpy.mock.calls[0];
-    expect(call).toBeDefined();
-    if (!call) return;
-    const [sendThunk, surface, context] = call;
-    expect(surface).toBe('account-deletion.terminal_failure');
-    expect(context).toEqual({
-      accountId: 'acc-terminal',
-      runId: 'run-xyz',
-    });
+    expect(sendEventCalls).toEqual([
+      {
+        name: 'dispatch-account-deletion-terminal-failure',
+        payload: {
+          id: 'deletion-terminal-failure:scheduled-account-deletion:run-xyz',
+          name: 'app/account.deletion_teardown.failed',
+          data: {
+            accountId: 'acc-terminal',
+            runId: 'run-xyz',
+            errorName: 'Error',
+            timestamp: expect.any(String),
+          },
+        },
+      },
+    ]);
+    expect(JSON.stringify(sendEventCalls)).not.toContain('private context');
+    expect(JSON.stringify(sendEventCalls)).not.toContain('alice@example.test');
+  });
 
-    await expect(sendThunk()).resolves.not.toThrow();
-    expect(inngestSendSpy).toHaveBeenCalledWith({
-      name: 'app/account.deletion_teardown.failed',
-      data: {
-        accountId: 'acc-terminal',
-        runId: 'run-xyz',
-        errorName: 'Error',
-        timestamp: expect.any(String),
+  it('[BREAK WI-2994] propagates durable-step rejection so Inngest can retry', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const transportError = new Error('event transport unavailable');
+    const { step, sendEventCalls } = createInngestStepRunner({
+      sendEventErrors: {
+        'dispatch-account-deletion-terminal-failure': transportError,
       },
     });
-    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
-      'private context',
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
+    }) => Promise<unknown>;
+
+    await expect(
+      onFailure({
+        event: {
+          data: {
+            event: { data: { accountId: 'acc-terminal' } },
+            run_id: 'run-xyz',
+          },
+        },
+        error: new Error('terminal deletion failure'),
+        step,
+      }),
+    ).rejects.toBe(transportError);
+    expect(sendEventCalls).toHaveLength(1);
+  });
+
+  it.each([
+    ['late resolution', false],
+    ['late rejection', true],
+  ] as const)(
+    '[BREAK WI-2994] awaits %s without starting a duplicate dispatch',
+    async (_label, rejects) => {
+      jest
+        .spyOn(sentry, 'captureException')
+        .mockImplementation(() => undefined);
+      let settle!: () => void;
+      const pending = new Promise<void>((resolve, reject) => {
+        settle = () => (rejects ? reject(new Error('late reject')) : resolve());
+      });
+      const sendEvent = jest.fn().mockReturnValue(pending);
+      const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+        event: { data: { event?: { data?: unknown }; run_id?: string } };
+        error: unknown;
+        step: { sendEvent: typeof sendEvent };
+      }) => Promise<unknown>;
+
+      const result = onFailure({
+        event: {
+          data: {
+            event: { data: { accountId: 'acc-terminal' } },
+            run_id: 'run-xyz',
+          },
+        },
+        error: new Error('terminal deletion failure'),
+        step: { sendEvent },
+      });
+      await Promise.resolve();
+      expect(sendEvent).toHaveBeenCalledTimes(1);
+      settle();
+      if (rejects) {
+        await expect(result).rejects.toThrow('late reject');
+      } else {
+        await expect(result).resolves.toEqual({
+          status: 'terminal_failure',
+          accountId: 'acc-terminal',
+        });
+      }
+      expect(sendEvent).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('[BREAK WI-2994] uses a stable memoization key across replay', async () => {
+    jest.spyOn(sentry, 'captureException').mockImplementation(() => undefined);
+    const transport = jest.fn().mockResolvedValue({ ids: ['event-1'] });
+    const memoized = new Map<string, Promise<unknown>>();
+    const sendEvent = jest.fn((name: string, payload: unknown) => {
+      const prior = memoized.get(name);
+      if (prior) return prior;
+      const dispatched = transport(payload);
+      memoized.set(name, dispatched);
+      return dispatched;
+    });
+    const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+      step: { sendEvent: typeof sendEvent };
+    }) => Promise<unknown>;
+    const args = {
+      event: {
+        data: {
+          event: { data: { accountId: 'acc-terminal' } },
+          run_id: 'run-xyz',
+        },
+      },
+      error: new Error('terminal deletion failure'),
+      step: { sendEvent },
+    };
+
+    await onFailure(args);
+    await onFailure(args);
+
+    expect(sendEvent).toHaveBeenCalledTimes(2);
+    expect(sendEvent.mock.calls[0]?.[0]).toBe(
+      'dispatch-account-deletion-terminal-failure',
     );
-    expect(JSON.stringify(inngestSendSpy.mock.calls)).not.toContain(
-      'alice@example.test',
+    expect(sendEvent.mock.calls[1]?.[0]).toBe(
+      'dispatch-account-deletion-terminal-failure',
     );
+    expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it('tolerates a missing original event payload (accountId null)', async () => {
@@ -709,11 +1029,14 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
     const onFailure = (scheduledDeletion as any).opts.onFailure as (args: {
       event: { data: { event?: { data?: unknown }; run_id?: string } };
       error: unknown;
+      step: { sendEvent: (name: string, payload: unknown) => Promise<unknown> };
     }) => Promise<unknown>;
+    const { step } = createInngestStepRunner();
 
     const result = await onFailure({
       event: { data: {} },
       error: 'non-error-rejection',
+      step,
     });
 
     expect(result).toEqual({ status: 'terminal_failure', accountId: null });
@@ -811,12 +1134,15 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
       mockDb,
       'org-1',
     );
-    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
-      organizationId: 'org-1',
-      ownerEmail: 'owner@example.com',
-      reason: 'user_initiated',
-      deletedBy: null,
-    });
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        organizationId: 'org-1',
+        ownerEmail: 'owner@example.com',
+        reason: 'user_initiated',
+        deletedBy: null,
+      }),
+    );
     expect(sendEventCalls).toContainEqual({
       name: 'request-subscription-store-teardown',
       payload: {
@@ -852,16 +1178,12 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     });
   });
 
-  it('calls getStepDatabase once per v2 DB step (6 total)', async () => {
+  it('calls getStepDatabase once per v2 DB access (10 total)', async () => {
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
     await handler({ event: { data: { accountId: 'org-1' } }, step });
 
-    // check-account-exists, capture-clerk-user-id, capture-owner-email,
-    // check-cancellation, capture-subscription-store-teardown-targets,
-    // delete-account-data — delete-clerk-user uses getStepClerkSecretKey,
-    // not getStepDatabase.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(10);
   });
 
   it('[BREAK CODEX-P1] pinned v2 survives a mid-grace-period flip to legacy — erases via executeDeletionV2', async () => {
@@ -879,12 +1201,15 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     expect(result).toEqual({ status: 'deleted', accountId: 'org-1' });
     // The erasure ran against the originally-scheduled v2 store, NOT the
     // now-active legacy store. This is the GDPR/COPPA-skip guard.
-    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
-      organizationId: 'org-1',
-      ownerEmail: 'owner@example.com',
-      reason: 'user_initiated',
-      deletedBy: null,
-    });
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        organizationId: 'org-1',
+        ownerEmail: 'owner@example.com',
+        reason: 'user_initiated',
+        deletedBy: null,
+      }),
+    );
   });
 
   // [BREAK WI-1255] Prod dropped the legacy tables (accounts/profiles/
@@ -907,12 +1232,15 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
     // organization.id was REUSED from account.id at the T1 migration, so the
     // same accountId already resolves the v2 entity — no translation step.
-    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
-      organizationId: 'acc-1',
-      ownerEmail: 'owner@example.com',
-      reason: 'user_initiated',
-      deletedBy: null,
-    });
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({
+        organizationId: 'acc-1',
+        ownerEmail: 'owner@example.com',
+        reason: 'user_initiated',
+        deletedBy: null,
+      }),
+    );
   });
 
   it('[BREAK WI-1255] pinned v1 whose v2 org is already gone completes as already_deleted, no error', async () => {

@@ -1192,8 +1192,9 @@ describe('billing routes', () => {
     });
 
     it('does not fall back to shared-pool reads when per-profile usage has no active profile', async () => {
-      // [WI-867] v2: findOwnerPersonScope null → no profileId set → 400 (profile required for per-profile quota).
-      mockFindOwnerPersonScope.mockResolvedValueOnce(null);
+      // [WI-2128] An authenticated caller whose own Person scope cannot be
+      // resolved fails closed before any quota pool can be read.
+      mockGetPersonScope.mockResolvedValueOnce(null);
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
 
@@ -1207,7 +1208,7 @@ describe('billing routes', () => {
         TEST_ENV,
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
@@ -1217,8 +1218,9 @@ describe('billing routes', () => {
     it.each(['family', 'pro'] as const)(
       '%s tier requires active profile and does not leak shared-pool aggregates',
       async (tier) => {
-        // [WI-867] v2: findOwnerPersonScope null → no profileId → 400 (profile required).
-        mockFindOwnerPersonScope.mockResolvedValueOnce(null);
+        // [WI-2128] Missing caller authority fails closed before family-wide
+        // aggregates can be read.
+        mockGetPersonScope.mockResolvedValueOnce(null);
         mockGetSubscriptionByAccountId.mockResolvedValue(
           mockSubscription({ tier }),
         );
@@ -1254,7 +1256,7 @@ describe('billing routes', () => {
           TEST_ENV,
         );
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
         expect(mockGetQuotaPool).not.toHaveBeenCalled();
         expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
       },

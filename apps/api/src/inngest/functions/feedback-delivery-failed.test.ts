@@ -61,12 +61,17 @@ jest.mock('../../services/logger', () => {
   };
 });
 
+// Internal-helper exception: this workflow unit test runs without an Inngest
+// request context or Neon database. Keep all real helper exports except the
+// request-owned DB/config bindings needed to drive the retry orchestration;
+// delivery itself remains isolated at the notification boundary above.
 jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
   return {
     ...actual,
+    getStepEnvironment: () => 'production',
     getStepResendApiKey: () => mockGetResendApiKey(),
     getStepEmailFrom: () => mockGetEmailFrom(),
     getStepSupportEmail: () => mockGetStepSupportEmail(),
@@ -351,7 +356,11 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     });
 
     it('[F-090] does NOT delete the queue row when the send failed (row still needed for the retry)', async () => {
-      mockSendEmail.mockResolvedValue({ sent: false, reason: 'rate_limited' });
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'transient',
+        reason: 'network_error',
+      });
       const { db } = stubFeedbackDb(feedbackRow());
 
       await expect(
@@ -533,36 +542,93 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
   });
 
   describe('valid payload — retry behavior', () => {
-    it('throws when sendEmail returns sent:false so Inngest retries', async () => {
-      mockSendEmail.mockResolvedValue({ sent: false, reason: 'rate_limited' });
-
-      await expect(
-        // Pass an eventId so the missing-event-id visibility path doesn't fire.
-        executeHandler(feedbackRetryEvent(), 'evt-retry-1'),
-      ).rejects.toThrow(/feedback-delivery-failed retry unsuccessful/);
-    });
-
-    it('captures exception when retry still fails', async () => {
+    it('throws when sendEmail returns a transient failure so Inngest retries', async () => {
       mockSendEmail.mockResolvedValue({
         sent: false,
+        retryability: 'transient',
         reason: 'network_error',
       });
 
       await expect(
-        // Pass an eventId so the missing-event-id visibility path doesn't fire,
-        // keeping captureException call count at exactly 1 (the retry failure).
+        // Pass an eventId so the missing-event-id visibility path doesn't fire.
+        executeHandler(feedbackRetryEvent(), 'evt-retry-1'),
+      ).rejects.toThrow(/feedback-delivery-failed transient retry failure/);
+    });
+
+    it('does not capture each transient retry attempt', async () => {
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'transient',
+        reason: 'network_error',
+      });
+
+      await expect(
+        // Pass an eventId so the missing-event-id visibility path does not add
+        // its own independent capture.
         executeHandler(feedbackRetryEvent(), 'evt-retry-2'),
       ).rejects.toThrow();
 
-      expect(mockCaptureException).toHaveBeenCalledTimes(1);
-      const [err, ctx] = mockCaptureException.mock.calls[0];
-      expect(err).toBeInstanceOf(Error);
-      expect(ctx.profileId).toBe('p-1');
-      expect(ctx.tags).toEqual({
-        surface: 'feedback',
-        signal: 'delivery-failed',
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('throws on no_api_key so the configured Inngest retries can recover after key repair', async () => {
+      const { db } = stubFeedbackDb(feedbackRow());
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'none',
+        reason: 'no_api_key',
       });
-      expect(ctx.extra.reason).toBe('network_error');
+
+      await expect(
+        executeHandler(feedbackRetryEvent(), 'evt-config-no-api-key'),
+      ).rejects.toThrow(
+        'feedback-delivery-failed retryable configuration failure: no_api_key',
+      );
+
+      expect(db.delete).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('deletes queued feedback when non-production recipient suppression is intentional', async () => {
+      const { db } = stubFeedbackDb(feedbackRow());
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'none',
+        reason: 'non_production_recipient',
+      });
+
+      await expect(
+        executeHandler(
+          feedbackRetryEvent(),
+          'evt-config-non-production-recipient',
+        ),
+      ).resolves.toMatchObject({
+        result: {
+          status: 'not_sent',
+          reason: 'non_production_recipient',
+        },
+      });
+
+      expect(db.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry a permanent provider rejection', async () => {
+      const { deleteWhere } = stubFeedbackDb(feedbackRow());
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'permanent',
+        reason: 'resend_api_error',
+        statusCode: 422,
+        providerCode: 'validation_error',
+      });
+
+      await expect(
+        executeHandler(feedbackRetryEvent(), 'evt-permanent-1'),
+      ).resolves.toMatchObject({
+        result: { status: 'not_sent', reason: 'resend_api_error' },
+      });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+      expect(deleteWhere).toHaveBeenCalledTimes(1);
     });
   });
 });

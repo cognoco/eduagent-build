@@ -59,10 +59,6 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   .post('/ocr', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
-    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5). The
-    // OCR provider (getOcrProvider -> extractText) routes through the LLM
-    // vision model unconditionally.
-    await assertLlmConsent(db, profileId);
 
     // [BUG-283] Reject oversize requests BEFORE parseBody() pulls the whole
     // multipart body into memory. Multipart boundary + headers add overhead
@@ -130,6 +126,12 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
         `File too large: ${file.size} bytes. Maximum: ${OCR_CONSTRAINTS.maxFileSizeBytes} bytes (5MB)`,
       );
     }
+
+    // [WI-2396/WI-2988] Consent-withdrawal gate after deterministic upload
+    // validation and before provider construction or LLM dispatch (canon R5).
+    // Invalid requests retain their established 400/413 precedence without
+    // reading the accepted file into an ArrayBuffer.
+    await assertLlmConsent(db, profileId);
 
     const imageBuffer = await file.arrayBuffer();
     // [Gemini-retirement Phase A / T-A4] OCR no longer keys on GEMINI_API_KEY.

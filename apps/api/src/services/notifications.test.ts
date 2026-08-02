@@ -330,7 +330,11 @@ describe('sendEmail', () => {
   it('returns no_api_key when RESEND_API_KEY is not provided', async () => {
     const result = await sendEmail(emailPayload);
 
-    expect(result).toEqual({ sent: false, reason: 'no_api_key' });
+    expect(result).toEqual({
+      sent: false,
+      retryability: 'none',
+      reason: 'no_api_key',
+    });
     expect(mockFetchFn).not.toHaveBeenCalled();
   });
 
@@ -341,6 +345,7 @@ describe('sendEmail', () => {
     });
 
     const result = await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
       emailFrom: 'test@mentomate.com',
     });
@@ -362,24 +367,36 @@ describe('sendEmail', () => {
     mockFetchFn.mockResolvedValue({
       ok: false,
       status: 422,
-      text: async () => 'Validation error',
+      json: async () => ({ name: 'validation_error' }),
     });
 
     const result = await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
     });
 
-    expect(result).toEqual({ sent: false, reason: 'resend_api_error_422' });
+    expect(result).toEqual({
+      sent: false,
+      retryability: 'permanent',
+      reason: 'resend_api_error',
+      statusCode: 422,
+      providerCode: 'validation_error',
+    });
   });
 
   it('returns network_error on fetch failure', async () => {
     mockFetchFn.mockRejectedValue(new Error('network down'));
 
     const result = await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
     });
 
-    expect(result).toEqual({ sent: false, reason: 'network_error' });
+    expect(result).toEqual({
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    });
   });
 
   // [BUG-699] Inngest step retries can replay sendEmail calls. Forwarding the
@@ -392,6 +409,7 @@ describe('sendEmail', () => {
     });
 
     await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
       idempotencyKey: 'consent-reminder:profile-1:evt-1:day-7',
     });
@@ -413,6 +431,7 @@ describe('sendEmail', () => {
     });
 
     await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
     });
 
@@ -780,7 +799,7 @@ describe('sendEmail structured logging', () => {
     mockFetchFn.mockResolvedValue({
       ok: false,
       status: 503,
-      text: async () => 'Service unavailable',
+      json: async () => ({ name: 'application_error' }),
     });
 
     const errorSpy = jest
@@ -788,10 +807,12 @@ describe('sendEmail structured logging', () => {
       .mockImplementation(() => undefined);
     try {
       const result = await sendEmail(emailPayload, {
+        environment: 'production',
         resendApiKey: 're_test_key',
       });
       expect(result.sent).toBe(false);
-      expect(result.reason).toBe('resend_api_error_503');
+      if (result.sent) throw new Error('expected email failure');
+      expect(result.reason).toBe('resend_api_error');
 
       // Must have logged via structured logger (which delegates to console.error)
       expect(errorSpy).toHaveBeenCalled();
@@ -824,9 +845,11 @@ describe('sendEmail structured logging', () => {
       .mockImplementation(() => undefined);
     try {
       const result = await sendEmail(emailPayload, {
+        environment: 'production',
         resendApiKey: 're_test_key',
       });
       expect(result.sent).toBe(false);
+      if (result.sent) throw new Error('expected email failure');
       expect(result.reason).toBe('network_error');
 
       expect(errorSpy).toHaveBeenCalled();
@@ -874,11 +897,16 @@ describe('sendEmail structured logging', () => {
 
   it('skips the send when the recipient is suppressed', async () => {
     const result = await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
       db: makeSuppressionLookupDb(true),
     });
 
-    expect(result).toEqual({ sent: false, reason: 'suppressed' });
+    expect(result).toEqual({
+      sent: false,
+      retryability: 'none',
+      reason: 'suppressed',
+    });
     // CRITICAL: the Resend API must never be called for a dead address.
     expect(mockFetchFn).not.toHaveBeenCalled();
   });
@@ -890,6 +918,7 @@ describe('sendEmail structured logging', () => {
     });
 
     const result = await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
       db: makeSuppressionLookupDb(false),
     });
@@ -905,6 +934,7 @@ describe('sendEmail structured logging', () => {
     });
 
     const result = await sendEmail(emailPayload, {
+      environment: 'production',
       resendApiKey: 're_test_key',
     });
 

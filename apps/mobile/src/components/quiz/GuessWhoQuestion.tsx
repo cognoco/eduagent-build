@@ -11,6 +11,7 @@ import type { ClientQuizQuestion, QuestionCheckInput } from '@eduagent/schemas';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useThemeColors } from '../../lib/theme';
+import { VoiceInputControl, appendTranscript } from '../common';
 
 type ClientGuessWhoQuestion = Extract<
   ClientQuizQuestion,
@@ -65,12 +66,15 @@ interface GuessWhoQuestionProps {
     options: GuessWhoCheckOptions,
   ) => Promise<boolean>;
   onResolved: (result: GuessWhoResolvedResult) => void;
+  /** Voice locale for the guess-field mic, resolved by the screen. */
+  voiceLocale?: string;
 }
 
 export function GuessWhoQuestion({
   question,
   onCheckAnswer,
   onResolved,
+  voiceLocale,
 }: GuessWhoQuestionProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -235,6 +239,17 @@ export function GuessWhoQuestion({
             onSubmitEditing={handleSubmitGuess}
             accessibilityLabel={t('quiz.guessWhoQuestion.answerLabel')}
             testID="guess-who-input"
+          />
+        </View>
+        <View className="mt-2">
+          <VoiceInputControl
+            value={guess}
+            disabled={isChecking}
+            voiceLocale={voiceLocale}
+            testID="guess-who-mic"
+            onTranscript={(finalTranscript) =>
+              setGuess((prev) => appendTranscript(prev, finalTranscript))
+            }
           />
         </View>
 

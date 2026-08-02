@@ -35,6 +35,7 @@ const MIC_LABEL_KEYS: Record<MentorMicState, TranslateKey> = {
 
 export interface MentorInputBarProps {
   unavailable?: boolean;
+  homeworkUnavailable?: boolean;
   showColdStartPrompts?: boolean;
   /** Rotation cadence for cold-start placeholder examples (ms). Test seam. */
   placeholderRotationIntervalMs?: number;
@@ -59,6 +60,7 @@ const DEFAULT_PLACEHOLDER_ROTATION_MS = 4000;
 
 export function MentorInputBar({
   unavailable = false,
+  homeworkUnavailable = false,
   showColdStartPrompts = false,
   placeholderRotationIntervalMs = DEFAULT_PLACEHOLDER_ROTATION_MS,
   voiceLocale,
@@ -372,10 +374,16 @@ export function MentorInputBar({
           testID="mentor-bar-homework-chip"
           accessibilityRole="button"
           accessibilityLabel={t('mentorHome.bar.homeworkChip')}
+          accessibilityState={{ disabled: homeworkUnavailable }}
+          disabled={homeworkUnavailable}
           onPress={onOpenHomework}
           className="rounded-full border border-border px-3 py-2"
         >
-          <Text className="text-sm font-semibold text-primary">
+          <Text
+            className={`text-sm font-semibold ${
+              homeworkUnavailable ? 'text-text-secondary' : 'text-primary'
+            }`}
+          >
             {t('mentorHome.bar.homeworkChip')}
           </Text>
         </Pressable>

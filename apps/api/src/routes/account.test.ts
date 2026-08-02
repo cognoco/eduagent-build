@@ -1195,7 +1195,7 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body).toEqual({
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Only the account owner can delete the account.',
+        message: 'Profile authority could not be resolved',
       });
       // The destructive side effect must never have been scheduled.
       expect(scheduleDeletionV2).not.toHaveBeenCalled();
@@ -1213,7 +1213,7 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body).toEqual({
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Only the account owner can export account data.',
+        message: 'Profile authority could not be resolved',
       });
       expect(generateExport).not.toHaveBeenCalled();
     });
@@ -1229,7 +1229,7 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body).toEqual({
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Only the account owner can cancel account deletion.',
+        message: 'Profile authority could not be resolved',
       });
       expect(cancelDeletionV2).not.toHaveBeenCalled();
     });
@@ -1249,7 +1249,7 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body).toEqual({
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Only the account owner can change account email.',
+        message: 'Profile authority could not be resolved',
       });
       expect(mockUpdateAccountEmailFromClerk).not.toHaveBeenCalled();
     });
@@ -1269,7 +1269,7 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body).toEqual({
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Only the account owner can manage account security.',
+        message: 'Profile authority could not be resolved',
       });
       expect(inngest.send).not.toHaveBeenCalled();
     });
@@ -1285,7 +1285,7 @@ describe('account routes', () => {
       const body = await res.json();
       expect(body).toEqual({
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Only the account owner can view deletion status.',
+        message: 'Profile authority could not be resolved',
       });
       expect(getDeletionStatusV2).not.toHaveBeenCalled();
     });

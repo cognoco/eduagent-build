@@ -30,7 +30,11 @@ import {
 import { isWeeklyProgressPushLocalHour9 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
-import { getStepDatabase, getStepResendApiKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepEnvironment,
+  getStepResendApiKey,
+} from '../helpers';
 import {
   getAllActiveGuardianPersonIds,
   getChargePersonIds,
@@ -824,6 +828,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               struggleLines,
             );
             const result = await sendEmail(emailPayload, {
+              environment: getStepEnvironment(),
               resendApiKey: getStepResendApiKey(),
               idempotencyKey: buildLegacyEmailIdempotencyKey(
                 'weekly',

@@ -10,17 +10,13 @@ export type OwnerEntryPhase =
 export type OwnerJourneyPhase =
   | 'seed-request'
   | 'seed-backoff'
-  | 'clerk-lookup'
-  | 'clerk-verification'
   | 'sign-in-setup'
   | 'sign-in-session'
   | 'sign-in-readiness'
   | `${OwnerEntry}-${OwnerEntryPhase}`;
 
 export type OwnerJourneyReadinessMarker =
-  | 'seed-response'
-  | 'clerk-email-address'
-  | 'clerk-email-verification'
+  | 'server-owned-seed-response'
   | 'sign-in-form'
   | 'session-cookie'
   | 'post-approval'
@@ -72,10 +68,7 @@ function statusClass(status: number | undefined): string | undefined {
 function pathname(url: string | URL | undefined): string | undefined {
   if (!url) return undefined;
   try {
-    const parsed = new URL(url, 'https://owner-journey.invalid').pathname;
-    return /^\/v1\/email_addresses\/[^/]+$/.test(parsed)
-      ? '/v1/email_addresses/:id'
-      : parsed;
+    return new URL(url, 'https://owner-journey.invalid').pathname;
   } catch {
     return '/invalid';
   }

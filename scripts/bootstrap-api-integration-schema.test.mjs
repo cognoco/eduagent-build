@@ -97,6 +97,9 @@ function baseDependencies(store, overrides = {}) {
           'CREATE TABLE organization (id uuid PRIMARY KEY)',
           'CREATE POLICY organization_isolation ON organization USING (true)',
         ],
+        postPushStatements: [
+          'CREATE UNIQUE INDEX IF NOT EXISTS curriculum_topics_book_title_lower_uq ON curriculum_topics (book_id, lower(title))',
+        ],
         fingerprint: CHAIN_FINGERPRINT,
       }),
       runSchemaPush: async (input) => {
@@ -165,7 +168,7 @@ test('redacts the complete connection identity from child-process output', () =>
   assert.match(redacted, /REDACTED/);
 });
 
-test('bootstraps an empty target with direct journal SQL then push, never migrate', async () => {
+test('bootstraps with direct journal SQL, push, and post-push replay, never migrate', async () => {
   const store = makeStore();
   const { deps, pushes } = baseDependencies(store);
 
@@ -205,11 +208,42 @@ test('bootstraps an empty target with direct journal SQL then push, never migrat
       'inspect',
       'createApplyingMarker',
       'applyDirectSchema',
+      'applyDirectSchema',
       'fingerprint',
       'markReady',
       'close',
     ],
   );
+});
+
+test('reapplies revision-pinned migration-only database objects after schema push', async () => {
+  const store = makeStore();
+  const timeline = [];
+  const { deps } = baseDependencies(store, {
+    runSchemaPush: async () => {
+      timeline.push('push');
+    },
+  });
+  const originalApplyDirectSchema = store.applyDirectSchema;
+  store.applyDirectSchema = async (input) => {
+    timeline.push(input.statements);
+    await originalApplyDirectSchema(input);
+  };
+  const revisionSql = await deps.loadRevisionSql();
+
+  await bootstrapDisposableApiIntegrationSchema(
+    {
+      revision: REVISION,
+      operatorRuling: 'operator:BID-48/WI-2939:approved',
+    },
+    deps,
+  );
+
+  assert.deepEqual(timeline, [
+    revisionSql.statements,
+    'push',
+    revisionSql.postPushStatements,
+  ]);
 });
 
 test('accepts an already-compatible target idempotently without push', async () => {
@@ -317,6 +351,82 @@ test('loads the committed journal as direct revision-pinned SQL', () => {
   assert.ok(
     plan.statements.some((statement) => /\bCREATE\s+POLICY\b/i.test(statement)),
   );
+  assert.ok(
+    Array.isArray(plan.postPushStatements),
+    'expected a revision-pinned post-push replay plan',
+  );
+  for (const indexName of [
+    'curriculum_topics_book_title_lower_uq',
+    'subjects_profile_name_lower_active_uq',
+    'curriculum_books_subject_title_lower_uq',
+  ]) {
+    assert.ok(
+      plan.postPushStatements.some((statement) =>
+        statement.includes(indexName),
+      ),
+      `expected post-push replay SQL for ${indexName}`,
+    );
+  }
+  const executableJournalSql = plan.statements
+    .join('\n')
+    .replace(/--.*$/gm, '');
+  const migrationOnlyRlsTables = [
+    ...executableJournalSql.matchAll(
+      /ALTER\s+TABLE\s+("[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY\s*;/gi,
+    ),
+  ].map((match) => match[1]);
+  assert.ok(
+    migrationOnlyRlsTables.length > 0,
+    'expected committed migration-only RLS SQL',
+  );
+  for (const table of new Set(migrationOnlyRlsTables)) {
+    const replay = plan.postPushStatements.find((statement) =>
+      statement.includes(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`),
+    );
+    assert.ok(replay, `expected post-push RLS enablement for ${table}`);
+    assert.ok(
+      replay.includes(`to_regclass('${table}') IS NOT NULL`),
+      `expected relation-existence guard for RLS replay on ${table}`,
+    );
+  }
+  for (const policyName of [
+    'assessments_profile_isolation',
+    'family_preferences_profile_isolation',
+    'activation_events_profile_isolation',
+  ]) {
+    assert.ok(
+      plan.postPushStatements.some(
+        (statement) =>
+          statement.includes(`CREATE POLICY "${policyName}"`) &&
+          /to_regclass\('[^']+'\) IS NOT NULL/.test(statement),
+      ),
+      `expected post-push policy replay for ${policyName}`,
+    );
+  }
+  const familyPolicyCreateIndex = plan.postPushStatements.findIndex(
+    (statement) =>
+      statement.includes(
+        'CREATE POLICY "family_preferences_profile_isolation"',
+      ),
+  );
+  const familyPolicyAlterIndex = plan.postPushStatements.findIndex(
+    (statement) =>
+      statement.includes('ALTER POLICY "family_preferences_profile_isolation"'),
+  );
+  assert.ok(
+    familyPolicyAlterIndex > familyPolicyCreateIndex,
+    'expected final ALTER POLICY replay after the historical CREATE POLICY',
+  );
+  assert.match(
+    plan.postPushStatements[familyPolicyAlterIndex],
+    /to_regclass\('[^']+'\) IS NOT NULL[\s\S]*app\.current_profile_id/,
+  );
+  assert.ok(
+    plan.postPushStatements.every(
+      (statement) => !/\bCREATE\s+(?:TABLE|TYPE)\b/i.test(statement),
+    ),
+    'post-push replay must not repeat table or enum creation',
+  );
 });
 
 test('records a failed push and refuses to retry it', async () => {
@@ -345,6 +455,42 @@ test('records a failed push and refuses to retry it', async () => {
     [
       'inspect',
       'createApplyingMarker',
+      'applyDirectSchema',
+      'markFailed',
+      'close',
+    ],
+  );
+});
+
+test('records a failed post-push replay and requires recreation', async () => {
+  const store = makeStore();
+  const originalApplyDirectSchema = store.applyDirectSchema;
+  let applyCount = 0;
+  store.applyDirectSchema = async (input) => {
+    applyCount += 1;
+    await originalApplyDirectSchema(input);
+    if (applyCount === 2) throw new Error('synthetic post-push failure');
+  };
+  const { deps, pushes } = baseDependencies(store);
+
+  await assert.rejects(
+    bootstrapDisposableApiIntegrationSchema(
+      {
+        revision: REVISION,
+        operatorRuling: 'operator:BID-48/WI-2939:approved',
+      },
+      deps,
+    ),
+    /destroy and recreate/i,
+  );
+
+  assert.equal(pushes.length, 1);
+  assert.deepEqual(
+    store.calls.map(([name]) => name),
+    [
+      'inspect',
+      'createApplyingMarker',
+      'applyDirectSchema',
       'applyDirectSchema',
       'markFailed',
       'close',

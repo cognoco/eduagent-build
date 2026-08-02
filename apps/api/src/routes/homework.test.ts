@@ -782,9 +782,9 @@ describe('homework routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). getOcrProvider().extractText unconditionally dispatches the LLM
-  // vision model.
+  // [WI-2396/WI-2988] Consent-withdrawal gate — deterministic upload
+  // validation keeps its established response precedence, then valid input
+  // refuses BEFORE provider construction or LLM dispatch (canon R5).
   // -------------------------------------------------------------------------
   describe('[WI-2396] OCR consent-withdrawal gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
@@ -801,27 +801,137 @@ describe('homework routes', () => {
       return formData;
     }
 
-    it('refuses with 403 CONSENT_WITHDRAWN and never calls the OCR provider when consent is withdrawn', async () => {
-      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+    afterEach(() => {
+      assertLlmConsentMock.mockReset().mockResolvedValue(undefined);
+    });
+
+    it('keeps the declared Content-Length 413 ahead of withdrawn consent without constructing the provider', async () => {
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
       const { getOcrProvider } = require('../services/ocr') as {
         getOcrProvider: jest.Mock;
       };
+      const oversizeContentLength = OCR_CONSTRAINTS.maxFileSizeBytes * 2 + 1;
 
       const res = await app.request(
         '/v1/ocr',
         {
           method: 'POST',
-          headers: OCR_HEADERS,
-          body: makeFormData(),
+          headers: {
+            ...OCR_HEADERS,
+            'Content-Length': String(oversizeContentLength),
+            'Content-Type':
+              'multipart/form-data; boundary=----WebKitFormBoundaryWI2988',
+          },
+          body: '------WebKitFormBoundaryWI2988--\r\n',
         },
         TEST_ENV,
       );
 
-      expect(res.status).toBe(403);
-      const body = (await res.json()) as { code?: string };
-      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(res.status).toBe(413);
+      expect(assertLlmConsentMock).not.toHaveBeenCalled();
       expect(getOcrProvider).not.toHaveBeenCalled();
     });
+
+    it.each([
+      {
+        name: 'missing image',
+        makeBody: () => new FormData(),
+        detail: 'Missing required field: image',
+      },
+      {
+        name: 'non-file image',
+        makeBody: () => {
+          const formData = new FormData();
+          formData.append('image', 'not-a-file');
+          return formData;
+        },
+        detail: 'Missing required field: image',
+      },
+      {
+        name: 'unsupported MIME type',
+        makeBody: () => {
+          const formData = new FormData();
+          formData.append(
+            'image',
+            new File([new ArrayBuffer(100)], 'test.gif', {
+              type: 'image/gif',
+            }),
+          );
+          return formData;
+        },
+        detail: 'Unsupported file type: image/gif',
+      },
+      {
+        name: 'file over the byte limit',
+        makeBody: () => {
+          const formData = new FormData();
+          formData.append(
+            'image',
+            new File(
+              [new ArrayBuffer(OCR_CONSTRAINTS.maxFileSizeBytes + 1)],
+              'large.jpg',
+              { type: 'image/jpeg' },
+            ),
+          );
+          return formData;
+        },
+        detail: 'File too large',
+      },
+    ])(
+      'keeps the $name 400 ahead of withdrawn consent without constructing the provider',
+      async ({ makeBody, detail }) => {
+        assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+        const { getOcrProvider } = require('../services/ocr') as {
+          getOcrProvider: jest.Mock;
+        };
+
+        const res = await app.request(
+          '/v1/ocr',
+          {
+            method: 'POST',
+            headers: OCR_HEADERS,
+            body: makeBody(),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(400);
+        const body = (await res.json()) as { details?: string };
+        expect(body.details).toContain(detail);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(getOcrProvider).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['image/jpeg', 'image/png', 'image/webp'])(
+      'refuses valid %s with 403 CONSENT_WITHDRAWN before constructing the OCR provider',
+      async (mimeType) => {
+        assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+        const { getOcrProvider } = require('../services/ocr') as {
+          getOcrProvider: jest.Mock;
+        };
+        const formData = new FormData();
+        formData.append(
+          'image',
+          new File([new ArrayBuffer(100)], 'test-image', { type: mimeType }),
+        );
+
+        const res = await app.request(
+          '/v1/ocr',
+          {
+            method: 'POST',
+            headers: OCR_HEADERS,
+            body: formData,
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code?: string };
+        expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+        expect(getOcrProvider).not.toHaveBeenCalled();
+      },
+    );
 
     it('proceeds (LLM dispatched) when consent is active', async () => {
       const res = await app.request(
@@ -836,6 +946,18 @@ describe('homework routes', () => {
 
       expect(res.status).toBe(200);
       expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      const { getOcrProvider } = require('../services/ocr') as {
+        getOcrProvider: jest.Mock;
+      };
+      expect(getOcrProvider).toHaveBeenCalledTimes(1);
+      const provider = getOcrProvider.mock.results[0]?.value as {
+        extractText: jest.Mock;
+      };
+      expect(provider.extractText).toHaveBeenCalledTimes(1);
+      expect(provider.extractText).toHaveBeenCalledWith(
+        expect.any(ArrayBuffer),
+        'image/jpeg',
+      );
     });
   });
 });

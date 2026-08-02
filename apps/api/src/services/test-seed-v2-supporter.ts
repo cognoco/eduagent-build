@@ -424,9 +424,9 @@ export async function seedV2SupporterManaged(
     birthYear: 1985,
   });
 
-  // Same-org managed child: hasOwnAccount defaults false (no writer sets it
-  // true anywhere in the codebase — WI-2538), and its membership is on the
-  // SUPPORTER's own organizationId — the property the owner-gate checks.
+  // Same-org managed child: hasOwnAccount remains at its false default because
+  // this Person has no Login. Its membership is on the SUPPORTER's own
+  // organizationId — the property the owner-gate checks.
   const { personId: managedChildPersonId } = await seedChildIdentityV2(db, {
     organizationId: supporter.organizationId,
     displayName: 'Managed Child',

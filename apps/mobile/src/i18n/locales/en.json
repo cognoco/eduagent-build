@@ -2191,8 +2191,6 @@
     "whichSubject": "Which subject is this for?",
     "loadingSubjects": "Loading your subjects...",
     "selectSubjectLabel": "Select {{name}}",
-    "createNewSubject": "Create New Subject",
-    "createNewSubjectLabel": "Create a new subject",
     "orTypeSubject": "Or type a subject name:",
     "subjectInputPlaceholder": "e.g. Biology, History...",
     "typeSubjectLabel": "Type a subject name",
@@ -2204,7 +2202,6 @@
     "manualInputPlaceholder": "Type your problem here...",
     "typeManuallyLabel": "Type your problem manually",
     "noSubjectsYet": "You don't have any subjects yet.",
-    "createSubject": "Create a subject",
     "continueWithProblemLabel": "Continue with typed problem",
     "continueArrow": "Continue →",
     "tryCameraAgain": "Try camera again",
@@ -3355,7 +3352,6 @@
     },
     "search": {
       "placeholder": "Search topics",
-      "micLabel": "Search by voice",
       "noResults": "No topics match that search."
     },
     "notes": {
@@ -3363,7 +3359,6 @@
       "authorSelf": "My notes",
       "authorMentor": "Saved from mentor",
       "addNote": "Add a note",
-      "micLabel": "Add a note by voice",
       "empty": "No notes yet. Capture a thought about this subject.",
       "emptyTopic": "No notes yet. Capture a thought about this topic.",
       "saveErrorTitle": "Could not save note"
@@ -4404,7 +4399,10 @@
       "revoke": "End sharing",
       "revoking": "Ending sharing...",
       "revokeErrorTitle": "Couldn't end sharing",
-      "missingActor": "We could not identify the active person."
+      "missingActor": "We could not identify the active person.",
+      "wrongProfileTitle": "This invite is for a specific profile",
+      "wrongProfileMessage": "This invite can only be opened with the profile it was sent to. Choose that profile, then open the invite again.",
+      "wrongProfileSwitch": "Choose profile"
     },
     "sharedRecord": {
       "emptyTitle": "No shared record yet",

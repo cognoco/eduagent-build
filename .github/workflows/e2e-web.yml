@@ -213,7 +213,21 @@ jobs:
           echo "::error title=Runner-to-edge probe failed::No phase sample was recorded within 5 seconds."
           exit 1
 
+      - name: Verify staging Clerk instance alignment
+        id: clerk-preflight
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set; no secret-consuming Playwright lane can use the staging identity contract."
+            exit 1
+          fi
+          doppler run -p mentomate -c stg \
+            --preserve-env="EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+            --command "set -eu; node scripts/check-clerk-key-alignment.mjs"
+
       - name: Run V2 release Playwright gate
+        if: ${{ steps.clerk-preflight.outcome == 'success' }}
         # The classifier artifact root below mirrors `outputDir` in
         # apps/mobile/playwright.config.ts; update both locations together.
         env:
@@ -232,7 +246,6 @@ jobs:
             export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
             set -eu; \
-            node scripts/check-clerk-key-alignment.mjs; \
             pnpm exec tsx scripts/playwright-seed-scenario-guard.ts \
               --project=v2-release \
               --project=smoke-auth \
@@ -242,9 +255,11 @@ jobs:
               --project=smoke-transport-recovery; \
             CANARY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-pre.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${CANARY_STATE_FILE}\"; \
-            PRE_STATE=\$(cut -d= -f2 \"\${CANARY_STATE_FILE}\"); \
+            PRE_STATE=\$(grep '^GATE_STATE=' \"\${CANARY_STATE_FILE}\" | cut -d= -f2-); \
+            PRE_REASON=\$(grep '^GATE_REASON=' \"\${CANARY_STATE_FILE}\" | cut -d= -f2-); \
             SUITE_NOT_RUN='not-run'; \
             if [ \"\${PRE_STATE}\" != 'healthy' ]; then \
+              echo \"CANARY_PREFLIGHT_REASON=\${PRE_REASON}\"; \
               node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${SUITE_NOT_RUN}\" \"\${SUITE_NOT_RUN}\" 1; \
               exit \$?; \
             fi; \
@@ -255,7 +270,7 @@ jobs:
             set -e; \
             POST_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-post.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${POST_STATE_FILE}\"; \
-            POST_STATE=\$(cut -d= -f2 \"\${POST_STATE_FILE}\"); \
+            POST_STATE=\$(grep '^GATE_STATE=' \"\${POST_STATE_FILE}\" | cut -d= -f2-); \
             CLASSIFY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-classification.state\"; \
             node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\" \"\${PLAYWRIGHT_API_URL}\" > \"\${CLASSIFY_STATE_FILE}\"; \
             cat \"\${CLASSIFY_STATE_FILE}\"; \
@@ -285,7 +300,7 @@ jobs:
 
       - name: Run required-stable legacy Playwright smoke
         id: legacy-core
-        if: ${{ always() && !cancelled() && steps.legacy-lanes.outcome == 'success' && steps.legacy-lanes.outputs.core != '' }}
+        if: ${{ always() && !cancelled() && steps.clerk-preflight.outcome == 'success' && steps.legacy-lanes.outcome == 'success' && steps.legacy-lanes.outputs.core != '' }}
         timeout-minutes: 5
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
@@ -303,7 +318,7 @@ jobs:
 
       - name: Run advisory legacy Playwright smoke
         id: legacy-advisory
-        if: ${{ always() && !cancelled() && steps.legacy-lanes.outcome == 'success' && steps.legacy-lanes.outputs.advisory != '' }}
+        if: ${{ always() && !cancelled() && steps.clerk-preflight.outcome == 'success' && steps.legacy-lanes.outcome == 'success' && steps.legacy-lanes.outputs.advisory != '' }}
         continue-on-error: true
         timeout-minutes: 5
         env:

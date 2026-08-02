@@ -19,6 +19,7 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
 
 const MANUAL_HOMEWORK_PROBLEM = 'Solve 3x + 7 = 22';
+const MANUAL_HOMEWORK_SUBJECT = 'Algebra';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -30,6 +31,13 @@ function isSessionCreate(request: Request): boolean {
   );
 }
 
+function isSubjectCreate(request: Request): boolean {
+  return (
+    request.method() === 'POST' &&
+    new URL(request.url()).pathname === '/v1/subjects'
+  );
+}
+
 function isSessionClose(request: Request, sessionId: string): boolean {
   return (
     request.method() === 'POST' &&
@@ -38,7 +46,16 @@ function isSessionClose(request: Request, sessionId: string): boolean {
 }
 
 async function openManualEntryFromMentor(page: Page): Promise<void> {
-  await pressableClick(page.getByTestId('mentor-bar-homework-chip'));
+  const homeworkChip = page.getByTestId('mentor-bar-homework-chip');
+  // WI-3024: under E2E the chip is disabled while the subjects index loads
+  // (mentor.tsx hostedManualHomeworkUnavailable). A tap that beats that query
+  // silently no-ops on the disabled Pressable and manual entry never mounts.
+  // RN-web expresses the disabled Pressable as aria-disabled, which
+  // toBeEnabled does not consult — wait on the attribute itself.
+  await expect(homeworkChip).not.toHaveAttribute('aria-disabled', 'true', {
+    timeout: 30_000,
+  });
+  await pressableClick(homeworkChip);
   await expect(page.getByTestId('homework-entry-mode-manual')).toBeVisible({
     timeout: 30_000,
   });
@@ -47,12 +64,12 @@ async function openManualEntryFromMentor(page: Page): Promise<void> {
   });
 }
 
-test('V2 Mentor trial-active manual homework creates one associated session, receives help, and returns to Mentor', async ({
+test('[WI-2196] V2 Mentor manual homework creates the correct inline Subject and one associated session', async ({
   page,
 }) => {
   const seed = await seedAndSignIn(page, {
     scenario: 'trial-active',
-    alias: 'wi-2236-manual-homework',
+    alias: 'wi-2196-correct-homework-subject',
     landingPath: '/mentor',
     landingTestId: 'mentor-screen',
   });
@@ -76,8 +93,8 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   await expect(page.getByTestId('mentor-bar-input')).toBeEnabled();
   expect(sessionCreateRequests).toHaveLength(0);
 
-  // Case 2 — enter one visible manual problem. The dedicated route receives
-  // Mentor's active subject or adopts the first active subject after loading.
+  // Case 2 — enter one visible manual problem, replace Mentor's unrelated
+  // seeded Science subject, and create the correct Algebra subject inline.
   await openManualEntryFromMentor(page);
   await expect(page.getByTestId('result-text-input')).toHaveValue('');
   await fillTextInput(
@@ -91,6 +108,36 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   await expect(
     page.getByTestId('homework-subject-resolution-ready'),
   ).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('homework-subject-resolution-name')).toHaveText(
+    'Science',
+  );
+  await pressableClick(page.getByTestId('homework-change-subject'));
+  await expect(page.getByTestId('homework-subject-name-input')).toBeVisible({
+    timeout: 15_000,
+  });
+  await fillTextInput(
+    page.getByTestId('homework-subject-name-input'),
+    MANUAL_HOMEWORK_SUBJECT,
+  );
+  const createdSubjectResponsePromise = page.waitForResponse(
+    (response) =>
+      isSubjectCreate(response.request()) && response.status() === 201,
+    { timeout: 60_000 },
+  );
+  await pressableClick(page.getByTestId('homework-subject-resolve-button'));
+  const createdSubjectResponse = await createdSubjectResponsePromise;
+  const createdSubjectBody = (await createdSubjectResponse.json()) as {
+    subject: { id: string; name: string; profileId: string };
+  };
+  expect(createdSubjectBody.subject.name).toBe(MANUAL_HOMEWORK_SUBJECT);
+  expect(createdSubjectBody.subject.profileId).toBe(seed.profileId);
+  expect(createdSubjectBody.subject.id).not.toBe(seed.ids.subjectId);
+  await expect(
+    page.getByTestId('homework-subject-resolution-ready'),
+  ).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('homework-subject-resolution-name')).toHaveText(
+    MANUAL_HOMEWORK_SUBJECT,
+  );
   const confirm = page.getByTestId('confirm-button');
   await expect(confirm).toBeEnabled();
   await pressableClick(confirm);
@@ -98,10 +145,9 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   await expect(page.getByTestId('session-screen')).toBeVisible({
     timeout: 30_000,
   });
-  // Bind the association assertions to the subject this exact browser journey
-  // resolved, whether Mentor supplied it immediately or the route loaded it.
+  // Bind every association assertion to the subject created in this journey.
   const resolvedSubjectId = new URL(page.url()).searchParams.get('subjectId');
-  expect(resolvedSubjectId).toBe(seed.ids.subjectId);
+  expect(resolvedSubjectId).toBe(createdSubjectBody.subject.id);
   await expect(page.getByTestId('homework-problem-text-bubble')).toHaveText(
     MANUAL_HOMEWORK_PROBLEM,
   );

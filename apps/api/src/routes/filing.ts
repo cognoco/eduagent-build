@@ -291,7 +291,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         name: 'app/filing.completed',
         data: {
           bookId: result.bookId,
-          topicTitle: result.topicTitle,
+          topicId: result.topicId,
           profileId,
           sessionId: body.sessionId,
           timestamp: new Date().toISOString(),

@@ -80,6 +80,14 @@ interface UseSpeechRecognitionOptions {
   continuous?: boolean;
 }
 
+// Module-scoped capture ownership: the native recognizer is a
+// singleton that broadcasts result/error/end events to EVERY mounted hook
+// instance. Without ownership, a capture started by one surface (e.g. the
+// feedback sheet over a session) lands its transcript in every other
+// subscribed consumer (session composer, note drafts). Ownership transfers
+// on each startListening; only the owning instance consumes engine events.
+let activeCaptureOwner: symbol | null = null;
+
 /**
  * Lazily resolve `ExpoSpeechRecognitionModule` from the dynamic import.
  * Returns `null` if the package is not installed / fails to load.
@@ -118,11 +126,23 @@ export function useSpeechRecognition(
   const [isFinalTranscript, setIsFinalTranscript] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const instanceTokenRef = useRef(Symbol('speech-capture-owner'));
+  // Incremented by stopListening; a startListening still awaiting module
+  // load or the OS permission prompt compares its captured generation after
+  // every await and aborts if a stop (or a newer start) has superseded it —
+  // otherwise the pending start would claim ownership and open the native
+  // microphone AFTER the caller already moved on (e.g. a scope change).
+  const startGenerationRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
+    const instanceToken = instanceTokenRef.current;
     return () => {
       mountedRef.current = false;
+      // An unmounting owner releases the capture; nobody may consume it.
+      if (activeCaptureOwner === instanceToken) {
+        activeCaptureOwner = null;
+      }
     };
   }, []);
 
@@ -144,6 +164,8 @@ export function useSpeechRecognition(
 
       resultSubscription = speechModule.addListener('result', (event) => {
         if (!mountedRef.current) return;
+        // Only the instance that started the current capture consumes it.
+        if (activeCaptureOwner !== instanceTokenRef.current) return;
 
         const resultEvent = event as {
           results?: Array<{ transcript?: string }>;
@@ -182,11 +204,13 @@ export function useSpeechRecognition(
       // engine gave up). Without this, a stop would sit in processing forever.
       endSubscription = speechModule.addListener('end', () => {
         if (!mountedRef.current) return;
+        if (activeCaptureOwner !== instanceTokenRef.current) return;
         setStatus((current) => (current === 'error' ? current : 'idle'));
       });
 
       errorSubscription = speechModule.addListener('error', (event) => {
         if (!mountedRef.current) return;
+        if (activeCaptureOwner !== instanceTokenRef.current) return;
 
         const errorEvent = event as { message?: string };
         setError(errorEvent.message ?? 'Speech recognition failed');
@@ -203,11 +227,19 @@ export function useSpeechRecognition(
   }, [loadModule, continuous]);
 
   const startListening = useCallback(async () => {
+    const generation = ++startGenerationRef.current;
+    const cancelled = () => startGenerationRef.current !== generation;
     try {
       setError(null);
       setStatus('requesting_permission');
 
       const speechModule = await loadModule();
+      if (cancelled()) {
+        if (mountedRef.current) {
+          setStatus((current) => (current === 'error' ? current : 'idle'));
+        }
+        return;
+      }
 
       if (!speechModule) {
         if (mountedRef.current) {
@@ -219,6 +251,12 @@ export function useSpeechRecognition(
 
       // Request permissions
       const { granted } = await speechModule.requestPermissionsAsync();
+      if (cancelled()) {
+        if (mountedRef.current) {
+          setStatus((current) => (current === 'error' ? current : 'idle'));
+        }
+        return;
+      }
       if (!granted) {
         if (mountedRef.current) {
           setError('Microphone permission is required for voice input');
@@ -228,6 +266,9 @@ export function useSpeechRecognition(
       }
 
       if (!mountedRef.current) return;
+      // Take capture ownership: any prior owner's still-pending capture is
+      // revoked the moment a new one starts.
+      activeCaptureOwner = instanceTokenRef.current;
       setTranscript('');
       setIsFinalTranscript(false);
       setStatus('listening');
@@ -247,10 +288,19 @@ export function useSpeechRecognition(
   }, [loadModule, options?.lang, continuous]);
 
   const stopListening = useCallback(async () => {
+    // Supersede any start still in flight (module load / permission prompt):
+    // it will observe the generation change at its next checkpoint and abort
+    // instead of opening the microphone after the caller moved on.
+    startGenerationRef.current += 1;
     try {
       const speechModule = await loadModule();
 
-      if (speechModule) {
+      // Only the capture owner may stop the native engine — a non-owner
+      // calling stop (e.g. a control unmounting after its capture was
+      // superseded) must not cut off the current owner's live capture. The
+      // non-owner still settles its own local status below.
+      const ownsCapture = activeCaptureOwner === instanceTokenRef.current;
+      if (speechModule && ownsCapture) {
         speechModule.stop();
       }
 
@@ -260,9 +310,11 @@ export function useSpeechRecognition(
         // the result or end event lands is what keeps a consumer from
         // committing the last interim guess. (Any state but error, which is
         // terminal and must not be masked.) With no module there is no engine
-        // to owe us anything and no end event will ever arrive, so waiting
-        // would strand the caller in processing forever — settle immediately.
-        const settled = speechModule ? 'processing' : 'idle';
+        // to owe us anything, and a NON-OWNER is owed nothing either (its
+        // capture was superseded and its events are dropped) — in both cases
+        // waiting would strand the caller in processing forever, so settle
+        // to idle immediately.
+        const settled = speechModule && ownsCapture ? 'processing' : 'idle';
         setStatus((current) => (current === 'error' ? current : settled));
       }
     } catch (err) {

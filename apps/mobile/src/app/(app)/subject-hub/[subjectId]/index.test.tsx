@@ -478,6 +478,11 @@ describe('SubjectHubRoute', () => {
   it('preserves the V0 due-review topic route without V2 return or book context', async () => {
     jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
     mockFetch.setRoute('/progress/resume-target', { target: null });
+    // Pure due-review state: clear the default in-progress session, which
+    // would otherwise (correctly, per WI-2853) win the hero as continue-now.
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}/sessions`, {
+      sessions: [],
+    });
     mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
       topics: [
         {
@@ -1503,9 +1508,19 @@ function proxyWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  const ownerProfile = createTestProfile({
+    id: 'proxy-owner-1',
+    accountId: 'proxy-account-1',
+    isOwner: true,
+  });
+  const childProfile = createTestProfile({
+    id: 'proxy-child-1',
+    accountId: 'proxy-account-1',
+    isOwner: false,
+  });
   return createScreenWrapper({
-    activeProfile: createTestProfile(),
-    profiles: [createTestProfile()],
+    activeProfile: childProfile,
+    profiles: [ownerProfile, childProfile],
     queryClient,
     isExplicitProxyMode: true,
   }).wrapper;

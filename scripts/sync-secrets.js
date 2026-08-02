@@ -71,9 +71,14 @@ const WRANGLER_CLI = require.resolve('wrangler/bin/wrangler.js', {
 function shouldInclude(key, value) {
   if (EXCLUDE_EXACT.includes(key)) return false;
   if (EXCLUDE_PREFIXES.some((prefix) => key.startsWith(prefix))) return false;
-  // Empty strings in Doppler become "" in Cloudflare, which fails Zod .min(1).
-  // Treat them as "not set" and skip — the Worker treats missing keys as undefined.
-  if (value === '') return false;
+  // Empty Worker values must not disappear from the sync/reconciliation plan:
+  // silently treating them as absent can strand or delete a live binding. The
+  // key name is safe to report; never include the value or neighboring values.
+  if (value === '') {
+    throw new Error(
+      `[sync] Refusing to omit empty Worker secret "${key}"; set a value or remove the key intentionally.`,
+    );
+  }
   return true;
 }
 

@@ -166,7 +166,8 @@ describe('reviewDictation', () => {
 
     await reviewDictation({
       ...BASE_INPUT,
-      ageYears: 17,
+      ageYears: 18,
+      ageBracket: 'adolescent',
       preferredExplanations: ['step-by-step', 'examples'],
     });
 
@@ -182,6 +183,15 @@ describe('reviewDictation', () => {
     );
     // step-by-step preference included
     expect(systemContent).toContain('numbered 1');
+    expect(mockRouteAndCall).toHaveBeenCalledWith(
+      expect.any(Array),
+      2,
+      expect.objectContaining({
+        flow: 'dictation.review',
+        // The caller's exact-date bracket wins over the year-only age fallback.
+        ageBracket: 'adolescent',
+      }),
+    );
   });
 
   it('uses child-friendly register for ageYears ≤ 13', async () => {

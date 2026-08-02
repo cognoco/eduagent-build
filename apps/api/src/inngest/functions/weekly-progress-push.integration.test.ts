@@ -24,6 +24,7 @@ import {
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
 } from './weekly-progress-push';
+import { runWithInngestRequestContext } from '../helpers';
 
 // ── Fetch interceptor for Expo Push API ──────────────────────────────
 // Instead of jest.mock on internal modules, intercept at the HTTP boundary.
@@ -31,6 +32,7 @@ import {
 // cap check, notification logging) while mocking only the external Expo API.
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 const RESEND_API_URL = 'https://api.resend.com/emails';
+const TEST_RESEND_API_KEY = 'resend-test-key';
 const pushApiCalls: Array<{
   to: string;
   title: string;
@@ -51,6 +53,7 @@ let expoPushTicketId = 'ticket-integration';
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 let db: Database;
+let integrationDatabaseUrl: string;
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
@@ -452,10 +455,22 @@ async function executeGenerateHandler(parentId: string): Promise<unknown> {
       fn: (ctx: unknown) => Promise<unknown>;
     }
   ).fn;
-  return handler({
-    event: { name: 'app/weekly-progress-push.generate', data: { parentId } },
-    step,
-  });
+  return runWithInngestRequestContext(
+    {
+      environment: 'production',
+      databaseUrl: integrationDatabaseUrl,
+      resendApiKey: TEST_RESEND_API_KEY,
+      emailFrom: 'test@mentomate.test',
+    },
+    () =>
+      handler({
+        event: {
+          name: 'app/weekly-progress-push.generate',
+          data: { parentId },
+        },
+        step,
+      }),
+  );
 }
 
 beforeAll(async () => {
@@ -466,9 +481,10 @@ beforeAll(async () => {
     );
   }
 
+  integrationDatabaseUrl = databaseUrl;
   db = createDatabase(databaseUrl);
   await ensureWeeklyReportsTable();
-  process.env['RESEND_API_KEY'] = 'resend-test-key';
+  process.env['RESEND_API_KEY'] = TEST_RESEND_API_KEY;
 
   // Intercept external notification APIs at the fetch level.
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {

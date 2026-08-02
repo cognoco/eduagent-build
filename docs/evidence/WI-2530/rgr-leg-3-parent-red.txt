@@ -1,0 +1,92 @@
+WI-2530 controlled-delay RGR leg 3 — PARENT-RED
+
+$ git rev-parse HEAD
+f9f904eb8726c94493115c848fa53531e97aaacb
+command_exit_code=0
+
+$ git restore --source=a0a2f161ee1d59ff9177598d62ae76a639eda3f2 -- apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+command_exit_code=0
+
+$ git rev-parse a0a2f161ee1d59ff9177598d62ae76a639eda3f2:apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+5a823b8eac409f418ab6f603932395d5dff524ec
+command_exit_code=0
+
+$ git hash-object apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+5a823b8eac409f418ab6f603932395d5dff524ec
+command_exit_code=0
+source_blob_matches=yes
+
+$ git apply --check <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+command_exit_code=0
+
+$ git apply <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+command_exit_code=0
+
+$ git hash-object apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+b2f053bdf9115bcf95f13a6fa4261553656f7c75
+command_exit_code=0
+expected_controlled_blob=b2f053bdf9115bcf95f13a6fa4261553656f7c75
+controlled_blob_matches=yes
+
+$ sha256sum <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+f0a0bea6d9bbda6f0ca9782c47b60262ca0ba9327a8651e65110624c0df76d57  <workspace>/docs/evidence/WI-2530/controlled-delay.patch
+command_exit_code=0
+expected_patch_sha256=f0a0bea6d9bbda6f0ca9782c47b60262ca0ba9327a8651e65110624c0df76d57
+patch_sha256_matches=yes
+
+started_utc=2026-08-01T10:42:40Z
+$ CI=1 FORCE_COLOR=0 pnpm dlx node@22 --max-old-space-size=6144 ./node_modules/jest/bin/jest.js --config apps/mobile/jest.config.cjs --runInBand --forceExit --runTestsByPath apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx --testNamePattern="shows session metadata when displaySummary is present"
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+FAIL @eduagent/mobile apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+  ● SessionDetailScreen (summary-only) › shows session metadata when displaySummary is present
+
+    Unable to find an element with text: Practiced light reactions
+
+    <RCTView
+      accessibilityLabel="common.timeoutLoader.loading"
+      accessibilityRole="progressbar"
+      testID="loading"
+    >
+      <ActivityIndicator />
+    </RCTView>
+
+      211 |     const { cleanup } = renderSessionDetail();
+      212 |
+    > 213 |     await waitFor(() => screen.getByText('Practiced light reactions'));
+          |                  ^
+      214 |     screen.getByTestId('session-metadata');
+      215 |
+      216 |     cleanup();
+
+      at Object.<anonymous> (<verification-checkout>/apps/mobile/src/app/(app)../../child/[profileId]/session/[sessionId].test.tsx:213:18)
+      at asyncGeneratorStep (node_modules/.pnpm/@babel+runtime@7.27.6/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/.pnpm/@babel+runtime@7.27.6/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/.pnpm/@babel+runtime@7.27.6/node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/.pnpm/@babel+runtime@7.27.6/node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+
+────────────────────────────────────────────────────────────
+CI failures (1)
+────────────────────────────────────────────────────────────
+✕ apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx:1
+    SessionDetailScreen (summary-only) › shows session metadata when displaySummary is present
+    Error: Unable to find an element with text: Practiced light reactions
+────────────────────────────────────────────────────────────
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 14 skipped, 15 total
+Snapshots:   0 total
+Time:        2.078 s, estimated 3 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+jest_exit_code=1
+expected_jest_exit_code=1
+ended_utc=2026-08-01T10:42:44Z
+
+$ git restore --source=HEAD --staged --worktree -- apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].test.tsx
+command_exit_code=0
+
+$ git status --short
+command_exit_code=0
+status_lines=0
+
+leg_result=PASS

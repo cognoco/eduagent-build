@@ -994,6 +994,39 @@ describe('filing routes', () => {
       );
     });
 
+    it('[WI-2788] emits the stable topicId contract for app/filing.completed', async () => {
+      const { inngest } = await import('../inngest/client');
+      const sendMock = inngest.send as jest.Mock;
+      sendMock.mockClear();
+
+      const res = await app.request(
+        '/v1/filing',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            rawInput: 'photosynthesis',
+            sessionId: '00000000-0000-4000-8000-000000000123',
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(200);
+
+      const completedEvent = sendMock.mock.calls.find(
+        ([event]) => event?.name === 'app/filing.completed',
+      )?.[0];
+      expect(completedEvent).toEqual(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            bookId: TEST_BOOK_ID,
+            topicId: TEST_TOPIC_ID,
+          }),
+        }),
+      );
+      expect(completedEvent.data).not.toHaveProperty('topicTitle');
+    });
+
     // [CR-2026-05-19-C3] Break test: app/filing.completed is a CORE dispatch.
     // If inngest.send() rejects, the route MUST surface a 5xx so the client
     // retries. Silent recovery (.catch swallowing) would hang the

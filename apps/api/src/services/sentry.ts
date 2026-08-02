@@ -13,6 +13,8 @@ export interface ErrorContext {
   extra?: Record<string, unknown>;
   /** Sentry tags for faceted search (e.g. { surface: 'billing.kv' }). */
   tags?: Record<string, string | number | boolean>;
+  /** Override the event severity for handled conditions such as fallbacks. */
+  level?: Sentry.SeverityLevel;
 }
 
 /**
@@ -23,6 +25,9 @@ export interface ErrorContext {
  */
 export function captureException(err: unknown, context?: ErrorContext): void {
   Sentry.withScope((scope) => {
+    if (context?.level) {
+      scope.setLevel(context.level);
+    }
     if (context?.userId) {
       scope.setUser({ id: context.userId });
     }
@@ -50,10 +55,7 @@ export function captureException(err: unknown, context?: ErrorContext): void {
  * Captures a queryable Sentry message event for operational anomalies that are
  * not exceptions but still need alerting/24h volume checks.
  */
-export function captureMessage(
-  message: string,
-  context?: ErrorContext & { level?: Sentry.SeverityLevel },
-): void {
+export function captureMessage(message: string, context?: ErrorContext): void {
   Sentry.withScope((scope) => {
     if (context?.userId) {
       scope.setUser({ id: context.userId });
@@ -172,7 +174,9 @@ const QUOTED_SNIPPET_PATTERN = /"[^"]*"/g;
  * `QUOTED_SNIPPET_PATTERN`'s doc comment for the shape/rationale.
  */
 function redactQuotedSnippets(value: string): string {
-  return value.replace(QUOTED_SNIPPET_PATTERN, '"[redacted]"');
+  return value
+    .replace(/(^|\r?\n)(\s*params:\s*)[^\r\n]*/gi, '$1$2[redacted]')
+    .replace(QUOTED_SNIPPET_PATTERN, '"[redacted]"');
 }
 
 /**

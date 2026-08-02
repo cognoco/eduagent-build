@@ -7,6 +7,7 @@ const logger = createLogger();
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
 const VERIFIED_EMAIL_CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_VERIFIED_EMAIL_CACHE_ENTRIES = 1_000;
+const CLERK_404_WARNING_COOLDOWN_MS = 5 * 60 * 1000;
 
 const clerkVerificationSchema = z
   .object({
@@ -48,6 +49,7 @@ interface VerifiedEmailCacheEntry {
 }
 
 const verifiedEmailCache = new Map<string, VerifiedEmailCacheEntry>();
+let nextClerk404WarningAt = 0;
 
 function readCachedVerifiedEmail(userId: string): string | null {
   const cached = verifiedEmailCache.get(userId);
@@ -78,6 +80,7 @@ export function invalidateVerifiedClerkEmailCache(userId: string): void {
 
 export function clearVerifiedClerkEmailCacheForTest(): void {
   verifiedEmailCache.clear();
+  nextClerk404WarningAt = 0;
 }
 
 function verificationStatus(
@@ -180,10 +183,21 @@ export async function resolveVerifiedClerkEmail({
       userId,
       status: res.status,
     });
-    captureException(new Error(`Clerk lookup ${res.status}`), {
-      userId,
-      tags: { surface: 'clerk_lookup', reason: `http_${res.status}` },
-    });
+    if (res.status === 404) {
+      const now = Date.now();
+      if (now >= nextClerk404WarningAt) {
+        nextClerk404WarningAt = now + CLERK_404_WARNING_COOLDOWN_MS;
+        captureException(new Error('Clerk lookup 404'), {
+          level: 'warning',
+          tags: { surface: 'clerk_lookup', reason: 'http_404' },
+        });
+      }
+    } else {
+      captureException(new Error(`Clerk lookup ${res.status}`), {
+        userId,
+        tags: { surface: 'clerk_lookup', reason: `http_${res.status}` },
+      });
+    }
     return {
       ok: false,
       reason: 'lookup-unavailable',

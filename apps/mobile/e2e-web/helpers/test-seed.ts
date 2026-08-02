@@ -1,12 +1,9 @@
 import { apiBaseUrl, buildTestSeedHeaders, seedEmailPrefix } from './runtime';
-import { alignPlaywrightClerkSecret } from './clerk-secret-identity';
 import type {
   OwnerJourneyPhase,
   OwnerJourneyPhaseDiagnostics,
   OwnerJourneyReadinessMarker,
 } from './owner-journey-phase-diagnostics';
-
-const CLERK_API_BASE = 'https://api.clerk.com/v1';
 
 export interface SeedResponse {
   scenario: string;
@@ -31,23 +28,10 @@ export interface ResetResponse {
 const RETRY_MAX_ATTEMPTS = 6;
 const RETRY_BASE_DELAY_MS = 1_500;
 const RETRYABLE_STATUSES = new Set([403, 429, 502, 503]);
-const CLERK_LOOKUP_MAX_ATTEMPTS = 10;
-const CLERK_LOOKUP_DELAY_MS = 750;
 // The Worker performs one list plus marker/bypass/delete requests per user.
 // Keep this in sync with apps/api/src/services/test-seed.ts.
 const MAX_WORKER_CLEANUP_BATCH_SIZE = 15;
 const MAX_WORKER_CLEANUP_BATCHES = 20;
-
-interface ClerkUser {
-  id: string;
-  primary_email_address_id?: string | null;
-  email_addresses?: Array<{
-    id?: string;
-    email_address?: string;
-  }>;
-}
-
-type ClerkUserLookupResponse = ClerkUser[] | { data?: ClerkUser[] };
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -166,17 +150,12 @@ export async function seedScenario(
           reporter: diagnostics,
           phase: 'seed-request',
           backoffPhase: 'seed-backoff',
-          readinessMarker: 'seed-response',
+          readinessMarker: 'server-owned-seed-response',
         }
       : undefined,
   );
 
-  const seeded = await readJsonOrThrow<SeedResponse>(
-    response,
-    `Seeding ${input.scenario}`,
-  );
-  await verifySeededClerkEmail(seeded.email, diagnostics);
-  return seeded;
+  return readJsonOrThrow<SeedResponse>(response, `Seeding ${input.scenario}`);
 }
 
 export async function resetSeededAccounts(
@@ -216,103 +195,4 @@ export async function resetSeededAccounts(
   throw new Error(
     `Resetting seeded accounts exceeded ${MAX_WORKER_CLEANUP_BATCHES} Clerk cleanup batches for prefix ${prefix}`,
   );
-}
-
-async function verifySeededClerkEmail(
-  email: string,
-  diagnostics?: OwnerJourneyPhaseDiagnostics,
-): Promise<void> {
-  const clerkSecretKey = alignPlaywrightClerkSecret(process.env);
-  if (!clerkSecretKey) return;
-
-  const emailAddressId = await findSeededClerkEmailAddressId(
-    email,
-    clerkSecretKey,
-    diagnostics,
-  );
-
-  if (!emailAddressId) {
-    throw new Error(
-      `Could not find Clerk email address for seed user ${email}`,
-    );
-  }
-
-  const verifyResponse = await fetchWithRetry(
-    `${CLERK_API_BASE}/email_addresses/${encodeURIComponent(emailAddressId)}`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ verified: true, primary: true }),
-    },
-    `Verifying Clerk seed email ${email}`,
-    diagnostics
-      ? {
-          reporter: diagnostics,
-          phase: 'clerk-verification',
-          readinessMarker: 'clerk-email-verification',
-        }
-      : undefined,
-  );
-
-  if (!verifyResponse.ok) {
-    const detail = await verifyResponse.text().catch(() => '');
-    throw new Error(
-      `Verifying Clerk seed email ${email} failed (${verifyResponse.status}): ${detail}`,
-    );
-  }
-}
-
-async function findSeededClerkEmailAddressId(
-  email: string,
-  clerkSecretKey: string,
-  diagnostics?: OwnerJourneyPhaseDiagnostics,
-): Promise<string | null> {
-  const params = new URLSearchParams({ email_address: email });
-
-  for (let attempt = 0; attempt < CLERK_LOOKUP_MAX_ATTEMPTS; attempt++) {
-    diagnostics?.enter({
-      phase: 'clerk-lookup',
-      attempt: attempt + 1,
-      url: `${CLERK_API_BASE}/users`,
-    });
-    const lookupResponse = await fetchWithRetry(
-      `${CLERK_API_BASE}/users?${params.toString()}`,
-      {
-        headers: { Authorization: `Bearer ${clerkSecretKey}` },
-      },
-      `Looking up Clerk seed user ${email}`,
-    );
-    const lookup = await readJsonOrThrow<ClerkUserLookupResponse>(
-      lookupResponse,
-      `Looking up Clerk seed user ${email}`,
-    );
-    const users = Array.isArray(lookup) ? lookup : (lookup.data ?? []);
-    const user = users[0];
-    const emailAddress =
-      user?.email_addresses?.find(
-        (address) =>
-          address.email_address?.toLowerCase() === email.toLowerCase(),
-      ) ?? null;
-    const emailAddressId = emailAddress?.id ?? user?.primary_email_address_id;
-
-    if (emailAddressId) {
-      diagnostics?.enter({
-        phase: 'clerk-lookup',
-        attempt: attempt + 1,
-        status: lookupResponse.status,
-        url: `${CLERK_API_BASE}/users`,
-        readinessMarker: 'clerk-email-address',
-      });
-      return emailAddressId;
-    }
-
-    if (attempt < CLERK_LOOKUP_MAX_ATTEMPTS - 1) {
-      await sleep(CLERK_LOOKUP_DELAY_MS);
-    }
-  }
-
-  return null;
 }

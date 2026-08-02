@@ -2089,8 +2089,6 @@
     "whichSubject": "これはどの科目ですか？",
     "loadingSubjects": "科目を読み込み中...",
     "selectSubjectLabel": "{{name}}を選択",
-    "createNewSubject": "新しい科目を作成",
-    "createNewSubjectLabel": "新しい科目を作成",
     "orTypeSubject": "または科目名を入力：",
     "subjectInputPlaceholder": "例：生物学、歴史...",
     "typeSubjectLabel": "科目名を入力",
@@ -2102,7 +2100,6 @@
     "manualInputPlaceholder": "ここに問題を入力してください...",
     "typeManuallyLabel": "問題を手動で入力",
     "noSubjectsYet": "まだ科目がありません。",
-    "createSubject": "科目を作成",
     "continueWithProblemLabel": "入力した問題で続ける",
     "continueArrow": "続ける →",
     "tryCameraAgain": "もう一度カメラを試す",
@@ -4260,7 +4257,6 @@
     },
     "search": {
       "placeholder": "トピックを検索",
-      "micLabel": "音声で検索",
       "noResults": "その検索に一致するトピックはありません。"
     },
     "notes": {
@@ -4268,7 +4264,6 @@
       "authorSelf": "自分のメモ",
       "authorMentor": "メンターから保存",
       "addNote": "メモを追加",
-      "micLabel": "音声でメモを追加",
       "empty": "まだメモはありません。この教科についての考えを記録しましょう。",
       "saveErrorTitle": "ノートを保存できませんでした",
       "emptyTopic": "まだノートはありません。このトピックについての考えを記録しましょう。"
@@ -4583,7 +4578,10 @@
       "existingTeenInviteSending": "送信中…",
       "existingTeenInviteSentTitle": "招待を送信しました",
       "existingTeenInviteSentMessage": "そのメールアドレスがMentoMateアカウントに登録されている場合、招待を送信しました。お子様にMentoMateを開いて招待を承認するようお伝えください。",
-      "existingTeenInviteErrorTitle": "招待を送信できませんでした"
+      "existingTeenInviteErrorTitle": "招待を送信できませんでした",
+      "wrongProfileTitle": "特定のプロフィール向けの招待です",
+      "wrongProfileMessage": "この招待は、送信先のプロフィールでのみ開くことができます。そのプロフィールを選択してから、もう一度招待を開いてください。",
+      "wrongProfileSwitch": "プロフィールを選択"
     }
   },
   "supporterColdStart": {

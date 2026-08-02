@@ -1,0 +1,26 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "A route parameter validator requires sessionId to be a UUID before handler execution and the handler consumes the validated value.",
+      "pointer": "apps/api/src/routes/assessments.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The malformed-ID regression returns 400 and proves repository, consent, context, and provider paths remain untouched.",
+      "pointer": "apps/api/src/routes/assessments.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The focused suite covers malformed ID plus every valid-ID preservation variant and carries red-green-revert-exact-restore proof.",
+      "pointer": ".workitem-artifacts/WI-2995/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The bounded diff and routed validation show no schema, ownership, response, LLM, prompt, or metering change.",
+      "pointer": ".workitem-artifacts/WI-2995/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-01",
+  "redGreenPointer": ".workitem-artifacts/WI-2995/red-green-revert.md"
+}

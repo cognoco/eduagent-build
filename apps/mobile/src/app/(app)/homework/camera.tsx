@@ -30,6 +30,12 @@ import {
 } from '../../../components/homework/camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useSpeechRecognition } from '../../../hooks/use-speech-recognition';
+import { useProfile } from '../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../components/common';
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
@@ -78,9 +84,18 @@ export default function CameraScreen(): React.ReactNode {
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
   const ocr = useHomeworkOcr();
   const cameraRef = useRef<CameraView>(null);
-  const { data: subjects, isLoading: subjectsLoading } = useSubjects();
+  const {
+    data: subjects,
+    isLoading: subjectsLoading,
+    isError: subjectsError,
+    refetch: refetchSubjects,
+  } = useSubjects();
   const createSubject = useCreateSubject();
   const speech = useSpeechRecognition();
+  const { activeProfile } = useProfile();
+  const subjectVoiceLocale = getVoiceLocaleForLanguage(
+    activeProfile?.conversationLanguage,
+  );
 
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
@@ -103,6 +118,10 @@ export default function CameraScreen(): React.ReactNode {
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const classifyTriggeredRef = useRef(false);
   const [manualSubjectName, setManualSubjectName] = useState('');
+  const [subjectResolutionPending, setSubjectResolutionPending] =
+    useState(false);
+  const subjectContinueLockedRef = useRef(false);
+  const subjectResolutionEpochRef = useRef(0);
   const lastAppliedTranscriptRef = useRef('');
 
   // BUG-366: Track phase via ref so useFocusEffect can check it without
@@ -111,25 +130,37 @@ export default function CameraScreen(): React.ReactNode {
   phaseRef.current = state.phase;
 
   // Reset state when screen regains focus (prevents stale state loop).
-  // BUG-366: Skip reset when user is in result phase — preserves OCR work
-  // when returning from create-subject navigation.
+  // BUG-366: Skip reset when user is in result phase so focus changes do not
+  // discard the confirmed OCR/manual draft.
   useFocusEffect(
     useCallback(() => {
-      if (phaseRef.current === 'result') return;
-      dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
-      setOcrText('');
-      setDraftProblems([]);
-      setDroppedProblems([]);
-      setTaskConfirmed(false);
-      setManualText('');
-      setVoiceProblemId(null);
-      lastAppliedTranscriptRef.current = '';
-      setManualSubjectName('');
-      setShowCelebration(true);
-      setFlash('off');
-      setAutoDetectedSubject(null);
-      setShowSubjectPicker(false);
-      classifyTriggeredRef.current = false;
+      subjectContinueLockedRef.current = false;
+      subjectResolutionEpochRef.current += 1;
+      setSubjectResolutionPending(false);
+      if (phaseRef.current !== 'result') {
+        dispatch({
+          type: 'RESET',
+          hasPermission: permission?.granted ?? false,
+        });
+        setOcrText('');
+        setDraftProblems([]);
+        setDroppedProblems([]);
+        setTaskConfirmed(false);
+        setManualText('');
+        setVoiceProblemId(null);
+        lastAppliedTranscriptRef.current = '';
+        setManualSubjectName('');
+        setShowCelebration(true);
+        setFlash('off');
+        setAutoDetectedSubject(null);
+        setShowSubjectPicker(false);
+        classifyTriggeredRef.current = false;
+      }
+
+      return () => {
+        subjectResolutionEpochRef.current += 1;
+        subjectContinueLockedRef.current = true;
+      };
     }, [permission?.granted]),
   );
 
@@ -263,6 +294,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const combinedProblemText = getHomeworkProblemText(draftProblems);
   const homeworkCaptureSource = state.imageUri ? state.source : undefined;
+  const subjectsLoadFailed = subjectsError && !subjects;
   const requiresTaskConfirmation = draftProblems.some(
     (problem) => problem.source === 'ocr',
   );
@@ -448,6 +480,9 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.imageUri, ocr]);
 
   const handleRetake = useCallback(() => {
+    subjectResolutionEpochRef.current += 1;
+    subjectContinueLockedRef.current = false;
+    setSubjectResolutionPending(false);
     if (speech.isListening) {
       void speech.stopListening();
     }
@@ -467,6 +502,9 @@ export default function CameraScreen(): React.ReactNode {
   }, [permission?.granted, speech]);
 
   const handleStartManualEntry = useCallback(() => {
+    subjectResolutionEpochRef.current += 1;
+    subjectContinueLockedRef.current = false;
+    setSubjectResolutionPending(false);
     if (speech.isListening) {
       void speech.stopListening();
     }
@@ -592,6 +630,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const handlePickSubject = useCallback(
     (sid: string, sName: string) => {
+      if (subjectResolutionPending) return;
       if (!canStartSession) {
         platformAlert(
           t('homework.confirmTaskRequiredTitle'),
@@ -617,13 +656,84 @@ export default function CameraScreen(): React.ReactNode {
       ocrText,
       homeworkCaptureSource,
       canStartSession,
+      subjectResolutionPending,
+      t,
+    ],
+  );
+
+  const continueWithTypedSubject = useCallback(
+    async (sessionDraft: {
+      problemText: string;
+      problems?: HomeworkProblem[];
+      imageUri?: string;
+      sourceOcrText?: string;
+      captureSource?: HomeworkCaptureSource;
+    }) => {
+      const typedName = manualSubjectName.trim();
+      if (!typedName || subjectContinueLockedRef.current) return;
+      subjectContinueLockedRef.current = true;
+      const resolutionEpoch = subjectResolutionEpochRef.current;
+
+      const existingSubject = subjects?.find(
+        (subject) =>
+          subject.name.trim().toLowerCase() === typedName.toLowerCase(),
+      );
+      if (existingSubject) {
+        navigateToSession(
+          existingSubject.id,
+          existingSubject.name,
+          sessionDraft.problemText,
+          sessionDraft.problems,
+          sessionDraft.imageUri,
+          sessionDraft.sourceOcrText,
+          sessionDraft.captureSource,
+        );
+        return;
+      }
+
+      setSubjectResolutionPending(true);
+      try {
+        const result = await createSubject.mutateAsync({
+          name: typedName,
+          rawInput: typedName,
+        });
+        if (resolutionEpoch !== subjectResolutionEpochRef.current) return;
+        navigateToSession(
+          result.subject.id,
+          result.subject.name,
+          sessionDraft.problemText,
+          sessionDraft.problems,
+          sessionDraft.imageUri,
+          sessionDraft.sourceOcrText,
+          sessionDraft.captureSource,
+        );
+      } catch (err: unknown) {
+        if (resolutionEpoch !== subjectResolutionEpochRef.current) return;
+        try {
+          await refetchSubjects();
+        } catch {
+          // The original creation error remains the useful message for retry.
+        }
+        if (resolutionEpoch !== subjectResolutionEpochRef.current) return;
+        subjectContinueLockedRef.current = false;
+        setSubjectResolutionPending(false);
+        platformAlert(
+          t('homework.createSubjectErrorTitle'),
+          formatApiError(err),
+        );
+      }
+    },
+    [
+      createSubject,
+      manualSubjectName,
+      navigateToSession,
+      refetchSubjects,
+      subjects,
       t,
     ],
   );
 
   const handleManualSubjectContinue = useCallback(async () => {
-    const typedName = manualSubjectName.trim();
-    if (!typedName) return;
     if (!canStartSession) {
       platformAlert(
         t('homework.confirmTaskRequiredTitle'),
@@ -632,52 +742,37 @@ export default function CameraScreen(): React.ReactNode {
       return;
     }
 
-    const existingSubject = subjects?.find(
-      (subject) =>
-        subject.name.trim().toLowerCase() === typedName.toLowerCase(),
-    );
-    if (existingSubject) {
-      navigateToSession(
-        existingSubject.id,
-        existingSubject.name,
-        combinedProblemText,
-        draftProblems,
-        state.imageUri ?? undefined,
-        ocrText,
-        homeworkCaptureSource,
-      );
-      return;
-    }
-
-    try {
-      const result = await createSubject.mutateAsync({
-        name: typedName,
-        rawInput: typedName,
-      });
-      navigateToSession(
-        result.subject.id,
-        result.subject.name,
-        combinedProblemText,
-        draftProblems,
-        state.imageUri ?? undefined,
-        ocrText,
-        homeworkCaptureSource,
-      );
-    } catch (err: unknown) {
-      platformAlert(t('homework.createSubjectErrorTitle'), formatApiError(err));
-    }
+    await continueWithTypedSubject({
+      problemText: combinedProblemText,
+      problems: draftProblems,
+      imageUri: state.imageUri ?? undefined,
+      sourceOcrText: ocrText,
+      captureSource: homeworkCaptureSource,
+    });
   }, [
-    combinedProblemText,
-    createSubject,
-    draftProblems,
-    manualSubjectName,
-    navigateToSession,
-    ocrText,
-    homeworkCaptureSource,
     canStartSession,
+    combinedProblemText,
+    continueWithTypedSubject,
+    draftProblems,
+    homeworkCaptureSource,
+    ocrText,
     state.imageUri,
-    subjects,
     t,
+  ]);
+
+  const handleManualFallbackSubjectContinue = useCallback(async () => {
+    await continueWithTypedSubject({
+      problemText: manualText,
+      imageUri: state.imageUri ?? undefined,
+      sourceOcrText: ocrText || undefined,
+      captureSource: homeworkCaptureSource,
+    });
+  }, [
+    continueWithTypedSubject,
+    homeworkCaptureSource,
+    manualText,
+    ocrText,
+    state.imageUri,
   ]);
 
   const handleManualContinue = useCallback(async () => {
@@ -687,8 +782,8 @@ export default function CameraScreen(): React.ReactNode {
         subjectName ?? '',
         manualText,
         undefined,
-        undefined,
-        undefined,
+        state.imageUri ?? undefined,
+        ocrText || undefined,
         homeworkCaptureSource,
       );
       return;
@@ -704,8 +799,8 @@ export default function CameraScreen(): React.ReactNode {
             candidate.subjectName,
             manualText,
             undefined,
-            undefined,
-            undefined,
+            state.imageUri ?? undefined,
+            ocrText || undefined,
             homeworkCaptureSource,
           );
         }
@@ -733,22 +828,32 @@ export default function CameraScreen(): React.ReactNode {
     manualText,
     classifyMutation,
     homeworkCaptureSource,
+    ocrText,
+    state.imageUri,
     t,
   ]);
 
   const handleManualPickSubject = useCallback(
     (sid: string, sName: string) => {
+      if (subjectResolutionPending) return;
       navigateToSession(
         sid,
         sName,
         manualText,
         undefined,
-        undefined,
-        undefined,
+        state.imageUri ?? undefined,
+        ocrText || undefined,
         homeworkCaptureSource,
       );
     },
-    [navigateToSession, manualText, homeworkCaptureSource],
+    [
+      navigateToSession,
+      manualText,
+      state.imageUri,
+      ocrText,
+      homeworkCaptureSource,
+      subjectResolutionPending,
+    ],
   );
 
   // Always replace, never back(). Camera is a leaf flow entered via cross-tab
@@ -757,6 +862,8 @@ export default function CameraScreen(): React.ReactNode {
   // the explicit returnTo target makes close/back behavior deterministic
   // regardless of the underlying back-stack state.
   const handleClose = useCallback(() => {
+    subjectResolutionEpochRef.current += 1;
+    subjectContinueLockedRef.current = true;
     router.replace(
       homeworkReturnHrefForReturnTo(
         returnTo,
@@ -1246,11 +1353,13 @@ export default function CameraScreen(): React.ReactNode {
                 {draftProblems.length > 1 && (
                   <Pressable
                     onPress={() => handleRemoveProblem(problem.id)}
+                    disabled={subjectResolutionPending}
                     testID={`remove-problem-${index}`}
                     accessibilityLabel={t('homework.removeProblemLabel', {
                       number: index + 1,
                     })}
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: subjectResolutionPending }}
                   >
                     <Text className="text-body-sm text-danger">
                       {t('homework.remove')}
@@ -1267,6 +1376,7 @@ export default function CameraScreen(): React.ReactNode {
                 onChangeText={(text) =>
                   handleProblemTextChange(problem.id, text)
                 }
+                editable={!subjectResolutionPending}
                 multiline
                 className="bg-background rounded-card p-4 text-body text-text-primary min-h-[120px]"
                 textAlignVertical="top"
@@ -1285,6 +1395,7 @@ export default function CameraScreen(): React.ReactNode {
                 <Pressable
                   testID={`problem-mic-${index}`}
                   onPress={() => void handleProblemMicPress(problem.id)}
+                  disabled={subjectResolutionPending}
                   className={`w-12 h-12 rounded-full items-center justify-center ${
                     voiceProblemId === problem.id && speech.isListening
                       ? 'bg-primary'
@@ -1300,6 +1411,7 @@ export default function CameraScreen(): React.ReactNode {
                         })
                   }
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: subjectResolutionPending }}
                 >
                   <Ionicons
                     name={
@@ -1323,9 +1435,11 @@ export default function CameraScreen(): React.ReactNode {
         <Pressable
           testID="add-problem-button"
           onPress={handleAddProblem}
+          disabled={subjectResolutionPending}
           className="mt-3 self-start bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] justify-center"
           accessibilityLabel={t('homework.addProblemLabel')}
           accessibilityRole="button"
+          accessibilityState={{ disabled: subjectResolutionPending }}
         >
           <Text className="text-body-sm font-semibold text-text-primary">
             {t('homework.addProblem')}
@@ -1336,13 +1450,17 @@ export default function CameraScreen(): React.ReactNode {
           <Pressable
             testID="confirm-task-button"
             onPress={() => setTaskConfirmed((prev) => !prev)}
+            disabled={subjectResolutionPending}
             className={`mt-4 rounded-card border p-4 flex-row items-start gap-3 ${
               taskConfirmed
                 ? 'bg-primary/10 border-primary/40'
                 : 'bg-surface border-border'
             }`}
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: taskConfirmed }}
+            accessibilityState={{
+              checked: taskConfirmed,
+              disabled: subjectResolutionPending,
+            }}
             accessibilityLabel={
               taskConfirmed
                 ? t('homework.confirmedTaskCta')
@@ -1444,7 +1562,9 @@ export default function CameraScreen(): React.ReactNode {
             </Text>
             <Pressable
               onPress={() => setShowSubjectPicker(true)}
+              disabled={subjectResolutionPending}
               testID="change-subject-link"
+              accessibilityState={{ disabled: subjectResolutionPending }}
             >
               <Text className="text-sm text-primary underline">
                 {t('homework.change')}
@@ -1477,6 +1597,22 @@ export default function CameraScreen(): React.ReactNode {
                 </Text>
               </View>
             ) : null}
+            {subjectsLoadFailed ? (
+              <Pressable
+                testID="subject-picker-load-error-retry"
+                onPress={() => void refetchSubjects()}
+                className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+                accessibilityLabel={t('subject.retryLoadSubjectsLabel')}
+                accessibilityRole="button"
+              >
+                <Text className="text-body-sm text-danger">
+                  {t('subject.subjectsLoadError')}{' '}
+                  <Text className="font-semibold text-primary">
+                    {t('subject.tapToRetry')}
+                  </Text>
+                </Text>
+              </Pressable>
+            ) : null}
             {/* Show classification candidates first (sorted by confidence) */}
             {classifyMutation.data?.candidates
               ?.slice()
@@ -1491,6 +1627,7 @@ export default function CameraScreen(): React.ReactNode {
                       candidate.subjectName,
                     )
                   }
+                  disabled={subjectResolutionPending}
                   className={`rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center ${
                     index === 0
                       ? 'bg-primary/10 border border-primary/30'
@@ -1500,6 +1637,7 @@ export default function CameraScreen(): React.ReactNode {
                     name: candidate.subjectName,
                   })}
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: subjectResolutionPending }}
                   testID={`subject-pick-${candidate.subjectId}`}
                 >
                   <Text className="text-body text-text-primary">
@@ -1519,66 +1657,80 @@ export default function CameraScreen(): React.ReactNode {
                 <Pressable
                   key={s.id}
                   onPress={() => handlePickSubject(s.id, s.name)}
+                  disabled={subjectResolutionPending}
                   className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
                   accessibilityLabel={t('homework.selectSubjectLabel', {
                     name: s.name,
                   })}
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: subjectResolutionPending }}
                   testID={`subject-pick-${s.id}`}
                 >
                   <Text className="text-body text-text-primary">{s.name}</Text>
                 </Pressable>
               ))}
-            <Pressable
-              onPress={() => router.push('/create-subject' as Href)}
-              className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-              accessibilityLabel={t('homework.createNewSubjectLabel')}
-              accessibilityRole="button"
-              testID="camera-create-subject"
-            >
-              <Text className="text-body font-semibold text-primary">
-                {t('homework.createNewSubject')}
-              </Text>
-            </Pressable>
-
-            {/* Manual subject entry — lets user type a subject name */}
-            <Text className="text-body-sm text-text-secondary mt-4 mb-2">
-              {t('homework.orTypeSubject')}
-            </Text>
-            <TextInput
-              testID="camera-subject-input"
-              value={manualSubjectName}
-              onChangeText={setManualSubjectName}
-              placeholder={t('homework.subjectInputPlaceholder')}
-              placeholderTextColor={colors.muted}
-              className="bg-surface rounded-button px-4 py-3 text-body text-text-primary min-h-[48px] mb-3 border border-border"
-              accessibilityLabel={t('homework.typeSubjectLabel')}
-              autoCapitalize="words"
-            />
-            <Pressable
-              testID="camera-continue-button"
-              onPress={() => void handleManualSubjectContinue()}
-              disabled={!manualSubjectName.trim() || createSubject.isPending}
-              className={`rounded-button py-4 min-h-[48px] items-center justify-center mb-2 ${
-                manualSubjectName.trim() && !createSubject.isPending
-                  ? 'bg-accent'
-                  : 'bg-surface-elevated'
-              }`}
-              accessibilityLabel={t('homework.continueWithSubjectLabel')}
-              accessibilityRole="button"
-            >
-              <Text
-                className={`text-body font-semibold ${
-                  manualSubjectName.trim()
-                    ? 'text-white'
-                    : 'text-text-secondary'
-                }`}
-              >
-                {createSubject.isPending
-                  ? t('homework.creatingSubject')
-                  : t('common.continue')}
-              </Text>
-            </Pressable>
+            {!subjectsLoading && !subjectsLoadFailed ? (
+              <>
+                {/* Manual subject entry — lets user type a subject name */}
+                <Text className="text-body-sm text-text-secondary mt-4 mb-2">
+                  {t('homework.orTypeSubject')}
+                </Text>
+                <TextInput
+                  testID="camera-subject-input"
+                  value={manualSubjectName}
+                  onChangeText={setManualSubjectName}
+                  editable={!subjectResolutionPending}
+                  placeholder={t('homework.subjectInputPlaceholder')}
+                  placeholderTextColor={colors.muted}
+                  className="bg-surface rounded-button px-4 py-3 text-body text-text-primary min-h-[48px] mb-3 border border-border"
+                  accessibilityLabel={t('homework.typeSubjectLabel')}
+                  autoCapitalize="words"
+                />
+                <View className="mb-3">
+                  <VoiceInputControl
+                    value={manualSubjectName}
+                    disabled={subjectResolutionPending}
+                    voiceLocale={subjectVoiceLocale}
+                    testID="camera-subject-mic"
+                    onTranscript={(finalTranscript) =>
+                      setManualSubjectName((prev) =>
+                        appendTranscript(prev, finalTranscript),
+                      )
+                    }
+                  />
+                </View>
+                <Pressable
+                  testID="camera-continue-button"
+                  onPress={() => void handleManualSubjectContinue()}
+                  disabled={
+                    !manualSubjectName.trim() || subjectResolutionPending
+                  }
+                  className={`rounded-button py-4 min-h-[48px] items-center justify-center mb-2 ${
+                    manualSubjectName.trim() && !subjectResolutionPending
+                      ? 'bg-accent'
+                      : 'bg-surface-elevated'
+                  }`}
+                  accessibilityLabel={t('homework.continueWithSubjectLabel')}
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    disabled:
+                      !manualSubjectName.trim() || subjectResolutionPending,
+                  }}
+                >
+                  <Text
+                    className={`text-body font-semibold ${
+                      manualSubjectName.trim() && !subjectResolutionPending
+                        ? 'text-white'
+                        : 'text-text-secondary'
+                    }`}
+                  >
+                    {subjectResolutionPending
+                      ? t('homework.creatingSubject')
+                      : t('common.continue')}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
 
             <Pressable
               testID="retake-button"
@@ -1694,7 +1846,12 @@ export default function CameraScreen(): React.ReactNode {
           <Ionicons name="close" size={28} color={colors.textPrimary} />
         </Pressable>
 
-        <View className="flex-1 justify-center">
+        <ScrollView
+          testID="manual-fallback-scroll"
+          className="flex-1"
+          contentContainerClassName="flex-grow justify-center pb-6"
+          keyboardShouldPersistTaps="handled"
+        >
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
             {errorMessage}
           </Text>
@@ -1708,6 +1865,7 @@ export default function CameraScreen(): React.ReactNode {
                 testID="manual-input"
                 value={manualText}
                 onChangeText={setManualText}
+                editable={!subjectResolutionPending}
                 multiline
                 placeholder={t('homework.manualInputPlaceholder')}
                 placeholderTextColor={colors.muted}
@@ -1735,38 +1893,44 @@ export default function CameraScreen(): React.ReactNode {
                           {t('homework.loadingSubjects')}
                         </Text>
                       </View>
+                    ) : subjectsLoadFailed ? (
+                      <Pressable
+                        testID="manual-subject-picker-load-error-retry"
+                        onPress={() => void refetchSubjects()}
+                        className="bg-surface rounded-button py-3 px-4 min-h-[48px] justify-center"
+                        accessibilityLabel={t('subject.retryLoadSubjectsLabel')}
+                        accessibilityRole="button"
+                      >
+                        <Text className="text-body-sm text-danger">
+                          {t('subject.subjectsLoadError')}{' '}
+                          <Text className="font-semibold text-primary">
+                            {t('subject.tapToRetry')}
+                          </Text>
+                        </Text>
+                      </Pressable>
                     ) : !subjects || subjects.length === 0 ? (
                       <View
                         className="py-3"
                         testID="manual-subject-picker-empty"
                       >
-                        <Text className="text-body-sm text-text-secondary mb-3">
+                        <Text className="text-body-sm text-text-secondary">
                           {t('homework.noSubjectsYet')}
                         </Text>
-                        <Pressable
-                          testID="manual-subject-picker-create"
-                          onPress={() => router.push('/create-subject' as Href)}
-                          className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
-                          accessibilityLabel={t(
-                            'homework.createNewSubjectLabel',
-                          )}
-                          accessibilityRole="button"
-                        >
-                          <Text className="text-body font-semibold text-text-inverse">
-                            {t('homework.createSubject')}
-                          </Text>
-                        </Pressable>
                       </View>
                     ) : (
                       subjects.map((s) => (
                         <Pressable
                           key={s.id}
                           onPress={() => handleManualPickSubject(s.id, s.name)}
+                          disabled={subjectResolutionPending}
                           className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
                           accessibilityLabel={t('homework.selectSubjectLabel', {
                             name: s.name,
                           })}
                           accessibilityRole="button"
+                          accessibilityState={{
+                            disabled: subjectResolutionPending,
+                          }}
                           testID={`manual-subject-pick-${s.id}`}
                         >
                           <Text className="text-body text-text-primary">
@@ -1775,6 +1939,75 @@ export default function CameraScreen(): React.ReactNode {
                         </Pressable>
                       ))
                     )}
+                    {!subjectsLoading && !subjectsLoadFailed ? (
+                      <>
+                        <Text className="text-body-sm text-text-secondary mt-4 mb-2">
+                          {t('homework.orTypeSubject')}
+                        </Text>
+                        <TextInput
+                          testID="manual-subject-name-input"
+                          value={manualSubjectName}
+                          onChangeText={setManualSubjectName}
+                          editable={!subjectResolutionPending}
+                          placeholder={t('homework.subjectInputPlaceholder')}
+                          placeholderTextColor={colors.muted}
+                          className="bg-surface rounded-button px-4 py-3 text-body text-text-primary min-h-[48px] mb-3 border border-border"
+                          accessibilityLabel={t('homework.typeSubjectLabel')}
+                          autoCapitalize="words"
+                        />
+                        <View className="mb-3">
+                          <VoiceInputControl
+                            value={manualSubjectName}
+                            disabled={subjectResolutionPending}
+                            voiceLocale={subjectVoiceLocale}
+                            testID="manual-subject-name-mic"
+                            onTranscript={(finalTranscript) =>
+                              setManualSubjectName((prev) =>
+                                appendTranscript(prev, finalTranscript),
+                              )
+                            }
+                          />
+                        </View>
+                        <Pressable
+                          testID="manual-subject-continue-button"
+                          onPress={() =>
+                            void handleManualFallbackSubjectContinue()
+                          }
+                          disabled={
+                            !manualSubjectName.trim() ||
+                            subjectResolutionPending
+                          }
+                          className={`rounded-button py-4 min-h-[48px] items-center justify-center mb-2 ${
+                            manualSubjectName.trim() &&
+                            !subjectResolutionPending
+                              ? 'bg-accent'
+                              : 'bg-surface-elevated'
+                          }`}
+                          accessibilityLabel={t(
+                            'homework.continueWithSubjectLabel',
+                          )}
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            disabled:
+                              !manualSubjectName.trim() ||
+                              subjectResolutionPending,
+                          }}
+                        >
+                          <Text
+                            className={`text-body font-semibold ${
+                              manualSubjectName.trim() &&
+                              !subjectResolutionPending
+                                ? 'text-text-inverse'
+                                : 'text-text-secondary'
+                            }`}
+                          >
+                            {subjectResolutionPending
+                              ? t('homework.creatingSubject')
+                              : t('common.continue')}
+                          </Text>
+                        </Pressable>
+                      </>
+                    ) : null}
                   </>
                 ) : (
                   <Pressable
@@ -1860,7 +2093,7 @@ export default function CameraScreen(): React.ReactNode {
               </Pressable>
             </>
           )}
-        </View>
+        </ScrollView>
       </View>
     );
   }

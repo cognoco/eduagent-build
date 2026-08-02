@@ -2,6 +2,7 @@ const mockSentryScope = {
   setExtra: jest.fn(),
   setTag: jest.fn(),
   setUser: jest.fn(),
+  setLevel: jest.fn(),
 };
 const mockSentryCaptureException = jest.fn();
 

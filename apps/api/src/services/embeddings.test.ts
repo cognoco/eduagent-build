@@ -4,6 +4,8 @@ import {
   extractSessionContent,
   storeSessionEmbedding,
   EmbeddingDimensionMismatchError,
+  VoyageEmbeddingHttpError,
+  parseVoyageRetryAfterMs,
 } from './embeddings';
 import type { Database } from '@eduagent/database';
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
@@ -51,12 +53,14 @@ function mockFetchSuccess(embedding: number[]): void {
   } as unknown as Response);
 }
 
-function mockFetchError(status: number, body: string): void {
-  globalThis.fetch = jest.fn().mockResolvedValue({
-    ok: false,
-    status,
-    text: () => Promise.resolve(body),
-  } as unknown as Response);
+function mockFetchError(
+  status: number,
+  body: string,
+  headers?: HeadersInit,
+): void {
+  globalThis.fetch = jest
+    .fn()
+    .mockResolvedValue(new Response(body, { status, headers }));
 }
 
 // ---------------------------------------------------------------------------
@@ -153,28 +157,36 @@ describe('generateEmbedding', () => {
     });
   });
 
-  it('throws descriptive error on non-200 response', async () => {
+  it('throws a sanitized typed error on non-200 response', async () => {
     mockFetchError(401, 'Unauthorized: invalid API key');
 
-    await expect(generateEmbedding('Some text', 'bad-key')).rejects.toThrow(
-      'Voyage AI embedding request failed (401): Unauthorized: invalid API key',
+    const promise = generateEmbedding('Some text', 'bad-key');
+    await expect(promise).rejects.toBeInstanceOf(VoyageEmbeddingHttpError);
+    await expect(promise).rejects.toMatchObject({
+      status: 401,
+      retryAfterMs: null,
+      message: 'Voyage AI embedding request failed (401)',
+    });
+  });
+
+  it('does not retain the provider response body in the thrown error', async () => {
+    const providerBody = 'request for learner@example.com was rejected';
+    mockFetchError(500, providerBody);
+
+    await expect(
+      generateEmbedding('Some text', TEST_API_KEY),
+    ).rejects.not.toHaveProperty(
+      'message',
+      expect.stringContaining(providerBody),
     );
   });
 
-  it('throws descriptive error on 500 response', async () => {
-    mockFetchError(500, 'Internal server error');
+  it('carries a bounded Retry-After delay on a 429 response', async () => {
+    mockFetchError(429, 'Rate limit exceeded', { 'Retry-After': '120' });
 
-    await expect(generateEmbedding('Some text', TEST_API_KEY)).rejects.toThrow(
-      'Voyage AI embedding request failed (500): Internal server error',
-    );
-  });
-
-  it('throws descriptive error on 429 rate limit', async () => {
-    mockFetchError(429, 'Rate limit exceeded');
-
-    await expect(generateEmbedding('Some text', TEST_API_KEY)).rejects.toThrow(
-      'Voyage AI embedding request failed (429): Rate limit exceeded',
-    );
+    await expect(
+      generateEmbedding('Some text', TEST_API_KEY),
+    ).rejects.toMatchObject({ status: 429, retryAfterMs: 120_000 });
   });
 
   // -------------------------------------------------------------------------
@@ -259,6 +271,35 @@ describe('generateEmbedding', () => {
     ).rejects.toBeInstanceOf(EmbeddingDimensionMismatchError);
 
     expect(storeEmbedding).not.toHaveBeenCalled();
+  });
+});
+
+describe('parseVoyageRetryAfterMs', () => {
+  const now = Date.parse('2026-08-01T12:00:00.000Z');
+
+  it('parses delta-seconds', () => {
+    expect(parseVoyageRetryAfterMs('45', now)).toBe(45_000);
+  });
+
+  it('parses an HTTP date', () => {
+    expect(parseVoyageRetryAfterMs('Sat, 01 Aug 2026 12:02:00 GMT', now)).toBe(
+      120_000,
+    );
+  });
+
+  it('caps excessive provider delays at fifteen minutes', () => {
+    expect(parseVoyageRetryAfterMs('86400', now)).toBe(15 * 60_000);
+  });
+
+  it.each([
+    null,
+    '',
+    '-1',
+    '1.5',
+    'not-a-date',
+    'Sat, 01 Aug 2026 11:00:00 GMT',
+  ])('returns null for an unusable Retry-After value %p', (value) => {
+    expect(parseVoyageRetryAfterMs(value, now)).toBeNull();
   });
 });
 

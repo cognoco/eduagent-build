@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors';
 import {
   isTransientDatabaseError,
   withTransientDatabaseRetry,
@@ -8,7 +9,12 @@ import {
 // forwarding runs and is exercised by these tests.
 jest.mock('@sentry/cloudflare', () => ({
   withScope: (fn: (scope: unknown) => void) =>
-    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+    fn({
+      setUser: jest.fn(),
+      setTag: jest.fn(),
+      setExtra: jest.fn(),
+      setLevel: jest.fn(),
+    }),
   captureException: jest.fn(),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),
@@ -39,6 +45,33 @@ describe('isTransientDatabaseError', () => {
     [42, false],
   ])('classifies %p as transient=%p', (error, expected) => {
     expect(isTransientDatabaseError(error)).toBe(expected);
+  });
+
+  it('[WI-2788] classifies a transient driver error wrapped by Drizzle', () => {
+    const driverError = Object.assign(new Error('socket interrupted'), {
+      code: 'ECONNRESET',
+    });
+    const wrapped = new DrizzleQueryError(
+      'select * from profiles where id = $1',
+      ['profile-id'],
+      driverError,
+    );
+
+    expect(isTransientDatabaseError(wrapped)).toBe(true);
+  });
+
+  it('[WI-2788] leaves a wrapped foreign-key violation non-transient', () => {
+    const driverError = Object.assign(
+      new Error('insert or update violates foreign key constraint'),
+      { code: '23503' },
+    );
+    const wrapped = new DrizzleQueryError(
+      'insert into activation_events ...',
+      ['profile-id'],
+      driverError,
+    );
+
+    expect(isTransientDatabaseError(wrapped)).toBe(false);
   });
 });
 
@@ -81,6 +114,43 @@ describe('withTransientDatabaseRetry', () => {
     });
     // Recovered before exhausting retries — no terminal capture.
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] never places Drizzle bound parameters in retry breadcrumbs', async () => {
+    const secretParameter = 'synthetic-bound-parameter-must-not-leak';
+    const driverError = Object.assign(new Error('socket interrupted'), {
+      code: 'ECONNRESET',
+    });
+    const wrapped = new DrizzleQueryError(
+      'select * from login where clerk_user_id = $1',
+      [secretParameter],
+      driverError,
+    );
+    const op = jest
+      .fn<Promise<string>, []>()
+      .mockRejectedValueOnce(wrapped)
+      .mockResolvedValueOnce('recovered');
+
+    await expect(
+      withTransientDatabaseRetry('safe_breadcrumb', op, {
+        idempotent: true,
+      }),
+    ).resolves.toBe('recovered');
+
+    expect(addBreadcrumb).toHaveBeenCalledWith({
+      message: 'Transient database error; retrying',
+      category: 'database',
+      level: 'warning',
+      data: {
+        retryable: true,
+        operation: 'safe_breadcrumb',
+        attempt: 1,
+        maxAttempts: 4,
+      },
+    });
+    expect(JSON.stringify(addBreadcrumb.mock.calls)).not.toContain(
+      secretParameter,
+    );
   });
 
   it('throws immediately on non-transient error', async () => {

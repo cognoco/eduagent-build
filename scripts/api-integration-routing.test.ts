@@ -1,8 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
+import { loadDatabaseEnv } from '../packages/test-utils/src/lib/load-database-env';
+import { createMockDb } from '../packages/test-utils/src/lib/neon-mock';
+
 const repoRoot = join(__dirname, '..');
+const requireFromTest = createRequire(__filename);
 
 type PackageJson = {
   scripts?: Record<string, string>;
@@ -10,6 +16,11 @@ type PackageJson = {
 
 type NxProject = {
   targets?: Record<string, { options?: { command?: string } }>;
+};
+
+type JestConfig = {
+  setupFilesAfterEnv?: string[];
+  testPathIgnorePatterns?: string[];
 };
 
 type WorkflowStep = {
@@ -54,7 +65,162 @@ function normalizeExpression(value: unknown): string {
     .trim();
 }
 
+const unitRuntimeConfig = requireFromTest(
+  join(repoRoot, 'apps/api/jest.config.cjs'),
+) as JestConfig;
+const integrationRuntimeConfig = requireFromTest(
+  join(repoRoot, 'apps/api/jest.integration.config.cjs'),
+) as JestConfig;
+const stagingDatabaseEnvFixture = [
+  'DATABASE_URL=postgresql://fake:fake@staging.invalid/fake_staging',
+  'DOPPLER_PROJECT=mentomate',
+  'DOPPLER_CONFIG=stg',
+  'DOPPLER_ENVIRONMENT=stg',
+  '',
+].join('\n');
+
+function probeDatabaseEnvSetup(): {
+  integrationError: Error | undefined;
+  integrationLoadCount: number;
+  loadDatabaseEnvProbe: jest.Mock;
+  preservesOtherTestUtilsExports: boolean;
+  unitLoadCount: number;
+} {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'wi-2806-env-fixture-'));
+  const envKeys = [
+    'DATABASE_URL',
+    'DOPPLER_PROJECT',
+    'DOPPLER_CONFIG',
+    'DOPPLER_ENVIRONMENT',
+    'NODE_ENV',
+  ] as const;
+  const previousEnv = { ...process.env };
+  let resolveFixture = false;
+  const loadDatabaseEnvProbe = jest.fn(() => {
+    if (resolveFixture) loadDatabaseEnv(fixtureRoot);
+  });
+  let integrationError: Error | undefined;
+  let unitLoadCount = 0;
+  let integrationLoadCount = 0;
+  let preservesOtherTestUtilsExports = false;
+
+  writeFileSync(
+    join(fixtureRoot, '.env.development.local'),
+    stagingDatabaseEnvFixture,
+  );
+
+  for (const key of envKeys) delete process.env[key];
+  process.env['NODE_ENV'] = 'test';
+
+  try {
+    jest.doMock(
+      '@eduagent/test-utils' /* gc1-allow: scripts Jest cannot load the source barrel's .js specifiers */,
+      () => ({
+        createMockDb,
+        loadDatabaseEnv: loadDatabaseEnvProbe,
+      }),
+    );
+    const mockedTestUtils = jest.requireMock<{
+      createMockDb: typeof createMockDb;
+    }>('@eduagent/test-utils');
+    preservesOtherTestUtilsExports =
+      mockedTestUtils.createMockDb === createMockDb;
+    jest.isolateModules(() => {
+      for (const setupFile of unitRuntimeConfig.setupFilesAfterEnv ?? []) {
+        void jest.requireActual<unknown>(setupFile);
+      }
+    });
+    unitLoadCount = loadDatabaseEnvProbe.mock.calls.length;
+
+    resolveFixture = true;
+    try {
+      jest.isolateModules(() => {
+        const databaseSetup = integrationRuntimeConfig.setupFilesAfterEnv?.[0];
+        if (!databaseSetup) {
+          throw new Error('Integration database setup not found');
+        }
+        void jest.requireActual<unknown>(databaseSetup);
+      });
+    } catch (error) {
+      integrationError =
+        error instanceof Error ? error : new Error(String(error));
+    }
+    integrationLoadCount =
+      loadDatabaseEnvProbe.mock.calls.length - unitLoadCount;
+  } finally {
+    jest.dontMock('@eduagent/test-utils');
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, previousEnv);
+    jest.setTimeout(5_000);
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+
+  return {
+    integrationError,
+    integrationLoadCount,
+    loadDatabaseEnvProbe,
+    preservesOtherTestUtilsExports,
+    unitLoadCount,
+  };
+}
+
+const processEnvBeforeDatabaseEnvSetupProbe = { ...process.env };
+const setTimeoutSpy = jest.spyOn(jest, 'setTimeout');
+const databaseEnvSetupProbe = probeDatabaseEnvSetup();
+const probeFinalTimeout = setTimeoutSpy.mock.calls.at(-1)?.[0];
+setTimeoutSpy.mockRestore();
+
 describe('API co-located integration routing', () => {
+  it('keeps database setup exclusive to the integration Jest config', () => {
+    const unitConfig = requireFromTest(
+      join(repoRoot, 'apps/api/jest.config.cjs'),
+    ) as JestConfig;
+    const integrationConfig = requireFromTest(
+      join(repoRoot, 'apps/api/jest.integration.config.cjs'),
+    ) as JestConfig;
+
+    expect(unitConfig.setupFilesAfterEnv).toEqual([
+      join(repoRoot, 'tests/integration/api-setup.ts'),
+      join(repoRoot, 'tests/unit/api-env-setup.ts'),
+    ]);
+    expect(unitConfig.testPathIgnorePatterns).toEqual(
+      expect.arrayContaining([expect.stringMatching(/integration/)]),
+    );
+    expect(integrationConfig.setupFilesAfterEnv).toEqual([
+      join(repoRoot, 'tests/integration/api-database-env-setup.ts'),
+      join(repoRoot, 'tests/integration/api-setup.ts'),
+    ]);
+
+    const unitSafeSetup = readFileSync(
+      join(repoRoot, 'tests/integration/api-setup.ts'),
+      'utf8',
+    );
+    const databaseEnvSetup = readFileSync(
+      join(repoRoot, 'tests/integration/api-database-env-setup.ts'),
+      'utf8',
+    );
+    expect(unitSafeSetup).not.toContain('loadDatabaseEnv');
+    expect(databaseEnvSetup).toContain('loadDatabaseEnv');
+  });
+
+  it('runs unit Jest without resolving an env:sync staging database file', () => {
+    expect(stagingDatabaseEnvFixture).toContain('DOPPLER_CONFIG=stg');
+    expect(stagingDatabaseEnvFixture).toContain('DOPPLER_ENVIRONMENT=stg');
+    expect(databaseEnvSetupProbe.preservesOtherTestUtilsExports).toBe(true);
+    expect(databaseEnvSetupProbe.unitLoadCount).toBe(0);
+    expect(probeFinalTimeout).toBe(5_000);
+  });
+
+  it('loads the guarded database setup in integration Jest', () => {
+    expect(databaseEnvSetupProbe.integrationLoadCount).toBe(1);
+    expect(databaseEnvSetupProbe.loadDatabaseEnvProbe).toHaveBeenLastCalledWith(
+      repoRoot,
+    );
+    expect(databaseEnvSetupProbe.integrationError?.message).toContain(
+      'config=stg, environment=stg is shared/non-local',
+    );
+  });
+
   it('maps the root API integration script through the guarded launcher', () => {
     const pkg = readJson<PackageJson>('package.json');
     const command = pkg.scripts?.['test:api:integration'] ?? '';
@@ -146,4 +312,10 @@ describe('API co-located integration routing', () => {
       "require('../../tools/quarantine/registry.cjs').jestIgnorePatterns()",
     );
   });
+});
+
+afterAll(() => {
+  for (const key of Object.keys(process.env)) delete process.env[key];
+  Object.assign(process.env, processEnvBeforeDatabaseEnvSetupProbe);
+  expect(process.env).toEqual(processEnvBeforeDatabaseEnvSetupProbe);
 });

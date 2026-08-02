@@ -12,6 +12,12 @@ import type { Translate } from '../../../i18n';
 import { useBookSuggestions } from '../../../hooks/use-book-suggestions';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStickyLoading } from '../../../hooks/use-sticky-loading';
+import { useProfile } from '../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../components/common';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
@@ -91,6 +97,7 @@ export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { activeProfile } = useProfile();
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
 
   const suggestionsQuery = useBookSuggestions(subjectId, { topup: true });
@@ -607,6 +614,21 @@ export default function PickBookScreen(): React.ReactElement {
               returnKeyType="go"
               testID="pick-book-custom-input"
             />
+            <View className="mb-3 -mt-2">
+              <VoiceInputControl
+                value={customText}
+                disabled={filing.isPending}
+                voiceLocale={getVoiceLocaleForLanguage(
+                  activeProfile?.conversationLanguage,
+                )}
+                testID="pick-book-custom-mic"
+                onTranscript={(finalTranscript) =>
+                  setCustomText((prev) =>
+                    appendTranscript(prev, finalTranscript),
+                  )
+                }
+              />
+            </View>
             <View className="flex-row gap-3">
               <Pressable
                 onPress={() => void handleCustomSubmit()}

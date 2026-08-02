@@ -123,6 +123,49 @@ function GrantedIdleCard({
   );
 }
 
+function PendingConsentCard({
+  card,
+}: {
+  card: Extract<SupporterColdStartCard, { state: 'consent-pending' }>;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const router = useRouter();
+
+  return (
+    <View
+      className="rounded-card border border-border bg-surface p-4"
+      testID={`supporter-cold-start-pending-${card.pendingLinkId}`}
+    >
+      <Text className="text-h3 font-semibold text-text-primary">
+        {card.displayName}
+      </Text>
+      <Text className="mt-1 text-body-sm text-text-secondary">
+        {t('visibility.link.message')}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('visibility.contract.accept')}
+        onPress={() =>
+          router.push({
+            pathname: '/(app)/link/[contractId]',
+            params: {
+              contractId: card.pendingLinkId,
+              supporteeName: card.displayName,
+              audience: 'supporter',
+            },
+          })
+        }
+        className="mt-3 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-3"
+        testID={`supporter-cold-start-approve-${card.pendingLinkId}`}
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          {t('visibility.contract.accept')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 interface SupporterColdStartProps {
   /**
    * WI-1135 scopes only the kickstart CTA's presence and copy; the actual
@@ -204,12 +247,10 @@ export function SupporterColdStart({
                       onKickstart={onKickstart}
                     />
                   );
-                // WI-1135 AC scopes only managed + granted-idle per-child
-                // rendering. `consent-pending` has no producing path yet
-                // (see supporter-coldstart.ts) and `none` cannot appear in a
-                // per-child list per the schema's superRefine; render nothing
-                // rather than inventing unratified copy for either.
                 case 'consent-pending':
+                  return (
+                    <PendingConsentCard key={card.pendingLinkId} card={card} />
+                  );
                 case 'none':
                 default:
                   return null;

@@ -118,7 +118,7 @@ function createAppWithProfileMeta(
 }
 
 describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
-  it('[WI-2653][RGR] allows an explicitly selected non-owner acting as themselves', async () => {
+  it('[WI-2128][WI-2653][RGR] allows a credentialed non-owner acting as themselves', async () => {
     const app = createAppWithProfileMeta({
       isOwner: false,
       resolvedVia: 'explicit-header',
@@ -149,12 +149,16 @@ describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
     const app = createAppWithProfileMeta({ isOwner: false });
     const res = await app.request('/test', { method: 'POST' });
     expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.message).toBe('Not available in proxy mode');
   });
 
-  it('[BREAK] rejects writes for non-owner profile EVEN when X-Proxy-Mode: false is sent', async () => {
-    const app = createAppWithProfileMeta({ isOwner: false });
+  it('[WI-2128][BREAK] rejects a guardian proxy write when caller and selected Person differ', async () => {
+    const app = createAppWithProfileMeta(
+      { isOwner: false, resolvedVia: 'explicit-header' },
+      {
+        callerPersonId: CALLER_PERSON_ID,
+        profileId: 'managed-charge-person-id',
+      },
+    );
     const res = await app.request('/test', {
       method: 'POST',
       headers: { 'X-Proxy-Mode': 'false' },

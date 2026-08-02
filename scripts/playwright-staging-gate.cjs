@@ -484,7 +484,9 @@ function decide({ postflight, classification, exitCode }) {
 }
 
 function printState(result) {
-  process.stdout.write(`GATE_STATE=${result.state}\n`);
+  process.stdout.write(
+    `GATE_STATE=${result.state}\nGATE_REASON=${result.reason ?? 'none'}\n`,
+  );
 }
 
 function runDecisionCli([preflight, postflight, classification, exitCodeText]) {

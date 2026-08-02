@@ -12,6 +12,7 @@ import {
   withProfile,
   type RouteEnv,
 } from '../route-utils/route-context';
+import { assertCanReadProfile } from '../services/family-access';
 import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 import { resolveMentorNoticeVisibility } from '../services/mentor-notices';
 
@@ -22,6 +23,8 @@ type NowRouteEnv = {
     MENTOR_NOTICE_POLICY_REVISION?: string;
   };
   Variables: RouteEnv['Variables'] & {
+    // [WI-2565] Required by assertCanReadProfile.
+    account: { id: string } | undefined;
     // [WI-2498] Server-resolved caller identity (set app-wide by
     // accountMiddleware from the login→person binding). The selfhood conjunct
     // of the mentor-notice visibility predicate reads it; never
@@ -35,6 +38,10 @@ type NowRouteEnv = {
 export const nowRoutes = new Hono<NowRouteEnv>()
   .get('/now', zValidator('query', nowQuerySchema), async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2565] withProfile proves only organization membership for the
+    // selected profile; require self-or-guardian read authority (matching
+    // GET /sessions/:sessionId/summary) before any notice-policy or feed read.
+    await assertCanReadProfile(c, profileId);
     const query = c.req.valid('query');
     const callerPersonId =
       query.scope === 'self'
@@ -73,6 +80,9 @@ export const nowRoutes = new Hono<NowRouteEnv>()
   })
   .get('/now/overflow', zValidator('query', nowQuerySchema), async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2565] Same read-authority boundary as `/now` — overflow is the
+    // second page of the same projection.
+    await assertCanReadProfile(c, profileId);
     const query = c.req.valid('query');
     const callerPersonId =
       query.scope === 'self'

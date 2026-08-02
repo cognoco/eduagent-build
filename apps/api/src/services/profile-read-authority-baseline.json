@@ -1,15 +1,5 @@
 [
   {
-    "file": "apps/api/src/routes/assessments.ts",
-    "method": "get",
-    "route": "/assessments/:assessmentId"
-  },
-  {
-    "file": "apps/api/src/routes/assessments.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/topics/:topicId/assessments/active"
-  },
-  {
     "file": "apps/api/src/routes/billing.ts",
     "method": "get",
     "route": "/subscription"
@@ -25,69 +15,9 @@
     "route": "/usage"
   },
   {
-    "file": "apps/api/src/routes/book-suggestions.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/book-suggestions"
-  },
-  {
-    "file": "apps/api/src/routes/book-suggestions.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/book-suggestions/all"
-  },
-  {
-    "file": "apps/api/src/routes/bookmarks.ts",
-    "method": "get",
-    "route": "/bookmarks"
-  },
-  {
-    "file": "apps/api/src/routes/bookmarks.ts",
-    "method": "get",
-    "route": "/bookmarks/session"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/library/books"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books/:bookId"
-  },
-  {
-    "file": "apps/api/src/routes/books.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books/:bookId/sessions"
-  },
-  {
-    "file": "apps/api/src/routes/celebrations.ts",
-    "method": "get",
-    "route": "/celebrations/pending"
-  },
-  {
-    "file": "apps/api/src/routes/coaching-card.ts",
-    "method": "get",
-    "route": "/coaching-card"
-  },
-  {
     "file": "apps/api/src/routes/consent.ts",
     "method": "get",
     "route": "/consent/:childProfileId/status"
-  },
-  {
-    "file": "apps/api/src/routes/curriculum.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/curriculum"
-  },
-  {
-    "file": "apps/api/src/routes/curriculum.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/curriculum/topics/:topicId/explain"
   },
   {
     "file": "apps/api/src/routes/dashboard.ts",
@@ -165,21 +95,6 @@
     "route": "/dashboard/children/:profileId/weekly-reports/:reportId"
   },
   {
-    "file": "apps/api/src/routes/dictation.ts",
-    "method": "get",
-    "route": "/dictation/history"
-  },
-  {
-    "file": "apps/api/src/routes/dictation.ts",
-    "method": "get",
-    "route": "/dictation/streak"
-  },
-  {
-    "file": "apps/api/src/routes/language-progress.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/cefr-progress"
-  },
-  {
     "file": "apps/api/src/routes/learner-profile.ts",
     "method": "get",
     "route": "/learner-profile/:profileId"
@@ -190,39 +105,9 @@
     "route": "/learner-profile/:profileId/export-text"
   },
   {
-    "file": "apps/api/src/routes/library-search.ts",
-    "method": "get",
-    "route": "/library/search"
-  },
-  {
     "file": "apps/api/src/routes/notifications.ts",
     "method": "get",
     "route": "/notifications/child-cap"
-  },
-  {
-    "file": "apps/api/src/routes/now.ts",
-    "method": "get",
-    "route": "/now"
-  },
-  {
-    "file": "apps/api/src/routes/now.ts",
-    "method": "get",
-    "route": "/now/overflow"
-  },
-  {
-    "file": "apps/api/src/routes/nudges.ts",
-    "method": "get",
-    "route": "/nudges"
-  },
-  {
-    "file": "apps/api/src/routes/parking-lot.ts",
-    "method": "get",
-    "route": "/sessions/:sessionId/parking-lot"
-  },
-  {
-    "file": "apps/api/src/routes/parking-lot.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/topics/:topicId/parking-lot"
   },
   {
     "file": "apps/api/src/routes/recaps.ts",
@@ -233,46 +118,6 @@
     "file": "apps/api/src/routes/recaps.ts",
     "method": "get",
     "route": "/recaps/:recapId"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/library/retention"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/retention/assessment-eligible"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/retention/stability"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/needs-deepening"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/retention"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/teaching-preference"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/topics/:topicId/evaluate-eligibility"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/topics/:topicId/retention"
   },
   {
     "file": "apps/api/src/routes/scopes.ts",

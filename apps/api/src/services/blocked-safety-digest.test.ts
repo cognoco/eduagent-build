@@ -160,6 +160,7 @@ function makeDeliveryDb(
 describe('[WI-1691] deliverBlockedSafetyDigestBucket', () => {
   const emailConfig = {
     to: 'operator@example.test',
+    environment: 'production',
     resendApiKey: 'resend-test-key',
     emailFrom: 'noreply@example.test',
   };
@@ -228,15 +229,59 @@ describe('[WI-1691] deliverBlockedSafetyDigestBucket', () => {
     expect(harness.set).toHaveBeenCalledWith({ deliveredAt: NOW });
   });
 
-  it('throws without marking when email delivery fails', async () => {
+  it('throws without marking when email delivery fails transiently', async () => {
     const harness = makeDeliveryDb();
-    const send = jest
-      .fn()
-      .mockResolvedValue({ sent: false, reason: 'network_error' });
+    const send = jest.fn().mockResolvedValue({
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    });
 
     await expect(
       deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
-    ).rejects.toThrow('blocked-safety digest email failed: network_error');
+    ).rejects.toThrow(
+      'blocked-safety digest transient email failure: network_error',
+    );
+
+    expect(harness.update).not.toHaveBeenCalled();
+  });
+
+  it('does not retry or mark a permanent email rejection', async () => {
+    const harness = makeDeliveryDb();
+    const send = jest.fn().mockResolvedValue({
+      sent: false,
+      retryability: 'permanent',
+      reason: 'resend_api_error',
+      statusCode: 422,
+      providerCode: 'validation_error',
+    });
+
+    await expect(
+      deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
+    ).resolves.toEqual({
+      delivered: false,
+      reason: 'resend_api_error',
+      retryability: 'permanent',
+    });
+
+    expect(harness.update).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a recoverable email configuration failure without marking delivered', async () => {
+    const harness = makeDeliveryDb();
+    const send = jest.fn().mockResolvedValue({
+      sent: false,
+      retryability: 'none',
+      reason: 'no_api_key',
+    });
+
+    await expect(
+      deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
+    ).resolves.toEqual({
+      delivered: false,
+      reason: 'no_api_key',
+      retryability: 'none',
+    });
 
     expect(harness.update).not.toHaveBeenCalled();
   });

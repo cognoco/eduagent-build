@@ -11,6 +11,7 @@ export * from './consent';
 // Habitual-residence country matrix + jurisdiction decision (WI-2690)
 export * from './country-policy';
 export * from './family-join';
+export * from './guardian-attachment';
 export * from './account';
 
 // Onboarding & Curriculum (Epic 1)
@@ -59,6 +60,9 @@ export * from './library-search';
 
 // Adaptive Memory (Epic 16)
 export * from './learning-profiles';
+
+// Persisted-learning-text safety gate (MMT-ADR-0036 §4 item 6)
+export * from './learning-text-safety';
 
 // Dictation (Practice)
 export * from './dictation';

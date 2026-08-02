@@ -23,10 +23,15 @@ import {
   shouldUpdateLearningStyle,
 } from './learner-profile';
 import type { Database } from '@eduagent/database';
+import { scanLearningText } from './learning-text-safety/scan';
 import { ConflictError } from '../errors';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 import * as sentry from './sentry';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
+// [WI-2952 AC-4] The REAL resolver. The `./llm/router` mock below spreads
+// `jest.requireActual`, so this binding is the production implementation — the
+// exclusion is decided by the same code the judge path runs, not by a stub.
+import { resolveJudgeEligibleVendors } from './llm/router';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -1790,7 +1795,10 @@ describe('analyzeSessionTranscript', () => {
       null,
     );
 
-    expect(result?.resolvedTopics).toBeNull();
+    // [WI-2952] `analyzeSessionTranscript` now returns `{analysis, author}` so
+    // the producing vendor survives to the safety gate; the analysis it carries
+    // is unchanged.
+    expect(result?.analysis.resolvedTopics).toBeNull();
   });
 
   it('keeps resolvedTopics when the learner demonstrates the resolved idea', () => {
@@ -1981,6 +1989,80 @@ describe('analyzeSessionTranscript — flow label (FCR-2026-05-23-L15.LOW3)', ()
       { flow?: string },
     ];
     expect(options?.flow).toBe('learner-profile-analysis');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2952 AC-4] analyzeSessionTranscript — judge independence
+//
+// Asserted where the exclusion is actually DECIDED. The threaded value feeds
+// `resolveJudgeEligibleVendors`, which filters a VENDOR pool, so the
+// discriminating assertion is not "a producer string was returned" but "the
+// producing vendor is ABSENT from the resolved pool". A model id satisfies the
+// former and fails the latter — and the matrix rejects only a *blank* vendor, so
+// a model id sits in the field, matches no exclusion-vocabulary member, and lets
+// the producing vendor grade its own output without failing closed. That exact
+// defect shipped once already here (a fixture threading 'cerebras' kept hundreds
+// of tests green while production threaded a model id). Precedent for the shape:
+// `memory/dedup-llm.test.ts` [WI-2628].
+// ---------------------------------------------------------------------------
+
+describe('analyzeSessionTranscript — judge independence (WI-2952 AC-4)', () => {
+  const PRODUCER_VENDOR = 'anthropic';
+  const PRODUCER_MODEL = 'claude-sonnet-4-6';
+
+  const events = [
+    { eventType: 'user_message', content: 'I keep messing up long division.' },
+    { eventType: 'ai_response', content: 'Let us walk one through together.' },
+    { eventType: 'user_message', content: 'That helped, thanks.' },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRouteAndCall.mockResolvedValue({
+      response: JSON.stringify({
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      }),
+      model: PRODUCER_MODEL,
+      provider: PRODUCER_VENDOR,
+    });
+  });
+
+  it('returns a vendor that ACTUALLY EXCLUDES itself from the judge pool', async () => {
+    const result = await analyzeSessionTranscript(
+      events,
+      'Math',
+      'Division',
+      null,
+    );
+
+    expect(result?.author.provenance).toBe('llm');
+    if (result?.author.provenance !== 'llm') return;
+
+    // The property: the value threaded downstream removes its own vendor.
+    expect(
+      resolveJudgeEligibleVendors({
+        mode: 'model-output',
+        producerVendor: result.author.producerVendor,
+      }),
+    ).not.toContain(PRODUCER_VENDOR);
+
+    // The control that makes the assertion above non-trivial: the MODEL id —
+    // the value a threading mistake substitutes — excludes nothing at all, so
+    // the producer stays eligible to grade its own output.
+    expect(
+      resolveJudgeEligibleVendors({
+        mode: 'model-output',
+        producerVendor: PRODUCER_MODEL,
+      }),
+    ).toContain(PRODUCER_VENDOR);
   });
 });
 
@@ -2832,4 +2914,125 @@ describe('[WI-2628] applyAnalysis / deleteMemoryItem — multilingual gate at th
     expect(profileUpdate?.['struggles']).toEqual([]);
     expect(harness.factTexts()).toEqual([]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2952] Caller provenance reaches the safety gate.
+//
+// `evaluateProfileFieldTexts` hard-coded `provenance:'llm'` + `producerVendor:
+// null` for EVERY caller. Under the fail-closed matrix (scan.ts) `'llm'` with a
+// blank vendor resolves the referral to null and BLOCKS — so a learner's own
+// typed self-description never reached the judge and was silently dropped from
+// `interests[]`. The strings below are the operator's own examples from the
+// 2026-07-26 ruling, which amended the matrix precisely to remove that
+// learner-capability regression.
+//
+// These assert the GUARANTEED PROPERTY per provenance — does the text survive
+// to the projection — not an internal field's shape.
+// ---------------------------------------------------------------------------
+describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => {
+  // The operator's own example strings. Each contains a protected clinical
+  // lexeme with NO person attribution — the exact "ambiguous, refer" case.
+  const EDUCATIONAL_TEXTS = [
+    'ADHD can affect executive function.',
+    "I'm learning about autism.",
+  ] as const;
+
+  describe.each(EDUCATIONAL_TEXTS)('operator example: %s', (text) => {
+    // AC-6, boundary `learner-profile.ts`: learner-authored educational text
+    // must REACH the judge rather than being blocked outright. Under the
+    // pre-fix hard-coded 'llm' + null vendor this resolved to null and blocked.
+    // (AC-6 names its two boundaries by FILE — `learner-profile.ts` and
+    // `inngest/functions/memory-facts-backfill.ts` — not by test layer.)
+    it('user provenance REFERS to the judge rather than being refused by the matrix', () => {
+      // Asserted at the SCAN layer, which is where the matrix decision lives.
+      // The gate one layer up then consults the judge, and an unavailable judge
+      // blocks — correctly, per the ruling: "the ruling moves this case to the
+      // JUDGE, not to allowed". So a gate-level `blockedCount` cannot tell
+      // "the matrix refused it" from "the judge was unavailable", and only the
+      // first is this item's subject.
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'user',
+        fieldKind: 'learner_profile_field',
+      });
+      expect(result.classification).toBe('ambiguous');
+      expect(result.disposition).toBe('refer');
+    });
+
+    // AC-5: LLM text WITH a known vendor reaches the judge too.
+    it('llm provenance with a known vendor REFERS, carrying that vendor', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'llm',
+        fieldKind: 'learner_profile_field',
+        producerVendor: 'anthropic',
+      });
+      expect(result.disposition).toBe('refer');
+    });
+
+    // AC-5: LLM text with a BLANK vendor still fails closed. This is the branch
+    // the operator deliberately left unchanged, and the reason the pre-fix
+    // hard-code was harmful rather than merely wrong.
+    it('llm provenance with a blank vendor still fails closed AT THE MATRIX', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'llm',
+        fieldKind: 'learner_profile_field',
+        producerVendor: '',
+      });
+      expect(result.disposition).toBe('block');
+    });
+
+    // AC-5: migration never refers. Backfill text has no live author.
+    it('migration provenance never refers', () => {
+      const result = scanLearningText({
+        text,
+        conversationLanguage: 'en',
+        provenance: 'migration',
+        fieldKind: 'memory_fact',
+      });
+      expect(result.disposition).toBe('block');
+    });
+  });
+
+  // AC-6 write-path coverage for the `learner-profile.ts` boundary IS NOW
+  // CLOSED, end to end, in
+  // `tests/integration/wi-2952-analysis-provenance.integration.test.ts`: it
+  // drives `applyAnalysis` against a real database with both operator strings,
+  // asserts the persisted `interests` CONTAINS the text under
+  // `{provenance:'user'}` and does NOT contain it under the pre-fix
+  // `{provenance:'llm', producerVendor:''}`, and was proven red against the
+  // reverted implementation. WI-2971, filed while the gap was open, is
+  // superseded by that test.
+  //
+  // Two earlier unit-level attempts failed to discriminate, which is why the
+  // evidence had to move to an integration test:
+  //
+  //   1. `expect(txMock).toHaveBeenCalled()` — measured against mutation 1
+  //      (reverting `evaluateProfileFieldTexts` to the hard-coded 'llm' + null):
+  //      275/275 still green. The transaction fires whether or not the gate
+  //      blanked the projection, so it discriminates nothing.
+  //   2. Capturing `tx.update(...).set(payload)` through a hand-built tx stub —
+  //      the stub does not satisfy enough of the real transaction body to reach
+  //      the write.
+  //
+  // AC-6's SECOND boundary — `inngest/functions/memory-facts-backfill.ts` — is
+  // REFUSED AS WRITTEN, not skipped. That file hard-codes
+  // `provenance: 'migration'` with no caller-supplied author, so no
+  // caller-provenance decision exists there for this item's fix to change. The
+  // operator's 2026-07-26 ruling (quoted in `learning-text-safety/scan.ts`)
+  // keeps migration text blocked BY DESIGN: backfill text has no live author.
+  // Making the operator strings pass at that boundary would contradict the
+  // ruling, so the clause is unsatisfiable as written and is declined on that
+  // authority rather than left silently uncovered.
+  //
+  // AC-4's named trap (provider vs model id) IS covered — see the
+  // `analyzeSessionTranscript — judge independence (WI-2952 AC-4)` describe
+  // earlier in this file: it asserts the producing vendor is absent from the
+  // RESOLVED judge pool against the real resolver, with a model-id control
+  // proving a `result.model` mutation would leave the vendor present.
 });

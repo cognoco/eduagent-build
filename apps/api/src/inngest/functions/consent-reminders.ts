@@ -6,6 +6,7 @@ import {
   getStepDatabase,
   getStepResendApiKey,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepAppUrl,
 } from '../helpers';
 import { and, eq, gte, inArray, lt } from 'drizzle-orm';
@@ -20,11 +21,20 @@ import { resolveOrgIdForPerson } from '../../services/identity-v2/family-v2';
 import {
   sendEmail,
   formatConsentReminderEmail,
+  type EmailPayload,
   type EmailOptions,
 } from '../../services/notifications';
-import { deletePersonIfNoConsentV2 } from '../../services/identity-v2/deletion-v2';
+import {
+  attemptPersonIfNoConsentErasureV2,
+  getPersonErasureSnapshotV2,
+} from '../../services/identity-v2/deletion-v2';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 import { captureMessage } from '../../services/sentry';
+import { safeSend } from '../../services/safe-non-core';
+import {
+  completePersonErasureExternalWork,
+  runStablePersonErasure,
+} from './person-erasure-steps';
 
 // [WI-973] Schema for the app/consent.requested event payload.
 const consentRequestedEventSchema = z.object({
@@ -33,7 +43,42 @@ const consentRequestedEventSchema = z.object({
 });
 
 export const consentReminder = inngest.createFunction(
-  { id: 'consent-reminder', name: 'Send consent reminder' },
+  {
+    id: 'consent-reminder',
+    name: 'Send consent reminder',
+    onFailure: async ({ event, error }) => {
+      const profileId = (
+        event.data.event?.data as { profileId?: string } | undefined
+      )?.profileId;
+      captureMessage(
+        'consent-reminder: all retries exhausted during consent expiry',
+        {
+          level: 'error',
+          extra: {
+            surface: 'consent-reminder.terminal_failure',
+            profileId: profileId ?? null,
+            runId: event.data.run_id ?? null,
+            errorClass: error instanceof Error ? 'error' : 'non_error',
+          },
+        },
+      );
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: observability-only erasure dead-letter signal.
+            name: 'app/consent.reminder_erasure.failed',
+            data: {
+              profileId: profileId ?? null,
+              runId: event.data.run_id ?? null,
+              errorClass: error instanceof Error ? 'error' : 'non_error',
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'consent-reminder.terminal_failure',
+        { profileId: profileId ?? null },
+      );
+    },
+  },
   { event: 'app/consent.requested' },
   async ({ event, step }) => {
     // [WI-973] Validate the event payload before entering the reminder
@@ -73,6 +118,7 @@ export const consentReminder = inngest.createFunction(
     // event (e.g. re-requesting consent for the same profile after the
     // workflow concluded) will produce a fresh key and send a fresh email.
     const emailOpts = (stepId: string): EmailOptions => ({
+      environment: getStepEnvironment(),
       resendApiKey: getStepResendApiKey(),
       emailFrom: getStepEmailFrom(),
       idempotencyKey: buildEmailIdempotencyKey(
@@ -82,6 +128,17 @@ export const consentReminder = inngest.createFunction(
         stepId,
       ),
     });
+
+    async function sendReminderEmail(
+      payload: EmailPayload,
+      options: EmailOptions,
+    ) {
+      const result = await sendEmail(payload, options);
+      if (!result.sent && result.retryability === 'transient') {
+        throw new Error('consent-reminder transient email failure');
+      }
+      return result;
+    }
 
     /** Look up parentEmail and consentToken from the DB (never from event payload — PII). */
     async function lookupConsentDetails(): Promise<{
@@ -192,7 +249,7 @@ export const consentReminder = inngest.createFunction(
       await step.run('send-day-7-reminder', async () => {
         const { parentEmail } = await lookupConsentDetails();
         if (!parentEmail) return;
-        await sendEmail(
+        await sendReminderEmail(
           formatConsentReminderEmail(
             parentEmail,
             'your child',
@@ -220,7 +277,7 @@ export const consentReminder = inngest.createFunction(
       await step.run('send-day-14-reminder', async () => {
         const { parentEmail } = await lookupConsentDetails();
         if (!parentEmail) return;
-        await sendEmail(
+        await sendReminderEmail(
           formatConsentReminderEmail(
             parentEmail,
             'your child',
@@ -239,7 +296,7 @@ export const consentReminder = inngest.createFunction(
       if (!status || isTerminalConsentStatus(status)) return;
       const { parentEmail } = await lookupConsentDetails();
       if (!parentEmail) return;
-      await sendEmail(
+      await sendReminderEmail(
         {
           to: parentEmail,
           subject:
@@ -258,24 +315,41 @@ export const consentReminder = inngest.createFunction(
     // deletion would be both redundant and unnecessarily distressing. The
     // last actionable notice is at Day-25; Day-30 is the cutoff itself.
     await step.sleep('wait-5-more-days', '5d');
-    await step.run('auto-delete-account', async () => {
-      const db = getStepDatabase();
-      // Fast guard: bail out if this GDPR request was already granted/withdrawn.
-      const status = await getCurrentConsentRequestStatus();
-      if (!status || isTerminalConsentStatus(status)) return;
-      if (!requestedAt) return;
-      // CI-11: Use service function instead of raw SQL.
-      // Atomic delete — only deletes if no CONSENTED/WITHDRAWN consent exists.
-      // This eliminates the TOCTOU race where a parent approves consent between
-      // the status check above and the delete below.
-      // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
-      // [CUT-B2] v2: re-home any grants, then delete the person (the §6.1
-      // pattern at single-person granularity). Same no-consent guard AND the
-      // same request-generation guard as legacy: thread requestedAtDate so a
-      // stale day-30 run cannot delete a child who started a newer consent
-      // cycle (the legacy deleteProfileIfNoConsent(requestedAt) semantics).
-      if (!requestedAtDate || Number.isNaN(requestedAtDate.getTime())) return;
-      await deletePersonIfNoConsentV2(db, profileId, requestedAtDate);
+    if (Number.isNaN(requestedAtDate.getTime())) return;
+    // Cheap guard for runs whose request became terminal during the sleeps.
+    // The transaction below repeats the authoritative predicate under locks;
+    // this read only avoids creating erasure snapshots for a known no-op.
+    const day30Status = await getCurrentConsentRequestStatus();
+    if (!day30Status || isTerminalConsentStatus(day30Status)) return;
+    const deletionResult = await runStablePersonErasure({
+      step,
+      stepPrefix: 'consent-expiry-person-erasure',
+      capture: () => getPersonErasureSnapshotV2(getStepDatabase(), profileId),
+      erase: (snapshot) =>
+        attemptPersonIfNoConsentErasureV2(
+          getStepDatabase(),
+          profileId,
+          snapshot,
+          requestedAtDate,
+        ),
+    });
+    if (deletionResult.status === 'admin_transfer_required') {
+      captureMessage(
+        'consent-reminder: erasure requires administrator transfer',
+        {
+          level: 'error',
+          extra: {
+            surface: 'consent-reminder.admin_transfer_required',
+            profileId,
+          },
+        },
+      );
+      return;
+    }
+    await completePersonErasureExternalWork({
+      step,
+      stepPrefix: 'consent-expiry-person-erasure',
+      result: deletionResult,
     });
   },
 );

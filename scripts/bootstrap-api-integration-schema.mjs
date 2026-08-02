@@ -34,6 +34,89 @@ export const REVISION_PINNED_SOURCE_PATHS = Object.freeze([
 const MARKER_SCHEMA = 'zdx_integration_bootstrap';
 const MARKER_TABLE = `${MARKER_SCHEMA}.schema_state`;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/i;
+const REQUIRED_POST_PUSH_INDEX_NAMES = Object.freeze([
+  'curriculum_topics_book_title_lower_uq',
+  'subjects_profile_name_lower_active_uq',
+  'curriculum_books_subject_title_lower_uq',
+]);
+
+function stripSqlLineComments(sql) {
+  return sql.replace(/--.*$/gm, '');
+}
+
+function buildPostPushStatements(statements) {
+  const sql = stripSqlLineComments(statements.join('\n'));
+  const postPushStatements = [];
+
+  for (const indexName of REQUIRED_POST_PUSH_INDEX_NAMES) {
+    const matches = [
+      ...sql.matchAll(
+        new RegExp(
+          `CREATE\\s+UNIQUE\\s+INDEX\\s+IF\\s+NOT\\s+EXISTS\\s+"${indexName}"[\\s\\S]*?;`,
+          'gi',
+        ),
+      ),
+    ];
+    const latest = matches.at(-1)?.[0]?.trim();
+    if (latest) postPushStatements.push(latest);
+  }
+
+  const identifier = '(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)';
+  const qualifiedIdentifier = `${identifier}(?:\\s*\\.\\s*${identifier})?`;
+  const rlsByTable = new Map();
+  for (const match of sql.matchAll(
+    new RegExp(
+      `ALTER\\s+TABLE\\s+(${qualifiedIdentifier})\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY\\s*;`,
+      'gi',
+    ),
+  )) {
+    const table = match[1].replace(/\s+/g, '');
+    const tableLiteral = table.replaceAll("'", "''");
+    rlsByTable.set(
+      table,
+      `DO $zdx_post_push$ BEGIN\nIF to_regclass('${tableLiteral}') IS NOT NULL THEN\n${match[0].trim()}\nEND IF;\nEND $zdx_post_push$;`,
+    );
+  }
+  postPushStatements.push(...rlsByTable.values());
+
+  const policiesByIdentity = new Map();
+  for (const match of sql.matchAll(
+    new RegExp(
+      `CREATE\\s+POLICY\\s+(${identifier})\\s+ON\\s+(${qualifiedIdentifier})[\\s\\S]*?;`,
+      'gi',
+    ),
+  )) {
+    const policySql = match[0].trim();
+    const table = match[2].replace(/\s+/g, '');
+    const tableLiteral = table.replaceAll("'", "''");
+    const identity = `${table}.${match[1]}`;
+    policiesByIdentity.set(
+      identity,
+      `DO $zdx_post_push$ BEGIN\nIF to_regclass('${tableLiteral}') IS NOT NULL THEN\n${policySql}\nEND IF;\nEXCEPTION WHEN duplicate_object THEN NULL;\nEND $zdx_post_push$;`,
+    );
+  }
+  postPushStatements.push(...policiesByIdentity.values());
+
+  const policyAltersByIdentity = new Map();
+  for (const match of sql.matchAll(
+    new RegExp(
+      `ALTER\\s+POLICY\\s+(${identifier})\\s+ON\\s+(${qualifiedIdentifier})[\\s\\S]*?;`,
+      'gi',
+    ),
+  )) {
+    const policySql = match[0].trim();
+    const table = match[2].replace(/\s+/g, '');
+    const tableLiteral = table.replaceAll("'", "''");
+    const identity = `${table}.${match[1]}`;
+    policyAltersByIdentity.set(
+      identity,
+      `DO $zdx_post_push$ BEGIN\nIF to_regclass('${tableLiteral}') IS NOT NULL THEN\n${policySql}\nEND IF;\nEND $zdx_post_push$;`,
+    );
+  }
+  postPushStatements.push(...policyAltersByIdentity.values());
+
+  return postPushStatements;
+}
 
 function refuse(reason) {
   refuseDisposableIntegrationTarget(reason);
@@ -176,6 +259,10 @@ export async function bootstrapDisposableApiIntegrationSchema(options, deps) {
             ...deps.env,
             INTEGRATION_SCHEMA_BOOTSTRAP: WORK_ITEM,
           },
+        });
+        await deps.store.applyDirectSchema({
+          statements: revisionSql.postPushStatements,
+          chainFingerprint: revisionSql.fingerprint,
         });
       } catch {
         try {
@@ -535,6 +622,7 @@ export function loadRevisionSql() {
     .flatMap((migration) => migration.sql)
     .map((statement) => statement.trim())
     .filter(Boolean);
+  const postPushStatements = buildPostPushStatements(statements);
   const fingerprint = createHash('sha256')
     .update(
       JSON.stringify(
@@ -542,7 +630,7 @@ export function loadRevisionSql() {
       ),
     )
     .digest('hex');
-  return { statements, fingerprint };
+  return { statements, postPushStatements, fingerprint };
 }
 
 function defaultDependencies(env, target) {

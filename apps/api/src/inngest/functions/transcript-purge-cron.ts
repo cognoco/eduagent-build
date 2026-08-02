@@ -1,6 +1,7 @@
 // @inngest-admin: cross-profile
 import { and, asc, count, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
+import { RetryAfterError } from 'inngest';
 import { learningSessions, sessionSummaries } from '@eduagent/database';
 import { inngest } from '../client';
 import {
@@ -9,6 +10,7 @@ import {
   getStepVoyageApiKey,
 } from '../helpers';
 import { purgeSessionTranscript } from '../../services/transcript-purge';
+import { VoyageEmbeddingHttpError } from '../../services/embeddings';
 import { captureException } from '../../services/sentry';
 
 const transcriptPurgeEventDataSchema = z.object({
@@ -434,8 +436,8 @@ export const transcriptPurgeHandler = inngest.createFunction(
     const { profileId, sessionSummaryId } = parsed.data;
 
     const result = await step.run('purge-transcript', async () => {
+      const db = getStepDatabase();
       try {
-        const db = getStepDatabase();
         return await purgeSessionTranscript(
           db,
           profileId,
@@ -443,13 +445,17 @@ export const transcriptPurgeHandler = inngest.createFunction(
           getStepVoyageApiKey(),
         );
       } catch (error) {
-        captureException(error, {
-          profileId,
-          extra: {
-            sessionSummaryId,
-            surface: 'transcript-purge',
-          },
-        });
+        if (
+          error instanceof VoyageEmbeddingHttpError &&
+          error.status === 429 &&
+          error.retryAfterMs !== null
+        ) {
+          throw new RetryAfterError(
+            'Voyage embedding rate limited during transcript purge',
+            error.retryAfterMs,
+            { cause: error },
+          );
+        }
         throw error;
       }
     });

@@ -8,6 +8,13 @@ const mockRefreshConsentTokenForRequestV2 = jest.fn().mockResolvedValue({
   freshToken: 'refreshed-token-xyz',
 });
 const mockDeletePersonIfNoConsentV2 = jest.fn().mockResolvedValue(undefined);
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
+const mockSafeSend = jest.fn().mockResolvedValue(undefined);
 const mockSendEmail = jest.fn();
 const mockFormatConsentReminderEmail = jest.fn(
   (_email: string, _name: string, _days: number, _tokenUrl: string) => ({
@@ -18,6 +25,19 @@ const mockFormatConsentReminderEmail = jest.fn(
   }),
 );
 
+jest.mock(
+  '../../services/safe-non-core' /* gc1-allow: requires live Inngest transport unavailable in unit step-runner context */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/safe-non-core',
+    ) as typeof import('../../services/safe-non-core');
+    return {
+      ...actual,
+      safeSend: (...args: unknown[]) => mockSafeSend(...args),
+    };
+  },
+);
+
 // Shared seeded DB — getStepDatabase returns this; seedConsentState patches its
 // db.query so the REAL resolveOrgIdForPerson (membership.findFirst) +
 // resolveConsentSetStatus (consentGrant + consentRequest STATUS) run unmocked.
@@ -26,18 +46,22 @@ const mockFormatConsentReminderEmail = jest.fn(
 // so the requestedAt-window suppression remains test-controllable.
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockGetStepDatabase(),
-    getStepResendApiKey: jest.fn(() => 're_test_key'),
-    getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
-    getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: request-scoped DB and secret bindings unavailable in unit step-runner context */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockGetStepDatabase(),
+      getStepClerkSecretKey: jest.fn(() => 'clerk-test-key'),
+      getStepResendApiKey: jest.fn(() => 're_test_key'),
+      getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
+      getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
+    };
+  },
+);
 
 jest.mock(
   '../../services/identity-v2/consent-v2' /* gc1-allow: write fn — refreshConsentTokenForRequestV2 performs an .update().returning() token write, not exercisable on the unit Proxy mock-db; no consent-reminders integration twin exists yet — coverage gap tracked WI-905 */,
@@ -53,22 +77,25 @@ jest.mock(
   },
 );
 
-jest.mock('../../services/notifications', () => {
-  const actual = jest.requireActual(
-    '../../services/notifications',
-  ) as typeof import('../../services/notifications');
-  return {
-    ...actual,
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    formatConsentReminderEmail: (...args: unknown[]) =>
-      mockFormatConsentReminderEmail(
-        ...(args as [string, string, number, string]),
-      ),
-  };
-});
+jest.mock(
+  '../../services/notifications' /* gc1-allow: workflow unit test isolates live Resend transport; requireActual preserves other exports */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      formatConsentReminderEmail: (...args: unknown[]) =>
+        mockFormatConsentReminderEmail(
+          ...(args as [string, string, number, string]),
+        ),
+    };
+  },
+);
 
 jest.mock(
-  '../../services/identity-v2/deletion-v2' /* gc1-allow: write fn — deletePersonIfNoConsentV2 performs an atomic .delete() guarded by a no-consent subquery, not exercisable on the unit Proxy mock-db; no consent-reminders integration twin exists yet — coverage gap tracked WI-905 */,
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: internal-service exception — the real snapshot/atomic-erasure path requires a transaction, advisory lock, and graph queries unavailable on the unit Proxy DB. This suite pins the durable Inngest step ABI, so adapters return persisted step-result shapes; requireActual preserves untouched exports. Real DB coverage gap remains tracked by WI-905. */,
   () => {
     const actual = jest.requireActual(
       '../../services/identity-v2/deletion-v2',
@@ -77,6 +104,57 @@ jest.mock(
       ...actual,
       deletePersonIfNoConsentV2: (...args: unknown[]) =>
         mockDeletePersonIfNoConsentV2(...args),
+      getPersonClerkUserIdsV2: (...args: unknown[]) =>
+        mockGetPersonClerkUserIdsV2(...args),
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
+      getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
+        personExists: true,
+        personId: args[1] as string,
+        organizationId: 'org-test',
+        clerkUserIds: await mockGetPersonClerkUserIdsV2(...args),
+        loginEmails: [],
+        organizationPersonIds: [args[1] as string],
+        subscriptionStoreTeardownTargets: [],
+      }),
+      attemptPersonIfNoConsentErasureV2: async (
+        db: unknown,
+        personId: unknown,
+        snapshot: { clerkUserIds: string[] },
+        requestedAt: unknown,
+      ) =>
+        (await mockDeletePersonIfNoConsentV2(db, personId, requestedAt))
+          ? {
+              status: 'deleted',
+              clerkUserIds: snapshot.clerkUserIds,
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            }
+          : {
+              status: 'not_eligible',
+              clerkUserIds: [],
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            },
+    };
+  },
+);
+
+// Clerk deletion is a live external API boundary; only that outbound call is
+// replaced in this workflow test.
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
     };
   },
 );
@@ -289,12 +367,45 @@ beforeEach(() => {
     guardianEmail: 'parent@example.com',
     freshToken: 'refreshed-token-xyz',
   });
+  mockDeletePersonIfNoConsentV2.mockResolvedValue(undefined);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
+  mockSendEmail.mockResolvedValue({ sent: true, retryability: 'none' });
 });
 
 describe('consentReminder', () => {
   it('should be defined as an Inngest function with the expected id', () => {
     expect((consentReminder as { opts?: { id?: string } }).opts?.id).toBe(
       'consent-reminder',
+    );
+  });
+
+  it('declares and emits a sanitized terminal erasure signal', async () => {
+    const onFailure = (consentReminder as any).opts.onFailure as (args: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => Promise<void>;
+
+    expect(typeof onFailure).toBe('function');
+    await onFailure({
+      event: {
+        data: {
+          event: { data: { profileId: 'profile-terminal' } },
+          run_id: 'run-terminal',
+        },
+      },
+      error: new Error('provider detail must not be forwarded'),
+    });
+
+    expect(captureMessageSpy).toHaveBeenCalledWith(
+      'consent-reminder: all retries exhausted during consent expiry',
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'consent-reminder.terminal_failure',
+          profileId: 'profile-terminal',
+          errorClass: 'error',
+        }),
+      }),
     );
   });
 
@@ -335,6 +446,71 @@ describe('consentReminder', () => {
       'profile-1',
       new Date('2026-05-01T00:00:00.000Z'),
     );
+  });
+
+  it.each([
+    ['day-7', 0],
+    ['day-14', 1],
+    ['day-25', 2],
+  ])(
+    '[WI-2788] rejects the workflow so Inngest retries a transient %s email failure',
+    async (_stepName, precedingSuccesses) => {
+      for (let index = 0; index < precedingSuccesses; index += 1) {
+        mockSendEmail.mockResolvedValueOnce({
+          sent: true,
+          retryability: 'none',
+        });
+      }
+      mockSendEmail.mockResolvedValueOnce({
+        sent: false,
+        reason: 'resend_503',
+        retryability: 'transient',
+      });
+
+      await expect(
+        executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']),
+      ).rejects.toThrow('consent-reminder transient email failure');
+      expect(mockSendEmail).toHaveBeenCalledTimes(precedingSuccesses + 1);
+    },
+  );
+
+  it.each([
+    ['permanent', 'invalid_recipient'],
+    ['none', 'no_resend_api_key'],
+  ])(
+    '[WI-2788] treats a %s email failure as terminal without retrying the workflow',
+    async (retryability, reason) => {
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        reason,
+        retryability,
+      });
+
+      await expect(
+        executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']),
+      ).resolves.toBeDefined();
+      expect(mockSendEmail).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it('deletes every captured Clerk identity after the day-30 DB erasure', async () => {
+    mockDeletePersonIfNoConsentV2.mockResolvedValue(true);
+    mockGetPersonClerkUserIdsV2.mockResolvedValue([
+      'clerk-consent-charge-a',
+      'clerk-consent-charge-b',
+    ]);
+
+    await executeHandler(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk-consent-charge-a',
+      clerkSecretKey: 'clerk-test-key',
+    });
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith({
+      userId: 'clerk-consent-charge-b',
+      clerkSecretKey: 'clerk-test-key',
+    });
   });
 
   // [IMP-2] Token URL must reach the email body, not just the format call

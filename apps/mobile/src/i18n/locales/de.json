@@ -2089,8 +2089,6 @@
     "whichSubject": "Für welches Fach ist das?",
     "loadingSubjects": "Deine Fächer werden geladen...",
     "selectSubjectLabel": "{{name}} auswählen",
-    "createNewSubject": "Neues Fach erstellen",
-    "createNewSubjectLabel": "Neues Fach erstellen",
     "orTypeSubject": "Oder gib einen Fachnamen ein:",
     "subjectInputPlaceholder": "z.B. Biologie, Geschichte...",
     "typeSubjectLabel": "Fachnamen eingeben",
@@ -2102,7 +2100,6 @@
     "manualInputPlaceholder": "Gib deine Aufgabe hier ein...",
     "typeManuallyLabel": "Deine Aufgabe manuell eingeben",
     "noSubjectsYet": "Du hast noch keine Fächer.",
-    "createSubject": "Fach erstellen",
     "continueWithProblemLabel": "Mit eingegebener Aufgabe fortfahren",
     "continueArrow": "Weiter →",
     "tryCameraAgain": "Kamera erneut versuchen",
@@ -4296,7 +4293,6 @@
     },
     "search": {
       "placeholder": "Themen suchen",
-      "micLabel": "Per Sprache suchen",
       "noResults": "Keine Themen entsprechen dieser Suche."
     },
     "notes": {
@@ -4304,7 +4300,6 @@
       "authorSelf": "Meine Notizen",
       "authorMentor": "Vom Mentor gespeichert",
       "addNote": "Notiz hinzufügen",
-      "micLabel": "Notiz per Sprache hinzufügen",
       "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest.",
       "saveErrorTitle": "Konnte Notiz nicht speichern",
       "emptyTopic": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."
@@ -4619,7 +4614,10 @@
       "existingTeenInviteSending": "Senden …",
       "existingTeenInviteSentTitle": "Einladung unterwegs",
       "existingTeenInviteSentMessage": "Wenn diese E-Mail zu einem MentoMate-Konto gehört, haben wir eine Einladung gesendet. Bitte sie, MentoMate zu öffnen und die Einladung anzunehmen.",
-      "existingTeenInviteErrorTitle": "Einladung nicht gesendet"
+      "existingTeenInviteErrorTitle": "Einladung nicht gesendet",
+      "wrongProfileTitle": "Diese Einladung ist für ein bestimmtes Profil",
+      "wrongProfileMessage": "Diese Einladung kann nur mit dem Profil geöffnet werden, an das sie gesendet wurde. Wähle dieses Profil aus und öffne die Einladung dann erneut.",
+      "wrongProfileSwitch": "Profil auswählen"
     }
   },
   "supporterColdStart": {

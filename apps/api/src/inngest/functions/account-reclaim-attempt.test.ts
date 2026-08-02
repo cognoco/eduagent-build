@@ -52,6 +52,7 @@ jest.mock(
     return {
       ...actual,
       getStepDatabase: jest.fn(() => mockDb),
+      getStepEnvironment: jest.fn(() => 'production'),
       getStepResendApiKey: jest.fn(() => process.env['RESEND_API_KEY']),
       getStepEmailFrom: jest.fn(() => process.env['EMAIL_FROM']),
       getStepSupportEmail: jest.fn(
@@ -245,8 +246,22 @@ describe('accountReclaimAttempt Inngest function [BUG-784]', () => {
       );
 
     await expect(executeHandler(reclaimEvent())).rejects.toThrow(
-      /account-reclaim-attempt send failed/,
+      /account-reclaim-attempt transient send failure/,
     );
+  });
+
+  it('does not retry a permanent Resend rejection', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue(
+      new Response(JSON.stringify({ name: 'validation_error' }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(executeHandler(reclaimEvent())).resolves.toMatchObject({
+      status: 'not_sent',
+      reason: 'resend_api_error',
+    });
   });
 
   it('formatter keeps the recovery path manual and fail-closed', () => {

@@ -4,19 +4,23 @@ import {
   classifyTerminalFailureError,
   type AccountDeletionTeardownFailedEvent,
 } from '@eduagent/schemas';
+import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
 import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
 import {
   organizationExistsV2,
   isDeletionCancelledV2,
   executeDeletionV2,
+  ensurePendingClerkErasures,
+  getOrganizationErasureSnapshotV2,
   getOrganizationOwnerClerkUserIdV2,
   getOrganizationOwnerEmailV2,
   getSubscriptionStoreTeardownTargetsV2,
+  markPendingClerkErasuresComplete,
+  type OrganizationErasureSnapshotV2,
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
-import { safeSend } from '../../services/safe-non-core';
 import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
@@ -43,13 +47,7 @@ export const scheduledDeletion = inngest.createFunction(
     // ops can query "how many erasures terminally failed?" and recover the
     // half-completed deletion manually. Mirrors the terminal-failure handlers on
     // auto-file-session.ts and topic-probe-extract.ts.
-    onFailure: async ({
-      event,
-      error,
-    }: {
-      event: { data: { event?: { data?: unknown }; run_id?: string } };
-      error: unknown;
-    }) => {
+    onFailure: async ({ event, error, step }) => {
       const accountId =
         (event.data.event?.data as { accountId?: string } | undefined)
           ?.accountId ?? null;
@@ -89,17 +87,13 @@ export const scheduledDeletion = inngest.createFunction(
           errorName,
           timestamp: new Date().toISOString(),
         });
-      await safeSend(
-        () =>
-          inngest.send({
-            // orphan-allow: observability-only dead-letter signal consumed by
-            // launch-health alerting and the Inngest dashboard.
-            name: 'app/account.deletion_teardown.failed',
-            data: failureEvent,
-          }),
-        'account-deletion.terminal_failure',
-        { accountId, runId },
-      );
+      await step.sendEvent('dispatch-account-deletion-terminal-failure', {
+        id: `deletion-terminal-failure:scheduled-account-deletion:${runId ?? accountId ?? 'unknown'}`,
+        // orphan-allow: observability-only dead-letter signal consumed by
+        // launch-health alerting and the Inngest dashboard.
+        name: 'app/account.deletion_teardown.failed',
+        data: failureEvent,
+      });
 
       return { status: 'terminal_failure', accountId };
     },
@@ -138,21 +132,17 @@ export const scheduledDeletion = inngest.createFunction(
       return { status: 'already_deleted', accountId };
     }
 
-    // [R1] Capture the Clerk login id BEFORE executeDeletionV2 removes the
-    // row, so we can erase the external identity afterwards (GDPR Art 17).
-    // Held in its own memoized step so a retry of the Clerk-erasure step
-    // below re-uses the captured value rather than reading a now-deleted row.
-    const clerkUserId = await step.run('capture-clerk-user-id', async () => {
-      const db = getStepDatabase();
-      return getOrganizationOwnerClerkUserIdV2(db, accountId);
-    });
-
-    // [CUT-B2] Pre-reads the owner email for the byok_waitlist erase (D2
-    // GDPR Art-17 leg in executeDeletionV2). Captured separately so the
-    // value survives the person cascade and a retry of delete-account-data
-    // re-uses the memoized value. Null when no login exists (pre-graph edge
-    // case) — executeDeletionV2 handles null ownerEmail as a no-op on that leg.
-    const ownerEmail = await step.run('capture-owner-email', async () => {
+    // Preserve the historical durable-step result ABIs for runs already asleep
+    // across a deployment. New runs also write these scalar receipts so an old
+    // executor can still resume safely during a rollback.
+    const legacyClerkUserId = await step.run(
+      'capture-clerk-user-id',
+      async () => {
+        const db = getStepDatabase();
+        return getOrganizationOwnerClerkUserIdV2(db, accountId);
+      },
+    );
+    const legacyOwnerEmail = await step.run('capture-owner-email', async () => {
       const db = getStepDatabase();
       return getOrganizationOwnerEmailV2(db, accountId);
     });
@@ -172,7 +162,7 @@ export const scheduledDeletion = inngest.createFunction(
     // after the DB erasure commits to emit a durable teardown event. This keeps
     // provider work out of the DB transaction and avoids a lost-ID retry hole if
     // dispatch fails after the subscription rows are gone.
-    const subscriptionStoreTeardownTargets = await step.run(
+    const legacyStoreTeardownTargets = await step.run(
       'capture-subscription-store-teardown-targets',
       async () => {
         const db = getStepDatabase();
@@ -180,21 +170,78 @@ export const scheduledDeletion = inngest.createFunction(
       },
     );
 
+    // [R1][WI-2788] The versioned step captures the COMPLETE organization
+    // erasure set. If an old run resumes after its DB commit, the organization
+    // is already absent; reconstruct the external cleanup set from the three
+    // historical scalar/list receipts above instead of losing those targets.
+    let erasureSnapshot: OrganizationErasureSnapshotV2 = await step.run(
+      'capture-organization-erasure-v2',
+      async () => {
+        const db = getStepDatabase();
+        return getOrganizationErasureSnapshotV2(db, accountId);
+      },
+    );
+    if (!erasureSnapshot.organizationExists) {
+      erasureSnapshot = {
+        organizationExists: false,
+        organizationId: accountId,
+        personIds: [],
+        clerkUserIds: legacyClerkUserId ? [legacyClerkUserId] : [],
+        loginEmails: legacyOwnerEmail ? [legacyOwnerEmail] : [],
+        subscriptionStoreTeardownTargets: legacyStoreTeardownTargets,
+      };
+    }
+    const ownerEmail = legacyOwnerEmail;
+    let subscriptionStoreTeardownTargets =
+      erasureSnapshot.subscriptionStoreTeardownTargets;
+
     // Permanently delete all data.
     // [Fix Bug #494] executeDeletionV2 includes an atomic TOCTOU guard: the
     // DELETE carries the same cancellation predicate as isDeletionCancelledV2(),
     // so a cancel that races with this step cannot delete an account that was
     // just cancelled. The result distinguishes 'deleted', 'cancelled', and
     // 'already_deleted' so telemetry is accurate.
-    const deletionResult = await step.run('delete-account-data', async () => {
+    let deletionResult = await step.run('delete-account-data', async () => {
       const db = getStepDatabase();
       return executeDeletionV2(db, {
         organizationId: accountId,
         ownerEmail,
+        expectedSnapshot: erasureSnapshot,
         reason: 'user_initiated',
         deletedBy: null,
       });
     });
+
+    // A membership/login/subscription mutation between snapshot and delete is
+    // a safe abort, not permission to erase a stale external identity set.
+    // Re-snapshot once and retry atomically; repeated drift requires operator
+    // reconciliation rather than an unbounded, potentially destructive loop.
+    if (deletionResult === 'snapshot_changed') {
+      erasureSnapshot = await step.run(
+        'capture-organization-erasure-2',
+        async () => {
+          const db = getStepDatabase();
+          return getOrganizationErasureSnapshotV2(db, accountId);
+        },
+      );
+      subscriptionStoreTeardownTargets =
+        erasureSnapshot.subscriptionStoreTeardownTargets;
+      deletionResult = await step.run('delete-account-data-2', async () => {
+        const db = getStepDatabase();
+        return executeDeletionV2(db, {
+          organizationId: accountId,
+          ownerEmail,
+          expectedSnapshot: erasureSnapshot,
+          reason: 'user_initiated',
+          deletedBy: null,
+        });
+      });
+      if (deletionResult === 'snapshot_changed') {
+        throw new NonRetriableError(
+          'scheduled-account-deletion: organization_erasure_snapshot_changed_twice; operator reconciliation required',
+        );
+      }
+    }
 
     if (deletionResult === 'cancelled') {
       // Cancellation arrived between the check-cancellation step and the
@@ -203,7 +250,7 @@ export const scheduledDeletion = inngest.createFunction(
     }
 
     if (
-      deletionResult === 'deleted' &&
+      (deletionResult === 'deleted' || deletionResult === 'already_deleted') &&
       subscriptionStoreTeardownTargets.length > 0
     ) {
       await step.sendEvent('request-subscription-store-teardown', {
@@ -224,19 +271,60 @@ export const scheduledDeletion = inngest.createFunction(
     // error, non-404 HTTP error, missing secret) makes Inngest retry the step
     // and ultimately page via Sentry — we never silently leave a login alive.
     // A 404 is idempotent (the user was already gone), so a retry completes.
+    // `already_deleted` after the initial existence/snapshot checks is the
+    // lost-step-receipt case: the DB commit may have landed, so external work
+    // must still finish from the memoized snapshot.
     let clerkErasure: 'deleted' | 'already_absent' | 'not_applicable' =
       'not_applicable';
-    if (deletionResult === 'deleted' && clerkUserId) {
-      const clerkResult = await step.run('delete-clerk-user', async () => {
-        return deleteClerkUser({
-          userId: clerkUserId,
-          clerkSecretKey: getStepClerkSecretKey(),
-        });
+    const deletionCompleted =
+      deletionResult === 'deleted' || deletionResult === 'already_deleted';
+    if (deletionCompleted && erasureSnapshot.clerkUserIds.length > 0) {
+      const reserved = await step.run('reserve-clerk-users', async () => {
+        const db = getStepDatabase();
+        return ensurePendingClerkErasures(db, erasureSnapshot.clerkUserIds);
       });
-      clerkErasure = clerkResult.deleted ? 'deleted' : 'already_absent';
+      if (!reserved) {
+        throw new NonRetriableError(
+          'scheduled-account-deletion: clerk_erasure_target_rebound; operator reconciliation required',
+        );
+      }
+
+      const clerkResults = await step.run('delete-clerk-users-v2', async () => {
+        // The earlier reserve step may be a stale memoized receipt after this
+        // run slept or retried. Re-check the live login rows immediately before
+        // the destructive boundary and refresh the database-clock fence. The
+        // 24-hour pending window is deliberately far longer than the bounded
+        // Clerk request, so bootstrap remains blocked for the whole callback.
+        const stillReserved = await ensurePendingClerkErasures(
+          getStepDatabase(),
+          erasureSnapshot.clerkUserIds,
+        );
+        if (!stillReserved) {
+          throw new NonRetriableError(
+            'scheduled-account-deletion: clerk_erasure_target_rebound; operator reconciliation required',
+          );
+        }
+        const clerkSecretKey = getStepClerkSecretKey();
+        const results = [];
+        for (const userId of erasureSnapshot.clerkUserIds) {
+          results.push(await deleteClerkUser({ userId, clerkSecretKey }));
+        }
+        return results;
+      });
+      clerkErasure = clerkResults.some((result) => result.deleted)
+        ? 'deleted'
+        : 'already_absent';
+
+      await step.run('release-clerk-users', async () => {
+        const db = getStepDatabase();
+        await markPendingClerkErasuresComplete(
+          db,
+          erasureSnapshot.clerkUserIds,
+        );
+      });
     }
 
-    if (deletionResult === 'deleted') {
+    if (deletionCompleted) {
       const subscriptionStoreTeardown =
         subscriptionStoreTeardownTargets.length > 0
           ? 'requested'

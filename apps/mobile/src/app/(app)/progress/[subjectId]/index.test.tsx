@@ -253,6 +253,13 @@ const OWNER_PROFILE = createTestProfile({
   isOwner: true,
   birthYear: 1990,
 });
+const PROXY_CHILD_PROFILE = createTestProfile({
+  id: 'proxy-child-1',
+  accountId: ACTIVE_ACCOUNT_ID,
+  displayName: 'Test Child',
+  isOwner: false,
+  birthYear: 2014,
+});
 
 type SubjectFixture = typeof fullSubject;
 
@@ -478,8 +485,8 @@ function mountProxy(opts: RouteOptions = {}): {
     routedFetch as unknown as typeof fetch;
 
   const profileContextValue: ProfileContextValue = {
-    profiles: [OWNER_PROFILE],
-    activeProfile: OWNER_PROFILE,
+    profiles: [OWNER_PROFILE, PROXY_CHILD_PROFILE],
+    activeProfile: PROXY_CHILD_PROFILE,
     isExplicitProxyMode: true,
     switchProfile: async () => ({ success: true }),
     isLoading: false,

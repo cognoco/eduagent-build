@@ -23,6 +23,7 @@ import {
 } from './services/llm-volume-alert-sink';
 import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
+import { isDeletedPersonReferenceViolation } from './services/db-errors';
 import { ConsentWithdrawnError } from './services/session';
 import {
   ForbiddenError,
@@ -183,6 +184,9 @@ type Bindings = {
 
   // Consent policy versioning
   CONSENT_POLICY_VERSION?: string;
+  GUARDIAN_AUTHORITY_TOKEN_SECRET?: string;
+  GUARDIAN_AUTHORITY_VERIFIER_URL?: string;
+  GUARDIAN_AUTHORITY_VERIFIER_KEY?: string;
 
   // Testing & operator tooling
   TEST_SEED_SECRET?: string;
@@ -241,7 +245,7 @@ type Variables = {
   quotaFractionRemaining: number | undefined;
 };
 
-type Env = { Bindings: Bindings; Variables: Variables };
+export type Env = { Bindings: Bindings; Variables: Variables };
 
 // ---------------------------------------------------------------------------
 // Route definition — a plain Hono instance (no basePath) so that `AppType`
@@ -460,7 +464,7 @@ app.use('*', async (c, next) => {
 app.route('/', routes);
 
 // Global error handler — catches unhandled exceptions and returns ApiErrorSchema envelope
-app.onError((err, c) => {
+export const appErrorHandler: Parameters<typeof app.onError>[0] = (err, c) => {
   // HTTPException is Hono's standard mechanism for non-500 errors thrown from
   // middleware/routes (e.g. requireProfileId → 401). Forward its response as-is.
   if (err instanceof HTTPException) {
@@ -628,6 +632,16 @@ app.onError((err, c) => {
     );
   }
 
+  if (isDeletedPersonReferenceViolation(err)) {
+    return c.json(
+      {
+        code: ERROR_CODES.CONFLICT,
+        message: 'This profile was deleted. Please sign in again.',
+      },
+      409,
+    );
+  }
+
   if (isTransientDatabaseError(err)) {
     captureException(err, {
       userId: c.get('user')?.userId,
@@ -667,7 +681,9 @@ app.onError((err, c) => {
     },
     500,
   );
-});
+};
+
+app.onError(appErrorHandler);
 
 export type AppType = typeof routes;
 
@@ -680,6 +696,7 @@ export { app };
 export default Sentry.withSentry(
   (env) => ({
     dsn: (env as unknown as Bindings).SENTRY_DSN,
+    environment: (env as unknown as Bindings).ENVIRONMENT,
     // WI-2717 / WI-2735 — only explicitly bridged, PII-free LLM threshold
     // warnings use Sentry.logger. We intentionally do not install
     // consoleLoggingIntegration(), so unrelated console output stays out of

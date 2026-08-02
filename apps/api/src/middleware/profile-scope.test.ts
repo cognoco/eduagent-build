@@ -13,13 +13,11 @@ jest.mock('../services/sentry', () => {
 });
 
 const mockGetPersonScope = jest.fn();
-const mockFindOwnerPersonScope = jest.fn();
 jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — profile-scope mw calls getPersonScope/findOwnerPersonScope (db.select() innerJoin chains, unrunnable on unit mock DB); real path covered by identity integration suite — coverage gap tracked WI-905 */,
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — profile-scope mw calls getPersonScope (db.select() innerJoin chains, unrunnable on unit mock DB); real path covered by identity integration suite — coverage gap tracked WI-905 */,
   () => ({
     ...jest.requireActual('../services/identity-v2/profile-v2'),
     getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
-    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
   }),
 );
 
@@ -44,7 +42,6 @@ function captureHttpException(callback: () => unknown): HTTPException {
 describe('profileScopeMiddleware', () => {
   beforeEach(() => {
     mockGetPersonScope.mockReset();
-    mockFindOwnerPersonScope.mockReset();
     // Default: valid profile belongs to account
     mockGetPersonScope.mockResolvedValue({
       profileId: 'valid-profile-id',
@@ -56,32 +53,32 @@ describe('profileScopeMiddleware', () => {
         isOwner: true,
       },
     });
-    // Default: owner auto-resolve
-    mockFindOwnerPersonScope.mockResolvedValue({
-      profileId: 'owner-profile-id',
-      meta: {
-        birthYear: 2014,
-        location: 'EU',
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: true,
-      },
-    });
   });
 
-  function createApp(): Hono<{ Variables: AppVariables }> {
+  function createApp(
+    callerPersonId = 'valid-profile-id',
+  ): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
     // Simulate account middleware having run
     app.use('*', async (c, next) => {
       c.set('account', { id: 'test-account-id' } as AppVariables['account']);
       c.set('db', {} as AppVariables['db']);
+      c.set('callerPersonId', callerPersonId);
       await next();
     });
     app.use('*', profileScopeMiddleware);
     app.get('/test', (c) => {
       const profileId = c.get('profileId');
       const profileMeta = c.get('profileMeta') ?? null;
-      return c.json({ profileId: profileId ?? null, profileMeta });
+      // [WI-2876] Server-only central-authority proof (bound to the exact
+      // verified profile id) read by assertCanReadProfile's fast path.
+      const profileAuthorityVerifiedFor =
+        c.get('profileAuthorityVerifiedFor') ?? null;
+      return c.json({
+        profileId: profileId ?? null,
+        profileMeta,
+        profileAuthorityVerifiedFor,
+      });
     });
     return app;
   }
@@ -105,27 +102,186 @@ describe('profileScopeMiddleware', () => {
       // 'explicit-header' so the owner-only gates accept it.
       resolvedVia: 'explicit-header',
     });
+    expect(mockGetPersonScope).toHaveBeenCalledWith(
+      expect.anything(),
+      'valid-profile-id',
+      'test-account-id',
+      'valid-profile-id',
+    );
   });
 
-  it('auto-resolves owner profile when X-Profile-Id header is absent', async () => {
+  it.each([
+    ['family owner', 'family-owner-id'],
+    ['credentialed sibling', 'credentialed-sibling-id'],
+  ])(
+    '[WI-2128][BREAK] joined learner cannot install same-org %s context',
+    async (_label, requestedProfileId) => {
+      const callerPersonId = 'joined-learner-id';
+      mockGetPersonScope.mockImplementation(
+        (
+          _db: unknown,
+          profileId: string,
+          _organizationId: string,
+          authorityCallerPersonId?: string,
+        ) => {
+          if (!authorityCallerPersonId) {
+            return Promise.resolve({
+              profileId,
+              meta: {
+                birthYear: 1985,
+                location: 'EU',
+                consentStatus: 'CONSENTED',
+                hasPremiumLlm: false,
+                isOwner: profileId === 'family-owner-id',
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+      const app = createApp(callerPersonId);
+      const res = await app.request('/test', {
+        headers: { 'X-Profile-Id': requestedProfileId },
+      });
+
+      expect(res.status).toBe(403);
+      expect(mockGetPersonScope).toHaveBeenCalledWith(
+        expect.anything(),
+        requestedProfileId,
+        'test-account-id',
+        callerPersonId,
+      );
+      const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+      expect(logged).toMatchObject({
+        level: 'warn',
+        message: 'profile_scope.ownership_mismatch',
+        context: { reason: 'not-operable' },
+      });
+      warnSpy.mockRestore();
+    },
+  );
+
+  it.each([
+    ['self', 'joined-learner-id', 'joined-learner-id'],
+    [
+      'active guardian to uncredentialed charge',
+      'guardian-id',
+      'uncredentialed-charge-id',
+    ],
+  ])(
+    '[WI-2128] preserves explicit %s context',
+    async (_label, callerPersonId, requestedProfileId) => {
+      mockGetPersonScope.mockImplementation(
+        (
+          _db: unknown,
+          profileId: string,
+          _organizationId: string,
+          authorityCallerPersonId?: string,
+        ) => {
+          const operable =
+            profileId === authorityCallerPersonId ||
+            (authorityCallerPersonId === 'guardian-id' &&
+              profileId === 'uncredentialed-charge-id');
+          return Promise.resolve(
+            operable
+              ? {
+                  profileId,
+                  meta: {
+                    birthYear: 2014,
+                    location: 'EU',
+                    consentStatus: 'CONSENTED',
+                    hasPremiumLlm: false,
+                    isOwner: authorityCallerPersonId === 'guardian-id',
+                  },
+                }
+              : null,
+          );
+        },
+      );
+
+      const app = createApp(callerPersonId);
+      const res = await app.request('/test', {
+        headers: { 'X-Profile-Id': requestedProfileId },
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        profileId: requestedProfileId,
+      });
+      expect(mockGetPersonScope).toHaveBeenCalledWith(
+        expect.anything(),
+        requestedProfileId,
+        'test-account-id',
+        callerPersonId,
+      );
+    },
+  );
+
+  it('auto-resolves the login-bound caller Person when X-Profile-Id is absent', async () => {
     const app = createApp();
     const res = await app.request('/test');
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.profileId).toBe('owner-profile-id');
+    expect(body.profileId).toBe('valid-profile-id');
     expect(body.profileMeta).toEqual({
       birthYear: 2014,
       location: 'EU',
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       isOwner: true,
-      // [Issue 901] The no-header auto-resolve path synthesizes the owner
-      // identity, so it is tagged 'auto'. The owner-only gates
-      // (assertOwnerProfile / assertNotProxyMode) reject 'auto' even though
-      // isOwner is true — an authenticated non-owner could otherwise omit the
-      // header to be auto-resolved to the owner (privilege escalation).
+      // The no-header path resolves the authenticated caller's own Person and
+      // marks the resolution auto so owner-only transitions still require an
+      // affirmative explicit selection.
       resolvedVia: 'auto',
+    });
+    expect(mockGetPersonScope).toHaveBeenCalledWith(
+      expect.anything(),
+      'valid-profile-id',
+      'test-account-id',
+      'valid-profile-id',
+    );
+  });
+
+  // [WI-2876] The server-only central-authority proof consumed by
+  // assertCanReadProfile's fast path: stamped ONLY after getPersonScope
+  // successfully resolved authority, and bound to the exact verified
+  // profile id so a downstream profileId rewrite can never reuse it.
+  describe('[WI-2876] profileAuthorityVerifiedFor proof', () => {
+    it('stamps the verified profile id after a verified explicit X-Profile-Id resolution', async () => {
+      const app = createApp();
+      const res = await app.request('/test', {
+        headers: { 'X-Profile-Id': 'valid-profile-id' },
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.profileId).toBe('valid-profile-id');
+      expect(body.profileAuthorityVerifiedFor).toBe('valid-profile-id');
+    });
+
+    it('stamps the verified profile id after a verified auto-resolution of the caller Person', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.profileId).toBe('valid-profile-id');
+      expect(body.profileAuthorityVerifiedFor).toBe('valid-profile-id');
+    });
+
+    it('leaves the proof unset when the middleware skips resolution (no caller context)', async () => {
+      // No callerPersonId → the headerless branch skips getPersonScope
+      // entirely; no profile is installed and no proof may be stamped.
+      const app = createApp('');
+      const res = await app.request('/test');
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.profileId).toBeNull();
+      expect(body.profileAuthorityVerifiedFor).toBeNull();
     });
   });
 
@@ -154,9 +310,10 @@ describe('profileScopeMiddleware', () => {
     expect(logged.level).toBe('warn');
     expect(logged.message).toBe('profile_scope.ownership_mismatch');
     expect(logged.context).toMatchObject({
-      accountId: 'test-account-id',
-      requestedProfileId: 'other-account-profile',
+      reason: 'not-operable',
     });
+    expect(logged.context).not.toHaveProperty('accountId');
+    expect(logged.context).not.toHaveProperty('requestedProfileId');
 
     warnSpy.mockRestore();
   });
@@ -188,7 +345,7 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  // [BUG-487 / BUG-502] Break test: when findOwnerPersonScope throws a transient
+  // [BUG-487 / BUG-502] Break test: when caller scope resolution throws a transient
   // DB error, profileScopeMiddleware must respond 503 (fail closed) and must
   // NOT call next(). Previous behavior was to swallow the error and call
   // next() with profileId undefined, allowing consent to skip enforcement.
@@ -198,13 +355,13 @@ describe('profileScopeMiddleware', () => {
   // - Sentry capture (aggregate alerting)
   // This preserves the CR-SILENT-RECOVERY-1 requirement while fixing the
   // fail-open bug.
-  it('[BUG-487/502] returns 503 + logs + captures when findOwnerProfile throws', async () => {
+  it('[BUG-487/502] returns 503 + logs + captures when caller scope resolution throws', async () => {
     // [BUG-231] See above — jest.fn() avoids the empty-function suppression.
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(jest.fn());
     (captureException as jest.Mock).mockClear();
 
     const dbError = new Error('DB connection lost');
-    mockFindOwnerPersonScope.mockRejectedValueOnce(dbError);
+    mockGetPersonScope.mockRejectedValueOnce(dbError);
 
     const app = createApp();
     const res = await app.request('/test');
@@ -220,34 +377,52 @@ describe('profileScopeMiddleware', () => {
     expect(logged.level).toBe('error');
     expect(logged.message).toBe('profile_scope.auto_resolve_failed');
     expect(logged.context).toMatchObject({
-      accountId: 'test-account-id',
-      error: 'DB connection lost',
+      errorType: 'Error',
     });
+    expect(logged.context).not.toHaveProperty('accountId');
+    expect(logged.context).not.toHaveProperty('error');
 
     // Sentry escalation: real exception object + queryable surface tag
     // [CR-2026-05-19-M1] tags.surface allows ops to filter/alert in Sentry.
     expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(dbError, {
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: { surface: 'profile_scope.auto_resolve_failure' },
       extra: {
-        context: 'profile-scope.auto_resolve_owner',
-        accountId: 'test-account-id',
+        context: 'profile-scope.auto_resolve_caller',
       },
     });
+    const capturedError = (captureException as jest.Mock).mock.calls[0]![0];
+    expect(capturedError).toMatchObject({
+      message: 'Profile scope auto-resolution failed',
+      cause: { errorType: 'Error' },
+    });
+    expect(capturedError.message).not.toContain(dbError.message);
 
     errorSpy.mockRestore();
   });
 
-  it('leaves profileMeta unset when findOwnerProfile returns null (new account) [BUG-TEMP-28]', async () => {
-    mockFindOwnerPersonScope.mockResolvedValueOnce(null);
+  it('[WI-2128][BREAK] returns 403 and categorical telemetry when caller scope returns null', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
+    mockGetPersonScope.mockResolvedValueOnce(null);
 
     const app = createApp();
     const res = await app.request('/test');
-    const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.profileId).toBeNull();
-    expect(body.profileMeta).toBeNull();
+    expect(res.status).toBe(403);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const logged = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+    expect(logged).toMatchObject({
+      level: 'warn',
+      message: 'profile_scope.authority_mismatch',
+      context: {
+        resolutionPath: 'auto',
+        reason: 'caller-scope-not-operable',
+      },
+    });
+    expect(logged.context).not.toHaveProperty('accountId');
+    expect(logged.context).not.toHaveProperty('callerPersonId');
+    expect(logged.context).not.toHaveProperty('profileId');
+    warnSpy.mockRestore();
   });
 
   it('skips auto-resolution and calls next when db or account is missing', async () => {

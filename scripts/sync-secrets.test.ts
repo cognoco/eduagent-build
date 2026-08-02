@@ -10,6 +10,7 @@
 
 const {
   buildWranglerBulkArgs,
+  filterSecrets,
   findMissingSecretNames,
   isRenderedWranglerToml,
   shouldSkipSync,
@@ -20,6 +21,10 @@ const {
     workerName: string,
     configPath?: string,
   ) => string[];
+  filterSecrets: (secrets: Record<string, string>) => {
+    filtered: Record<string, string>;
+    excluded: string[];
+  };
   findMissingSecretNames: (
     expectedNames: string[],
     actualNames: string[],
@@ -33,6 +38,35 @@ const {
     reason?: string;
   };
 };
+
+describe('[WI-2788] empty Worker secret preflight', () => {
+  it('fails loudly with the key name and never includes another secret value', () => {
+    const unrelatedValue = 'synthetic-value-that-must-not-be-reported';
+
+    expect(() =>
+      filterSecrets({
+        RETENTION_PURGE_ENABLED: '',
+        DATABASE_URL: unrelatedValue,
+      }),
+    ).toThrow('RETENTION_PURGE_ENABLED');
+
+    try {
+      filterSecrets({
+        RETENTION_PURGE_ENABLED: '',
+        DATABASE_URL: unrelatedValue,
+      });
+    } catch (error) {
+      expect(String(error)).not.toContain(unrelatedValue);
+    }
+  });
+
+  it('still silently excludes intentionally non-Worker keys when empty', () => {
+    expect(filterSecrets({ EXPO_TOKEN: '' })).toEqual({
+      filtered: {},
+      excluded: ['EXPO_TOKEN'],
+    });
+  });
+});
 
 describe('[WI-1920] API Worker Sentry project identity', () => {
   it('accepts the mentomate-api Sentry project', () => {

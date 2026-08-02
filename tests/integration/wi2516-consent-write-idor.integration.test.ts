@@ -3,9 +3,10 @@
  * callerPersonId, never the client-supplied X-Profile-Id selection.
  *
  * The matrix below runs through the real auth/account/profile middleware and
- * real database. It proves both write endpoints ignore honest or spoofed
- * profile headers when deciding whether the authenticated caller is self, or
- * is an org admin with an active guardianship edge to the target.
+ * real database. It proves both write endpoints bind authorization to the
+ * authenticated caller. The selected profile must first be operable by that
+ * caller (self or an uncredentialed managed charge); after that shared boundary,
+ * the consent route still decides self/guardian authority from callerPersonId.
  */
 
 import { eq } from 'drizzle-orm';
@@ -46,6 +47,8 @@ const PEER_CLERK_ID = `wi2516-peer-${RUN_ID}`;
 const PEER_EMAIL = `wi2516-peer-${RUN_ID}@integration.test`;
 const CONSENT_EMAIL = `wi2516-guardian-${RUN_ID}@integration.test`;
 const FORBIDDEN_MESSAGE = 'Not authorized to request consent for this profile';
+const PROFILE_SCOPE_FORBIDDEN_MESSAGE =
+  'Profile does not belong to this account';
 
 type HeaderMode = 'honest' | 'target' | 'owner';
 type Relationship = 'self' | 'admin-with-edge' | 'admin-no-edge' | 'peer';
@@ -55,6 +58,7 @@ type RelationshipCase = {
   relationship: Relationship;
   header: HeaderMode;
   allowed: boolean;
+  forbiddenMessage?: string;
 };
 
 const RELATIONSHIP_CASES: RelationshipCase[] = [
@@ -68,7 +72,8 @@ const RELATIONSHIP_CASES: RelationshipCase[] = [
     label: 'self with mismatched same-org header',
     relationship: 'self',
     header: 'target',
-    allowed: true,
+    allowed: false,
+    forbiddenMessage: PROFILE_SCOPE_FORBIDDEN_MESSAGE,
   },
   {
     label: 'admin guardian with honest header',
@@ -93,6 +98,7 @@ const RELATIONSHIP_CASES: RelationshipCase[] = [
     relationship: 'admin-no-edge',
     header: 'target',
     allowed: false,
+    forbiddenMessage: PROFILE_SCOPE_FORBIDDEN_MESSAGE,
   },
   {
     label: 'same-org peer with honest header',
@@ -105,12 +111,14 @@ const RELATIONSHIP_CASES: RelationshipCase[] = [
     relationship: 'peer',
     header: 'target',
     allowed: false,
+    forbiddenMessage: PROFILE_SCOPE_FORBIDDEN_MESSAGE,
   },
   {
     label: 'same-org peer spoofing owner-shaped header',
     relationship: 'peer',
     header: 'owner',
     allowed: false,
+    forbiddenMessage: PROFILE_SCOPE_FORBIDDEN_MESSAGE,
   },
 ];
 
@@ -203,7 +211,7 @@ async function readConsentState(chargePersonId: string) {
 describe('WI-2516: consent write authorization uses callerPersonId', () => {
   it.each(MATRIX)(
     '$endpoint: $label => allowed=$allowed',
-    async ({ endpoint, relationship, header, allowed }) => {
+    async ({ endpoint, relationship, header, allowed, forbiddenMessage }) => {
       const { profileId: ownerId, orgId } = await createOwner();
       const peerId = await createPerson({
         orgId,
@@ -270,7 +278,7 @@ describe('WI-2516: consent write authorization uses callerPersonId', () => {
         expect(res.status).toBe(403);
         expect(await res.json()).toEqual({
           code: ERROR_CODES.FORBIDDEN,
-          message: FORBIDDEN_MESSAGE,
+          message: forbiddenMessage ?? FORBIDDEN_MESSAGE,
         });
         expect(after).toEqual(before);
         expect(getCapturedInngestEvents()).toEqual([]);

@@ -1,6 +1,7 @@
 // @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { eq, and, isNull, count } from 'drizzle-orm';
 import { z } from 'zod';
+import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -16,16 +17,26 @@ import { extractFirstJsonObject } from '../../services/llm/extract-json';
 import { sanitizeXmlValue } from '../../services/llm/sanitize';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
+import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-ownership';
 
 const logger = createLogger();
 
-const filingCompletedDataSchema = z.object({
-  bookId: z.string(),
-  topicTitle: z.string(),
-  profileId: z.string(),
-  sessionId: z.string().optional(),
-  timestamp: z.string().optional(),
-});
+const filingCompletedDataSchema = z
+  .object({
+    profileId: z.string(),
+    sessionId: z.string().optional(),
+    timestamp: z.string().optional(),
+    // Rolling-deploy compatibility: legacy producers omitted topicId and
+    // no-topic producers omitted either or both identifiers after JSON
+    // serialization. Any incomplete target is normalized to the no-topic path.
+    bookId: z.string().nullish(),
+    topicId: z.string().nullish(),
+  })
+  .transform(({ bookId, topicId, ...context }) => ({
+    ...context,
+    bookId: bookId ?? null,
+    topicId: topicId ?? null,
+  }));
 
 const suggestionsResponseSchema = z.object({
   suggestions: z.array(z.string().min(1).max(200)).max(2),
@@ -84,7 +95,13 @@ export const postSessionSuggestions = inngest.createFunction(
         timestamp: new Date().toISOString(),
       };
     }
-    const { bookId, topicTitle, profileId } = validated.data;
+    const { bookId, topicId, profileId } = validated.data;
+    // A filed legacy/edge-case session may have no resolved topic. The
+    // completion event is still valid because other consumers use it to
+    // settle session state, but there is nothing to generate suggestions for.
+    if (bookId === null || topicId === null) {
+      return { status: 'skipped' as const, reason: 'no_topic' as const };
+    }
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();
@@ -105,6 +122,20 @@ export const postSessionSuggestions = inngest.createFunction(
       });
       if (!ownerSubject)
         return { status: 'skipped' as const, reason: 'ownership mismatch' };
+
+      const completedTopic = await findOwnedCurriculumTopic(db, {
+        profileId,
+        topicId,
+      });
+      if (!completedTopic) {
+        return {
+          status: 'skipped' as const,
+          reason: 'topic not found or ownership mismatch',
+        };
+      }
+      if (completedTopic.bookId !== bookId) {
+        return { status: 'skipped' as const, reason: 'topic/book mismatch' };
+      }
 
       // [WI-116] Re-check current consent at execution time. This job runs
       // on the Inngest endpoint, outside the HTTP consent middleware, so a
@@ -163,7 +194,10 @@ export const postSessionSuggestions = inngest.createFunction(
         .map((t) => sanitizeXmlValue(t.title, 200))
         .filter((t) => t.length > 0)
         .join(', ');
-      const safeCompletedTopicTitle = sanitizeXmlValue(topicTitle, 200);
+      const safeCompletedTopicTitle = sanitizeXmlValue(
+        completedTopic.topicTitle,
+        200,
+      );
 
       const messages = [
         {
@@ -184,6 +218,13 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
       const llmResult = await routeAndCall(messages, 1, {
         flow: 'post.session.suggestions',
         conversationLanguage,
+        ageBracket: ctx
+          ? computeAgeBracketFromDate(
+              ctx.birthYear,
+              ctx.birthMonth ?? undefined,
+              ctx.birthDay ?? undefined,
+            )
+          : undefined,
       });
 
       // [BUG-842 / F-SVC-009] Use canonical extractFirstJsonObject helper

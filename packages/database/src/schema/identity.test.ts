@@ -33,6 +33,7 @@ import {
   policyKindEnum,
   modelTierEnum,
 } from './identity.js';
+import * as identitySchema from './identity.js';
 
 // ---------------------------------------------------------------------------
 // Table export smoke tests
@@ -65,6 +66,23 @@ describe('identity schema — table exports', () => {
     expect(login.email).toBeDefined();
     expect(login.createdAt).toBeDefined();
     expect(login.updatedAt).toBeDefined();
+  });
+
+  it('[WI-2788] exports a digest-only pending Clerk erasure fence', () => {
+    const pendingClerkErasure = (
+      identitySchema as unknown as {
+        pendingClerkErasure?: Record<string, unknown>;
+      }
+    ).pendingClerkErasure;
+
+    expect(pendingClerkErasure).toBeDefined();
+    if (!pendingClerkErasure) return;
+    expect(pendingClerkErasure.clerkUserIdDigest).toBeDefined();
+    expect(pendingClerkErasure.erasureSetDigest).toBeDefined();
+    expect(pendingClerkErasure.releaseAfter).toBeDefined();
+    expect(pendingClerkErasure.createdAt).toBeDefined();
+    expect(pendingClerkErasure.updatedAt).toBeDefined();
+    expect(pendingClerkErasure).not.toHaveProperty('clerkUserId');
   });
 
   it('exports organization table', () => {

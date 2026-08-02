@@ -214,7 +214,7 @@ async function runAutoFileSession({
     name: 'app/filing.completed',
     data: {
       bookId: result.bookId,
-      topicTitle: result.topicTitle,
+      topicId: result.topicId,
       profileId,
       sessionId,
       timestamp,

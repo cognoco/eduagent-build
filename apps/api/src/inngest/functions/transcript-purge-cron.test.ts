@@ -49,6 +49,8 @@ jest.mock(
 );
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { VoyageEmbeddingHttpError } from '../../services/embeddings';
+import { RetryAfterError } from 'inngest';
 import { sessionSummaryRegenerate } from './summary-regenerate';
 import {
   computeRotatingDelayedOffset,
@@ -745,16 +747,40 @@ describe('transcriptPurgeHandler', () => {
       }),
     ).rejects.toThrow('Voyage unavailable');
 
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Voyage unavailable' }),
-      expect.objectContaining({
-        profileId: '00000000-0000-7000-8000-000000000001',
-        extra: expect.objectContaining({
-          sessionSummaryId: '00000000-0000-7000-8000-000000000002',
-          surface: 'transcript-purge',
-        }),
-      }),
-    );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] honors Voyage Retry-After for rate-limited purge attempts', async () => {
+    const voyageError = new VoyageEmbeddingHttpError({
+      status: 429,
+      retryAfterMs: 45_000,
+    });
+    mockPurgeSessionTranscript.mockRejectedValueOnce(voyageError);
+
+    const { step } = createInngestStepRunner();
+    const handler = (transcriptPurgeHandler as any).fn;
+
+    let caught: unknown;
+    try {
+      await handler({
+        event: {
+          data: {
+            profileId: '00000000-0000-7000-8000-000000000001',
+            sessionSummaryId: '00000000-0000-7000-8000-000000000002',
+          },
+        },
+        step,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(RetryAfterError);
+    expect(caught).toMatchObject({
+      retryAfter: '45',
+      cause: voyageError,
+    });
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('drops malformed purge payloads before touching transcript data', async () => {
@@ -779,6 +805,7 @@ describe('transcriptPurgeHandler', () => {
         }),
       }),
     );
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -831,6 +858,7 @@ describe('transcriptPurgeHandlerOnFailure', () => {
         }),
       }),
     );
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 
   it('[BUG-992] skips non-purge-handler failures without calling captureException', async () => {

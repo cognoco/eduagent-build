@@ -196,6 +196,9 @@ import {
   fetchGenerateContext,
 } from '../services/dictation';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { ERROR_CODES } from '@eduagent/schemas';
+import { ForbiddenError } from '../errors';
 import { ConsentWithdrawnError } from '../services/session';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
@@ -221,6 +224,10 @@ afterAll(() => {
 beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
+  // Tests that prove deterministic exits intentionally leave a queued
+  // rejection unconsumed because the consent gate must not run. Reset the
+  // implementation as well as call history so that queue cannot leak.
+  (assertLlmConsent as jest.Mock).mockReset().mockResolvedValue(undefined);
   meteringFixture.reset();
   // [WI-774] Default: delegate to the REAL checkAndLogRateLimit so the existing
   // rate-limit tests (driven by meteringFixture) are unchanged. The flag-on
@@ -288,6 +295,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
 
     expect(prepareHomework).toHaveBeenCalledWith('Test sentence.', {
       conversationLanguage: 'en', // [WI-867] v2 personScope default
+      ageBracket: 'adult',
     });
   });
 
@@ -323,8 +331,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
-  // RF-01: Missing X-Profile-Id header must return 400
-  it('returns 400 when X-Profile-Id header is missing [RF-01]', async () => {
+  it('[WI-2128] returns 403 when a profile write omits explicit X-Profile-Id selection', async () => {
     const res = await app.request(
       '/v1/dictation/prepare-homework',
       {
@@ -335,7 +342,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(prepareHomework).not.toHaveBeenCalled();
   });
 
@@ -476,7 +483,10 @@ describe('POST /v1/dictation/generate', () => {
 
     expect(fetchGenerateContext).toHaveBeenCalledTimes(1);
     expect(generateDictation).toHaveBeenCalledTimes(1);
-    expect(generateDictation).toHaveBeenCalledWith(mockCtx);
+    expect(generateDictation).toHaveBeenCalledWith({
+      ...mockCtx,
+      ageBracket: 'adult',
+    });
   });
 
   // RF-01 / BUG-975: Missing X-Profile-Id header — proxy-guard fails closed
@@ -864,8 +874,11 @@ describe('GET /v1/dictation/streak', () => {
     );
   });
 
-  // RF-01: Missing X-Profile-Id header must return 400
-  it('returns 400 when X-Profile-Id header is missing [RF-01]', async () => {
+  it('[WI-2128] auto-resolves the authenticated caller for a headerless streak read', async () => {
+    (getDictationStreak as jest.Mock).mockResolvedValueOnce({
+      streak: 0,
+      lastDate: null,
+    });
     const res = await app.request(
       '/v1/dictation/streak',
       {
@@ -874,7 +887,7 @@ describe('GET /v1/dictation/streak', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('returns 401 without auth header', async () => {
@@ -931,14 +944,15 @@ describe('GET /v1/dictation/history', () => {
     );
   });
 
-  it('returns 400 when X-Profile-Id header is missing', async () => {
+  it('[WI-2128] auto-resolves the authenticated caller for a headerless history read', async () => {
+    (getDictationHistory as jest.Mock).mockResolvedValueOnce([]);
     const res = await app.request(
       '/v1/dictation/history',
       { headers: makeAuthHeaders() },
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('returns 401 without auth header', async () => {
@@ -1006,8 +1020,100 @@ describe('POST /v1/dictation/review', () => {
     expect(body.mistakes[0].error).toBe('spelling');
   });
 
+  it('threads the exact profile birth date into review safety routing', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00Z'));
+    mockGetPersonScope.mockResolvedValueOnce(
+      personScope({
+        profileId: 'test-profile-id',
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      }),
+    );
+    (reviewDictation as jest.Mock).mockResolvedValueOnce({
+      totalSentences: 2,
+      correctCount: 2,
+      mistakes: [],
+    });
+
+    try {
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(reviewDictation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ageYears: 18,
+          ageBracket: 'adolescent',
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
   describe('[WI-2396] consent-withdrawal gate', () => {
+    it('[WI-2987] preserves the rate-limit 429 before withdrawn consent', async () => {
+      meteringFixture.setNotificationLogCount(10);
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(429);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('RATE_LIMITED');
+      expect(assertLlmConsent).not.toHaveBeenCalled();
+      expect(reviewDictation).not.toHaveBeenCalled();
+    });
+
+    it('[WI-2987] preserves the aggregate prompt-budget 413 before withdrawn consent', async () => {
+      const aggregateOversized = Array.from({ length: 50 }, () => ({
+        text: 'a'.repeat(125),
+        withPunctuation: 'b'.repeat(125),
+        wordCount: 25,
+      }));
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            ...REVIEW_BODY,
+            sentences: aggregateOversized,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(413);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('PAYLOAD_TOO_LARGE');
+      expect(assertLlmConsent).not.toHaveBeenCalled();
+      expect(reviewDictation).not.toHaveBeenCalled();
+    });
+
     it('refuses with 403 CONSENT_WITHDRAWN and never calls reviewDictation when consent is withdrawn', async () => {
       (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
         new ConsentWithdrawnError(),
@@ -1026,6 +1132,7 @@ describe('POST /v1/dictation/review', () => {
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code?: string };
       expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(mockCheckAndLogRateLimit).toHaveBeenCalledTimes(1);
       expect(reviewDictation).not.toHaveBeenCalled();
     });
 
@@ -1051,7 +1158,7 @@ describe('POST /v1/dictation/review', () => {
     });
   });
 
-  it('returns 400 when X-Profile-Id header is missing', async () => {
+  it('[WI-2128] returns 403 when a profile write omits explicit X-Profile-Id selection', async () => {
     const res = await app.request(
       '/v1/dictation/review',
       {
@@ -1062,7 +1169,7 @@ describe('POST /v1/dictation/review', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(reviewDictation).not.toHaveBeenCalled();
   });
 
@@ -1504,4 +1611,82 @@ describe('POST /v1/dictation/review — struggle fetch failure logging (errors-a
       warnSpy.mockRestore();
     }
   });
+});
+
+// ---- [WI-2877] read-authority guard (G17) ----
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so the attacks below are credentialed
+// non-owner requests traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+
+describe('[WI-2877] read-authority guard', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', dictationRoutes);
+    return direct;
+  }
+
+  it.each([
+    ['/dictation/streak', () => jest.mocked(getDictationStreak)],
+    ['/dictation/history', () => jest.mocked(getDictationHistory)],
+  ] as const)(
+    'GET %s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+    async (path, getServiceMock) => {
+      // The caller's person holds no self/guardianship authority over the
+      // header-selected profile — dictation history carries the persisted
+      // source sentences of past exercises and must not leak cross-profile.
+      jest
+        .mocked(verifyPersonOwnershipV2)
+        .mockRejectedValueOnce(
+          new Error('caller cannot read selected profile'),
+        );
+
+      const res = await makeUnprovenApp().request(path, {
+        headers: { 'X-Profile-Id': VICTIM_PROFILE_ID },
+      });
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+      expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+        expect.anything(),
+        VICTIM_PROFILE_ID,
+        'test-account-id',
+        ATTACKER_PERSON_ID,
+      );
+      expect(getServiceMock()).not.toHaveBeenCalled();
+    },
+  );
 });

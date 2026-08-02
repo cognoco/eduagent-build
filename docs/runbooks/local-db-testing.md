@@ -109,10 +109,12 @@ explicit test database. Remote database URLs never receive that exception.
 ## Quick Start
 
 ```powershell
-# 1. Start the test database (pgvector/pgvector:pg16 on port 5433)
+# 1. Remove any prior disposable container, then start a clean database.
+docker compose -f docker-compose.test.yml down --remove-orphans
 docker compose -f docker-compose.test.yml up -d --wait
 
-# 2. Apply the current schema via drizzle-kit push
+# 2. Apply the current schema via drizzle-kit push. The container healthcheck
+# has already verified that vector and pg_trgm are installed.
 $env:DATABASE_URL = "postgresql://test:test@localhost:5433/eduagent_test"
 pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs push
 
@@ -133,9 +135,11 @@ The same logic exists in `tests/integration/api-setup.ts` for API-scoped integra
 
 No production code is changed — the driver swap is test-setup only.
 
-## pgvector Handling
+## PostgreSQL extension handling
 
-The Docker image is `pgvector/pgvector:pg16`, which ships with the `pgvector` extension pre-installed. The schema push (`drizzle-kit push`) creates `vector(1024)` columns and HNSW indexes, which require pgvector.
+The Docker image is `pgvector/pgvector:pg16`, which ships the extension files but does not install the extensions in each new database. On first initialization, PostgreSQL runs `scripts/init-test-db.sql` from its standard `/docker-entrypoint-initdb.d/` directory. The script idempotently installs both `vector` and `pg_trgm`; the service healthcheck verifies both before `docker compose ... up --wait` succeeds.
+
+The schema push (`drizzle-kit push`) creates `vector(1024)` columns and HNSW indexes plus indexes using `gin_trgm_ops`, so both extensions must exist before the push starts. Re-running the initializer is safe because both statements use `CREATE EXTENSION IF NOT EXISTS`.
 
 If you use a plain `postgres:16` image instead, any test that touches `session_embeddings` or `memory_facts.embedding` will fail with:
 
@@ -143,7 +147,7 @@ If you use a plain `postgres:16` image instead, any test that touches `session_e
 ERROR: type "vector" does not exist
 ```
 
-**Decision:** Use `pgvector/pgvector:pg16` as the standard local test image. This matches Neon's built-in pgvector support and allows all integration tests to run locally without modification.
+**Decision:** Use `pgvector/pgvector:pg16` as the standard local test image and install the database extensions through the disposable container initializer. This matches Neon's available pgvector support and allows all integration tests to run locally without modification.
 
 ### Suites that require pgvector
 
@@ -214,4 +218,4 @@ CI uses a PostgreSQL 16 service container (GitHub Actions `services:` block). Th
 
 **Open handles warning:** Jest may warn about open handles after the test run. This is a known issue with the shared `pg.Pool` — the pool outlives individual test files within a Jest worker. Tests still pass; the warning is cosmetic.
 
-**pgvector not found:** Verify the Docker image is `pgvector/pgvector:pg16`, not `postgres:16`. Run `docker exec <container> psql -U test -d eduagent_test -c "SELECT extname FROM pg_extension WHERE extname = 'vector'"` to confirm.
+**Database extension not found:** Verify the image is `pgvector/pgvector:pg16` and the `scripts/init-test-db.sql` mount remains under `/docker-entrypoint-initdb.d/`. Run `docker exec <container> psql -U test -d eduagent_test -c "SELECT extname FROM pg_extension WHERE extname IN ('vector', 'pg_trgm') ORDER BY extname"` to confirm both extensions.

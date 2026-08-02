@@ -299,7 +299,9 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { curriculumRoutes } from './curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
-import { NotFoundError, TopicNotSkippedError } from '../errors';
+import { ForbiddenError, NotFoundError, TopicNotSkippedError } from '../errors';
+import { ERROR_CODES } from '@eduagent/schemas';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 import { seedConsentState } from '../test-utils/consent-seed';
 
@@ -728,13 +730,14 @@ describe('curriculum routes', () => {
       expect(mockGetCurriculum).not.toHaveBeenCalled();
     });
 
-    it('returns 400 when profile cannot be resolved (no X-Profile-Id and no owner)', async () => {
+    it('[WI-2128] returns 403 when the authenticated caller Person cannot be resolved', async () => {
+      mockGetPersonScope.mockResolvedValueOnce(null);
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/curriculum`,
         { headers: makeAuthHeaders() },
         TEST_ENV,
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
       expect(mockGetCurriculum).not.toHaveBeenCalled();
     });
   });
@@ -1379,4 +1382,87 @@ describe('[WI-147 / DS-058] curriculum proxy-mode guard', () => {
     expect(res.status).toBe(403);
     expect(mockAdaptCurriculumFromPerformance).not.toHaveBeenCalled();
   });
+});
+
+// ---- [WI-2877] read-authority guard (G16) ----
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so the attacks below are credentialed
+// non-owner requests traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+
+describe('[WI-2877] read-authority guard', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', curriculumRoutes);
+    return direct;
+  }
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it.each([
+    [`/subjects/${SUBJECT_ID}/curriculum`, () => mockGetCurriculum],
+    [
+      `/subjects/${SUBJECT_ID}/curriculum/topics/${TOPIC_ID}/explain`,
+      () => mockExplainTopicOrdering,
+    ],
+  ] as const)(
+    'GET %s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+    async (path, getServiceMock) => {
+      // The caller's person holds no self/guardianship authority over the
+      // header-selected profile — the real verifyPersonOwnershipV2 would
+      // throw against a real membership table.
+      jest
+        .mocked(verifyPersonOwnershipV2)
+        .mockRejectedValueOnce(
+          new Error('caller cannot read selected profile'),
+        );
+
+      const res = await makeUnprovenApp().request(path, {
+        headers: { 'X-Profile-Id': VICTIM_PROFILE_ID },
+      });
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+      expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+        expect.anything(),
+        VICTIM_PROFILE_ID,
+        'test-account-id',
+        ATTACKER_PERSON_ID,
+      );
+      expect(getServiceMock()).not.toHaveBeenCalled();
+    },
+  );
 });

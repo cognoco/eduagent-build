@@ -18,7 +18,9 @@ status: deferred
 > targets remain present (`ModeSwitcher.tsx`, `legacy-navigation-contract.ts`,
 > V0/V1 flag plumbing, and legacy routes). Gate (a) remains met. Gate (b), the
 > product ruling authorizing V0/V1 retirement, is not evidenced; `MMT-ADR-0024`
-> remains Proposed. The MVP definition keeps S6 OUT/deferred. The mandatory
+> remains Proposed with an explicit non-reliance disposition recorded 2026-08-01
+> (WI-2062 — see pre-execution checklist item 2 below). The MVP definition keeps
+> S6 OUT/deferred. The mandatory
 > explicit human irreversibility confirmation below and every remaining
 > per-deletion heir check remain in force; this update authorizes no deletion.
 
@@ -229,7 +231,7 @@ T12 Delete V0/V1 e2e regression flows; final orphan-grep sweep (incl. apps/api a
 
 > **Group B does not start until gate (c) is green.** Until the §13.1 product ruling, all protected legacy flag states must not regress: flags-off legacy, current production V0-on/V1-off, and V1 dev/preview. T9–T12 are the *execution* of that ruling, removing the flag scaffolding and the legacy contract entirely.
 
-> **Pre-execution checklist (one-way-door drain T4 rider, added 2026-07-15, ruled sitting-1):** before starting T10/T11 deletion work: (1) refresh this plan's file/line anchors against current `main` (captured 2026-06-13); (2) confirm `MMT-ADR-0024` (scope-chip) resolved status — owned by WI-2062 (Resolve MMT-ADR-0024 status before S5/S6 reliance) — if any deletion depends on scope-chip semantics; (3) keep the T9 flag flip a separate change-set from T10/T11 deletions (already this plan's order — do not collapse them); (4) restate at execution time that once T10/T11 land, rollback is `git revert` only — no longer a flag flip or OTA.
+> **Pre-execution checklist (one-way-door drain T4 rider, added 2026-07-15, ruled sitting-1):** before starting T10/T11 deletion work: (1) refresh this plan's file/line anchors against current `main` (captured 2026-06-13); (2) `MMT-ADR-0024` (scope-chip) status is RESOLVED — **explicit non-reliance, effective 2026-08-01** (WI-2062; see `docs/adr/MMT-ADR-0024-scope-chip-supersedes-nav-contract.md` § "Disposition — Explicit non-reliance"). The executable guard this creates for T10/T11: no deletion change-set may cite `MMT-ADR-0024` as governing authority — each scope-chip-dependent deletion cites its authority from the disposition's non-reliance table (MMT-ADR-0037, MMT-ADR-0027/0028, shell spec §4.1–§4.2/§6.3, or the named code contracts); at this checkpoint run `rg -n 'MMT-ADR-0024'` over the deletion change-set's docs and code — only historical/non-reliance references may appear, and any hit used as authority blocks T10/T11 until ADR-0024 is Accepted in an Architecture-signed change-set; (3) keep the T9 flag flip a separate change-set from T10/T11 deletions (already this plan's order — do not collapse them); (4) restate at execution time that once T10/T11 land, rollback is `git revert` only — no longer a flag flip or OTA.
 
 - [ ] **T9: Flip `MODE_NAV_V2_ENABLED` to the production default.**
   In `apps/mobile/eas.json`, set `build.production.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'` (the prod build now ships V2) and **remove** `EXPO_PUBLIC_ENABLE_MODE_NAV` / `..._V1` from prod (`:13`), dev (`:23-24`), preview (`:39-40`). In `.github/workflows/ci.yml` OTA env (currently around `:397-398`), remove the V0/V1 lines and keep only the V2 line. In `apps/api/src/config.ts`, the `MODE_NAV_V2_ENABLED` env entry stays (it is now the canonical "on" state) — add a comment that V0/V1 are retired. Do this as a **flag-flip commit separate from code deletion** so a regression is reverted by flipping one env value, not by restoring deleted files.

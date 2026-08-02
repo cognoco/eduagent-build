@@ -74,6 +74,7 @@ const mockSessionCompletedDb = createTransactionalMockDb({
       findFirst: jest.fn().mockResolvedValue({
         displayName: 'Emma',
         conversationLanguage: 'en',
+        birthDate: '2010-01-01',
         birthYear: 2015,
         pronouns: null,
       }),
@@ -933,7 +934,10 @@ describe('sessionCompleted', () => {
       expect.objectContaining({
         message: expect.stringContaining('waitForEvent timed out'),
       }),
-      expect.objectContaining({ profileId: validProfileId }),
+      expect.objectContaining({
+        profileId: validProfileId,
+        level: 'warning',
+      }),
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('filing waitForEvent timed out'),
@@ -2279,6 +2283,7 @@ describe('sessionCompleted', () => {
           subjectId: SUBJECT_ID,
           topicId: TOPIC_ID,
           summaryId: 'summary-1',
+          ageBracket: 'adolescent',
         }),
       );
     });
@@ -2345,7 +2350,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SESSION_ID,
-        { conversationLanguage: 'en' },
+        { conversationLanguage: 'en', ageBracket: 'adolescent' },
       );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'extract-homework-summary',
@@ -2378,7 +2383,11 @@ describe('sessionCompleted', () => {
               // Returns both legacy (accountId) and v2 (conversationLanguage)
               // fields so this mock works under both IDENTITY_V2_ENABLED states.
               return Promise.resolve([
-                { conversationLanguage: 'en', accountId: ACCOUNT_ID },
+                {
+                  conversationLanguage: 'en',
+                  birthDate: '2010-01-01',
+                  accountId: ACCOUNT_ID,
+                },
               ]);
             },
           }),
@@ -2421,7 +2430,12 @@ describe('sessionCompleted', () => {
         'sub-test-id',
         PROFILE_ID,
       );
-      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
+      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        SESSION_ID,
+        expect.objectContaining({ ageBracket: 'adolescent' }),
+      );
       // No refund — LLM succeeded.
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
@@ -2861,14 +2875,19 @@ describe('sessionCompleted', () => {
         memoryCollectionEnabled: true,
       });
       mockAnalyzeSessionTranscript.mockResolvedValue({
-        explanationEffectiveness: null,
-        interests: ['space'],
-        strengths: null,
-        struggles: null,
-        resolvedTopics: null,
-        communicationNotes: null,
-        engagementLevel: null,
-        confidence: 'high',
+        // [WI-2952] analyzeSessionTranscript now returns the analysis WITH the
+        // vendor that produced it, so the producer survives to the safety gate.
+        analysis: {
+          explanationEffectiveness: null,
+          interests: ['space'],
+          strengths: null,
+          struggles: null,
+          resolvedTopics: null,
+          communicationNotes: null,
+          engagementLevel: null,
+          confidence: 'high',
+        },
+        author: { provenance: 'llm', producerVendor: 'anthropic' },
       });
 
       await executeSteps(createEventData({ qualityRating: 4 }));
@@ -2884,6 +2903,8 @@ describe('sessionCompleted', () => {
         null,
         'inferred',
         SUBJECT_ID,
+        // [WI-2952] the author threaded from analyzeSessionTranscript
+        { provenance: 'llm', producerVendor: 'anthropic' },
       );
     });
 
@@ -3332,14 +3353,19 @@ describe('sessionCompleted', () => {
         memoryCollectionEnabled: true,
       });
       mockAnalyzeSessionTranscript.mockResolvedValue({
-        explanationEffectiveness: null,
-        interests: null,
-        strengths: null,
-        struggles: null,
-        resolvedTopics: null,
-        communicationNotes: null,
-        engagementLevel: null,
-        confidence: 'high',
+        // [WI-2952] analyzeSessionTranscript now returns the analysis WITH the
+        // vendor that produced it, so the producer survives to the safety gate.
+        analysis: {
+          explanationEffectiveness: null,
+          interests: null,
+          strengths: null,
+          struggles: null,
+          resolvedTopics: null,
+          communicationNotes: null,
+          engagementLevel: null,
+          confidence: 'high',
+        },
+        author: { provenance: 'llm', producerVendor: 'anthropic' },
       });
 
       await executeSteps(createEventData({ qualityRating: 4 }));
@@ -3352,6 +3378,8 @@ describe('sessionCompleted', () => {
         null, // subjectName (null when DB lookup returns no name)
         'inferred',
         SUBJECT_ID, // subjectId threaded from event data
+        // [WI-2952] the author threaded from analyzeSessionTranscript
+        { provenance: 'llm', producerVendor: 'anthropic' },
       );
     });
   });
@@ -3697,14 +3725,19 @@ describe('memoized step-state PII break test [F-089]', () => {
       memoryCollectionEnabled: true,
     });
     mockAnalyzeSessionTranscript.mockResolvedValue({
-      explanationEffectiveness: null,
-      interests: null,
-      strengths: null,
-      struggles: [{ topic: 'long division', subject: 'maths' }],
-      resolvedTopics: null,
-      communicationNotes: null,
-      engagementLevel: null,
-      confidence: 'high',
+      // [WI-2952] analyzeSessionTranscript now returns the analysis WITH the
+      // vendor that produced it, so the producer survives to the safety gate.
+      analysis: {
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: [{ topic: 'long division', subject: 'maths' }],
+        resolvedTopics: null,
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      },
+      author: { provenance: 'llm', producerVendor: 'anthropic' },
     });
     mockApplyAnalysis.mockResolvedValue({
       fieldsUpdated: ['struggles'],

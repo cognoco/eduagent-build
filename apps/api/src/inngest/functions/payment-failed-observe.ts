@@ -22,6 +22,7 @@ import { inngest } from '../client';
 import {
   getStepDatabase,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepResendApiKey,
 } from '../helpers';
 
@@ -180,21 +181,33 @@ export const paymentFailedObserve = inngest.createFunction(
         throw new Error('billing alert delivery target not found');
       }
       if (!target.email) {
-        return { sent: false, reason: 'no_email' };
+        return { sent: false, reason: 'no_email' as const };
       }
       const manageBillingUrl =
         'mentomate://billing/manage?payerPersonId=' +
         encodeURIComponent(target.payerPersonId);
-      return sendEmail(
+      const result = await sendEmail(
         formatPaymentFailedEmail(target.email, manageBillingUrl),
         {
           db,
+          environment: getStepEnvironment(),
           resendApiKey: getStepResendApiKey(),
           emailFrom: getStepEmailFrom(),
           idempotencyKey: sourceEventId,
         },
       );
+      if (!result.sent && result.retryability === 'transient') {
+        throw new Error(
+          `payment-failed-observe transient email failure: ${result.reason}`,
+        );
+      }
+      return result;
     });
+    const emailFailureReason = !email.sent
+      ? email.reason === 'resend_api_error'
+        ? `resend_api_error_${email.statusCode}`
+        : email.reason
+      : undefined;
 
     await step.run('record-payment-failed-email-outcome', async () => {
       const db = getStepDatabase();
@@ -202,7 +215,7 @@ export const paymentFailedObserve = inngest.createFunction(
         alertId: persisted.alertId,
         channel: 'email',
         sent: email.sent,
-        ...(email.reason ? { reason: email.reason } : {}),
+        ...(emailFailureReason ? { reason: emailFailureReason } : {}),
       });
     });
     if (!email.sent) {
@@ -210,7 +223,7 @@ export const paymentFailedObserve = inngest.createFunction(
         alertId: persisted.alertId,
         subscriptionId: data.subscriptionId,
         channel: 'email',
-        reason: email.reason ?? 'unknown',
+        reason: emailFailureReason ?? 'unknown',
         timestamp: new Date().toISOString(),
       });
       await step.sendEvent('escalate-payment-failed-email', {

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import {
   assessmentAnswerSchema,
   quickCheckRequestSchema,
@@ -17,6 +18,7 @@ import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
+import { assertCanReadProfile } from '../services/family-access';
 import {
   createAssessmentIfNoneActive,
   getAssessment,
@@ -33,12 +35,18 @@ import { createLogger } from '../services/logger';
 
 const logger = createLogger();
 
+const quickCheckSessionParamSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
 // Extends the base RouteEnv with quota variables set by the metering
 // middleware. Typed here rather than in RouteEnv itself because these variables
 // are only meaningful for metered routes — adding them globally would mislead
 // readers of unmetered route handlers.
 type AssessmentRouteEnv = RouteEnv & {
   Variables: RouteEnv['Variables'] & {
+    // [WI-2876] Required by assertCanReadProfile.
+    account: { id: string } | undefined;
     subscriptionId: string | undefined;
     quotaDecrementSource: 'monthly' | 'top_up' | undefined;
     quotaDecrementTopUpCreditId: string | undefined;
@@ -84,6 +92,10 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
 
   .get('/subjects/:subjectId/topics/:topicId/assessments/active', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -215,6 +227,11 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Get assessment state
   .get('/assessments/:assessmentId', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts) —
+    // before returning the exchangeHistory transcript.
+    await assertCanReadProfile(c, profileId);
     const assessmentId = c.req.param('assessmentId');
 
     const assessment = await getAssessment(db, profileId, assessmentId);
@@ -254,17 +271,19 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Submit quick check response during session
   .post(
     '/sessions/:sessionId/quick-check',
+    zValidator('param', quickCheckSessionParamSchema),
     zValidator('json', quickCheckRequestSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
-      const sessionId = c.req.param('sessionId');
+      const { sessionId } = c.req.valid('param');
       const { answer } = c.req.valid('json');
-
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      await assertLlmConsent(db, profileId);
 
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
+
+      // [WI-2990] Preserve the scoped not-found result before enforcing the
+      // consent boundary shared by topic-scoped and general LLM dispatches.
+      await assertLlmConsent(db, profileId);
 
       // Load topic scope for LLM context.
       const topicContext = session.topicId
