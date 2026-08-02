@@ -3,6 +3,7 @@ import {
   NOW_REFRESH_OBSERVATION_WINDOW_MS,
   assertRequestAttempted,
   captureNowRefreshPayload,
+  isExactSelfNowRequest,
   observeCapturedNowRefresh,
   observeNowRefreshRequestAttempt,
 } from '../../helpers/now-refresh-observation';
@@ -110,28 +111,17 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
   // REQUEST observation too, so "no matching request fired" is always a
   // distinct, asserted failure -- never silently absorbed into the response's
   // rejected/unsettled classification.
-  const postBackNowMatchesUrl = (url: URL) =>
-    url.pathname.endsWith('/v1/now') &&
-    url.searchParams.get('scope') === 'self';
-
   const postBackNowArmedAtMs = Date.now();
-  const postBackNowRequestPromise = page.waitForRequest(
-    (request) =>
-      request.method() === 'GET' &&
-      postBackNowMatchesUrl(new URL(request.url())),
-    { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
-  );
+  const postBackNowRequestPromise = page.waitForRequest(isExactSelfNowRequest, {
+    timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS,
+  });
   // [WI-2961] Start reading the body the instant Playwright observes the
   // exact response. Keeping only the Response handle until after Back can
   // outlive Chromium's Network body, making a healthy response unreadable.
   const postBackNowCapturePromise = captureNowRefreshPayload(
     page.waitForResponse(
       (response) => {
-        const request = response.request();
-        return (
-          request.method() === 'GET' &&
-          postBackNowMatchesUrl(new URL(response.url()))
-        );
+        return isExactSelfNowRequest(response.request());
       },
       { timeout: NOW_REFRESH_OBSERVATION_WINDOW_MS },
     ),
@@ -139,6 +129,10 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
       (await response.json()) as {
         generatedAt?: unknown;
       },
+    {
+      page,
+      matchesResponse: (response) => isExactSelfNowRequest(response.request()),
+    },
   );
 
   await pressableClick(page.getByTestId('chat-shell-back'));

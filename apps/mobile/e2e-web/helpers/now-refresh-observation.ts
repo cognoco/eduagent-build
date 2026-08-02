@@ -28,6 +28,19 @@ const OBSERVATION_SLACK_MS = 3_000;
 export const NOW_REFRESH_OBSERVATION_WINDOW_MS =
   PRODUCTION_MENTOR_RETURN_REFRESH_BOUND_MS + OBSERVATION_SLACK_MS;
 
+/** Exact self-scoped Now request used by the post-Back observation. */
+export function isExactSelfNowRequest(request: {
+  method(): string;
+  url(): string;
+}): boolean {
+  const url = new URL(request.url());
+  return (
+    request.method() === 'GET' &&
+    url.pathname.endsWith('/v1/now') &&
+    url.searchParams.get('scope') === 'self'
+  );
+}
+
 export type NowRefreshOutcome<Response> =
   | { kind: 'settled'; response: Response }
   | { kind: 'rejected'; error: unknown }
@@ -50,6 +63,16 @@ export type NowRefreshCaptureResult<Response, Payload> =
       payloadRead: Promise<NowRefreshPayloadReadResult<Payload>>;
     };
 
+interface NowRefreshPayloadCapturePage<Response> {
+  on(event: 'response', listener: (response: Response) => void): void;
+  off(event: 'response', listener: (response: Response) => void): void;
+}
+
+interface NowRefreshPayloadCaptureOptions<Response> {
+  page: NowRefreshPayloadCapturePage<Response>;
+  matchesResponse: (response: Response) => boolean;
+}
+
 async function readNowRefreshPayload<Payload>(
   readPayload: () => Promise<Payload>,
 ): Promise<NowRefreshPayloadReadResult<Payload>> {
@@ -71,18 +94,44 @@ async function readNowRefreshPayload<Payload>(
 export async function captureNowRefreshPayload<Response, Payload>(
   responsePromise: Promise<Response>,
   readPayload: (response: Response) => Promise<Payload>,
+  options?: NowRefreshPayloadCaptureOptions<Response>,
 ): Promise<NowRefreshCaptureResult<Response, Payload>> {
+  let capturedResponse: Response | undefined;
+  let capturedPayloadRead:
+    | Promise<NowRefreshPayloadReadResult<Payload>>
+    | undefined;
+  const onResponse = (response: Response): void => {
+    if (
+      capturedPayloadRead === undefined &&
+      options?.matchesResponse(response)
+    ) {
+      capturedResponse = response;
+      capturedPayloadRead = readNowRefreshPayload(() => readPayload(response));
+    }
+  };
+
+  if (options) options.page.on('response', onResponse);
+
+  const cleanup = (): void => {
+    if (options) options.page.off('response', onResponse);
+  };
+
   let response: Response;
   try {
     response = await responsePromise;
   } catch (error) {
+    cleanup();
     return { kind: 'response-rejected', error };
   }
 
+  cleanup();
   return {
     kind: 'response-settled',
     response,
-    payloadRead: readNowRefreshPayload(() => readPayload(response)),
+    payloadRead:
+      capturedResponse === response && capturedPayloadRead !== undefined
+        ? capturedPayloadRead
+        : readNowRefreshPayload(() => readPayload(response)),
   };
 }
 

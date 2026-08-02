@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The deterministic helper suite characterizes response rejection/abort, bounded non-settlement, settled payload capture, released-body hard failure, request-attempt classification, and expanded parallel-load timing at PR head e3941e042.",
+      "pointer": "apps/mobile/e2e-web/helpers/now-refresh-observation.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "At PR head e3941e042, the returning-learner harness uses one shared exact GET self-scoped Now predicate for request observation, waitForResponse, and response-event payload capture before Back; a source contract test locks all three wires.",
+      "pointer": "apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Mutation-sensitive RED/GREEN/REVERT evidence was rerun against the 24-test PR head; both mutations fail and restoration is green.",
+      "pointer": "docs/evidence/WI-2976/red-green.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "PR-head staging evidence only: run 30750006446 / job 91502325938, E2E_ENV=staging, v2-release 23/23 with four workers and returning learner direct-green. Landed-head rerun plus focused one-worker retries-zero control are still pending; those empirical results gate AC-4 satisfaction.",
+      "pointer": "gh run view 30750006446 --job 91502325938"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "UNMET at PR head: AC-5 is not claimed satisfied until every applicable check and automated-review thread is strict green; pending landed-head proof and review status remain explicit in the completion summary.",
+      "pointer": "docs/evidence/WI-2976/completion-summary.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "docs/evidence/WI-2976/red-green.md"
+}
