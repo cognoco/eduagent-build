@@ -488,6 +488,7 @@ export default function ChildMentorMemoryScreen() {
             voiceLocale={getVoiceLocaleForLanguage(
               activeProfile?.conversationLanguage,
             )}
+            voiceScopeKey={childProfileId}
             onChangeText={setDraft}
             onAppendTranscript={(finalTranscript) =>
               setDraft((prev) => appendTranscript(prev, finalTranscript))
@@ -654,6 +655,7 @@ export default function ChildMentorMemoryScreen() {
                 voiceLocale={getVoiceLocaleForLanguage(
                   activeProfile?.conversationLanguage,
                 )}
+                scopeKey={childProfileId}
                 testID="correction-mic"
                 onTranscript={(finalTranscript) =>
                   setCorrectionText((prev) =>

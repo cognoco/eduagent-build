@@ -127,6 +127,12 @@ export function useSpeechRecognition(
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const instanceTokenRef = useRef(Symbol('speech-capture-owner'));
+  // Incremented by stopListening; a startListening still awaiting module
+  // load or the OS permission prompt compares its captured generation after
+  // every await and aborts if a stop (or a newer start) has superseded it —
+  // otherwise the pending start would claim ownership and open the native
+  // microphone AFTER the caller already moved on (e.g. a scope change).
+  const startGenerationRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -221,11 +227,19 @@ export function useSpeechRecognition(
   }, [loadModule, continuous]);
 
   const startListening = useCallback(async () => {
+    const generation = ++startGenerationRef.current;
+    const cancelled = () => startGenerationRef.current !== generation;
     try {
       setError(null);
       setStatus('requesting_permission');
 
       const speechModule = await loadModule();
+      if (cancelled()) {
+        if (mountedRef.current) {
+          setStatus((current) => (current === 'error' ? current : 'idle'));
+        }
+        return;
+      }
 
       if (!speechModule) {
         if (mountedRef.current) {
@@ -237,6 +251,12 @@ export function useSpeechRecognition(
 
       // Request permissions
       const { granted } = await speechModule.requestPermissionsAsync();
+      if (cancelled()) {
+        if (mountedRef.current) {
+          setStatus((current) => (current === 'error' ? current : 'idle'));
+        }
+        return;
+      }
       if (!granted) {
         if (mountedRef.current) {
           setError('Microphone permission is required for voice input');
@@ -268,6 +288,10 @@ export function useSpeechRecognition(
   }, [loadModule, options?.lang, continuous]);
 
   const stopListening = useCallback(async () => {
+    // Supersede any start still in flight (module load / permission prompt):
+    // it will observe the generation change at its next checkpoint and abort
+    // instead of opening the microphone after the caller moved on.
+    startGenerationRef.current += 1;
     try {
       const speechModule = await loadModule();
 

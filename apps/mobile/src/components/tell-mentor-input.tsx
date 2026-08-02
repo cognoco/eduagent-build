@@ -15,6 +15,8 @@ interface TellMentorInputProps {
   isPending?: boolean;
   /** Voice locale resolved from the writing profile's conversation language. */
   voiceLocale?: string;
+  /** Data-scope identity for the voice capture (e.g. the child profile id). */
+  voiceScopeKey?: string | number;
   onChangeText: (text: string) => void;
   /**
    * Preferred voice-append path: the parent applies the final transcript with
@@ -75,6 +77,7 @@ export function TellMentorInput({
   value,
   isPending,
   voiceLocale,
+  voiceScopeKey,
   onChangeText,
   onAppendTranscript,
   onSubmit,
@@ -124,6 +127,7 @@ export function TellMentorInput({
           value={value}
           disabled={isPending}
           voiceLocale={voiceLocale}
+          scopeKey={voiceScopeKey}
           testID="tell-mentor-mic"
           onTranscript={(finalTranscript) =>
             onAppendTranscript
