@@ -226,3 +226,72 @@ scripts/eval-live-gate-independence.test.ts: 14 passed, 14 total
 `nx run api:typecheck` exit 0. `eslint` clean (0 errors; pre-existing-pattern
 non-null-assertion warnings only). `pnpm run test:scripts`: 73 suites passed
 (1 skipped), 1221 passed (4 skipped), 1225 total — unchanged.
+
+## Adversarial correction round (fresh exact-head review, 0 MUST_FIX, 2 SHOULD_FIX)
+
+A fresh independent adversarial review at head `39c7633cf449c44ee14da878feebc20beec49588`
+confirmed the provider-accounting round correct on every axis it re-derived
+(context threading, opener judge accounting, runner reservation, preflight
+floor, filter consistency, error messages, type safety, regressions) and ran
+6 targeted mutations, killing 5/6. The 2 SHOULD_FIX items — both proof/
+consistency gaps, not runtime defects — are resolved below.
+
+**SHOULD-1 — mutation M6 (`runner.ts:276` `openrouterModel: options.openrouterModel`
+→ `undefined`) survived the full `eval-llm/runner/` + opener suite (14 suites,
+182 tests, all green under the mutation).** Root cause: every existing
+`providerCallCount` test fixture (`makeCostlyLiveFlow`) uses a FIXED cost
+that ignores its `context` argument entirely, so no test could distinguish
+"the runner passed the real `openrouterModel`" from "the runner silently
+dropped it." Fix: added one new case to `runner.test.ts`'s "provider-accounting
+correction" describe block using a flow whose `providerCallCount` mirrors
+review-continuity-opener's real rule (`context.openrouterModel ? 2 : 1`),
+run with `openrouterModel` set and a cap that only fits the pinned (2/item)
+cost. RED (mutation applied, `openrouterModel: undefined` hardcoded):
+`calls.count` was `3` (not `2`) — every item silently priced at 1 instead of
+2, nothing skipped, no error, `--max-live-calls` overspent by exactly the
+failure class this WI closes. GREEN after reverting the mutation: `calls.count`
+is `2`, 1 item correctly skipped. Mutation applied and reverted via a single
+paired `Edit`/`Edit` (no Bash `sed`); `git diff --stat apps/api/eval-llm/runner/runner.ts`
+confirmed a byte-identical revert before proceeding.
+
+**SHOULD-2 — `index.ts`'s `--list` block ignored `--flow`/`--profile`/`--scenarios`,
+unlike the sibling preflight and post-run report blocks in the same file.**
+Verified by direct CLI invocation (deterministic, `--list` only, no
+bootstrap): `--list --flow review-continuity-opener --scenarios verbatim-solid`
+reported the FULL unscoped matrix (`required=329 ... total=366`) instead of
+the scoped one. Fix: reused the exact filter expressions already written
+twice in `index.ts` (`FLOWS.filter(flow => !options.flowFilter || ...)`,
+`PROFILES.filter(profile => !options.profileFilter || ...)`), and threaded
+`scenarioFilter` into both derive calls — no new abstraction. RED: added
+`scripts/eval-live-gate-independence.test.ts`'s new SHOULD-2 test (source-
+pattern assertions on the `--list` block plus a numeric scoped-vs-full
+comparison via the real derive functions) with the `--list` hunk of `index.ts`
+temporarily reverted via `Edit`/`Edit` (not Bash) to its pre-fix content —
+failed on the first source-pattern assertion (`FLOWS.filter(...flowFilter...)`
+absent from the block). GREEN after restoring the fix: passes, and the same
+scoped derivation now reports `required=1 ... total=1` for the exact
+`--flow review-continuity-opener --scenarios verbatim-solid` repro from the
+adversarial report, instead of the full 329/366.
+
+Manually re-verified after the fix (deterministic, no bootstrap):
+```text
+$ npx tsx apps/api/eval-llm/index.ts --list --flow review-continuity-opener --scenarios verbatim-solid | grep -E "Envelope|review-continuity"
+  review-continuity-opener  Review-Continuity Opener faithfulness (...)
+Envelope matrix demand: required=1 baseline=10 configured=2 headroom=1 (10%)
+Envelope provider demand: outer=1 internal=0 total=1 (context: unpinned/production routing)
+  [review-continuity-opener] required=1 baseline=10
+```
+
+Final suite counts after this round:
+
+```text
+apps/api/eval-llm/runner/runner.test.ts: 20 passed, 20 total
+apps/api/eval-llm/ (all): 27 suites, 322 passed, 9 skipped, 331 total
+scripts/eval-live-gate-independence.test.ts: 15 passed, 15 total
+```
+
+`nx run api:typecheck` exit 0. `eslint` clean (0 errors; pre-existing-pattern
+non-null-assertion warnings only). `pnpm run test:scripts`: 73 suites passed
+(1 skipped), 1222 passed (4 skipped), 1226 total. No `--live`, no provider
+bootstrap, no paid/live call, no deploy, no GitHub thread reply, no merge,
+no Cosmo mutation at any point in this round.

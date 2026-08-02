@@ -162,15 +162,32 @@ async function main(): Promise<void> {
     clearZeroDriftReceipt();
     listFlows(FLOWS);
     const baseline = await readBaseline();
+    // [WI-3029 SHOULD-2] --list is the operator-facing sizing surface for
+    // scoped seed/reseed invocations (see the seed-guard's remedy text
+    // below) — it must apply --flow / --profile / --scenarios exactly like
+    // the preflight and post-run report blocks do, or a scoped `--list`
+    // still reports the FULL unscoped matrix (329/366), which is the wrong
+    // number to size --max-live-calls from.
+    const scopedFlows = FLOWS.filter(
+      (flow) => !options.flowFilter || options.flowFilter.has(flow.id),
+    );
+    const scopedProfiles = PROFILES.filter(
+      (profile) =>
+        !options.profileFilter || options.profileFilter.has(profile.id),
+    );
     const budget = deriveEnvelopeBudgetFromMatrix(
-      FLOWS,
-      PROFILES,
+      scopedFlows,
+      scopedProfiles,
       baseline?.flows,
+      { scenarioFilter: options.scenarioFilter },
     );
     const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
-      FLOWS,
-      PROFILES,
-      { providerCallContext: { openrouterModel: options.openrouterModel } },
+      scopedFlows,
+      scopedProfiles,
+      {
+        scenarioFilter: options.scenarioFilter,
+        providerCallContext: { openrouterModel: options.openrouterModel },
+      },
     );
     console.log(
       `Envelope matrix demand: required=${budget.requiredSamples} ` +

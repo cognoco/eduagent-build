@@ -250,6 +250,70 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     );
   });
 
+  test('[WI-3029 SHOULD-2] --list demand report honors --flow/--profile/--scenarios like the preflight and post-run report do', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/api/eval-llm/index.ts'),
+      'utf8',
+    );
+    const listOnlyStart = source.indexOf('if (listOnly) {');
+    expect(listOnlyStart).toBeGreaterThanOrEqual(0);
+    const listOnlyEnd = source.indexOf('\n  }\n', listOnlyStart);
+    const listOnlyBlock = source.slice(listOnlyStart, listOnlyEnd);
+
+    // The --list block must filter FLOWS/PROFILES by flowFilter/profileFilter
+    // BEFORE deriving demand, and thread scenarioFilter into both derive
+    // calls — exactly like the sibling preflight (`--live --only-envelope-
+    // flows`) and post-run report blocks already do in this same file.
+    // Passing the raw, unfiltered FLOWS/PROFILES means --list always reports
+    // the full unscoped matrix regardless of --flow/--profile/--scenarios.
+    expect(listOnlyBlock).toMatch(
+      /FLOWS\.filter\(\s*\(flow\) => !options\.flowFilter \|\| options\.flowFilter\.has\(flow\.id\)/,
+    );
+    expect(listOnlyBlock).toMatch(
+      /PROFILES\.filter\(\s*\(profile\)\s*=>\s*!options\.profileFilter \|\| options\.profileFilter\.has\(profile\.id\)/,
+    );
+    expect(listOnlyBlock).toMatch(/scenarioFilter:\s*options\.scenarioFilter/);
+
+    // Ground the "over-reports" claim numerically with the SAME derive
+    // functions the CLI uses, scoped exactly as
+    // `--list --flow review-continuity-opener --scenarios verbatim-solid`
+    // would scope them: this must be a tiny demand, nothing like the
+    // full-matrix 329/366 an unfiltered --list reports today.
+    const scopedFlows = FLOWS.filter(
+      (flow) => flow.id === 'review-continuity-opener',
+    );
+    const scenarioFilter = new Set(['verbatim-solid']);
+    const baseline = parseBaseline(
+      readFileSync(join(repoRoot, 'apps/api/eval-llm/baseline.json'), 'utf8'),
+    );
+    const scopedBudget = deriveEnvelopeBudgetFromMatrix(
+      scopedFlows,
+      PROFILES,
+      baseline!.flows,
+      { scenarioFilter },
+    );
+    const scopedDemand = deriveEnvelopeProviderDemandFromMatrix(
+      scopedFlows,
+      PROFILES,
+      { scenarioFilter },
+    );
+    const fullBudget = deriveEnvelopeBudgetFromMatrix(
+      FLOWS,
+      PROFILES,
+      baseline!.flows,
+    );
+    const fullDemand = deriveEnvelopeProviderDemandFromMatrix(FLOWS, PROFILES);
+
+    expect(scopedBudget.requiredSamples).toBe(1);
+    expect(scopedDemand.providerCalls).toBe(1);
+    expect(fullBudget.requiredSamples).toBe(329);
+    expect(fullDemand.providerCalls).toBe(366);
+    expect(scopedBudget.requiredSamples).toBeLessThan(
+      fullBudget.requiredSamples,
+    );
+    expect(scopedDemand.providerCalls).toBeLessThan(fullDemand.providerCalls);
+  });
+
   test('full flow registry preserves the pre-budget runtime order', () => {
     // [CodeRabbit] Parse the ACTUAL registry membership + order from the
     // array body and assert exact equality against the expected list — the

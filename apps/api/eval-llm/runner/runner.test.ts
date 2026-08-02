@@ -212,16 +212,16 @@ describe('runHarness live budget cap [WI-3029 provider-accounting correction]', 
   });
 
   afterEach(async () => {
-    const dir = path.resolve(
-      __dirname,
-      '..',
-      'snapshots',
+    for (const id of [
       'test-costly-live-flow',
-    );
-    try {
-      await fs.rm(dir, { recursive: true, force: true });
-    } catch {
-      // ignore
+      'test-context-sensitive-live-flow',
+    ]) {
+      const dir = path.resolve(__dirname, '..', 'snapshots', id);
+      try {
+        await fs.rm(dir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
     }
   });
 
@@ -308,6 +308,53 @@ describe('runHarness live budget cap [WI-3029 provider-accounting correction]', 
     });
     expect(calls.count).toBe(2);
     expect(summary.liveCallsOk).toBe(2);
+  });
+
+  it('[WI-3029 SHOULD-1] threads the real options.openrouterModel into providerCallCount, not an empty/undefined context', async () => {
+    // makeCostlyLiveFlow's cost is a FIXED constant that ignores its context
+    // argument, so it cannot tell "the runner passed the real
+    // openrouterModel" apart from "the runner silently dropped it" — both
+    // look identical to a context-blind cost function. This flow mirrors
+    // review-continuity-opener's ACTUAL rule (context.openrouterModel ? 2 : 1),
+    // so it only costs 2/item when options.openrouterModel genuinely reaches
+    // providerCallCount. If runHarness ever stopped threading the real value
+    // (e.g. `providerCallContext: { openrouterModel: undefined }` regardless
+    // of options.openrouterModel), every item would silently cost 1 instead
+    // of 2, nothing would be skipped, and calls.count would be 3, not 2.
+    const calls = { count: 0 };
+    const flow: FlowDefinition<{ scenarioId: string }> = {
+      id: 'test-context-sensitive-live-flow',
+      name: 'Test Context-Sensitive Live Flow',
+      sourceFile: 'test',
+      buildPromptInput: () => null,
+      enumerateScenarios(): Array<Scenario<{ scenarioId: string }>> {
+        return [
+          { scenarioId: 'L1', input: { scenarioId: 'L1' } },
+          { scenarioId: 'L2', input: { scenarioId: 'L2' } },
+          { scenarioId: 'L3', input: { scenarioId: 'L3' } },
+        ];
+      },
+      buildPrompt: (input) => ({ system: `live ${input.scenarioId}` }),
+      runLive: async () => {
+        calls.count++;
+        return '{"ok":true}';
+      },
+      providerCallCount: (_input, context) => (context.openrouterModel ? 2 : 1),
+    };
+    const summary = await runHarness([flow as FlowDefinition], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+      openrouterModel: 'openai/gpt-oss-120b',
+      // Fits exactly 2 pinned-cost items (2+2=4); the 3rd needs 2 more
+      // (4+2=6 > 4) and must be skipped.
+      maxLiveCalls: 4,
+    });
+    expect(calls.count).toBe(2);
+    expect(summary.liveCallsOk).toBe(2);
+    const budgetSkips = summary.skipped.filter((s) =>
+      s.reason.includes('live budget exceeded'),
+    );
+    expect(budgetSkips.length).toBe(1);
   });
 });
 
