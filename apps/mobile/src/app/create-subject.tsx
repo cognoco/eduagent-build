@@ -23,7 +23,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCreateSubject, useSubjects } from '../hooks/use-subjects';
 import { useResolveSubject } from '../hooks/use-resolve-subject';
 import { useThemeColors } from '../lib/theme';
+import { useProfile } from '../lib/profile';
+import { getVoiceLocaleForLanguage } from '../lib/language-locales';
 import { Button } from '../components/common/Button';
+import { VoiceInputControl, appendTranscript } from '../components/common';
 import { BookPageFlipAnimation } from '../components/common/BookPageFlipAnimation';
 import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
@@ -117,6 +120,10 @@ function CreateSubjectScreenAuthenticated() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
+  const { activeProfile } = useProfile();
+  const voiceLocale = getVoiceLocaleForLanguage(
+    activeProfile?.conversationLanguage,
+  );
   const { returnTo, chatTopic } = useLocalSearchParams<{
     returnTo?: string;
     chatTopic?: string;
@@ -617,6 +624,22 @@ function CreateSubjectScreenAuthenticated() {
     [resolveState.phase, error],
   );
 
+  // Voice append: functional updater so an edit racing the transcript commit
+  // is never overwritten; clamped to the field's 200-char maxLength (which
+  // only bounds native edits, not programmatic appends). Side-effect resets
+  // mirror onNameChange.
+  const onNameTranscript = useCallback(
+    (finalTranscript: string) => {
+      setName((prev) => appendTranscript(prev, finalTranscript).slice(0, 200));
+      if (error) setError('');
+      if (resolveState.phase === 'suggestion') {
+        setResolveState({ phase: 'idle' });
+      }
+      setResolveRounds(0);
+    },
+    [resolveState.phase, error],
+  );
+
   const handleCancel = useCallback(() => {
     // [BUG-692] Signal any in-flight mutation to skip post-await navigation.
     cancelledRef.current = true;
@@ -810,6 +833,15 @@ function CreateSubjectScreenAuthenticated() {
             autoFocus
             onFocus={onFieldFocus('name')}
           />
+          <View className="mb-4 -mt-2">
+            <VoiceInputControl
+              value={name}
+              disabled={isBusy}
+              voiceLocale={voiceLocale}
+              testID="create-subject-name-mic"
+              onTranscript={onNameTranscript}
+            />
+          </View>
         </View>
 
         {/* Inline error when existing subjects failed to load [UX-DE] */}
@@ -1010,6 +1042,19 @@ function CreateSubjectScreenAuthenticated() {
                   editable={!isBusy}
                   testID="subject-clarify-input"
                 />
+                <View className="mb-3 -mt-2">
+                  <VoiceInputControl
+                    value={clarificationInput}
+                    disabled={isBusy}
+                    voiceLocale={voiceLocale}
+                    testID="subject-clarify-mic"
+                    onTranscript={(finalTranscript) =>
+                      setClarificationInput((prev) =>
+                        appendTranscript(prev, finalTranscript),
+                      )
+                    }
+                  />
+                </View>
                 <Button
                   variant="primary"
                   label={t('subject.checkThisInstead')}

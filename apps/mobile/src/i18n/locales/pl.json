@@ -4425,7 +4425,6 @@
     },
     "search": {
       "placeholder": "Szukaj tematów",
-      "micLabel": "Szukaj głosem",
       "noResults": "Brak tematów pasujących do wyszukiwania."
     },
     "notes": {
@@ -4433,7 +4432,6 @@
       "authorSelf": "Moje notatki",
       "authorMentor": "Zapisane od mentora",
       "addNote": "Dodaj notatkę",
-      "micLabel": "Dodaj notatkę głosowo",
       "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu.",
       "saveErrorTitle": "Nie można zapisać notatki",
       "emptyTopic": "Jeszcze brak notatek. Zapisz myśl na ten temat."

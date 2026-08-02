@@ -3,20 +3,10 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '../../lib/theme';
-import { VoiceRecordButton } from '../session/VoiceRecordButton';
+import { VoiceInputControl, appendTranscript } from '../common';
 import type { SubjectHubNote } from './_view-models/subject-hub-state';
 
 type NoteOrigin = SubjectHubNote['origin'];
-
-// Transcription-only contract (spec §16 / AI Act Art 5(1)(f)): the note mic only
-// ever requests speech-to-text. It never analyses tone or emotion. Mirrors the
-// search mic's SubjectHubVoiceRequest so both surfaces carry the same invariant.
-export interface SubjectHubNotesVoiceRequest {
-  kind: 'transcription';
-  source: 'subject-hub-notes';
-  analyzesTone: false;
-  analyzesEmotion: false;
-}
 
 interface SubjectHubNotesSectionProps {
   notes: SubjectHubNote[];
@@ -25,7 +15,8 @@ interface SubjectHubNotesSectionProps {
   canStudy?: boolean;
   onAddNote?: (content: string) => void | Promise<void>;
   isAddingNote?: boolean;
-  onNoteVoice?: (request: SubjectHubNotesVoiceRequest) => void;
+  /** Voice locale resolved from the active profile's conversation language. */
+  voiceLocale?: string;
   // Empty-state copy, resolved by the caller so it can match the mount context:
   // the subject-level mount keeps the default ("…about this subject"); the
   // topic-sheet mount passes the topic-context string ("…about this topic").
@@ -57,7 +48,7 @@ export function SubjectHubNotesSection({
   canStudy = true,
   onAddNote,
   isAddingNote = false,
-  onNoteVoice,
+  voiceLocale,
   emptyMessage,
 }: SubjectHubNotesSectionProps): React.ReactElement {
   const { t } = useTranslation();
@@ -104,10 +95,12 @@ export function SubjectHubNotesSection({
         {t('subjectHub.notes.heading')}
       </Text>
 
-      {/* Add-note input + transcription-only voice mic. Rendered only when the
-          learner Me-scope can study AND a persistence handler is wired; the masked
-          supporter view (canStudy=false) and the persistence-deferred hub render
-          neither. */}
+      {/* Add-note input + transcription-only voice mic (WI-2550, shared
+          VoiceInputControl citing the WI-2553 ledger). Rendered only when the
+          learner Me-scope can study AND a persistence handler is wired; the
+          masked supporter view (canStudy=false) and the persistence-deferred
+          hub render neither. The final transcript appends to the editable
+          draft and persists only through the existing submit path. */}
       {canAddNote ? (
         <View
           testID="subject-hub-notes-add-row"
@@ -123,34 +116,17 @@ export function SubjectHubNotesSection({
             placeholderTextColor={colors.textSecondary}
             className="min-h-12 flex-1 text-body text-text-primary"
           />
-          {/* The pressable carries testID `notes-mic`; the reused
-              VoiceRecordButton supplies the transcription-only mic visual.
-              The inner button's own onPress is a no-op so the request fires
-              exactly once, from the notes-mic pressable. Rendered only when an
-              `onNoteVoice` handler is wired — otherwise the mic would do nothing. */}
-          {onNoteVoice ? (
-            <Pressable
+          <View className="ms-2">
+            <VoiceInputControl
+              value={draft}
+              disabled={isSavingNote}
+              voiceLocale={voiceLocale}
               testID="notes-mic"
-              accessibilityRole="button"
-              accessibilityLabel={t('subjectHub.notes.micLabel')}
-              className="ms-2"
-              onPress={() =>
-                onNoteVoice({
-                  kind: 'transcription',
-                  source: 'subject-hub-notes',
-                  analyzesTone: false,
-                  analyzesEmotion: false,
-                })
+              onTranscript={(finalTranscript) =>
+                setDraft((prev) => appendTranscript(prev, finalTranscript))
               }
-            >
-              <View pointerEvents="none">
-                <VoiceRecordButton
-                  isListening={false}
-                  onPress={() => undefined}
-                />
-              </View>
-            </Pressable>
-          ) : null}
+            />
+          </View>
         </View>
       ) : null}
 

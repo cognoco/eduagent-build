@@ -9,6 +9,8 @@ import {
   SupportHubSubjectsTab,
 } from '../../components/support';
 import { SubjectsBrowse } from '../../components/subjects/SubjectsBrowse';
+import { useProfile } from '../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
 import {
   useEligibleManagedPersons,
   type EligibleManagedPerson,
@@ -28,6 +30,7 @@ import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 export default function SubjectsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { activeProfile } = useProfile();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const subjectsIndex = useSubjectsIndex({
     includeInactive: FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
@@ -126,6 +129,9 @@ export default function SubjectsScreen(): React.ReactElement {
       <SubjectsBrowse
         subjects={subjectsIndex.subjects}
         isLoading={subjectsIndex.isLoading}
+        voiceLocale={getVoiceLocaleForLanguage(
+          activeProfile?.conversationLanguage,
+        )}
         onOpenSubject={(subjectId) => {
           markSubjectsToHubTransition(subjectId);
           router.push({

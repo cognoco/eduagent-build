@@ -2030,6 +2030,7 @@ function SessionScreenInner() {
       handleTypeSubject={handleTypeSubject}
       setPendingSubjectResolution={setPendingSubjectResolution}
       router={router}
+      voiceLocale={languageVoiceLocale}
       effectiveMode={effectiveMode}
       homeworkProblemsState={homeworkProblemsState}
       currentProblemIndex={currentProblemIndex}

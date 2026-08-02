@@ -1,26 +1,25 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Pressable, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '../../lib/theme';
-
-export interface SubjectHubVoiceRequest {
-  kind: 'transcription';
-  source: 'subject-hub-search';
-  analyzesTone: false;
-  analyzesEmotion: false;
-}
+import { VoiceInputControl } from '../common';
 
 interface SubjectHubSearchFilterProps {
   query: string;
   onQueryChange: (query: string) => void;
-  onVoiceSearch?: (request: SubjectHubVoiceRequest) => void;
+  /** Voice locale resolved from the active profile's conversation language. */
+  voiceLocale?: string;
 }
 
+// The mic is the shared transcription-only VoiceInputControl (WI-2550, citing
+// the WI-2553 ledger): a final transcript REPLACES the query — the
+// JournalNotesArchive search precedent — flowing through the same
+// onQueryChange path as typing, so filtering behavior is identical. No tone
+// or emotion inference (AI Act Art 5(1)(f)); no raw-audio persistence.
 export function SubjectHubSearchFilter({
   query,
   onQueryChange,
-  onVoiceSearch,
+  voiceLocale,
 }: SubjectHubSearchFilterProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -35,22 +34,14 @@ export function SubjectHubSearchFilter({
         placeholderTextColor={colors.textSecondary}
         className="min-h-12 flex-1 text-body text-text-primary"
       />
-      <Pressable
-        testID="search-mic"
-        accessibilityRole="button"
-        accessibilityLabel={t('subjectHub.search.micLabel')}
-        className="ms-2 h-10 w-10 items-center justify-center rounded-full bg-background"
-        onPress={() =>
-          onVoiceSearch?.({
-            kind: 'transcription',
-            source: 'subject-hub-search',
-            analyzesTone: false,
-            analyzesEmotion: false,
-          })
-        }
-      >
-        <Ionicons name="mic-outline" size={20} color={colors.primary} />
-      </Pressable>
+      <View className="ms-2">
+        <VoiceInputControl
+          value={query}
+          voiceLocale={voiceLocale}
+          testID="search-mic"
+          onTranscript={onQueryChange}
+        />
+      </View>
     </View>
   );
 }

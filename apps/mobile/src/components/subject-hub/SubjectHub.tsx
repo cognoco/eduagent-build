@@ -17,10 +17,7 @@ import {
   type HubNextUp,
   type SubjectHubData,
 } from './_view-models/subject-hub-state';
-import {
-  SubjectHubSearchFilter,
-  type SubjectHubVoiceRequest,
-} from './SubjectHubSearchFilter';
+import { SubjectHubSearchFilter } from './SubjectHubSearchFilter';
 import { SubjectHubChapterSection } from './SubjectHubChapterSection';
 import { SubjectHubNextUp } from './SubjectHubNextUp';
 import { SubjectHubNotesSection } from './SubjectHubNotesSection';
@@ -52,7 +49,8 @@ interface SubjectHubProps {
   onNextUpPress?: (nextUp: HubNextUp) => void;
   onStudyTopic?: (topicId: string) => void;
   onReviewTopic?: (topicId: string) => void;
-  onSearchVoice?: (request: SubjectHubVoiceRequest) => void;
+  /** Voice locale for the search + notes mics (WI-2550), resolved by the route. */
+  voiceLocale?: string;
   // Topic-scoped note authoring (felt-knowing loop Flow 1). Threaded to the focused
   // topic's detail sheet; the subject-level notes section stays read-only.
   onAddNote?: (topicId: string, content: string) => void | Promise<void>;
@@ -69,7 +67,7 @@ export function SubjectHub({
   onNextUpPress,
   onStudyTopic,
   onReviewTopic,
-  onSearchVoice,
+  voiceLocale,
   onAddNote,
   isAddingNote = false,
 }: SubjectHubProps): React.ReactElement {
@@ -217,7 +215,7 @@ export function SubjectHub({
           <SubjectHubSearchFilter
             query={query}
             onQueryChange={setQuery}
-            onVoiceSearch={onSearchVoice}
+            voiceLocale={voiceLocale}
           />
         ) : null}
 
@@ -250,6 +248,7 @@ export function SubjectHub({
         onReviewTopic={handleReviewTopic}
         onAddNote={onAddNote}
         isAddingNote={isAddingNote}
+        voiceLocale={voiceLocale}
       />
     </>
   );
