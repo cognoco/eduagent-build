@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-02 10:08 CEST
+Last reconciled: 2026-08-02 10:16 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -19,12 +19,38 @@ Last reconciled: 2026-08-02 10:08 CEST
   Cosmo Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 remains
   Backlog/Active in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains
   Closed / Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live authoritative slice at checkpoint: 34 Closed, 2 Executing, 1 Reviewing,
-  1 In Review, and 4 Ready (42 members).
+- Live authoritative slice at checkpoint: 35 Closed, 3 Executing, and 4 Ready
+  (42 members).
 
 ## Current frontier — supersedes stale per-item positions below
 
 ### Latest authoritative boundary — 2026-08-02 10:08 CEST
+
+- Canonical global reviewer independently Closed/Done WI-2922 at 08:10Z. QA verified
+  landed ancestry, required green checks, 35/35 exact-revision tests, independent
+  14-failure pre-fix reconstruction followed by 35/35 restored green, and the
+  read-only live development column. QA comment
+  `3b08bce9-1f7c-8191-8fa5-001df9fb9328`; close comment
+  `3b08bce9-1f7c-81c5-9e5e-001db50f2ef5`.
+- WI-2643's distinct adversarial review found a substantive P1: the local-only role
+  setup guard reads URL authority hostname while PostgreSQL accepts query-string
+  host/socket overrides. A mutation-sensitive local proof admitted
+  `localhost?...host=shared.neon.tech` and invoked the apply path. Review returned
+  the item to Ready; it was immediately reclaimed as
+  `codex:wi2643-guard-rework:WI-2643` for a repository-only repair. FO-2097 /
+  `OCC-683942B7C3C8` records the occurrence. No database/config mutation is part of
+  this rework.
+- WI-2826's normal push gate has one safe repository-standard path: disposable
+  PostgreSQL 16 plus pgvector/pg_trgm on localhost:5433 through
+  `docker-compose.test.yml`. Lancre currently has no Docker/Podman/container runtime,
+  local PostgreSQL binaries, or listener on 5433. The executor did not use a remote
+  database, staging fallback, dummy URL, or hook bypass. Operator action is required
+  to install/start Docker Engine (preferred) or supply the equivalent localhost-only
+  database; corrected local head remains `787e254b`.
+- Updated live relation slice is 35 Closed, 3 Executing, and 4 Ready. Brief/relation
+  parity remains 42 and BID-48 remains Running.
+
+### Previous authoritative boundary — 2026-08-02 10:08 CEST
 
 - The operator-authorized `DATABASE_URL_DEVELOPMENT_HOST` pin was added as the only
   Doppler `mentomate/dev` configuration change. WI-2922 then reconciled the one
@@ -57,7 +83,7 @@ Last reconciled: 2026-08-02 10:08 CEST
   occurred. FO-2094 / `OCC-5FB5D6557BEE` records that the baseline has no `azp`
   validation despite the AC saying it must remain enforced. The item still awaits
   its separate shared-development audience-alignment authorization and live proof.
-- Direct live relation query returns 34 Closed, 2 Executing, 1 Reviewing, 1 In
+- Direct live relation query returned 34 Closed, 2 Executing, 1 Reviewing, 1 In
   Review, and 4 Ready across the same 42 authoritative members. Brief/relation
   membership remains reconciled; BID-48 remains Running.
 

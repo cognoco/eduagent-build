@@ -56,9 +56,29 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-02 10:08 CEST
+## Live reconciliation — 2026-08-02 10:16 CEST
 
 ### Latest authoritative boundary
+
+- WI-2922 is independently Closed/Done. Global review verified landed ancestry,
+  required checks, exact 35/35, independent pre-fix 14-failure reconstruction and
+  restored 35/35, plus the live read-only development column. QA comment
+  `3b08bce9-1f7c-8191-8fa5-001df9fb9328`; close comment
+  `3b08bce9-1f7c-81c5-9e5e-001db50f2ef5`.
+- WI-2643 adversarial review found a real local-target guard bypass through
+  PostgreSQL query-string host/socket overrides. It was returned to rework and
+  immediately reclaimed as `codex:wi2643-guard-rework:WI-2643`; the repair is
+  repository-only and must add a mutation-sensitive negative regression. FO-2097 /
+  `OCC-683942B7C3C8` captures the occurrence.
+- WI-2826's safe normal-hook path requires the documented disposable localhost:5433
+  PostgreSQL container. Lancre has no container runtime or local PostgreSQL, so the
+  operator must install/start Docker Engine (preferred) or supply equivalent
+  localhost-only PostgreSQL 16 with pgvector and pg_trgm. No remote target, staging
+  fallback, dummy URL, or hook bypass was used; local head remains `787e254b`.
+- Live slice is now 35 Closed, 3 Executing, and 4 Ready across 42 authoritative
+  members. Brief/relation parity remains intact and the batch is Running.
+
+### Previous authoritative boundary — 2026-08-02 10:08 CEST
 
 - WI-2922 is Reviewing at landed `01f55639` after the exact operator-authorized
   shared-development schema reconciliation. Only the approved non-secret host pin
