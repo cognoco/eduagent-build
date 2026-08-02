@@ -7,12 +7,12 @@
     },
     {
       "acRef": "AC-2",
-      "description": "The returning-learner harness uses one shared exact GET self-scoped Now predicate for request observation, waitForResponse, and response-event payload capture before Back; production code/config remains unchanged.",
+      "description": "The returning-learner harness uses one shared exact GET self-scoped Now predicate for request observation, waitForResponse, and response-event payload capture before Back; a source contract test locks all three wires and the legacy local predicate stays absent.",
       "pointer": "apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts"
     },
     {
       "acRef": "AC-3",
-      "description": "The mutation-sensitive red-green-revert run demonstrates the former response-settlement-only mechanism rejects after body release while the event-time seam passes.",
+      "description": "The mutation-sensitive red-green-revert run separately demonstrates capture-callback removal causing zero reads and fallback-selection forcing a late released-body failure; the restored event-time seam passes.",
       "pointer": ".cosmo/WI-2976/red-green.md"
     },
     {

@@ -35,6 +35,22 @@ describe('exact self-scoped Now request predicate', () => {
       ),
     ).toBe(false);
   });
+
+  it('keeps all post-Back observers wired to the shared predicate', () => {
+    const flowSource = readFileSync(
+      join(__dirname, '..', 'flows', 'v2', 'returning-learner-resume.spec.ts'),
+      'utf8',
+    );
+
+    expect(flowSource).toContain('page.waitForRequest(isExactSelfNowRequest');
+    expect(flowSource).toContain(
+      'return isExactSelfNowRequest(response.request());',
+    );
+    expect(flowSource).toContain(
+      'matchesResponse: (response) => isExactSelfNowRequest(response.request()),',
+    );
+    expect(flowSource).not.toContain('postBackNowMatchesUrl');
+  });
 });
 
 describe('exact Now-feed payload lifetime (WI-2961)', () => {
