@@ -10,7 +10,7 @@ Added an optional page-event capture seam to the test helper. It filters exact r
 
 ## Verification
 
-Focused Jest: 22 tests passed. Targeted ESLint and mobile TypeScript checks passed. Mutation-sensitive red/green-revert evidence is in `red-green.md`. Exact landed-head staging catalog and one-worker retries-zero control remain required PR/landing evidence.
+Focused Jest: 23 tests passed. Targeted ESLint and mobile TypeScript checks passed. Mutation-sensitive red/green-revert evidence is in `red-green.md`. Exact landed-head staging catalog and one-worker retries-zero control remain required PR/landing evidence.
 
 ## Caveats / Follow-ups
 

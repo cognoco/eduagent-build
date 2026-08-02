@@ -6,10 +6,36 @@ import {
   assertArmedBeforeAction,
   assertRequestAttempted,
   captureNowRefreshPayload,
+  isExactSelfNowRequest,
   observeCapturedNowRefresh,
   observeExactNowRefresh,
   observeNowRefreshRequestAttempt,
 } from './now-refresh-observation';
+
+describe('exact self-scoped Now request predicate', () => {
+  it('matches only GET self-scoped Now requests', () => {
+    const request = (method: string, url: string) => ({
+      method: () => method,
+      url: () => url,
+    });
+
+    expect(
+      isExactSelfNowRequest(
+        request('GET', 'https://api-stg.mentomate.com/v1/now?scope=self'),
+      ),
+    ).toBe(true);
+    expect(
+      isExactSelfNowRequest(
+        request('POST', 'https://api-stg.mentomate.com/v1/now?scope=self'),
+      ),
+    ).toBe(false);
+    expect(
+      isExactSelfNowRequest(
+        request('GET', 'https://api-stg.mentomate.com/v1/now?scope=person'),
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('exact Now-feed payload lifetime (WI-2961)', () => {
   it('starts the body read from the response event before Chromium can release it', async () => {

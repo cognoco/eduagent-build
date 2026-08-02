@@ -28,6 +28,19 @@ const OBSERVATION_SLACK_MS = 3_000;
 export const NOW_REFRESH_OBSERVATION_WINDOW_MS =
   PRODUCTION_MENTOR_RETURN_REFRESH_BOUND_MS + OBSERVATION_SLACK_MS;
 
+/** Exact self-scoped Now request used by the post-Back observation. */
+export function isExactSelfNowRequest(request: {
+  method(): string;
+  url(): string;
+}): boolean {
+  const url = new URL(request.url());
+  return (
+    request.method() === 'GET' &&
+    url.pathname.endsWith('/v1/now') &&
+    url.searchParams.get('scope') === 'self'
+  );
+}
+
 export type NowRefreshOutcome<Response> =
   | { kind: 'settled'; response: Response }
   | { kind: 'rejected'; error: unknown }

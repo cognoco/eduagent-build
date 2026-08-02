@@ -7,7 +7,7 @@
     },
     {
       "acRef": "AC-2",
-      "description": "The returning-learner harness starts exact-response body consumption from the matching response event before Back and leaves production code/config unchanged.",
+      "description": "The returning-learner harness uses one shared exact GET self-scoped Now predicate for request observation, waitForResponse, and response-event payload capture before Back; production code/config remains unchanged.",
       "pointer": "apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts"
     },
     {
