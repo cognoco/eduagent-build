@@ -8,6 +8,7 @@
 - running + pending + third main push — the intermediate SHA must remain independently attributable and main runs must not cancel;
 - stale pull-request head — PR group must use the PR number and stale PR runs must cancel;
 - historical main rerun — a rerun SHA must remain isolated from newer main evidence.
+- OTA publication — the preview branch is serialized and publication requires a live-main-tip match immediately before `eas update`.
 
 ## RED
 
@@ -47,8 +48,16 @@ reverted to the baseline and the same focused command was rerun:
 
 ```text
 REVERT/RED — exit 1; 1 suite; 3 failed, 1 passed
-RESTORE/GREEN — exit 0; 1 suite; 4 passed
+RESTORE/GREEN — exit 0; 1 suite; 6 passed
 ```
 
-No deployment, permissions, trigger, required-check, or merge-gate settings
-were changed.
+## OTA correction
+
+The OTA job now uses `group: ota-preview` with `cancel-in-progress: true` and
+checks the live `main` ref through the existing read-only `github.token` before
+publication. The publish condition requires
+`steps.live-main-tip.outputs.matches == 'true'`; this prevents an older main
+SHA from publishing after a newer tip has landed.
+
+No deployment authority, permissions, trigger, required-check, or merge-gate
+settings were broadened.

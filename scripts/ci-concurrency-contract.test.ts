@@ -7,41 +7,110 @@ type Concurrency = {
   'cancel-in-progress'?: unknown;
 };
 
-function readConcurrency(): Concurrency {
-  const workflow = parse(
+type Workflow = {
+  concurrency?: Concurrency;
+  jobs?: Record<
+    string,
+    { concurrency?: Concurrency; steps?: Array<Record<string, unknown>> }
+  >;
+};
+
+const MAIN_GROUP =
+  "${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || format('ci-main-{0}', github.sha) }}";
+const PR_CANCEL = "${{ github.event_name == 'pull_request' }}";
+
+function readWorkflow(): Workflow {
+  return parse(
     readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8'),
-  ) as { concurrency?: Concurrency };
-  return workflow.concurrency ?? {};
+  ) as Workflow;
 }
 
-function groupExpression(): string {
-  return String(readConcurrency().group ?? '');
+function schedule(
+  runs: Array<{ group: string; cancelInProgress: boolean }>,
+  next: { group: string; cancelInProgress: boolean },
+): Array<{ group: string; cancelInProgress: boolean }> {
+  if (next.cancelInProgress) {
+    return [...runs.filter((run) => run.group !== next.group), next];
+  }
+  const sameGroup = runs.filter((run) => run.group === next.group);
+  return sameGroup.length >= 2
+    ? [...runs.filter((run) => run.group !== next.group), sameGroup[0], next]
+    : [...runs, next];
 }
 
-function cancelExpression(): string {
-  return String(readConcurrency()['cancel-in-progress'] ?? '');
+function step(workflow: Workflow, name: string): Record<string, unknown> {
+  const steps = workflow.jobs?.['ota-update']?.steps ?? [];
+  const found = steps.find((candidate) => candidate.name === name);
+  if (!found) throw new Error(`Missing ota-update step: ${name}`);
+  return found;
 }
 
 describe('CI concurrency contract', () => {
-  it('keeps an idle main push attributable to its commit SHA', () => {
-    expect(groupExpression()).toContain('github.sha');
+  it('pins the exact PR/main concurrency group and PR-only cancellation policy', () => {
+    const concurrency = readWorkflow().concurrency;
+
+    expect(concurrency?.group).toBe(MAIN_GROUP);
+    expect(concurrency?.['cancel-in-progress']).toBe(PR_CANCEL);
   });
 
-  it('does not replace an intermediate main commit during rapid merges', () => {
-    const group = groupExpression();
+  it.each([
+    [
+      'A — idle main push',
+      [],
+      { group: 'ci-main-main-1', cancelInProgress: false },
+    ],
+    [
+      'B — running, pending, and third main push',
+      [
+        { group: 'ci-main-main-1', cancelInProgress: false },
+        { group: 'ci-main-main-2', cancelInProgress: false },
+      ],
+      { group: 'ci-main-main-3', cancelInProgress: false },
+    ],
+    [
+      'C — stale PR head cancellation',
+      [{ group: 'ci-pr-42', cancelInProgress: true }],
+      { group: 'ci-pr-42', cancelInProgress: true },
+    ],
+    [
+      'D — historical main rerun beside newer main evidence',
+      [{ group: 'ci-main-main-new', cancelInProgress: false }],
+      { group: 'ci-main-main-old', cancelInProgress: false },
+    ],
+  ])(
+    '%s models the intended one-running/one-pending behavior',
+    (_name, runs, next) => {
+      const retained = schedule(runs, next);
 
-    expect(group).toContain('github.sha');
-    expect(cancelExpression()).toContain("github.event_name == 'pull_request'");
-  });
+      if (next.group === 'ci-pr-42') {
+        expect(retained).toEqual([next]);
+      } else {
+        expect(retained).toContainEqual(next);
+        expect(new Set(retained.map((run) => run.group)).size).toBe(
+          new Set([...runs, next].map((run) => run.group)).size,
+        );
+      }
+    },
+  );
 
-  it('cancels stale heads while keeping one concurrency group per pull request', () => {
-    const group = groupExpression();
+  it('serializes preview publication and requires a live main-tip proof immediately before it', () => {
+    const ota = readWorkflow().jobs?.['ota-update'];
+    const concurrency = ota?.concurrency;
+    const liveTip = step(
+      readWorkflow(),
+      'Verify live main tip before OTA publish',
+    );
+    const publish = step(
+      readWorkflow(),
+      'Publish OTA update to preview channel',
+    );
 
-    expect(group).toContain('github.event.pull_request.number');
-    expect(cancelExpression()).toContain("github.event_name == 'pull_request'");
-  });
-
-  it('keeps a historical main rerun isolated from newer main evidence', () => {
-    expect(groupExpression()).toContain('github.sha');
+    expect(concurrency?.group).toBe('ota-preview');
+    expect(concurrency?.['cancel-in-progress']).toBe(true);
+    expect(liveTip.id).toBe('live-main-tip');
+    expect(JSON.stringify(liveTip.env)).toContain('github.sha');
+    expect(String(publish.if)).toContain(
+      "steps.live-main-tip.outputs.matches == 'true'",
+    );
   });
 });

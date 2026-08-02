@@ -2,12 +2,12 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "The deterministic contract covers idle main pushes and SHA attribution.",
+      "description": "The deterministic contract pins the exact PR/main group and covers idle main pushes and SHA attribution.",
       "pointer": "scripts/ci-concurrency-contract.test.ts"
     },
     {
       "acRef": "AC-2",
-      "description": "The SHA-scoped main group preserves every rapid-merge commit's attributable CI evidence while PR heads remain cancellable.",
+      "description": "The SHA-scoped main group preserves every rapid-merge commit's attributable CI evidence while PR heads remain cancellable, and OTA publication is serialized.",
       "pointer": ".github/workflows/ci.yml:28"
     },
     {
@@ -17,7 +17,7 @@
     },
     {
       "acRef": "AC-4",
-      "description": "Historical cancelled zero-job runs and the post-fix deterministic concurrency proof are recorded.",
+      "description": "Historical cancelled zero-job runs, OTA ordering/live-tip protection, and the post-fix deterministic concurrency proof are recorded.",
       "pointer": ".cosmo/WI-2981/red-green.md"
     },
     {

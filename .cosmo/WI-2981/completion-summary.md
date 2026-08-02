@@ -4,29 +4,34 @@
 
 Changed CI workflow concurrency so pull-request heads retain PR-scoped
 cancellation while main pushes use an independently attributable commit-SHA
-group.
+group; OTA preview publication is separately serialized and guarded against a
+stale main tip.
 
 ## What changed
 
 - Updated `.github/workflows/ci.yml` concurrency group and explanatory comments.
-- Added `scripts/ci-concurrency-contract.test.ts` covering the four acceptance variants.
+- Added job-level `ota-preview` cancellation and a live-main-tip check before
+  the OTA publish step.
+- Strengthened `scripts/ci-concurrency-contract.test.ts` with an exact group
+  contract, deterministic A-D scheduling model, OTA serialization, and live-tip
+  publication assertions.
 - Captured deterministic RED/GREEN and revert/restoration evidence in
   `red-green.md` and `evidence.json`.
 
 ## Verification
 
-- Focused contract suite: RED baseline `3 failed / 1 passed`; GREEN and restored
-  candidate `4 passed`.
+- Focused contract suite: correction RED failed on the missing OTA guard; GREEN
+  and restored candidate passed all 6 tests.
 - Historical cancelled zero-job runs recorded: `30688886377`, `30688890531`,
   and `30688912863`.
-- No deployment authority, permissions, triggers, required checks, or merge
-  gates changed.
+- Workflow security and YAML checks remained green; no deployment authority,
+  permissions, triggers, required checks, or merge gates changed.
 
 ## Caveats
 
-GitHub-hosted rapid-merge execution was not reproduced in this branch; the
-deterministic contract proves the concurrency-key invariant that prevents
-distinct main SHAs from sharing the one-running/one-pending slot.
+GitHub-hosted rapid-merge and OTA race execution were not reproduced in this
+branch; the deterministic contract proves the concurrency-key, serialization,
+and live-tip invariants.
 
 ## Follow-ups
 

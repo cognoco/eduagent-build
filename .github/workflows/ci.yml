@@ -662,6 +662,9 @@ jobs:
   ota-update:
     needs: main
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    concurrency:
+      group: ota-preview
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -728,8 +731,22 @@ jobs:
           packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Publish OTA update to preview channel
+      - name: Verify live main tip before OTA publish
+        id: live-main-tip
         if: steps.mobile-check.outputs.mobile_changed == 'true' && steps.native-check.outputs.native_changed != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          current_main_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
+            echo "Main advanced from $EXPECTED_SHA to $current_main_sha; refusing stale OTA publication."
+            exit 1
+          fi
+          echo "matches=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish OTA update to preview channel
+        if: steps.mobile-check.outputs.mobile_changed == 'true' && steps.native-check.outputs.native_changed != 'true' && steps.live-main-tip.outputs.matches == 'true'
         working-directory: apps/mobile
         env:
           # Must match eas.json build.preview.env — eas update does NOT read
