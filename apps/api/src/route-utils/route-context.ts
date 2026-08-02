@@ -29,6 +29,10 @@ export interface RouteVariables {
   profileId: string | undefined;
   /** Server-resolved login -> person binding set by accountMiddleware. */
   callerPersonId?: string | undefined;
+  /** [WI-2876] Server-only central-authority proof stamped by
+   *  profileScopeMiddleware, bound to the exact profileId it verified;
+   *  consumed by assertCanReadProfile's fast path. */
+  profileAuthorityVerifiedFor?: string | undefined;
   /** Set by profileScopeMiddleware — carries birthYear, location, consent,
    *  conversationLanguage, isOwner, hasPremiumLlm for route-level gating. */
   profileMeta: ProfileMeta | undefined;

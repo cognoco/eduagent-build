@@ -184,6 +184,7 @@ import {
 import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { ConsentWithdrawnError } from '../services/session';
+import { ForbiddenError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -336,54 +337,78 @@ describe('book-suggestions routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2876] read-authority guard (G11). The header-resolved profileId is
-  // only org-checked (getPersonScope); these cases prove a credentialed
-  // caller spoofing another profile via X-Profile-Id is rejected (403) by
-  // assertCanReadProfile BEFORE the suggestions read runs.
+  // [WI-2876] read-authority guard (G11). Direct-mount harness WITHOUT
+  // profileScopeMiddleware: no profileAuthorityVerifiedFor proof exists, so
+  // these cases exercise the route guard's own fail-closed fallback
+  // (verifyPersonOwnershipV2) — the defense-in-depth layer for
+  // standalone/direct mounting. In the full app the same spoof is rejected
+  // centrally by profileScopeMiddleware (WI-2128) before any route runs
+  // (see profile-scope.test.ts), so a full-app variant would have to
+  // fabricate a central proof that cannot occur.
   // -------------------------------------------------------------------------
 
   describe('[WI-2876] read-authority guard', () => {
     const VICTIM_PROFILE_ID = 'victim-profile-id';
+    const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+    function makeUnprovenApp() {
+      const direct = new Hono();
+      direct.use('*', async (c, next) => {
+        c.set('db' as never, {});
+        c.set('profileId' as never, VICTIM_PROFILE_ID);
+        c.set('user' as never, { id: 'test-user' });
+        c.set('account' as never, { id: 'test-account-id' });
+        c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+        // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+        await next();
+      });
+      direct.onError((err, c) => {
+        if (err instanceof ForbiddenError) {
+          return c.json({ code: 'FORBIDDEN', message: err.message }, 403);
+        }
+        return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+      });
+      direct.route('/', bookSuggestionRoutes);
+      return direct;
+    }
 
     it.each([
       [
-        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions',
+        '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions',
         () => jest.mocked(getUnpickedBookSuggestionsEnvelope),
       ],
       [
-        '/v1/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/all',
+        '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/all',
         () => jest.mocked(getAllBookSuggestions),
       ],
     ] as const)(
-      '%s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
+      '%s rejects a cross-profile read with 403 via the fallback when no central proof exists',
       async (path, getServiceMock) => {
         const serviceMock = getServiceMock();
         // This file has no global clearAllMocks — clear the service mock's
         // call log so the not-called assertion below is about THIS request.
         serviceMock.mockClear();
-        // Header selects another org member's profile...
-        mockGetPersonScope.mockResolvedValueOnce(
-          personScope({ profileId: VICTIM_PROFILE_ID }),
-        );
-        // ...and the caller (seeded person 'test-profile-id') holds no
-        // self/guardianship authority over it — the real
-        // verifyPersonOwnershipV2 would throw against a real membership
-        // table (covered by wi2416-read-idor.integration.test.ts).
+        // The caller's person holds no self/guardianship authority over the
+        // installed profile — the real verifyPersonOwnershipV2 would throw
+        // against a real membership table (covered by
+        // wi2416-read-idor.integration.test.ts).
         jest
           .mocked(verifyPersonOwnershipV2)
           .mockRejectedValueOnce(
             new Error('caller cannot read selected profile'),
           );
 
-        const res = await app.request(
-          path,
-          { headers: makeAuthHeaders({ 'X-Profile-Id': VICTIM_PROFILE_ID }) },
-          TEST_ENV,
-        );
+        const res = await makeUnprovenApp().request(path);
 
         expect(res.status).toBe(403);
         const body = (await res.json()) as { code: string };
         expect(body.code).toBe('FORBIDDEN');
+        expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+          expect.anything(),
+          VICTIM_PROFILE_ID,
+          'test-account-id',
+          ATTACKER_PERSON_ID,
+        );
         expect(serviceMock).not.toHaveBeenCalled();
       },
     );

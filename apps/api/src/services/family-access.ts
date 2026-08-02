@@ -365,10 +365,19 @@ export async function assertCallerIsOrganizationAdminForPerson(
   }
 }
 
-type CanReadProfileSource = {
+type CallerAuthoritySource = {
   get(key: 'db'): Database;
   get(key: 'account'): { id: string } | undefined;
   get(key: 'callerPersonId'): string | undefined;
+};
+
+type CanReadProfileSource = CallerAuthoritySource & {
+  // [WI-2876] Server-only proof set by profileScopeMiddleware after central
+  // authority resolution, bound to the exact profileId it verified (see the
+  // fast path in assertCanReadProfile). Both undefined on routes mounted
+  // without it.
+  get(key: 'profileAuthorityVerifiedFor'): string | undefined;
+  get(key: 'profileId'): string | undefined;
 };
 
 /**
@@ -402,6 +411,23 @@ export async function assertCanReadProfile(
   targetProfileId: string,
   message = 'You are not authorized to read this profile.',
 ): Promise<void> {
+  // [WI-2876] Defense-in-depth fast path. Since WI-2128 (021ab325b),
+  // profileScopeMiddleware resolves caller authority centrally (getPersonScope
+  // → resolvePersonOperationAuthorityV2: self or guardian of a login-less
+  // charge — the same rule verifyPersonOwnershipV2 enforces below) before
+  // installing profileId, and stamps the server-only proof BOUND to the
+  // exact profileId it verified. Skip the duplicate
+  // membership/guardianship/login queries ONLY when the proof names exactly
+  // the target profile and that profile is still the installed one (a
+  // downstream profileId rewrite can therefore never ride a stale proof).
+  // Any other target — or a route mounted without the middleware — takes
+  // the full fail-closed check, so standalone/direct routes lose nothing.
+  if (
+    source.get('profileAuthorityVerifiedFor') === targetProfileId &&
+    source.get('profileId') === targetProfileId
+  ) {
+    return;
+  }
   const account = source.get('account');
   const callerPersonId = source.get('callerPersonId');
   if (!account || !callerPersonId) {
@@ -431,7 +457,10 @@ export async function assertCanReadProfile(
   }
 }
 
-type CanWriteProfileSource = CanReadProfileSource;
+// [WI-2876] Writes keep the pre-proof shape: the read fast path does not
+// apply to write authority, so assertCanWriteProfile does not require the
+// proof getters.
+type CanWriteProfileSource = CallerAuthoritySource;
 
 /**
  * [WI-2398 — write-side IDOR] Write-authority twin of assertCanReadProfile,
