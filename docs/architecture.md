@@ -332,7 +332,6 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 |----------|-----------|-----------|
 | Code execution sandbox | v2.0 | Programming subjects not in MVP |
 | Offline capability | v2.0 | Requires local cache + sync protocol |
-| Language Learning mode | Shipped | FR96-FR107 — Four Strands (`pedagogyMode`) shipped alongside Socratic; no longer deferred |
 | OCR server-side fallback provider | Homework Help epic | Mathpix vs CF Workers AI — design the interface now, choose provider when evaluating real content |
 | Zustand (shared client state) | When justified | Start with TanStack Query + Context + local state |
 
@@ -1422,7 +1421,7 @@ Two complementary mechanisms control how the AI teaches:
    - This is NOT re-teaching from scratch. The student knows the concept; they missed a critical evaluation step. The response targets analytical skill, not foundational knowledge.
    - Difficulty rung (`evaluateDifficultyRung` 1-4 on retention card) persists across sessions and advances independently of the Socratic escalation rung.
 
-**Epic 6 (shipped): Language learning teaching mode.** Language learning (FR96-107) added the third mechanism: a per-subject pedagogy mode distinguishing Socratic (default) from Four Strands methodology (language). Implemented as `pedagogyModeSchema = z.enum(['socratic', 'four_strands'])` in `packages/schemas/src/language.ts`, carried on `subject.pedagogyMode`, and read throughout the exchange path (`services/exchange-prompts.ts`, `services/session/session-exchange.ts`, `services/language-curriculum.ts`) to select Four Strands prompting and gate language-specific extraction/summary steps. The existing `teaching_method` enum still covers _how_ to teach (visual vs step-by-step) independently of pedagogy mode. **Note:** FR146 (Language SPEAK/LISTEN voice) is mapped to Epic 6, not Epic 8. Epic 8 (Full Voice Mode stories 8.1-8.2) must complete before Epic 6 SPEAK/LISTEN stories can begin — voice infrastructure is the dependency.
+**Epic 6 (shipped): Language learning teaching mode.** Language learning (FR96-107) added the third mechanism: a per-subject pedagogy mode distinguishing Socratic (default) from Four Strands methodology (language). Implemented as `pedagogyModeSchema = z.enum(['socratic', 'four_strands'])` in `packages/schemas/src/language.ts`, carried on `subject.pedagogyMode`, and read throughout the exchange path (`services/exchange-prompts.ts`, `services/session/session-exchange.ts`, `services/language-curriculum.ts`) to select Four Strands prompting and gate language-specific extraction/summary steps. The existing `teaching_method` enum still covers _how_ to teach (visual vs step-by-step) independently of pedagogy mode. **Note:** FR146 (Language SPEAK/LISTEN voice) is mapped to Epic 6, not Epic 8. It consumes the Epic 8 voice infrastructure (Full Voice Mode, shipped 2026-04-03 — see the FR table above); the SPEAK/LISTEN stories themselves are tracked under Epic 6.
 
 **Voice Mode Architecture (Epic 8 — v1.1):**
 
@@ -1432,7 +1431,7 @@ Voice-first session mode, orthogonal to session type (learning/homework/interlea
 - **Voice session controls:** pause/resume TTS, replay last response, speed control (0.75x/1x/1.25x via `expo-speech` rate parameter), interrupt (stop current TTS and begin new STT recording).
 - **VAD (FR148):** Optional/stretch — manual tap-to-stop is the reliable default. Voice Activity Detection has false positives in noisy environments (classrooms, public transport). If implemented, use `expo-speech-recognition`'s built-in silence detection with a conservative threshold (2s silence), not a custom VAD model.
 - **Voice accessibility (FR149):** Shipped with the conservative coexistence strategy: detect when a screen reader is active, suppress app auto-play, keep the visual transcript available, and expose manual replay/speed controls plus haptics for recording state changes. This avoids competing audio channels while preserving voice-mode access. Physical iOS/Android verification is still recommended before store submission, but the product decision is no longer open.
-- **Epic 8 dependency chain:** Epic 8 stories 8.1-8.2 (voice infrastructure + voice session mode) must complete before Epic 6 (Language Learning) SPEAK/LISTEN stories. Voice is the platform; language learning is a consumer.
+- **Epic 8 dependency chain:** Epic 8 stories 8.1-8.2 (voice infrastructure + voice session mode, shipped 2026-04-03) precede Epic 6 (Language Learning) SPEAK/LISTEN stories. Voice is the platform; language learning is a consumer.
 
 **Onboarding as route-level split, not conditional rendering:**
 
@@ -1561,7 +1560,7 @@ Service Function (business logic)
 | **Epic 5: Subscription** | `billing.ts`, `revenuecat-webhook.ts`, `stripe-webhook.ts` (dormant) | `billing.ts`, `subscription.ts`, `trial.ts`, `metering.ts` | `(app)/subscription.tsx` | `billing.ts` | `schema/billing.ts` |
 | **Epic 6: Language** | `language-progress.ts`, `subjects.ts` (extend) | `language-curriculum.ts`, `language-detect.ts`, `language-prompts.ts`, `language-session-engine.ts`, `language-session-summary.ts` | `(app)/onboarding/language-setup.tsx`, `(app)/more/mentor-language.tsx` | `language.ts` | `schema/language.ts` |
 | **Epic 7: Concept Map (v1.1)** | `curriculum.ts` (extend), `concept-map.ts` | `concept-map.ts` (new), `coaching-cards.ts` (extend) | `concept-map/` (new), `book/` (extend) | `subjects.ts` (extend `topic_prerequisites`), `curriculumAdaptations` (add JSONB column) | `@eduagent/schemas` (prerequisiteContext Zod schema) |
-| **Epic 8: Full Voice Mode (v1.1)** | `sessions.ts` (extend for voice mode flag) | `exchanges.ts` (extend for voice context) | `session/` (extend: voice controls, waveform), `hooks/use-voice.ts` (new) | `sessions.ts` (extend: voice mode schemas) | `schema/sessions.ts` (voice mode flag on sessions) |
+| **Epic 8: Full Voice Mode** | `sessions.ts` (extend for voice mode flag) | `exchanges.ts` (extend for voice context) | `session/` (extend: voice controls, waveform), `hooks/use-voice.ts` (new) | `sessions.ts` (extend: voice mode schemas) | `schema/sessions.ts` (voice mode flag on sessions) |
 
 **Cross-Cutting Concerns Mapping:**
 
@@ -1781,7 +1780,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 **Decision Completeness:**
 
 - All 10 critical decisions documented with specific versions
-- 5 deferred decisions documented with clear deferral rationale
+- 4 deferred decisions documented with clear deferral rationale (Language Learning left the list when FR96-FR107 shipped)
 - Implementation patterns cover naming, structure, format, communication, and process
 - 13 enforcement rules provide clear guardrails for AI agents
 - Code examples provided for every major pattern (Hono handlers, scoped repository, error handling, Inngest events, TanStack Query keys, logging)

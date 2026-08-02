@@ -246,7 +246,7 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
   as-is; it is the one identity-adjacent term that is *not* drifting.
 
 ### §3.4 — Residence jurisdiction
-*(Column shipped; nothing yet reads it for consent — see the implementation-status banner at the top.)*
+*(Column shipped; read for consent only by the guardian-attachment verification path — every other wired consent flow remains jurisdiction-blind. See the implementation-status banner at the top.)*
 - A Person carries a **`residence_jurisdiction`**: a **first-class, time-versioned attribute** (history
   retained for audit — *"what policy was in force when we processed"*), keyed off **residence**, not
   current location (a holiday or VPN must not re-gate). It is the input to the consent computation
