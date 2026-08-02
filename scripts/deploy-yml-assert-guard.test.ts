@@ -18,6 +18,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const repoRoot = join(__dirname, '..');
+const BASH =
+  process.platform === 'win32'
+    ? 'C:\\Program Files\\Git\\bin\\bash.exe'
+    : 'bash';
 const yaml = readFileSync(
   join(repoRoot, '.github/workflows/deploy.yml'),
   'utf8',
@@ -76,6 +80,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'false',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: '',
       EVENT_NAME: 'push',
     },
@@ -88,6 +94,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'false',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: 'staging',
       EVENT_NAME: 'workflow_dispatch',
     },
@@ -100,6 +108,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'true',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: 'production',
       EVENT_NAME: 'workflow_dispatch',
     },
@@ -112,6 +122,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'false',
       STAGING_SECRET_SET: 'false',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: 'staging',
       EVENT_NAME: 'workflow_dispatch',
     },
@@ -125,11 +137,43 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'true',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'false',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: 'production',
       EVENT_NAME: 'workflow_dispatch',
     },
     expect: 'fail',
     expectStderr: /DATABASE_URL_PRODUCTION is empty or unset/,
+  },
+  {
+    name: 'staging deploy but DATABASE_URL_STAGING_APP unset → fail',
+    env: {
+      IS_STAGING: 'true',
+      IS_PRODUCTION: 'false',
+      STAGING_SECRET_SET: 'true',
+      PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'false',
+      PRODUCTION_APP_SECRET_SET: 'true',
+      API_ENVIRONMENT: 'staging',
+      EVENT_NAME: 'workflow_dispatch',
+    },
+    expect: 'fail',
+    expectStderr: /DATABASE_URL_STAGING_APP is empty or unset/,
+  },
+  {
+    name: 'production deploy but DATABASE_URL_PRODUCTION_APP unset → fail',
+    env: {
+      IS_STAGING: 'false',
+      IS_PRODUCTION: 'true',
+      STAGING_SECRET_SET: 'true',
+      PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'false',
+      API_ENVIRONMENT: 'production',
+      EVENT_NAME: 'workflow_dispatch',
+    },
+    expect: 'fail',
+    expectStderr: /DATABASE_URL_PRODUCTION_APP is empty or unset/,
   },
   // [CR-PR129-NEW-6] Regression cases: unrecognized api_environment must fail.
   {
@@ -139,6 +183,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'false',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: 'stg',
       EVENT_NAME: 'workflow_dispatch',
     },
@@ -152,6 +198,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'false',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: '',
       EVENT_NAME: 'workflow_dispatch',
     },
@@ -165,6 +213,8 @@ const SCENARIOS: Scenario[] = [
       IS_PRODUCTION: 'false',
       STAGING_SECRET_SET: 'true',
       PRODUCTION_SECRET_SET: 'true',
+      STAGING_APP_SECRET_SET: 'true',
+      PRODUCTION_APP_SECRET_SET: 'true',
       API_ENVIRONMENT: 'dev',
       EVENT_NAME: 'workflow_dispatch',
     },
@@ -178,7 +228,7 @@ function runGuard(
   env: Record<string, string>,
 ): { code: number; output: string } {
   try {
-    const stdout = execFileSync('bash', ['-c', script], {
+    const stdout = execFileSync(BASH, ['-c', script], {
       env: { ...process.env, ...env },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -80,6 +80,9 @@ childProcess.spawnSync = function spawnSync(binary, args = [], options) {
   }
 
   process.stdout.write(`ARGS:${args.join(' ')}\n`);
+  if (process.env.DOPPLER_MARKER) {
+    fs.appendFileSync(process.env.DOPPLER_MARKER, `${args.join(' ')}\n`);
+  }
   if (process.env.DOPPLER_RUN_FAKE_EXEC_CHILD === '1') {
     const separator = args.indexOf('--');
     const [command, ...commandArgs] = args.slice(separator + 1);
