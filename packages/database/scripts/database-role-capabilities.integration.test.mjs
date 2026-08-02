@@ -33,9 +33,10 @@ function assertDisposableAdminDatabase(target) {
   } catch {
     throw new Error('WI1628_ADMIN_DATABASE_URL must be a parseable URL');
   }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
   const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
   if (
-    !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname) ||
+    !['localhost', '127.0.0.1', '::1'].includes(hostname) ||
     !/(^|[_-])(test|integration)([_-]|$)/i.test(databaseName)
   ) {
     throw new Error(
@@ -43,6 +44,22 @@ function assertDisposableAdminDatabase(target) {
     );
   }
 }
+
+test('accepts bracketed IPv6 loopback disposable database URLs', () => {
+  assert.doesNotThrow(() =>
+    assertDisposableAdminDatabase('postgresql://[::1]/mentomate_integration'),
+  );
+});
+
+test('rejects non-loopback disposable database URLs', () => {
+  assert.throws(
+    () =>
+      assertDisposableAdminDatabase(
+        'postgresql://db.example.com/mentomate_integration',
+      ),
+    /loopback disposable test database/,
+  );
+});
 
 async function capabilitiesFor(roleName) {
   await client.query(`SET ROLE "${roleName}"`);

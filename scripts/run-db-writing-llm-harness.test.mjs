@@ -38,14 +38,45 @@ test('maps a pnpm ESM launcher through the Node executable', () => {
 });
 
 test('rejects an unsupported inner harness before command dispatch', () => {
-  const result = spawnSync(
-    process.execPath,
-    [HARNESS, '--inner', 'scripts/unapproved-harness.ts'],
-    { cwd: REPO_ROOT, encoding: 'utf8' },
+  const fixtureDir = mkdtempSync(path.join(tmpdir(), 'wi1628 dispatch-'));
+  const sentinel = path.join(fixtureDir, 'child-dispatched');
+  const preload = path.join(fixtureDir, 'sentinel-preload.cjs');
+  const preloadOptionPath = preload.replaceAll('\\', '/');
+  writeFileSync(
+    preload,
+    `
+      const childProcess = require('node:child_process');
+      const fs = require('node:fs');
+      const { syncBuiltinESMExports } = require('node:module');
+      childProcess.spawnSync = () => {
+        fs.writeFileSync(process.env.WI1628_DISPATCH_SENTINEL, 'dispatched');
+        return { status: 89 };
+      };
+      syncBuiltinESMExports();
+    `,
   );
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /unsupported harness.*unapproved-harness/i);
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [HARNESS, '--inner', 'scripts/unapproved-harness.ts'],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          NODE_OPTIONS: `--require="${preloadOptionPath}"`,
+          WI1628_DISPATCH_SENTINEL: sentinel,
+        },
+      },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /unsupported harness.*unapproved-harness/i);
+    assert.throws(() => readFileSync(sentinel), { code: 'ENOENT' });
+  } finally {
+    rmSync(fixtureDir, { recursive: true, force: true });
+  }
 });
 
 test('inner harness launches tsx through the pinned npm_execpath', () => {
