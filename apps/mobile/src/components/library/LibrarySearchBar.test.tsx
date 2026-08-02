@@ -1,6 +1,45 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, act } from '@testing-library/react-native';
+
+import type { SpeechRecognitionStatus } from '../../hooks/use-speech-recognition';
 import { ThemeContext } from '../../lib/theme';
 import { LibrarySearchBar } from './LibrarySearchBar';
+
+interface MockSpeech {
+  status: SpeechRecognitionStatus;
+  transcript: string;
+  isFinalTranscript: boolean;
+  error: string | null;
+  isListening: boolean;
+  startListening: jest.Mock;
+  stopListening: jest.Mock;
+  clearTranscript: jest.Mock;
+  requestMicrophonePermission: jest.Mock;
+  getMicrophonePermissionStatus: jest.Mock;
+}
+
+let mockSpeech: MockSpeech;
+
+jest.mock(
+  '../../hooks/use-speech-recognition' /* gc1-allow: native-boundary — the hook wraps expo-speech-recognition, a native module with no jest-runnable implementation */,
+  () => ({
+    useSpeechRecognition: () => mockSpeech,
+  }),
+);
+
+beforeEach(() => {
+  mockSpeech = {
+    status: 'idle',
+    transcript: '',
+    isFinalTranscript: false,
+    error: null,
+    isListening: false,
+    startListening: jest.fn().mockResolvedValue(undefined),
+    stopListening: jest.fn().mockResolvedValue(undefined),
+    clearTranscript: jest.fn(),
+    requestMicrophonePermission: jest.fn().mockResolvedValue(true),
+    getMicrophonePermissionStatus: jest.fn().mockResolvedValue(null),
+  };
+});
 
 // renderWithTheme is only needed when a test asserts theme-derived style props.
 function renderWithTheme(ui: Parameters<typeof render>[0]) {
@@ -29,6 +68,41 @@ describe('LibrarySearchBar', () => {
     );
     screen.getByTestId('library-search-input');
     expect(screen.getByPlaceholderText('Search shelves...'));
+  });
+
+  it('renders the shared voice control and a final transcript REPLACES the query (WI-2552)', async () => {
+    const onChangeText = jest.fn();
+    const screenApi = render(
+      <LibrarySearchBar
+        value="mol"
+        onChangeText={onChangeText}
+        placeholder="Search..."
+      />,
+    );
+    fireEvent.press(screen.getByTestId('library-search-mic'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockSpeech.startListening).toHaveBeenCalledTimes(1);
+
+    mockSpeech = {
+      ...mockSpeech,
+      status: 'idle',
+      isListening: false,
+      transcript: 'photosynthesis',
+      isFinalTranscript: true,
+    };
+    screenApi.rerender(
+      <LibrarySearchBar
+        value="mol"
+        onChangeText={onChangeText}
+        placeholder="Search..."
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onChangeText).toHaveBeenCalledWith('photosynthesis');
   });
 
   it('calls onChangeText when typing', () => {

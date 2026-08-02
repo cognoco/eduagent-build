@@ -176,6 +176,8 @@ describe('MyNotesListScreen', () => {
     fireEvent.press(screen.getByTestId('my-notes-group-subject'));
     screen.getAllByText('Chemistry');
 
+    // WI-2552 (WI-1763 row 27): shared transcription-only mic renders with search.
+    screen.getByTestId('my-notes-search-mic');
     fireEvent.changeText(screen.getByTestId('my-notes-search'), 'history');
     await waitFor(() => screen.getByTestId('my-notes-empty'));
     screen.getByText('No sessions yet');

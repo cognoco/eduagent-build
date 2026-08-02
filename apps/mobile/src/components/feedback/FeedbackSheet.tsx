@@ -16,6 +16,12 @@ import { useTranslation } from 'react-i18next';
 import type { FeedbackCategory } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 import { useFeedbackSubmit } from '../../hooks/use-feedback';
+import { useProfile } from '../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../lib/language-locales';
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../common/VoiceInputControl';
 import { formatApiError } from '../../lib/format-api-error';
 
 const CATEGORY_VALUES: FeedbackCategory[] = ['bug', 'suggestion', 'other'];
@@ -33,6 +39,7 @@ export function FeedbackSheet({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { isPending, mutate, reset } = useFeedbackSubmit();
+  const { activeProfile } = useProfile();
   const [category, setCategory] = useState<FeedbackCategory>('bug');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -59,6 +66,17 @@ export function FeedbackSheet({
 
   function handleMessageChange(value: string) {
     setMessage(value);
+    setSubmitted(false);
+    setError('');
+  }
+
+  // Voice append (WI-2552): functional updater so an edit racing the commit
+  // is never overwritten; clamped to the field's 2000-char maxLength (which
+  // only bounds native edits). Side-effect resets mirror handleMessageChange.
+  function handleMessageTranscript(finalTranscript: string) {
+    setMessage((prev) =>
+      appendTranscript(prev, finalTranscript).slice(0, 2000),
+    );
     setSubmitted(false);
     setError('');
   }
@@ -207,6 +225,17 @@ export function FeedbackSheet({
                 testID="feedback-message-input"
                 accessibilityLabel={t('feedbackSheet.messageLabel')}
               />
+              <View className="mt-2">
+                <VoiceInputControl
+                  value={message}
+                  disabled={isPending}
+                  voiceLocale={getVoiceLocaleForLanguage(
+                    activeProfile?.conversationLanguage,
+                  )}
+                  testID="feedback-message-mic"
+                  onTranscript={handleMessageTranscript}
+                />
+              </View>
               <Text className="text-caption text-text-muted mt-1 text-right">
                 {message.length}/2000
               </Text>
