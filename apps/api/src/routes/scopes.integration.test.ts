@@ -6,6 +6,7 @@ import {
   createDatabase,
   generateUUIDv7,
   login,
+  membership,
   person,
   subjects,
   supportership,
@@ -28,6 +29,8 @@ type TestEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: undefined;
+    // [WI-2881] Caller organization context, required by assertCanReadProfile.
+    account: { id: string } | undefined;
     callerPersonId: string | undefined;
     user: unknown;
   };
@@ -54,9 +57,26 @@ function makeApp(
 ) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
+    // [WI-2881] assertCanReadProfile reads the caller's organization context
+    // (production: set app-wide by accountMiddleware from the authenticated
+    // login). Mirror the WI-2565 harness pattern in now.integration.test.ts:
+    // resolve it from the caller's REAL membership row — never a dummy id —
+    // and fail loudly when a seed carries no membership, so the fallback
+    // guard proves ownership instead of fail-closing every read to 403.
+    const [callerMembership] = await db
+      .select({ organizationId: membership.organizationId })
+      .from(membership)
+      .where(eq(membership.personId, callerPersonId))
+      .limit(1);
+    if (!callerMembership) {
+      throw new Error(
+        `Integration harness: no organization membership seeded for caller ${callerPersonId}`,
+      );
+    }
     c.set('db', db);
     c.set('profileId', profileId);
     c.set('profileMeta', undefined);
+    c.set('account', { id: callerMembership.organizationId });
     c.set('callerPersonId', callerPersonId);
     await next();
   });
