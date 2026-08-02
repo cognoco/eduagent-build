@@ -1,12 +1,10 @@
-import { eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import {
   mentorNotices,
   needsDeepeningTopics,
-  person,
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import { parseConversationLanguage } from '../llm/conversation-language';
 import { classifyPersistedLearningText } from './persisted-remediation';
 import type { LearningTextFieldKind } from './scan';
 
@@ -35,48 +33,81 @@ export interface SurfaceRemediationReport {
    * learner-visible text is not something an unattended backfill may do.
    */
   readonly review: number;
+  /**
+   * Rows classified `remediate` whose bytes changed between the scan and the
+   * write, so the guarded update matched nothing and the row was left alone.
+   * A later run reclassifies whatever is there now; reporting the count keeps
+   * that visible instead of letting `remediated` silently under-count.
+   */
+  readonly skippedChanged: number;
 }
 
-interface LoadedRow {
+interface TextRow {
   readonly id: string;
   readonly text: string | null;
-  readonly rawLanguage: string | null;
+}
+
+interface SurfaceClassification {
+  readonly scanned: number;
+  readonly review: number;
+  /** Rows to scrub, carrying the EXACT bytes the classification saw. */
+  readonly remediate: readonly { id: string; text: string }[];
 }
 
 /**
- * Classify one surface's rows, then hand back the ids to scrub and the count to
- * report. Shared so every surface uses ONE classification path and no surface
- * can drift into its own term list (AC-3).
+ * Classify one surface's rows. Shared so every surface uses ONE classification
+ * path and no surface can drift into its own term list (AC-3).
  */
 async function classifySurface(
-  rows: readonly LoadedRow[],
+  rows: readonly TextRow[],
   fieldKind: LearningTextFieldKind,
-): Promise<{ remediate: string[]; review: number; scanned: number }> {
-  const withText = rows.filter((row) => typeof row.text === 'string');
+): Promise<SurfaceClassification> {
+  const withText = rows.filter(
+    (row): row is TextRow & { text: string } => typeof row.text === 'string',
+  );
   if (withText.length === 0) {
-    return { remediate: [], review: 0, scanned: 0 };
+    return { scanned: 0, review: 0, remediate: [] };
   }
 
   const verdicts = await classifyPersistedLearningText({
     fieldKind,
-    rows: withText.map((row) => ({
-      id: row.id,
-      text: row.text,
-      // Never the raw column: an unrecognised or null code must collapse to
-      // `undefined` so the gate scans every grammar, rather than being read as
-      // a language it is not.
-      conversationLanguage: parseConversationLanguage(row.rawLanguage),
-    })),
+    rows: withText,
   });
+  const textById = new Map(withText.map((row) => [row.id, row.text]));
 
   return {
     scanned: withText.length,
-    remediate: verdicts
-      .filter((verdict) => verdict.disposition === 'remediate')
-      .map((verdict) => verdict.id),
     review: verdicts.filter((verdict) => verdict.disposition === 'review')
       .length,
+    remediate: verdicts
+      .filter((verdict) => verdict.disposition === 'remediate')
+      .map((verdict) => ({
+        id: verdict.id,
+        text: textById.get(verdict.id) as string,
+      })),
   };
+}
+
+/**
+ * Scrub one row, but ONLY if its text is still byte-identical to what the
+ * classification saw.
+ *
+ * The scan and the write are separate statements, so a learner can save new,
+ * safe content in between; a blind `WHERE id IN (…)` would overwrite it with a
+ * redaction placeholder on the strength of a verdict about bytes that no longer
+ * exist. Matching the original text in the WHERE clause makes the update a
+ * compare-and-set: it applies to the text that was judged, or to nothing.
+ *
+ * Returns whether the row was actually updated.
+ */
+async function scrubIfUnchanged(
+  run: () => Promise<{ rowCount?: number | null } | unknown[]>,
+): Promise<boolean> {
+  const result = await run();
+  const affected = Array.isArray(result)
+    ? result.length
+    : (result?.rowCount ?? 0);
+  return affected > 0;
 }
 
 /**
@@ -96,55 +127,67 @@ export async function remediateMentorNotices(
       id: mentorNotices.id,
       concept: mentorNotices.concept,
       correctionHint: mentorNotices.correctionHint,
-      rawLanguage: person.conversationLanguage,
     })
-    .from(mentorNotices)
-    .innerJoin(person, eq(mentorNotices.profileId, person.id));
+    .from(mentorNotices);
 
   const concepts = await classifySurface(
-    rows.map((row) => ({
-      id: row.id,
-      text: row.concept,
-      rawLanguage: row.rawLanguage,
-    })),
+    rows.map((row) => ({ id: row.id, text: row.concept })),
     'mentor_notice_concept',
   );
 
-  if (concepts.remediate.length > 0) {
-    await db
-      .update(mentorNotices)
-      .set({ concept: REDACTED_PLACEHOLDER, status: 'faded' })
-      .where(inArray(mentorNotices.id, concepts.remediate));
+  let conceptsScrubbed = 0;
+  for (const target of concepts.remediate) {
+    const updated = await scrubIfUnchanged(() =>
+      db
+        .update(mentorNotices)
+        .set({ concept: REDACTED_PLACEHOLDER, status: 'faded' })
+        .where(
+          and(
+            eq(mentorNotices.id, target.id),
+            eq(mentorNotices.concept, target.text),
+          ),
+        )
+        .returning({ id: mentorNotices.id }),
+    );
+    if (updated) conceptsScrubbed += 1;
   }
 
   const hints = await classifySurface(
-    rows.map((row) => ({
-      id: row.id,
-      text: row.correctionHint,
-      rawLanguage: row.rawLanguage,
-    })),
+    rows.map((row) => ({ id: row.id, text: row.correctionHint })),
     'mentor_notice_correction_hint',
   );
 
-  if (hints.remediate.length > 0) {
-    await db
-      .update(mentorNotices)
-      .set({ correctionHint: null })
-      .where(inArray(mentorNotices.id, hints.remediate));
+  let hintsScrubbed = 0;
+  for (const target of hints.remediate) {
+    const updated = await scrubIfUnchanged(() =>
+      db
+        .update(mentorNotices)
+        .set({ correctionHint: null })
+        .where(
+          and(
+            eq(mentorNotices.id, target.id),
+            eq(mentorNotices.correctionHint, target.text),
+          ),
+        )
+        .returning({ id: mentorNotices.id }),
+    );
+    if (updated) hintsScrubbed += 1;
   }
 
   return [
     {
       surface: 'mentor_notices.concept',
       scanned: concepts.scanned,
-      remediated: concepts.remediate.length,
+      remediated: conceptsScrubbed,
       review: concepts.review,
+      skippedChanged: concepts.remediate.length - conceptsScrubbed,
     },
     {
       surface: 'mentor_notices.correction_hint',
       scanned: hints.scanned,
-      remediated: hints.remediate.length,
+      remediated: hintsScrubbed,
       review: hints.review,
+      skippedChanged: hints.remediate.length - hintsScrubbed,
     },
   ];
 }
@@ -160,28 +203,34 @@ export async function remediateTopicNotes(
   db: Database,
 ): Promise<SurfaceRemediationReport> {
   const rows = await db
-    .select({
-      id: topicNotes.id,
-      text: topicNotes.content,
-      rawLanguage: person.conversationLanguage,
-    })
-    .from(topicNotes)
-    .innerJoin(person, eq(topicNotes.profileId, person.id));
+    .select({ id: topicNotes.id, text: topicNotes.content })
+    .from(topicNotes);
 
   const result = await classifySurface(rows, 'note_text');
 
-  if (result.remediate.length > 0) {
-    await db
-      .update(topicNotes)
-      .set({ content: REDACTED_PLACEHOLDER })
-      .where(inArray(topicNotes.id, result.remediate));
+  let scrubbed = 0;
+  for (const target of result.remediate) {
+    const updated = await scrubIfUnchanged(() =>
+      db
+        .update(topicNotes)
+        .set({ content: REDACTED_PLACEHOLDER })
+        .where(
+          and(
+            eq(topicNotes.id, target.id),
+            eq(topicNotes.content, target.text),
+          ),
+        )
+        .returning({ id: topicNotes.id }),
+    );
+    if (updated) scrubbed += 1;
   }
 
   return {
     surface: 'topic_notes.content',
     scanned: result.scanned,
-    remediated: result.remediate.length,
+    remediated: scrubbed,
     review: result.review,
+    skippedChanged: result.remediate.length - scrubbed,
   };
 }
 
@@ -199,26 +248,35 @@ export async function remediateNeedsDeepening(
     .select({
       id: needsDeepeningTopics.id,
       text: needsDeepeningTopics.misconception,
-      rawLanguage: person.conversationLanguage,
     })
     .from(needsDeepeningTopics)
-    .innerJoin(person, eq(needsDeepeningTopics.profileId, person.id))
     .where(isNotNull(needsDeepeningTopics.misconception));
 
   const result = await classifySurface(rows, 'needs_deepening');
 
-  if (result.remediate.length > 0) {
-    await db
-      .update(needsDeepeningTopics)
-      .set({ misconception: null })
-      .where(inArray(needsDeepeningTopics.id, result.remediate));
+  let scrubbed = 0;
+  for (const target of result.remediate) {
+    const updated = await scrubIfUnchanged(() =>
+      db
+        .update(needsDeepeningTopics)
+        .set({ misconception: null })
+        .where(
+          and(
+            eq(needsDeepeningTopics.id, target.id),
+            eq(needsDeepeningTopics.misconception, target.text),
+          ),
+        )
+        .returning({ id: needsDeepeningTopics.id }),
+    );
+    if (updated) scrubbed += 1;
   }
 
   return {
     surface: 'needs_deepening_topics.misconception',
     scanned: result.scanned,
-    remediated: result.remediate.length,
+    remediated: scrubbed,
     review: result.review,
+    skippedChanged: result.remediate.length - scrubbed,
   };
 }
 

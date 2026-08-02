@@ -1,6 +1,6 @@
+import { conversationLanguageSchema } from '@eduagent/schemas';
 import { evaluateLearningTextByContent, learningTextContentKey } from './gate';
 import type { LearningTextBlockReason, LearningTextFieldKind } from './scan';
-import type { ConversationLanguage } from '@eduagent/schemas';
 
 /**
  * [WI-2753] Classify ALREADY-PERSISTED learning text for remediation.
@@ -41,23 +41,17 @@ const REMEDIABLE_REASONS: readonly LearningTextBlockReason[] = [
   'diagnostic_inference',
 ];
 
+/**
+ * Every conversation language, read from the shared enum so a newly supported
+ * locale is covered the moment it is added rather than needing a second list
+ * here (the same sourcing the gate itself uses).
+ */
+const ALL_CONVERSATION_LANGUAGES = conversationLanguageSchema.options;
+
 export interface PersistedTextRow {
   /** Caller's row identity. Opaque here; never logged with the text. */
   readonly id: string;
   readonly text: string | null | undefined;
-  /**
-   * The row's OWN declared conversation language, or undefined when the column
-   * is null or holds an unrecognised code.
-   *
-   * Load-bearing, and measured rather than assumed: with the declared language
-   * absent, `Der Schüler hat ADHS.` classifies `unclear` instead of
-   * `person_attribution` and would be missed by the rule above while being
-   * indistinguishable from an educational row. Never substitute `'en'` — the
-   * gate documents that as the English-only behaviour WI-2628 removed. An
-   * unresolved value is passed through as `undefined`, which makes the gate scan
-   * every grammar and keep the strictest verdict.
-   */
-  readonly conversationLanguage: ConversationLanguage | undefined;
 }
 
 export interface PersistedTextVerdict {
@@ -67,71 +61,88 @@ export interface PersistedTextVerdict {
 }
 
 /**
- * Classify a batch of persisted rows of ONE field kind.
+ * Classify a batch of persisted rows of ONE field kind, scanning under EVERY
+ * attribution grammar and keeping the strictest REASON any of them produces.
  *
- * Rows are grouped by declared language because the gate takes a single
- * `conversationLanguage` per call, not one per field — so "pass each row's own
- * language" is expressed as one call per language group. Grouping also keeps
- * the deduplication inside `evaluateLearningTextByContent` effective: identical
- * text under the same language collapses to one evaluation.
+ * WHY NOT THE LEARNER'S DECLARED LANGUAGE. The obvious source — joining
+ * `person.conversation_language` — is the learner's CURRENT, MUTABLE preference,
+ * not provenance stored alongside the row. A learner who wrote Spanish notes and
+ * later switched to English would have their clinical rows scanned under the
+ * wrong grammar. Measured, not assumed: at an unresolved or mismatched language
+ * a German, Czech or French attribution classifies `unclear` rather than
+ * `person_attribution`, so it would drop into the review queue instead of being
+ * remediated — an automatic sweep that quietly stops sweeping.
+ *
+ * WHY SCANNING EVERY GRAMMAR IS SAFE. The gate's own unresolved-language path
+ * already scans all ten and keeps the strictest DISPOSITION; this applies the
+ * same idea one level down, to the reason. Each non-English attribution is
+ * caught by its own grammar, and — measured across the corpus — neither
+ * educational reference nor benign learning text yields an attribution reason
+ * under ANY grammar. So the broader scan finds more true positives without
+ * manufacturing false ones, which matters because a false positive here destroys
+ * learner text.
  */
 export async function classifyPersistedLearningText(input: {
   readonly fieldKind: LearningTextFieldKind;
   readonly rows: readonly PersistedTextRow[];
 }): Promise<PersistedTextVerdict[]> {
-  const byLanguage = new Map<string, PersistedTextRow[]>();
-  for (const row of input.rows) {
-    // A row with no text has nothing to remediate; `clear` it without a gate
-    // call rather than letting `undefined` collapse into a language bucket.
-    if (typeof row.text !== 'string') continue;
-    const bucket = row.conversationLanguage ?? 'unresolved';
-    const existing = byLanguage.get(bucket);
-    if (existing) existing.push(row);
-    else byLanguage.set(bucket, [row]);
+  const withText = input.rows.filter(
+    (row): row is PersistedTextRow & { text: string } =>
+      typeof row.text === 'string',
+  );
+
+  // Strictest reason seen for each row across all grammars. An attribution from
+  // any one language outranks an `unclear` from the other nine.
+  const strongest = new Map<string, LearningTextBlockReason | null>();
+
+  if (withText.length > 0) {
+    const texts = withText.map((row) => row.text);
+    const perLanguage = await Promise.all(
+      ALL_CONVERSATION_LANGUAGES.map((language) =>
+        evaluateLearningTextByContent({
+          fieldKind: input.fieldKind,
+          texts,
+          conversationLanguage: language,
+          // [AC-4] Migration provenance. `resolveReferralPayload` returns null
+          // for it, so no row can reach the judge: the classification is a pure
+          // function of the bytes and the grammars, with no LLM call, no per-row
+          // cost, and no way for two runs to disagree about the same text.
+          provenance: 'migration',
+        }),
+      ),
+    );
+
+    for (const row of withText) {
+      const key = learningTextContentKey(row.text);
+      let best: LearningTextBlockReason | null = null;
+      for (const result of perLanguage) {
+        const reason = result.reasonFor(key);
+        if (reason === null) continue;
+        if (REMEDIABLE_REASONS.includes(reason)) {
+          best = reason;
+          break;
+        }
+        best ??= reason;
+      }
+      strongest.set(row.id, best);
+    }
   }
 
-  // A row that was never bucketed (no text) falls through to the `clear`
-  // default in the return below, so it needs no entry here.
-  const verdicts = new Map<string, PersistedTextVerdict>();
-
-  await Promise.all(
-    [...byLanguage].map(async ([bucket, rows]) => {
-      const result = await evaluateLearningTextByContent({
-        fieldKind: input.fieldKind,
-        texts: rows.map((row) => row.text as string),
-        conversationLanguage:
-          bucket === 'unresolved'
-            ? undefined
-            : (bucket as ConversationLanguage),
-        // [AC-4] Migration provenance. `resolveReferralPayload` returns null for
-        // it, so no row can reach the judge: the classification is a pure
-        // function of the bytes and the grammar, with no LLM call, no per-row
-        // cost, and no way for two runs to disagree about the same text.
-        provenance: 'migration',
-      });
-      for (const row of rows) {
-        const key = learningTextContentKey(row.text as string);
-        const reason = result.reasonFor(key);
-        verdicts.set(row.id, {
-          id: row.id,
-          reason,
-          disposition:
-            reason !== null && REMEDIABLE_REASONS.includes(reason)
-              ? 'remediate'
-              : reason !== null
-                ? 'review'
-                : 'clear',
-        });
-      }
-    }),
-  );
-
-  return input.rows.map(
-    (row) =>
-      verdicts.get(row.id) ?? {
-        id: row.id,
-        disposition: 'clear' as const,
-        reason: null,
-      },
-  );
+  return input.rows.map((row) => {
+    // A row with no text was never scanned and has nothing to remediate.
+    if (typeof row.text !== 'string') {
+      return { id: row.id, disposition: 'clear' as const, reason: null };
+    }
+    const reason = strongest.get(row.id) ?? null;
+    return {
+      id: row.id,
+      reason,
+      disposition:
+        reason === null
+          ? ('clear' as const)
+          : REMEDIABLE_REASONS.includes(reason)
+            ? ('remediate' as const)
+            : ('review' as const),
+    };
+  });
 }

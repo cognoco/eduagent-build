@@ -12,10 +12,22 @@ const classify = (
     rows,
   });
 
+const ATTRIBUTIONS = [
+  ['es', 'El alumno tiene TEA.'],
+  ['de', 'Der Schüler hat ADHS.'],
+  ['cs', 'Petr má dyslexii.'],
+  ['fr', "L'élève a un TDAH."],
+  ['en', 'Emma has ADHD.'],
+] as const;
+
+const EDUCATIONAL = 'This chapter explains what dyslexia is.';
+const EDUCATIONAL_2 = 'Dyslexia is a reading difference that affects decoding.';
+const BENIGN = 'We read two chapters about volcanoes today.';
+
 describe('[WI-2753 AC-5] the discriminator: attribution is remediated, educational reference is not', () => {
-  it('remediates a non-English diagnostic attribution at its declared language', async () => {
+  it('remediates a non-English diagnostic attribution', async () => {
     const [verdict] = await classify([
-      { id: 'es-1', text: 'El alumno tiene TEA.', conversationLanguage: 'es' },
+      { id: 'es-1', text: 'El alumno tiene TEA.' },
     ]);
 
     expect(verdict).toMatchObject({
@@ -29,33 +41,60 @@ describe('[WI-2753 AC-5] the discriminator: attribution is remediated, education
     // The half of the red/green that actually discriminates. A remediation that
     // blanks everything the gate blocks passes the case above and fails here,
     // destroying the learner capability the 2026-07-26 ruling restored.
-    const [verdict] = await classify([
-      {
-        id: 'edu-1',
-        text: 'This chapter explains what dyslexia is.',
-        conversationLanguage: 'en',
-      },
+    const verdicts = await classify([
+      { id: 'edu-1', text: EDUCATIONAL },
+      { id: 'edu-2', text: EDUCATIONAL_2 },
     ]);
 
-    expect(verdict?.disposition).toBe('review');
-    expect(verdict?.disposition).not.toBe('remediate');
+    for (const verdict of verdicts) {
+      expect(verdict.disposition).toBe('review');
+      expect(verdict.disposition).not.toBe('remediate');
+    }
+  });
+});
+
+describe('[WI-2753] every grammar is scanned, so no declared language is needed', () => {
+  // The reviewer finding this replaced: the first implementation joined
+  // `person.conversation_language`, which is the learner's CURRENT, MUTABLE
+  // preference rather than provenance stored with the row. A learner who wrote
+  // Spanish notes and later switched to English would have had their clinical
+  // rows scanned under the wrong grammar and silently missed.
+  it.each(ATTRIBUTIONS)(
+    'catches the %s attribution with no language supplied',
+    async (_language, text) => {
+      const [verdict] = await classify([{ id: 'row', text }]);
+
+      expect(verdict?.disposition).toBe('remediate');
+    },
+  );
+
+  it('does not manufacture an attribution for educational or benign text', async () => {
+    // The safety side of scanning every grammar: a broader scan must find more
+    // TRUE positives without inventing false ones, because a false positive here
+    // destroys learner-authored text.
+    const verdicts = await classify([
+      { id: 'edu-1', text: EDUCATIONAL },
+      { id: 'edu-2', text: EDUCATIONAL_2 },
+      { id: 'benign', text: BENIGN },
+    ]);
+
+    expect(verdicts.map((v) => v.disposition)).toEqual([
+      'review',
+      'review',
+      'clear',
+    ]);
   });
 });
 
 describe('[WI-2753] a HEDGED attribution is remediated, not skipped', () => {
-  // The correction that re-verification caught. `diagnostic_inference` and
-  // `person_attribution` come from ONE branch of the scan and differ only by an
-  // inference marker inside the attribution span, so keying remediation on the
-  // unhedged label alone would leave hedged clinical text in the database —
-  // precisely what this item exists to remove.
+  // `diagnostic_inference` and `person_attribution` come from ONE branch of the
+  // scan and differ only by an inference marker inside the attribution span, so
+  // keying remediation on the unhedged label alone would leave hedged clinical
+  // text in the database — precisely what this item exists to remove.
   it('treats both attribution reasons as remediable', async () => {
     const verdicts = await classify([
-      { id: 'plain', text: 'El alumno tiene TEA.', conversationLanguage: 'es' },
-      {
-        id: 'hedged',
-        text: 'El alumno probablemente tiene TEA.',
-        conversationLanguage: 'es',
-      },
+      { id: 'plain', text: 'El alumno tiene TEA.' },
+      { id: 'hedged', text: 'El alumno probablemente tiene TEA.' },
     ]);
 
     expect(verdicts.map((v) => v.disposition)).toEqual([
@@ -70,64 +109,35 @@ describe('[WI-2753] a HEDGED attribution is remediated, not skipped', () => {
   });
 });
 
-describe('[WI-2753] the row’s declared language is load-bearing', () => {
-  it('classifies a German attribution as remediable when its language is passed', async () => {
-    const [verdict] = await classify([
-      { id: 'de-1', text: 'Der Schüler hat ADHS.', conversationLanguage: 'de' },
-    ]);
-
-    expect(verdict?.disposition).toBe('remediate');
-  });
-
-  it('never renders an unresolved language as clear', async () => {
-    // An unresolved language must not fail OPEN. The gate scans every grammar
-    // and keeps the strictest verdict, so the row is still caught — the point of
-    // this case is that `undefined` is passed through rather than defaulted to
-    // English, which is the behaviour WI-2628 removed.
-    const [verdict] = await classify([
-      {
-        id: 'unknown-1',
-        text: 'Der Schüler hat ADHS.',
-        conversationLanguage: undefined,
-      },
-    ]);
-
-    expect(verdict?.disposition).not.toBe('clear');
-  });
-});
-
 describe('[WI-2753 AC-4] idempotence', () => {
   it('returns the same verdicts for the same bytes across runs', async () => {
     const rows = [
-      { id: 'a', text: 'El alumno tiene TEA.', conversationLanguage: 'es' },
-      {
-        id: 'b',
-        text: 'This chapter explains what dyslexia is.',
-        conversationLanguage: 'en',
-      },
-      {
-        id: 'c',
-        text: 'We read two chapters about volcanoes today.',
-        conversationLanguage: 'en',
-      },
-    ] as const;
+      { id: 'a', text: 'El alumno tiene TEA.' },
+      { id: 'b', text: EDUCATIONAL },
+      { id: 'c', text: BENIGN },
+    ];
 
-    const first = await classify([...rows]);
-    const second = await classify([...rows]);
+    const first = await classify(rows);
+    const second = await classify(rows);
 
     expect(second).toEqual(first);
+  });
+
+  it('classifies the redaction placeholder itself as clear', async () => {
+    // What makes a re-run a no-op rather than a second scrub.
+    const [verdict] = await classify([
+      { id: 'placeholder', text: '[redacted: clinical inference removed]' },
+    ]);
+
+    expect(verdict?.disposition).toBe('clear');
   });
 });
 
 describe('[WI-2753] rows with nothing to remediate', () => {
-  it('clears safe text and absent text without a verdict of its own', async () => {
+  it('clears safe text and absent text', async () => {
     const verdicts = await classify([
-      {
-        id: 'safe',
-        text: 'We read two chapters about volcanoes today.',
-        conversationLanguage: 'en',
-      },
-      { id: 'null', text: null, conversationLanguage: 'en' },
+      { id: 'safe', text: BENIGN },
+      { id: 'null', text: null },
     ]);
 
     expect(verdicts.map((v) => v.disposition)).toEqual(['clear', 'clear']);
@@ -135,13 +145,9 @@ describe('[WI-2753] rows with nothing to remediate', () => {
 
   it('preserves input order and returns exactly one verdict per row', async () => {
     const verdicts = await classify([
-      { id: 'one', text: 'El alumno tiene TEA.', conversationLanguage: 'es' },
-      { id: 'two', text: null, conversationLanguage: 'de' },
-      {
-        id: 'three',
-        text: 'Der Schüler hat ADHS.',
-        conversationLanguage: 'de',
-      },
+      { id: 'one', text: 'El alumno tiene TEA.' },
+      { id: 'two', text: null },
+      { id: 'three', text: 'Der Schüler hat ADHS.' },
     ]);
 
     expect(verdicts.map((v) => v.id)).toEqual(['one', 'two', 'three']);

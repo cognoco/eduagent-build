@@ -137,9 +137,9 @@ describeLoopbackOnly(
           displayName: 'WI-2753 learner',
           birthDate: '2012-01-01',
           residenceJurisdiction: 'ROW',
-          // Load-bearing: without the declared language the Spanish attribution
-          // classifies `unclear` and would be indistinguishable from the
-          // educational row.
+          // Recorded for realism only. The classification no longer reads this
+          // column: it is the learner's mutable CURRENT preference, not the
+          // provenance of the text, so the sweep scans every grammar instead.
           conversationLanguage: 'es',
         })
         .returning({ id: person.id });
@@ -284,7 +284,7 @@ describeLoopbackOnly(
       }
     });
 
-    it('[AC-1] reports a per-surface count before anything is scrubbed', async () => {
+    it('[AC-1] first run: scrubs the attribution rows and returns per-surface counts', async () => {
       const reports = await remediatePersistedLearningText(db);
       const bySurface = new Map(reports.map((r) => [r.surface, r]));
 

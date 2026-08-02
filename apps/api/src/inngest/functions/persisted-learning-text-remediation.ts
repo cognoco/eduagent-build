@@ -2,7 +2,11 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { createLogger } from '../../services/logger';
-import { remediatePersistedLearningText } from '../../services/learning-text-safety/persisted-remediation-apply';
+import {
+  remediateMentorNotices,
+  remediateNeedsDeepening,
+  remediateTopicNotes,
+} from '../../services/learning-text-safety/persisted-remediation-apply';
 
 const logger = createLogger();
 
@@ -35,9 +39,26 @@ export const persistedLearningTextRemediation = inngest.createFunction(
   async ({ step }) => {
     const db = getStepDatabase();
 
-    const reports = await step.run('remediate-surfaces', async () =>
-      remediatePersistedLearningText(db),
-    );
+    // ONE STEP PER SURFACE, not one step for all of them. The surfaces are
+    // independent reads and writes with no transaction spanning them, so a
+    // single wrapping step that threw partway would replay the surfaces that had
+    // already committed — and their counts would come back zero the second time
+    // (the rows are scrubbed, so nothing is left to remediate), silently
+    // under-reporting what the run actually did. Per-surface steps let Inngest
+    // memoize each completed surface's real counts and retry only the one that
+    // failed. Re-running a surface is still safe on its own terms; this is about
+    // not losing the numbers.
+    const reports = [
+      ...(await step.run('remediate-mentor-notices', async () =>
+        remediateMentorNotices(db),
+      )),
+      await step.run('remediate-topic-notes', async () =>
+        remediateTopicNotes(db),
+      ),
+      await step.run('remediate-needs-deepening', async () =>
+        remediateNeedsDeepening(db),
+      ),
+    ];
 
     // Observability records surface, counts and nothing else — never the text,
     // and never a row id alongside it. `review` is logged at warn because it is
@@ -49,6 +70,7 @@ export const persistedLearningTextRemediation = inngest.createFunction(
         surface: report.surface,
         scanned: report.scanned,
         remediated: report.remediated,
+        skippedChanged: report.skippedChanged,
       });
       if (report.review > 0) {
         logger.warn('[WI-2753] rows require human review, not remediated', {
