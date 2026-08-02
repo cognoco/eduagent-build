@@ -289,6 +289,46 @@ describe('checkGithubWorkflowSecurity', () => {
     expect(checkGithubWorkflowSecurity(root)).toEqual([]);
   });
 
+  it('allows the D-80 floating allowlist entry at its exact tag only', () => {
+    writeFixture(
+      root,
+      '.github/workflows/allowlisted.yml',
+      `
+      name: Allowlisted
+      on: pull_request
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: anthropics/claude-code-action@v1
+      `,
+    );
+
+    expect(messages(root)).not.toContain(
+      'anthropics/claude-code-action@v1 must be pinned to a 40-character SHA',
+    );
+  });
+
+  it('rejects the allowlisted action at any other mutable ref', () => {
+    writeFixture(
+      root,
+      '.github/workflows/allowlisted-wrong-tag.yml',
+      `
+      name: Allowlisted wrong tag
+      on: pull_request
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: anthropics/claude-code-action@main
+      `,
+    );
+
+    expect(messages(root)).toContain(
+      'anthropics/claude-code-action@main must be pinned to a 40-character SHA',
+    );
+  });
+
   it('rejects mutable external reusable workflow refs', () => {
     writeFixture(
       root,
