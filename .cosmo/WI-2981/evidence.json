@@ -17,7 +17,7 @@
     },
     {
       "acRef": "AC-4",
-      "description": "Cancelled zero-job runs 30688886377, 30688890531, and 30688912863 are recorded, and the equivalent concurrency proof shows no intermediate main SHA loses CI coverage: RED under the pre-fix group line (5 failed / 8 passed, named per test), restored workflow GREEN (13/13). GitHub-hosted rapid-merge execution was not reproduced; the deterministic contract stands in for it.",
+      "description": "All three cited runs are recorded in red-green.md with URL, head SHA, created time, attempt count, conclusion and job count, verified read-only via gh api on 2026-08-02. Correction: only 30688886377 and 30688890531 are unrecovered zero-job cancellations; 30688912863 currently concludes success with 4 jobs, but its attempts 1 and 2 were themselves zero-job cancellations before a manual third attempt produced CI evidence. The three head SHAs are consecutive main commits merged inside 46 seconds, matching the pending-run eviction the deterministic contract reproduces; the equivalent concurrency proof is the RED under the pre-fix group line and the restored-workflow rerun, both named per assertion in red-green.md. GitHub-hosted rapid-merge racing was not re-executed.",
       "pointer": ".cosmo/WI-2981/red-green.md"
     }
   ],

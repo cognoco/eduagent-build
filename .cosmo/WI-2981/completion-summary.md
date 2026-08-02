@@ -1,6 +1,6 @@
 # WI-2981 completion summary
 
-## What was done
+## What was done:
 
 Reworked the WI-2981 proof after independent review rejected the first
 submission. The rejection was correct: the deterministic model's variant B fed
@@ -15,7 +15,7 @@ merge of pull request 2897 (see
 https://github.com/cognoco/eduagent-build/pull/2897) and its semantics are
 untouched here.
 
-## What changed
+## What changed:
 
 - `scripts/ci-concurrency-contract.test.ts`
   - Added a small dependency-free GitHub Actions expression evaluator (context
@@ -34,12 +34,22 @@ untouched here.
     cancellation but made it group-name agnostic so it asserts behavior and
     stays honest under mutation.
 - `.cosmo/WI-2981/red-green.md` — rewritten (not appended) with the mutation
-  proof, the RED tests named individually, and the withdrawn OTA claim.
+  proof, the RED tests named individually, and the withdrawn OTA claim. Now
+  also carries the cited GitHub Actions runs, each with its URL, head SHA,
+  created time, attempt count, conclusion and job count, verified read-only
+  through the GitHub API, plus the read-only commands used.
 - `.cosmo/WI-2981/evidence.json` — claims realigned to the live four-criterion
   acceptance set (previously mislabelled with six) and pointers made explicit
-  `.cosmo/WI-2981/` paths instead of bare names.
+  `.cosmo/WI-2981/` paths instead of bare names. The fourth claim now states
+  the verified run facts rather than the earlier blanket description.
+- **Correction to the cited runs.** The first submission called all three cited
+  runs zero-job cancellations. Verification shows only two of them are
+  unrecovered zero-job cancellations; the third currently concludes
+  successfully, and it is its first two attempts that were zero-job
+  cancellations before a manual attempt produced CI evidence. The false claim
+  is withdrawn and the accurate sequence is recorded in the evidence file.
 
-## Verification
+## Verification:
 
 Commands run, with full transcripts and per-assertion outcomes recorded in
 `.cosmo/WI-2981/red-green.md`:
@@ -59,9 +69,7 @@ Commands run, with full transcripts and per-assertion outcomes recorded in
 - Workflow YAML parses; Prettier reports no formatting diff on the changed
   files; a no-emit TypeScript check of the contract file exits 0.
 
-## Caveats / Follow-ups
-
-Caveats:
+## Caveats / Follow-ups:
 
 - GitHub-hosted rapid-merge racing was not executed; the contract is a
   deterministic model of GitHub's one-running plus one-pending queue, now bound

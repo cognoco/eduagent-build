@@ -136,6 +136,68 @@ No claim is made here about branch-protection required checks: that
 configuration is GitHub-side and not declared in this repository, and this
 change does not touch it.
 
+## Cited GitHub Actions runs — verified, with a correction
+
+Verified read-only on 2026-08-02 against `repos/cognoco/eduagent-build`. Every
+field below is quoted from the API, not from memory:
+
+```text
+gh api repos/cognoco/eduagent-build/actions/runs/<id>
+gh api repos/cognoco/eduagent-build/actions/runs/<id>/jobs?filter=latest
+gh api repos/cognoco/eduagent-build/actions/runs/<id>/attempts/<n>
+gh api repos/cognoco/eduagent-build/actions/runs/<id>/attempts/<n>/jobs
+```
+
+| Run | Head SHA | Created (UTC) | Attempts | Current conclusion | Jobs on latest attempt |
+|---|---|---|---|---|---|
+| [30688886377](https://github.com/cognoco/eduagent-build/actions/runs/30688886377) | `ca55c7af` | 2026-08-01T07:01:21Z | 1 | `cancelled` | **0** |
+| [30688890531](https://github.com/cognoco/eduagent-build/actions/runs/30688890531) | `fc6e09ee` | 2026-08-01T07:01:28Z | 1 | `cancelled` | **0** |
+| [30688912863](https://github.com/cognoco/eduagent-build/actions/runs/30688912863) | `17c958e5` | 2026-08-01T07:02:07Z | 3 | `success` | 4 |
+
+All three are `CI` runs of `.github/workflows/ci.yml`, triggered by `push` on
+`main`.
+
+### Correction to the earlier claim
+
+The first submission described all three as "cancelled zero-job runs". That is
+**wrong for 30688912863** and is withdrawn: that run's current conclusion is
+`success` with 4 jobs. Its per-attempt history, however, is itself the evidence:
+
+| Run 30688912863 | Created (UTC) | Conclusion | Jobs |
+|---|---|---|---|
+| attempt 1 | 2026-08-01T07:02:07Z | `cancelled` | **0** |
+| attempt 2 | 2026-08-01T07:21:13Z | `cancelled` | **0** |
+| attempt 3 | 2026-08-01T08:25:13Z | `success` | 4 |
+
+So the accurate statement is: **two runs are zero-job cancellations that were
+never recovered (30688886377, 30688890531), and a third SHA was cancelled at
+zero jobs twice before a manual third attempt finally produced CI evidence.**
+
+### What the sequence evidences
+
+The three head SHAs are consecutive commits on `main`, merged inside 46
+seconds:
+
+```text
+ca55c7af  2026-08-01T07:01:18Z  fix(api): resolve civil midnight gaps [WI-2572] (#2798)
+fc6e09ee  2026-08-01T07:01:25Z  fix(scripts): cover Jest worker passthrough [WI-2834] (#2800)
+17c958e5  2026-08-01T07:02:04Z  fix(mobile): confirm language in WI-2231 release E2E (#2783)
+```
+
+Under the pre-fix expression all three shared one `ci-refs/heads/main` group.
+With `cancel-in-progress` false for main, GitHub does not cancel the running
+run — it **evicts the pending one**, which completes as `cancelled` having
+started no jobs. That is exactly the zero-job signature observed: runs marked
+`cancelled` with `total_count: 0`, so no job ever attributed CI to those
+commits.
+
+This is the same displacement the deterministic contract now reproduces
+(`sha-3` evicting pending `sha-2`), and it is why CI evidence for `17c958e5`
+existed only after someone re-ran it twice. Note the attempt-3 job list also
+contains a `failure` job (`Flag-ON integration (IDENTITY_V2_ENABLED)`) while the
+run concluded `success`; that is unrelated to this work item and is recorded
+here only because it appears in the same API response.
+
 ## Wider validation (this rework)
 
 ```text
