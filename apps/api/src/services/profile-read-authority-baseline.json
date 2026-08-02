@@ -122,32 +122,12 @@
   {
     "file": "apps/api/src/routes/scopes.ts",
     "method": "get",
-    "route": "/scopes"
-  },
-  {
-    "file": "apps/api/src/routes/scopes.ts",
-    "method": "get",
     "route": "/scopes/:personId/subjects"
-  },
-  {
-    "file": "apps/api/src/routes/scopes.ts",
-    "method": "get",
-    "route": "/scopes/coldstart"
   },
   {
     "file": "apps/api/src/routes/settings.ts",
     "method": "get",
     "route": "/settings/celebration-level"
-  },
-  {
-    "file": "apps/api/src/routes/settings.ts",
-    "method": "get",
-    "route": "/settings/family-pool-breakdown-sharing"
-  },
-  {
-    "file": "apps/api/src/routes/settings.ts",
-    "method": "get",
-    "route": "/settings/notifications"
   },
   {
     "file": "apps/api/src/routes/settings.ts",
@@ -158,55 +138,5 @@
     "file": "apps/api/src/routes/settings.ts",
     "method": "get",
     "route": "/settings/subjects/:subjectId/native-language"
-  },
-  {
-    "file": "apps/api/src/routes/settings.ts",
-    "method": "get",
-    "route": "/settings/withdrawal-archive"
-  },
-  {
-    "file": "apps/api/src/routes/snapshot-progress.ts",
-    "method": "get",
-    "route": "/progress/history"
-  },
-  {
-    "file": "apps/api/src/routes/snapshot-progress.ts",
-    "method": "get",
-    "route": "/progress/inventory"
-  },
-  {
-    "file": "apps/api/src/routes/snapshot-progress.ts",
-    "method": "get",
-    "route": "/progress/milestones"
-  },
-  {
-    "file": "apps/api/src/routes/streaks.ts",
-    "method": "get",
-    "route": "/streaks"
-  },
-  {
-    "file": "apps/api/src/routes/streaks.ts",
-    "method": "get",
-    "route": "/xp"
-  },
-  {
-    "file": "apps/api/src/routes/subjects.ts",
-    "method": "get",
-    "route": "/subjects"
-  },
-  {
-    "file": "apps/api/src/routes/subjects.ts",
-    "method": "get",
-    "route": "/subjects/:id"
-  },
-  {
-    "file": "apps/api/src/routes/topic-suggestions.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/books/:bookId/topic-suggestions"
-  },
-  {
-    "file": "apps/api/src/routes/vocabulary.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/vocabulary"
   }
 ]

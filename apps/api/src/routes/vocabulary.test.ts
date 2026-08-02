@@ -168,6 +168,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+import { HTTPException } from 'hono/http-exception';
 import { app } from '../index';
 import { vocabularyRoutes } from './vocabulary';
 import {
@@ -176,8 +177,11 @@ import {
   listVocabulary,
   reviewVocabulary,
 } from '../services/vocabulary';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { ForbiddenError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import {
+  ERROR_CODES,
   SubjectNotFoundError,
   VocabularyNotFoundError,
 } from '@eduagent/schemas';
@@ -539,5 +543,78 @@ describe('[WI-181 / DS-092] vocabulary proxy-mode guard', () => {
     );
     expect(res.status).toBe(403);
     expect(deleteVocabulary).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2881] read-authority guard (G28)
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so the attack below is a credentialed
+// non-owner request traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the case mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+// ---------------------------------------------------------------------------
+describe('[WI-2881] read-authority guard (G28)', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', vocabularyRoutes);
+    return direct;
+  }
+
+  it('[G28] GET /subjects/:subjectId/vocabulary rejects a cross-profile X-Profile-Id spoof with 403 before the vocabulary read', async () => {
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+
+    const res = await makeUnprovenApp().request(
+      `/subjects/${SUBJECT_ID}/vocabulary`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+    expect(listVocabulary).not.toHaveBeenCalled();
   });
 });
