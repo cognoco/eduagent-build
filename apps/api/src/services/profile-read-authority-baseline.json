@@ -120,46 +120,6 @@
     "route": "/recaps/:recapId"
   },
   {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/library/retention"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/retention/assessment-eligible"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/retention/stability"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/needs-deepening"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/retention"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/teaching-preference"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/topics/:topicId/evaluate-eligibility"
-  },
-  {
-    "file": "apps/api/src/routes/retention.ts",
-    "method": "get",
-    "route": "/topics/:topicId/retention"
-  },
-  {
     "file": "apps/api/src/routes/scopes.ts",
     "method": "get",
     "route": "/scopes"

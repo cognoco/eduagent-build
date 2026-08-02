@@ -56,6 +56,7 @@ import { clearFetchCalls } from './fetch-interceptor';
 import { app } from '../../apps/api/src/index';
 import {
   createSubjectWithCurriculum,
+  insertRetentionCards,
   insertSessionWithRecap,
 } from '../../apps/api/src/services/test-seed';
 
@@ -249,6 +250,23 @@ async function seedCelebrationsData(
   });
 }
 
+/**
+ * [WI-2879 G22a] Seeds a subject whose topic titles carry the marker plus a
+ * retention card on the first topic, so an unguarded aggregate read
+ * (GET /library/retention) would leak the marker via `topicTitle`.
+ */
+async function seedRetentionData(
+  profileId: string,
+  marker: string,
+): Promise<void> {
+  const { topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    `WI-2879 Retention Subject ${marker}`,
+  );
+  await insertRetentionCards(db, { profileId, topicId: topicIds[0]! });
+}
+
 async function seedRecapData(profileId: string, marker: string): Promise<void> {
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
@@ -374,6 +392,34 @@ describe('WI-2416: read-side profile-authority check rejects a spoofed X-Profile
 
     const res = await app.request(
       '/v1/celebrations/pending',
+      {
+        headers: buildAuthHeaders(
+          { sub: OWNER_CLERK_ID, email: OWNER_EMAIL },
+          peerProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.text();
+    expect(body).not.toContain(marker);
+  });
+
+  it('[WI-2879][G22a] GET /v1/library/retention: peer spoofing X-Profile-Id is denied (403) by the real middleware chain and no retention topic title is leaked', async () => {
+    // Sweep-C representative (mirrors the [WI-2877][G14] case above): the
+    // route-level denial tests in retention.test.ts use a direct-mount
+    // harness, so this case proves the PRODUCTION chain (auth → account →
+    // profileScopeMiddleware) rejects the spoof before the retention route
+    // can run — a real login for the owner, a seeded unrelated credentialed
+    // peer in the same org, and the header as the only attacker lever.
+    const { orgId } = await createOwner();
+    const peerProfileId = await createCredentialedPeer(orgId);
+    const marker = secretMarker('retention-g22a');
+    await seedRetentionData(peerProfileId, marker);
+
+    const res = await app.request(
+      '/v1/library/retention',
       {
         headers: buildAuthHeaders(
           { sub: OWNER_CLERK_ID, email: OWNER_EMAIL },

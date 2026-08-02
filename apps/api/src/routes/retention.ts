@@ -22,6 +22,7 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { parseConversationLanguage } from '../services/llm';
 import {
   getSubjectRetention,
@@ -48,6 +49,10 @@ type RetentionRouteEnv = {
     // [WI-2114] Populated by profile-scope middleware; carries the learner's
     // conversation_language for the recall-grader feedback (AC-4).
     profileMeta: ProfileMeta | undefined;
+    // [WI-2879] Set server-side by accountMiddleware — required by
+    // assertCanReadProfile.
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -67,6 +72,10 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   .get('/library/retention', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2879] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const result = await getAllSubjectsRetention(db, profileId);
     return c.json(libraryRetentionResponseSchema.parse(result));
   })
@@ -75,6 +84,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     await assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2879] Read-authority guard — see /library/retention above.
+    await assertCanReadProfile(c, profileId);
     const topics = await getAssessmentEligibleTopics(db, profileId);
     return c.json(assessmentEligibleTopicsResponseSchema.parse({ topics }));
   })
@@ -86,6 +97,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2879] Read-authority guard — see /library/retention above.
+      await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('param');
 
       const result = await getSubjectRetention(db, profileId, subjectId);
@@ -100,6 +113,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2879] Read-authority guard — see /library/retention above.
+      await assertCanReadProfile(c, profileId);
       const { topicId } = c.req.valid('param');
 
       const card = await getTopicRetention(db, profileId, topicId);
@@ -155,6 +170,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2879] Read-authority guard — see /library/retention above.
+      await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('param');
 
       const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
@@ -169,6 +186,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2879] Read-authority guard — see /library/retention above.
+      await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('param');
 
       const preference = await getTeachingPreference(db, profileId, subjectId);
@@ -241,6 +260,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2879] Read-authority guard — see /library/retention above.
+      await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('query');
 
       const topics = await getStableTopics(db, profileId, subjectId);
@@ -255,6 +276,8 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2879] Read-authority guard — see /library/retention above.
+      await assertCanReadProfile(c, profileId);
       const { topicId } = c.req.valid('param');
 
       const eligibility = await checkEvaluateEligibility(
