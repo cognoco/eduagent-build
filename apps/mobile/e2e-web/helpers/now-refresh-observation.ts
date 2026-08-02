@@ -78,7 +78,7 @@ async function readNowRefreshPayload<Payload>(
  * release the Network body once navigation completes, while the plain
  * `Response` handle itself remains settled and otherwise looks healthy.
  */
-export function captureNowRefreshPayload<Response, Payload>(
+export async function captureNowRefreshPayload<Response, Payload>(
   responsePromise: Promise<Response>,
   readPayload: (response: Response) => Promise<Payload>,
   options?: NowRefreshPayloadCaptureOptions<Response>,
@@ -103,23 +103,23 @@ export function captureNowRefreshPayload<Response, Payload>(
     if (options) options.page.off('response', onResponse);
   };
 
-  return responsePromise.then(
-    (response) => {
-      cleanup();
-      return {
-        kind: 'response-settled' as const,
-        response,
-        payloadRead:
-          capturedResponse === response && capturedPayloadRead !== undefined
-            ? capturedPayloadRead
-            : readNowRefreshPayload(() => readPayload(response)),
-      };
-    },
-    (error) => {
-      cleanup();
-      return { kind: 'response-rejected' as const, error };
-    },
-  );
+  let response: Response;
+  try {
+    response = await responsePromise;
+  } catch (error) {
+    cleanup();
+    return { kind: 'response-rejected', error };
+  }
+
+  cleanup();
+  return {
+    kind: 'response-settled',
+    response,
+    payloadRead:
+      capturedResponse === response && capturedPayloadRead !== undefined
+        ? capturedPayloadRead
+        : readNowRefreshPayload(() => readPayload(response)),
+  };
 }
 
 /**
