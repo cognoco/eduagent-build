@@ -22,12 +22,14 @@ import {
   createDatabase,
   consentGrant,
   guardianship,
+  login,
   membership,
   organization,
   person,
   type Database,
 } from '@eduagent/database';
 import { listProfilesV2, getProfileV2, getPersonScope } from './profile-v2';
+import { getTierConfig } from '../subscription';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -85,6 +87,41 @@ const RUN = !!process.env.DATABASE_URL;
       roles: args.roles,
     });
     return p!.id;
+  }
+
+  async function seedLogin(personId: string): Promise<void> {
+    await db.insert(login).values({
+      personId,
+      clerkUserId: `wi2899-clerk-${personId}`,
+      email: `wi2899-${personId}@integration.test`,
+    });
+  }
+
+  async function countListQueries(
+    organizationId: string,
+    callerPersonId: string,
+  ): Promise<{
+    profiles: Awaited<ReturnType<typeof listProfilesV2>>;
+    count: number;
+  }> {
+    const client = (db as unknown as { $client: { query: unknown } }).$client;
+    const original = client.query.bind(client) as (
+      ...args: unknown[]
+    ) => unknown;
+    let count = 0;
+    (client as { query: unknown }).query = (...args: unknown[]) => {
+      count += 1;
+      return original(...args);
+    };
+
+    try {
+      return {
+        profiles: await listProfilesV2(db, organizationId, callerPersonId),
+        count,
+      };
+    } finally {
+      (client as { query: unknown }).query = original;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -267,6 +304,118 @@ const RUN = !!process.env.DATABASE_URL;
     expect(byId.get(child)!.consentStatus).toBe('CONSENTED');
     // Owner has no consent rows → null (legacy parity).
     expect(byId.get(owner)!.consentStatus).toBeNull();
+  });
+
+  it('[WI-2899] returns only self and active uncredentialed managed charges', async () => {
+    const org = await seedOrg('Authority Org');
+    const foreignOrg = await seedOrg('Foreign Org');
+    const caller = await seedMember(org, {
+      name: 'Caller',
+      roles: ['admin'],
+    });
+    const managedCharge = await seedMember(org, {
+      name: 'Managed charge',
+      roles: ['learner'],
+    });
+    const credentialedCharge = await seedMember(org, {
+      name: 'Credentialed charge',
+      roles: ['learner'],
+    });
+    const unrelatedMember = await seedMember(org, {
+      name: 'Unrelated member',
+      roles: ['learner'],
+    });
+    const revokedCharge = await seedMember(org, {
+      name: 'Revoked charge',
+      roles: ['learner'],
+    });
+    const foreignMember = await seedMember(foreignOrg, {
+      name: 'Foreign member',
+      roles: ['learner'],
+    });
+    const [nonmember] = await db
+      .insert(person)
+      .values({
+        displayName: 'Nonmember',
+        birthDate: '2010-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    personIds.push(nonmember!.id);
+
+    await db.insert(guardianship).values([
+      { guardianPersonId: caller, chargePersonId: managedCharge },
+      { guardianPersonId: caller, chargePersonId: credentialedCharge },
+      {
+        guardianPersonId: caller,
+        chargePersonId: revokedCharge,
+        revokedAt: new Date(),
+      },
+      { guardianPersonId: caller, chargePersonId: foreignMember },
+      { guardianPersonId: caller, chargePersonId: nonmember!.id },
+    ]);
+    await seedLogin(caller);
+    await seedLogin(credentialedCharge);
+
+    const profiles = await listProfilesV2(db, org, caller);
+
+    expect(profiles.map((profile) => profile.id)).toEqual([
+      caller,
+      managedCharge,
+    ]);
+    expect(profiles.find((profile) => profile.id === caller)).toMatchObject({
+      isCurrentUser: true,
+      isOwner: true,
+    });
+    expect(
+      profiles.find((profile) => profile.id === managedCharge),
+    ).toMatchObject({
+      isCurrentUser: false,
+      hasFamilyLinks: true,
+    });
+    expect(profiles.map((profile) => profile.id)).not.toEqual(
+      expect.arrayContaining([
+        credentialedCharge,
+        unrelatedMember,
+        revokedCharge,
+        foreignMember,
+        nonmember!.id,
+      ]),
+    );
+  });
+
+  it('[WI-2899] keeps list query count fixed for 1, 4, and policy-max rosters', async () => {
+    const policyMax = getTierConfig('pro').maxProfiles;
+    const rosterSizes = [1, 4, policyMax];
+    const counts: number[] = [];
+
+    for (const rosterSize of rosterSizes) {
+      const org = await seedOrg(`Query-count Org ${rosterSize}`);
+      const caller = await seedMember(org, {
+        name: `Caller ${rosterSize}`,
+        roles: ['admin'],
+      });
+      await seedLogin(caller);
+      for (let index = 1; index < rosterSize; index += 1) {
+        const charge = await seedMember(org, {
+          name: `Charge ${rosterSize}-${index}`,
+          roles: ['learner'],
+        });
+        await db.insert(guardianship).values({
+          guardianPersonId: caller,
+          chargePersonId: charge,
+        });
+      }
+
+      const result = await countListQueries(org, caller);
+      expect(result.profiles).toHaveLength(rosterSize);
+      counts.push(result.count);
+    }
+
+    expect(policyMax).toBe(6);
+    // One member/authority query + one edge query + the existing two queries
+    // for each of the two consent purposes. None grows with roster size.
+    expect(counts).toEqual([6, 6, 6]);
   });
 
   it('returns an empty list for an org with no members', async () => {
