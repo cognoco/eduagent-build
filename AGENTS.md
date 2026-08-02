@@ -8,7 +8,7 @@
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-07-29. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-07-29 — heuristic grep; jest-reported totals may run slightly higher via `it.each` expansion.
 
 ## How to Work
 
@@ -88,7 +88,7 @@ Sorting test: **DECISIONS** = "I can't responsibly continue until you choose"; *
 3. Use [`CONTEXT.md`](CONTEXT.md) for standard terminology.
 4. Use `docs/project_context.md` for repo-specific implementation rules.
 5. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
-6. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md). *(Seeded 2026-06-08 — identity-foundation canon is fully indexed; estate-wide population is in progress.)*
+6. For the cross-layer map of canon / ADRs / specs / registers, see the documentation index: [`docs/INDEX.md`](docs/INDEX.md).
 7. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", load the project-memory skill from `.agents/skills/project-memory/SKILL.md` and follow its workflow. Memory lives in `.claude/memory/MEMORY.md` plus topic files.
 
 Memory is context, not law. If memory conflicts with this file, current docs, code, or explicit user instructions, follow the higher-priority source and update/archive the stale memory when appropriate.
@@ -159,25 +159,11 @@ concern and may override the commands named here. Standard:
 
 ## Git Commits
 
-Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`). The global primitive ships in the `zdx-core` plugin from the `cognoco/zdx-marketplace` plugin registry — if `/zdx-core:commit` is unavailable, install/enable that plugin; never fall back to ad-hoc git. Never hand-roll a commit flow, use the runtime's built-in commit protocol, or stage broadly without first checking scope. The skill lets hooks run and never bypasses them autonomously; the `--no-verify` doctrine lives in Required Validation below.
+Always use the repo commit skill for every commit and push — `/commit` in Claude Code, or load `.agents/skills/commit/SKILL.md` in Codex. It is the single source of truth for staging, message format, hook handling, and push behavior (a thin overlay over the global `/zdx-core:commit`; if unavailable, install the `zdx-core` plugin from the `cognoco/zdx-marketplace` registry — never fall back to ad-hoc git). Never hand-roll a commit flow, use the runtime built-in commit protocol, or stage broadly without checking scope. Hooks always run; the `--no-verify` doctrine lives in Required Validation below.
 
-Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session's work — own-work scope, which the commit skill enforces — and never stage files another session modified.
+Agents perform code changes in isolated worktrees they own (see Worktree Placement below) and commit from there. In the residual shared-tree case, commit only your own session work — own-work scope, which the commit skill enforces — and never stage files another session modified.
 
-**Docs-only exception (operator-ruled 2026-07-29):** a change touching ONLY documentation artifacts (`docs/**` markdown/HTML/PDF evidence, repo meta-docs — no code, config, CI, schema, or test files) still lands via **branch + PR**, but does NOT need an isolated worktree (no `setup-worktree.sh`, no `pnpm install`/`env:sync`). Build the commit against `origin/main` with git plumbing from the shared checkout and push it to a branch — never commit on `main` directly, never switch the shared checkout's branch:
-
-```bash
-base=$(git rev-parse origin/main)
-export GIT_INDEX_FILE=$(mktemp -u)
-git read-tree "$base"
-blob=$(git hash-object -w <local-file>)                      # repeat per file
-git update-index --add --cacheinfo 100644 "$blob" <repo-path> # (or --force-remove to delete)
-tree=$(git write-tree); unset GIT_INDEX_FILE
-commit=$(git commit-tree "$tree" -p "$base" -m "docs(scope): summary")
-git push origin "$commit":refs/heads/<branch>
-gh pr create --head <branch> ...
-```
-
-Local hooks don't run on a plumbing commit; the PR's CI is the gate (docs change-class routes light checks). Any change that mixes in non-doc files still goes worktree→PR.
+**Docs-only exception (operator-ruled 2026-07-29):** a change touching ONLY documentation artifacts (`docs/**` markdown/HTML/PDF evidence, repo meta-docs — no code, config, CI, schema, or test files) still lands via **branch + PR**, but does NOT need an isolated worktree: build the commit against `origin/main` with the working-tree-free plumbing path declared in the commit skill (`.agents/skills/commit/SKILL.md` § Plumbing authorization) — never commit on `main` directly, never switch the shared checkout branch. Local hooks do not run on a plumbing commit; the PR CI is the gate (the docs change-class routes light checks). Any change that mixes in non-doc files still goes worktree→PR.
 
 ## Pull Requests
 
@@ -203,8 +189,8 @@ This repo overrides specific upstream skills. Use the repo version, not the upst
 
 | Upstream | Use instead | Why |
 |----------|-------------|-----|
-| `superpowers:using-git-worktrees` | `.agents/skills/worktree-setup/SKILL.md` | Canonical placement at `.worktrees/`; adds `pnpm install` + `pnpm env:sync` |
-| `EnterWorktree` (Claude Code built-in) | `.agents/skills/worktree-setup/SKILL.md` | Same reason; built-in default `.claude/worktrees/` is wrong for this repo |
+| `superpowers:using-git-worktrees` | `.agents/skills/worktree-setup/SKILL.md` | Wrong placement — see Worktree Placement above |
+| `EnterWorktree` (Claude Code built-in) | `.agents/skills/worktree-setup/SKILL.md` | Wrong placement — see Worktree Placement above |
 | `superpowers:finishing-a-development-branch` | `.agents/skills/commit/SKILL.md` (commit + push); manual PR creation via `gh pr create` | This repo has an opinionated PR/push flow via the commit skill; the superpowers menu would create competing guidance |
 | `superpowers:writing-plans` | `.agents/skills/writing-plans/SKILL.md` | Repo-local, profile-aware planner (embryo of a global ZDX planner) — keeps the useful mechanics (naming, location, file-map-first, self-review) and drops the upstream's prescriptive 5-step TDD template that degrades frontier-model planning |
 
@@ -219,181 +205,78 @@ When writing or editing skills:
 
 `.claude/skills/<name>/` is generated from `.agents/skills/<name>/` by `scripts/sync-skills.mjs`. Edit the master in `.agents/skills/`, then run `pnpm sync-skills` (or rely on the pre-commit hook). Direct edits to `.claude/skills/` will be overwritten on next sync.
 
-Skills under a **group directory** (currently `tech/`) are an exception to the 1:1 mirror: each child `.agents/skills/tech/<skill>/` is flattened to `.claude/skills/tech-<skill>/`. Codex reads the nested master directly; Claude Code reads the flattened copy because it does not reliably discover skills nested two levels deep under `.claude/skills/`. Add a new tech skill by creating `.agents/skills/tech/<skill>/SKILL.md` and running `pnpm sync-skills`. Group dirs are configured in `GROUP_DIRS` in `scripts/sync-skills.mjs`.
+Skills under a **group directory** (currently `tech/`) flatten on sync (`.agents/skills/tech/<skill>/` → `.claude/skills/tech-<skill>/`) because Claude Code does not reliably discover skills nested two levels deep; Codex reads the nested master directly. Add a tech skill by creating the nested master and running `pnpm sync-skills`. Config: `GROUP_DIRS` in `scripts/sync-skills.mjs`.
 
 `AGENTS.md` is the single source of truth for repo agent instructions. `CLAUDE.md` is a thin pointer that imports it (`@AGENTS.md`), so the two can never diverge — make every change here in `AGENTS.md`, never in `CLAUDE.md` (converged 2026-06-09, WI-386). Claude Code's skill loader still discovers the synced `.claude/skills/` copies for slash commands, but this doc cites the `.agents/skills/` masters as the canonical path, since both runtimes can read them.
 
 ## Profile Shapes (Two Tab Shapes + isOwner Gating)
 
-> **Scope.** This section describes the **current** nav/gating system (live in `apps/mobile/src/lib/navigation-contract.ts`). The **target** identity model being designed in the identity-foundation runway (6-persona set, capability split, "charge" terminology) is **not** this — it lives in `docs/canon/identity/` + `_wip/identity-foundation/CANONICAL-SET.md`. Don't conflate the two.
+> **Scope.** This describes the **current** nav/gating system (`apps/mobile/src/lib/navigation-contract.ts`), not the target identity model (`docs/canon/identity/` + `_wip/identity-foundation/CANONICAL-SET.md`). In the target model `isOwner` is retired — split into the `admin` membership role, the Payer, and Guardianship — but it is the **live production authz until the Identity-V2 cutover executes**. Never "clean up" `isOwner` ahead of the cutover.
 
-**For the reconstructed audience-gating inventory** (screens/APIs/Inngest jobs by user mode, with historical file:line citations and scaffolded findings F1-F14), see `docs/compliance/audience-matrix.md`; verify its leads against current code before relying on them. For the implemented contract — one `resolveNavigationContract()` function owning UI gating — see `apps/mobile/src/lib/navigation-contract.ts` (design rationale archived at `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`). The current short version is below.
+> **Nav mode is per-environment — never assume a global default.** The flags are build-time (`MODE_NAV_V0_ENABLED` / `MODE_NAV_V1_ENABLED`, `apps/mobile/src/lib/feature-flags.ts`) and intentionally differ by environment: read the values for the environment in question (`apps/mobile/eas.json` + workflow OTA env) before any nav/tab/mode claim, and **never write a flag state into docs or memory as "the default."** **V0 no-regress (ruled 2026-06-09):** target shell is V2, V1 is intermediate, V0 + flags-off legacy are shipped insurance — no currently shipped flag state may regress across any nav PR until the V0-retirement ruling executes (mentor-is-the-app spec §13); legacy helpers and flags-off short-circuits stay alive, and `resolveNavigationContract` wiring sits behind `MODE_NAV_V1_ENABLED`, never replacing the legacy fallback.
 
-> **Nav mode is per-environment — check it whenever the environment under discussion changes; never assume a global default.** The flags are **build-time** (`MODE_NAV_V0_ENABLED` / `MODE_NAV_V1_ENABLED` from `EXPO_PUBLIC_ENABLE_MODE_NAV` / `..._V1`, resolved in `apps/mobile/src/lib/feature-flags.ts:30-31`) and intentionally differ by environment — as of 2026-06-09: production build V0=on/V1=off (`apps/mobile/eas.json`), dev/preview builds and the preview-channel OTA both-on → V1 (`eas.json`, `.github/workflows/ci.yml` OTA env), local `.env.example` flags-off. These can change — read the flag values for the environment in question before making any nav/tab/mode claim, and use the audience × flag-state "Navigation shell matrix" in `docs/flows/mobile-app-flow-inventory.md`. Do not write any flag state into docs or memory as "the default."
->
-> **V0 status + hard constraint (ruled 2026-06-09).** V0 is the currently shipped production state and flag-isolated legacy insurance — not the long-term target. The target shell is **V2** per `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`; V1 is an intermediate, live on dev/preview/staging. All currently shipped flag states — the flags-off legacy 5-tab shell AND the V0-on mode shells — **must not regress** across any nav PR until the V0-retirement ruling (mentor-is-the-app spec §13, owner: product) is executed at its S6 milestone. The legacy helpers (`apps/mobile/src/lib/legacy-navigation-contract.ts`, e.g. `resolveShellVisibleTabs()`) and the flags-off short-circuits in `app-context.tsx` stay alive; `resolveNavigationContract` wiring sits behind `MODE_NAV_V1_ENABLED` and never replaces the legacy fallback. (Historical design rationale: `docs/_archive/specs/Done/2026-05-21-navigation-contract.md`.)
-
-**Tab shape** controls which tabs appear. The learner shape is stable; the guardian/supporter shape depends on the flag state — three states, not two:
-
-| Audience | flags-off (V0=off, V1=off) | V0=on, V1=off | V1=on |
-|---|---|---|---|
-| Solo owner / child on parent's account | 4: home, library, progress, more | same | same |
-| Adult owner + linked children | 5: home, own-learning, library, progress, more (`LEGACY_GUARDIAN_TABS`) | family mode: 3 (home, progress, more); study mode: 4 learner tabs; ModeSwitcher | family: 4 (home, **recaps**, progress, more — `FAMILY_TABS`); study: 4 (`STUDY_TABS`) |
-| Parent-proxy | 3: home, library, progress | 3 | 3 (`PROXY_TABS`) |
-
-The V1 guardian redesign replaces `own-learning` + `library` with a single `recaps` tab. V1 sets live in `apps/mobile/src/lib/navigation-contract.ts`; legacy/V0 sets in `apps/mobile/src/lib/legacy-navigation-contract.ts`. Which column is "production" depends on the build profile — check, don't assume (see the mode-check note above). Full matrix with file:line: `docs/flows/mobile-app-flow-inventory.md` → "Navigation shell matrix".
-
-Note: the learner-vs-parent home branch is the `navigationContract.home.screen === 'FamilyHome'` check in `home.tsx` — it renders `ParentHomeScreen` when true, else `LearnerScreen` directly. The legacy in-`LearnerScreen` `showParentHome` branch has been removed (WI-729). [was: documented as branching inside `LearnerScreen.tsx`]
-
-**`isOwner` gating** controls what appears INSIDE tabs (especially More and Progress). Billing/Security live inside `more/account.tsx`; Export/Delete live inside `more/privacy.tsx` — they are not top-level More rows:
-
-| Feature | Owner (guardian or solo) | Non-owner (child on parent's account) |
-|---|---|---|
-| Billing / subscription (in `more/account.tsx`) | visible | hidden |
-| Account security (in `more/account.tsx`) | visible | hidden |
-| Export / delete account (in `more/privacy.tsx`) | visible | hidden |
-| Add child | visible if 18+ | hidden |
-| Progress toggle (view children) | visible if has children | hidden |
+**Tab shape** controls which tabs appear (three flag states, not two); **`isOwner` gating** controls what appears INSIDE tabs (billing, security, export/delete, add-child, progress toggle). Full tab-shape matrix with file:line: `docs/flows/mobile-app-flow-inventory.md` → "Navigation shell matrix". Owner-vs-non-owner visibility summary + current gate sites (`navigationContract.gates.*`): `docs/compliance/audience-matrix.md` → "Where gating lives now" (verify the reconstructed inventory there against current code before relying on it).
 
 Key rules:
-- Use `resolveTabShape()` for tab visibility. Use `isOwner` / `role` for content gating inside screens.
-- `isGuardianProfile()` requires `isOwner` AND at least one non-owner in profiles[].
-- `computeAgeBracket()` (from `@eduagent/schemas`) is the canonical age-bracket function — use it for theming and age-appropriate copy, never for feature gating. The removed `personaFromBirthYear()` (and related fossils `isLearner`, local `Persona` type) must not be re-introduced — enforced by `persona-fossil-guard.test.ts`.
-- `computeAgeBracketFromDate()` (from `@eduagent/schemas`) is the canonical function for feature-gating and safety-adjacent age decisions (family-mode gate, adult-owner gate, LLM safety preamble, suitability-judge sampling). It falls back to year-only when month/day are absent. Use it — not `computeAgeBracket()` — for any gate that turns on the learner's age.
-- A solo owner and a child on a parent's account see the **same tabs** — they differ only in what's inside More/Progress.
 
+- `resolveTabShape()` for tab visibility; `isOwner` / `role` (via `navigationContract.gates.*`) for content gating inside screens. `isGuardianProfile()` requires `isOwner` AND a non-owner in profiles[].
+- `computeAgeBracket()` is for theming and age-appropriate copy — **never** feature gating. `computeAgeBracketFromDate()` (year-only fallback when month/day absent) is canonical for feature-gating and safety-adjacent age decisions (family-mode gate, adult-owner gate, LLM safety preamble, suitability-judge sampling). Any gate that turns on the learner age uses the date-based function. (Persona fossils are armed: `persona-fossil-guard.test.ts`.)
+- A solo owner and a child on a parent account see the **same tabs** — they differ only in what is inside More/Progress.
 ## Languages
 
-Two language enums exist, and they intentionally diverge:
+Two language enums **intentionally diverge** — the UI shell set (`SUPPORTED_LANGUAGES`, 7: en, de, es, ja, nb, pl, pt) is a subset of the LLM tutor-prose set (`conversationLanguageSchema`, 10: those plus cs, fr, it). **Never align them**: the conversation set is a deliberate superset; the UI shell falls back to English for cs/fr/it. Full system documentation: `docs/i18n.md`.
 
-| Concept | Enum | Where | Count |
-|---|---|---|---|
-| UI shell language | `SUPPORTED_LANGUAGES` | `apps/mobile/src/i18n/index.ts:23` | 7: en, de, es, ja, nb, pl, pt |
-| LLM tutor-prose language | `conversationLanguageSchema` | `packages/schemas/src/profiles.ts:10` | 10: en, cs, es, fr, de, it, pt, pl, ja, nb |
-
-The conversation set is intentionally a **superset**. Czech, French, and Italian
-learners can pick those as their tutor-prose language during onboarding and
-get LLM cards in their language; the UI shell falls back to English because we
-haven't committed to maintaining UI translations for those locales yet.
-
-`useMentorLanguageSync` (`apps/mobile/src/hooks/use-mentor-language-sync.ts:10`)
-clamps `i18next.language` through `conversationLanguageSchema.safeParse` before
-patching the profile, so a UI-language change can never write an invalid value
-to `profiles.conversation_language`. The DB CHECK constraint
-(`profiles_conversation_language_check`, migration 0087) is the hard floor.
-
-Adding a language requires:
-
-- **UI-only locale (already in conversation set):** add to `SUPPORTED_LANGUAGES`,
-  add `LANGUAGE_LABELS` entry, add to `resources` in `i18n/index.ts`, run
-  `pnpm translate`, ensure `scripts/check-i18n-staleness.ts` passes.
-- **Conversation-only locale:** add to `conversationLanguageSchema`, add to
-  `CONVERSATION_LANGUAGE_NAMES` in `apps/api/src/services/llm/router.ts:194`,
-  add a new migration extending the DB CHECK constraint.
-- **Both:** combination of the two.
-
-### UI strings hygiene
-
-`scripts/check-i18n-orphan-keys.ts` is a `ts-morph` AST walker (it replaced the
-old regex scanner). It is the single source of truth for i18n key health:
-
-- **Forward orphans:** a `t('foo.bar')` whose key is missing from `en.json`.
-- **Unused (reverse) orphans:** an `en.json` key no `t(…)` call references.
-  Default-on; pass `--allow-unused` only for ad-hoc local debugging.
-- **Namespace misuse:** `t('ns:key')` colon-prefix and `useTranslation('ns')`.
-- **Multi-interpolation templates:** `t(\`a.${x}.b.${y}\`)` loses the literal
-  between vars; refactor to compute the key, or add an on-line
-  `// i18n-allow-multi-var: <reason>` escape.
-
-Keys reached only through runtime-dynamic dispatch (a map lookup, an
-`i18next.t(entry.key)`, a `${var}`-suffixed template) live in
-`scripts/i18n-keep.ts` as `KEEP_PATTERNS`. Each entry's `reason` must cite a
-real `file:line`; `scripts/check-i18n-keep-rot.ts` fails CI if a cite rots. The
-walker also follows `cond ? 'a' : 'b'`, `x ?? 'a'`, `as` casts, `i18next.t(…)`
-member calls, and `const tr = t` alias rebindings.
-
-### Hardcoded-JSX-literal ratchet (Phase 3)
-
-The orphan-key checker only sees strings that pass through `t()`. Hardcoded
-English literals in JSX (e.g. `<Text>Add child</Text>`) bypass i18n entirely
-and render English to every locale. `scripts/check-i18n-jsx-literals.ts` is the
-read-side guard: a `ts-morph` AST walker that flags `JsxText` nodes and
-JSX-children `StringLiteral` / `NoSubstitutionTemplateLiteral` nodes (including
-through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) plus
-user-visible JSX attribute literals for known copy props (`label`,
-`accessibilityLabel`, `title`, `placeholder`, etc.) in
-`apps/mobile/src/**/*.tsx`. It is a forward-only baseline ratchet mirroring the
-`no-clinical-copy` pattern: existing literals are grandfathered in
-`scripts/i18n-jsx-literals-baseline.json`, and only NEW literals fail CI (the
-`i18n hardcoded-JSX-literal check` step in `ci.yml`). Child/text violations are
-keyed on `{file, kind, text}`; attribute violations are keyed on
-`{file, kind, prop, text}` — never line number — so reformatting does not churn
-the baseline. The attribute scanner deliberately ignores non-copy props such as
-`testID`, style/class props, role-like values, IDs, routes, image/source paths,
-metadata, unknown custom props, and translation-key literals. Run
-`pnpm check:i18n:jsx-literals --accept` to refresh the baseline when you
-genuinely add non-translatable JSX copy (a code sample, a brand token) and
-justify it in the commit message.
-
-When adding user-visible copy, route it through `t('…')` and add the key to
-`en.json` in the same PR — the ratchet enforces this for the JsxText/child
-surface and known copy attributes; review remains responsible for copy hidden
-behind unknown custom prop names.
-
-### Variable-interpolation fallbacks
-
-Keys with `{{var}}` interpolation should ship a no-variable companion key when
-the variable is genuinely optional, so the rendered string is never
-"Starting with …" (translators guess at the ellipsis and produce odd output).
-Example: instead of `t('rowSubject', { subject: subject || '…' })`, prefer
-`subject ? t('rowSubject', { subject }) : t('rowSubjectNoSubject')`.
+- Language-sync writes are safe by construction: `useMentorLanguageSync` clamps through `conversationLanguageSchema` before patching the profile, and the DB CHECK constraint is the hard floor.
+- **Adding a language** → follow the recipe in `docs/i18n.md` § Adding a language (UI-only, conversation-only, and both are different procedures).
+- i18n key health and the hardcoded-JSX-literal ratchet are **CI-armed**. Escapes when a gate fires: dynamic-dispatch keys → `scripts/i18n-keep.ts` `KEEP_PATTERNS` with a real `file:line` cite (cite rot is itself CI-checked); multi-interpolation templates → on-line `// i18n-allow-multi-var: <reason>`; genuinely non-translatable JSX copy → `pnpm check:i18n:jsx-literals --accept`, justified in the commit message.
+- **All user-visible copy goes through `t('…')` with its `en.json` key added in the same PR.** The ratchet enforces the JsxText/child surface and known copy attributes; review remains responsible for copy behind unknown custom prop names.
+- Keys with `{{var}}` interpolation ship a no-variable companion key when the variable is genuinely optional — never render "Starting with …" from a guessed ellipsis; translators produce odd output from it.
 
 ## Non-Negotiable Engineering Rules
 
 - `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.
-- Business logic belongs in `services/`, not in route handlers. Route/service boundaries are lint-enforced (eslint G1 and G5 in `eslint.config.mjs`).
-- Reads must use `createScopedRepository(profileId)` when the query operates on a single scoped table. For queries that join through a parent chain (e.g. `learning_sessions → curriculum_topics → curriculum_books → subjects`), use direct `db.select()` and enforce `profileId` via `subjects.profileId` (or the closest ancestor that owns it) in the WHERE clause. The scoped repo cannot express multi-table joins; the parent-chain pattern is the sanctioned alternative. Existing examples: `services/session/session-topic.ts`, `session-book.ts`, `session-subject.ts`. A second sanctioned deviation, for a **single scoped table**: reads that need ordering and/or a limit the scoped repo's `findFirst`/`findMany` API cannot express — e.g. a strict time-bound (`lt(createdAt, …)`) with `orderBy(desc(createdAt))` and `limit(1)` together to fetch the latest row before a timestamp, or an `orderBy` + `limit` pair with no time-bound at all — use direct `db.select()` with `profileId` pinned in the WHERE clause; it is the inexpressibility, not the specific predicate shape, that makes this the sanctioned pattern rather than a violation. Existing examples: `inngest/functions/review-calibration-grade.ts` (EU-7 grader-failure cap); `apps/api/src/services/now-feed.ts`'s `collectRecapReadyCandidates` and `collectSnapshotReadyCandidates` (WI-1121 derive-on-read projections).
-- Writes must include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
-- Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors. Exception: brand-fixed hex values are acceptable inside SVG-internal animation and celebration components (`*Animation.tsx`, `*Celebration.tsx`, `AnimatedSplash.tsx`, `MentomateLogo.tsx`) when the file annotates the brand intent.
-- Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
-- LLM calls go through `services/llm/router.ts` or its barrel, not direct provider SDK calls.
-- Non-core Inngest dispatches (telemetry, post-success notifications, observability events) go through `safeSend()` in `apps/api/src/services/safe-non-core.ts` so a dispatch failure is captured in Sentry but never throws and never breaks the user action. Bare `inngest.send(...)` is reserved for CORE flows where dispatch failure must short-circuit the user action — those sites carry a `// core-send: <reason>` comment on the line(s) immediately above the call. Forward-only ratchet test: `apps/api/src/services/safe-non-core.guard.test.ts`.
-- LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
-- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook does NOT run the harness; it only checks for staged snapshot files when drift exists, or a harness-written zero-drift receipt when the full Tier-1 run rewrote snapshots with no tracked changes. Harness code: `apps/api/eval-llm/`.
-- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `assessments.mastery_challenge_verified_at` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to `needs_deepening_topics` with `source = 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns may apply a routing-only rung-4 floor (mechanism planned — `ExchangeContext.llmRoutingRung` field not yet in source), and per-tier model routing (incl. minor/Family) follows `MMT-ADR-0014` + `docs/registers/llm-models/master.md` (the prior "Family = Gemini-only" wording is superseded — Gemini is excluded under-18). The persistent Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed in Phase 0 (PR #325); today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
+- Business logic belongs in `services/`, not in route handlers (lint-enforced: eslint G1/G5).
+- Reads use `createScopedRepository(profileId)` for single scoped tables; two sanctioned `db.select()` alternatives exist — parent-chain joins, and single-table queries the scoped repo API cannot express — always with `profileId` pinned in the WHERE. It is the **inexpressibility** that sanctions the pattern. Full rule + worked examples: `docs/architecture.md` § Enforcement Rules (scoped-read discipline).
+- Writes include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
+- Shared mobile components stay persona-unaware: semantic tokens and CSS variables, no persona checks or hardcoded hex (exception: annotated brand-fixed hex inside SVG-internal animation/celebration components).
+- Durable async work goes through Inngest — never fire-and-forget from route handlers.
+- LLM calls go through `services/llm/router.ts` or its barrel, never direct provider SDKs.
+- Non-core Inngest dispatches go through `safeSend()`; bare `inngest.send(...)` is reserved for CORE flows and carries a `// core-send: <reason>` comment (ratchet-tested). Full discipline: `docs/project_context.md` § safeSend.
+- LLM responses that drive state-machine decisions use the structured envelope (`llmResponseEnvelopeSchema` via `parseEnvelope()`) — never `[MARKER]` tokens or JSON blobs in free text — and **every envelope signal has a server-side hard cap**. Full contract: `docs/architecture.md` § LLM Response Envelope.
+- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `services/llm/*.ts`), run the eval harness: `pnpm eval:llm` (Tier-1 snapshots) and `pnpm eval:llm --live` (Tier 2). The pre-commit hook does NOT run the harness — this obligation is on you. Mechanics: `docs/architecture.md`; receipt path: `docs/change-classes.md`.
+- Challenge Round mastery is server-owned and conservative: the LLM proposes per-concept evaluations (`signals.challenge_round_evaluation`, each with `answerEventId` + `learnerQuote`); `decideMasteryAndReview()` verifies mastery only when **every** concept is `solid`. Note drafts use only `solidAnswerQuotes` and pass the hallucination guard in `services/challenge-round/note-draft.ts`. Routing goes through `resolveExchangeLlmRouting()` per MMT-ADR-0014 (Gemini excluded under-18). Full policy + history: `docs/project_context.md` § Challenge Round.
 
 ## Known Exceptions to Engineering Rules
 
-These deviations from the rules above exist in the codebase as of 2026-05-01. They are listed here so reviewers don't try to "fix" them in unrelated PRs and so new contributors don't take them as precedent. Each exception should either be tracked toward a refactor, or promoted into an explicit rule.
+Sanctioned deviations — do **not** "fix" these in unrelated PRs, do not copy them as precedent. Full rationale for each: `docs/known-exceptions.md`.
 
-- **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
-
-- **`@clerk/clerk-js` ships `@coinbase/wallet-sdk` + `@solana/*` into `node_modules`, but they never reach the device bundle** — clerk-js `dist` is PRE-BUNDLED (no `require()` of those packages), so Metro never traverses them; install-footprint only, zero device-bundle impact (verified WI-1040). Not removable via pnpm config: they are real `dependencies` of clerk-js, not missing optional peers, so `pnpm.peerDependencyRules.ignoreMissing` does not apply. An upstream issue against `@clerk/clerk-expo` for a no-web3 entrypoint is the only real mitigation; do not attempt to strip them locally.
-- **The global unscoped `@tanstack/query-core` pin in root `package.json` `pnpm.overrides` is load-bearing**, not hygiene debt — it dedupes query-core to one version across `@clerk/shared` (declares `5.87.4`) and the `@tanstack/*` consumers (react-query, query-async-storage-persister, query-persist-client-core). Scoping it to the react-query edge (`@tanstack/react-query>@tanstack/query-core`) regresses to 3 separate query-core versions in the tree (verified WI-1043). Keep it global, and bump its version **in lockstep** whenever `@tanstack/react-query` is bumped.
-- **Account-level Inngest events omit `profileId`** — `app/account.reclaim_attempt` and similar events that fire at account-creation time (before any profile exists) legitimately carry no `profileId`. This is a sanctioned deviation from the "payloads always include `profileId`" rule for events scoped to the accounts table by `clerkUserId` or `accountId`. The `@inngest-admin: event-profile` annotation documents the scoping mechanism in place. Do not attempt to add a dummy `profileId: null` to satisfy the rule textually — it would be misleading.
-- **`teachingPreferenceSchema.analogyDomain` (request) keeps `.nullable().optional()`** — a documented carve-out (WI-1160, operator-ruled) from the "never `.nullable().optional()`; request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). This **request** field is genuinely tri-state: a value = set, `null` = explicitly clear, absent = leave unchanged. `null`-as-clear is established, tested product behavior (`apps/api/src/routes/retention.test.ts` → "accepts null analogyDomain to clear preference"), so both `.nullable()` and `.optional()` are required; the canon's "pick one" wrongly assumes null and absent are interchangeable here. The ban is docs-only (no automated checker), so no escape annotation is needed. The **response** fields (`teachingPreferenceResponseDataSchema.analogyDomain` / `nativeLanguage`) DO conform to `.nullable()` — the carve-out is request-side only.
-- **`profileSchemaShape.conversationLanguageConfirmed` / `.isCurrentUser` (response) keep `.optional()`** — a documented carve-out (WI-1556) from the "request → `.optional()`, response → `.nullable()`" canon (`docs/project_context.md`, `docs/architecture.md`). Both are **hints derived by the API**, not stored columns, and only *some* response shapers populate them: `listProfilesV2` emits both and `getOwnerProfileV2` emits `conversationLanguageConfirmed`, while `updateProfileV2` (`apps/api/src/services/identity-v2/profile-v2.ts`, backing `PATCH /profiles/:id`), `updateProfileAppContext` (`apps/api/src/services/profile.ts`, backing `PATCH /profiles/:id/app-context`) and `getProfileV2` (`apps/api/src/services/identity-v2/profile-v2.ts`, backing `GET /profiles/:id`) emit **neither**. Mobile parses the two PATCH responses through `profileResponseSchema` (`apps/mobile/src/hooks/use-profiles.ts:70` and `:108`), so the keys are genuinely absent on **current, live traffic** — a standing shaper asymmetry, not only a rollout window; a mixed-version API rollout produces the same absent-key shape. `.nullable()` does not help: it requires the key to be **present** with a `null` value and throws when it is absent, so it would break those parses today. `.nullable().optional()` is banned outright by the same canon, which leaves `.optional()` as the only single Zod primitive that fits. **Why `.optional()` rather than the `.default(false)` used by neighbouring booleans (`hasPremiumLlm`, `hasFamilyLinks`):** `undefined` is a meaningful third state — "this response did not report the hint" — and the consumer relies on it. `shouldRequireFirstMentorLanguageConfirmation` (`apps/mobile/src/lib/first-mentor-language.ts`) gates on strict `conversationLanguageConfirmed === false`, so an absent hint **fails open** and a response from a shaper that omits the field can never raise the blocking first-Mentor gate. `.default(false)` would coerce that absence into a definitive "not confirmed" and gate a learner off a response that simply never carried the field. The ban is docs-only (no automated checker), so no escape annotation is needed. **Does not generalize:** it is scoped to these two derived hint fields on `profileSchemaShape`. Response fields backed by a real column still use `.nullable()`, and a new response field must not copy this pattern unless it is likewise shaper-optional **and** its consumer fails open on absence.
-- **`signals.topic_opened_pending_content`'s hard cap lives client-side, not server-side** — a documented deviation (WI-2107) from the "every envelope signal needs a server-side hard cap" rule. This signal has no server-side loop to cap (unlike `MAX_INTERVIEW_EXCHANGES`, which bounds an in-request loop): each auto-continuation is a discrete client-initiated request, so the termination guarantee is enforced in `apps/mobile/src/components/session/use-session-streaming.ts`'s `autoContinuationFiredRef` (capped at one auto-fired follow-up per learner turn) instead. The rule's intent — bound the flow so it terminates even if the LLM never stops emitting the signal — is preserved; only the enforcement layer differs because the control-flow shape differs.
-- **Terminal-deletion dead-letter dispatches inside Inngest `onFailure` handlers use awaited `step.sendEvent`, not `safeSend()`** — a narrowly scoped durability exception (WI-2994) for `apps/api/src/inngest/functions/account-deletion.ts` and `billing-subscription-store-teardown.ts`. `safeSend()` deliberately captures and swallows transport rejection or timeout so observability cannot break a successful user action; here the user action has already failed terminally, and swallowing the dead-letter transport failure would permanently lose the erasure-recovery signal. The awaited, stable-name `step.sendEvent` operation must reject so Inngest durably retries and memoizes the dispatch across replay. This exception applies only to these terminal deletion `onFailure` dead letters; ordinary non-core dispatches still use `safeSend()`.
+- **`apps/mobile/tsconfig.json` references `../api`** — type-only imports from `@eduagent/api` allowed (Hono RPC `AppType`); runtime imports remain forbidden.
+- **clerk-js ships web3 packages into `node_modules`** — install-footprint only, never reach the device bundle (WI-1040). Do not attempt to strip.
+- **Global `@tanstack/query-core` pin is load-bearing** (WI-1043) — dedupes across clerk + tanstack consumers. Bump in lockstep with `react-query`; never scope it.
+- **Account-level Inngest events omit `profileId`** — account-scoped by design; do not add a dummy null.
+- **`analogyDomain` (request) keeps `.nullable().optional()`** — genuine tri-state: set / clear / leave unchanged (WI-1160, operator-ruled). Request-side only.
+- **`conversationLanguageConfirmed` / `isCurrentUser` (response) keep `.optional()`** — shaper-optional derived hints; consumer fails open on absence (WI-1556). Does **not** generalize to column-backed fields.
+- **`topic_opened_pending_content` cap is client-side** (WI-2107) — no server loop to cap; termination enforced in `use-session-streaming.ts`.
+- **Terminal-deletion dead-letters use awaited `step.sendEvent`, not `safeSend()`** (WI-2994) — dead-letter loss would be worse; scoped to the two deletion functions only.
 
 ## Schema And Deploy Safety
 
 - Dev schema iteration can use `drizzle-kit push`.
-- **Dev Neon is push/direct-only — never run `drizzle-kit migrate` against dev.** Dev's `drizzle.__drizzle_migrations` journal has drifted: it records only ~22 of ~109 repo migrations (last ~2026-04-11) because dev has been `db:push`-managed since the push→migrate transition (see `.claude/memory/project_schema_drift_pattern.md`). A `drizzle-kit migrate` against dev would replay the ~85 unjournaled migrations and abort on the first already-exists collision (42701 on `learning_profiles.recently_resolved_topics`). Staging (109 journal rows) and production (107) are clean and stay `migrate`-managed. The dev deploy/apply path must never invoke `migrate`; apply dev schema AND data changes via `push`/direct execution. Re-journaling dev (gap-stamping the 85 rows) is deliberately deferred — dev works correctly on push, so the stamping churn carries risk without benefit.
+- **Dev Neon is push/direct-only — never run `drizzle-kit migrate` against dev.** The dev migration journal has drifted (push-managed since the push→migrate transition), so a `migrate` would replay unjournaled migrations and abort on already-exists collisions; staging and production journals are clean and stay `migrate`-managed. Apply dev schema AND data changes via `push`/direct execution; re-journaling dev is deliberately deferred. Forensics: `.claude/memory/project_schema_drift_pattern.md`.
 - Staging and production must use committed migration SQL plus `drizzle-kit migrate`.
 - Never run `drizzle-kit push` against staging or production.
-- Applied migrations are immutable. CI fails any PR that Modifies, Deletes, or Renames an existing `apps/api/drizzle/NNNN_*.sql` (the `Migration immutability guard (BUG-886)` step in `ci.yml` → `scripts/check-migration-immutability.ts`) — editing an applied migration re-runs its DDL on the next `drizzle-kit migrate` and drifts the schema (the 2026-05 staging-ledger-drift root cause). Write a NEW forward migration instead; a genuinely exceptional change (e.g. a branch-sync renumber) is allowlisted with a reason in `scripts/migration-immutability-allowlist.json`.
+- Applied migrations are immutable — CI-armed (`Migration immutability guard (BUG-886)` → `scripts/check-migration-immutability.ts`): editing an applied `apps/api/drizzle/NNNN_*.sql` re-runs its DDL on the next `migrate` and drifts the schema. Write a NEW forward migration; a genuinely exceptional change is allowlisted with a reason in `scripts/migration-immutability-allowlist.json`.
 - A worker deploy does not migrate Neon. Apply the target migration before shipping code that reads new columns.
 - Keep staging and production database credentials separate in CI. Never let staging deploys point at production data.
 - Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying whether rollback is possible, what data is lost, and the recovery procedure. If rollback is impossible, say so explicitly.
 
 ## Required Validation
 
-Local hooks are fast feedback; **CI is the authoritative gate that protects `main`**. **pre-commit** runs cheap staged-only guards (`lint-staged`, the eval-snapshot / i18n / GC1 guards, skills-sync, a secret/large-file scan) — **not** whole-tree `tsc`/tests. **pre-push** is the local type/test gate (`tsc --build` + surgical `--findRelatedTests` jest on the push delta, plus Tier-1 eval + i18n). **CI routes the slow suites by change class** — `scripts/check-change-class.sh` is the single routing source (see `docs/change-classes.md`). Verify locally while iterating, and focus on what hooks do not cover:
+Local hooks are fast feedback; **CI is the authoritative gate that protects `main`** — it routes the slow suites by change class (`scripts/check-change-class.sh` is the single routing source; see `docs/change-classes.md`). pre-commit runs cheap staged-only guards; pre-push runs the local type/test gate on the push delta. Verify locally while iterating, and focus on what hooks do not cover:
 
-- **Run what CI runs.** When diagnosing a CI failure or addressing review findings, run the affected projects' typecheck + lint + tests locally — the full set CI would run, not just the file named in the error — and batch fixes into one validated push. A failure that first surfaces in CI costs a ~30-minute push-fix-push round trip (Insights analysis 2026-03-27 measured 3–4 such cycles in single sessions).
-- Integration tests are **routed by the CI change-class router** and run whenever the diff could affect them (api / db-schema / shared-schemas / lockfile classes). The cross-package suite is `pnpm exec nx run api:test:integration` (`tests/integration/`); the API co-located suite is `pnpm run test:api:integration:ci` (`apps/api/src/**/*.integration.test.ts`, local wrapper `pnpm test:api:integration`). Running them locally before a commit is **advisory** — useful fast feedback for `apps/api/` or `tests/integration/` changes, but local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
-- **`--no-verify`, two levels.** *Doctrine:* default is to let hooks run; a **narrow, deliberate** bypass of a local hook is acceptable **because CI backstops it** (a genuinely broken local harness via `SKIP_PRE_PUSH`, or a local-only hook defect after reporting the failure) and is not a violation — but needing to bypass the same check repeatedly means the check is **mis-placed: fix the gate, don't normalise the bypass**. Verified zero-drift prompt changes use the eval harness receipt path, not a bypass. One platform-scoped accommodation stands: `nx affected` is broken on Windows by an upstream `@nx/expo` bug, so the documented `--no-verify` escape for large staged sets remains for human Windows devs until the upstream fix lands (MMT-ADR-0019; watch-item WI-542). *Skill behavior is stricter than doctrine:* the automated commit agent never bypasses hooks autonomously — on a hook failure it stops and reports.
+- **Run what CI runs.** When diagnosing a CI failure or addressing review findings, run the affected projects' typecheck + lint + tests locally — the full set CI would run, not just the file named in the error — and batch fixes into one validated push (a CI-first failure costs a ~30-minute round trip).
+- Integration tests are **routed by the CI change-class router** (api / db-schema / shared-schemas / lockfile classes). Cross-package suite: `pnpm exec nx run api:test:integration` (`tests/integration/`); API co-located suite: `pnpm run test:api:integration:ci` (local wrapper `pnpm test:api:integration`). Local runs are **advisory** — local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
+- **`--no-verify`, two levels.** *Doctrine:* hooks run by default; a narrow, deliberate bypass of a local hook is acceptable **because CI backstops it** — but needing the same bypass repeatedly means the check is mis-placed: fix the gate, do not normalise the bypass. Zero-drift prompt changes use the eval-harness receipt path, not a bypass. One platform-scoped accommodation stands for human Windows devs (`nx affected` broken by an upstream `@nx/expo` bug — MMT-ADR-0019; watch-item WI-542). *Skill behavior is stricter than doctrine:* the automated commit agent never bypasses hooks autonomously — on a hook failure it stops and reports.
 - Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshot evidence is still failing.
 - No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
 
@@ -404,7 +287,7 @@ Local hooks are fast feedback; **CI is the authoritative gate that protects `mai
 - Package imports go through the package barrel, enforced by `@nx/enforce-module-boundaries`.
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.
 - In API code, use the typed config object instead of raw `process.env` reads (eslint G4 enforces this; the violation message points back here).
-- Cross-tab / cross-stack `router.push` calls must push the full ancestor chain, not just the leaf. A direct push to `shelf/[subjectId]/book/[bookId]` from another tab synthesizes a 1-deep stack containing only the leaf, so `router.back()` falls through to the Tabs first-route (Home). Either push the parent first then the child, or rely on `unstable_settings.initialRouteName` in the nested layout — but the rule of thumb is to push the chain. `unstable_settings` only seeds one level, so it does not protect future deeper paths (e.g. `shelf/[subjectId]/book/[bookId]/chapter/[chapterId]`).
+- Cross-tab / cross-stack `router.push` calls push the full ancestor chain, never just the leaf — a direct leaf push synthesizes a 1-deep stack, so `router.back()` falls through to the Tabs first-route. `unstable_settings.initialRouteName` only seeds one level and does not protect deeper paths; push the chain.
 - Any new nested Expo Router layout that contains both an `index` screen and a deeper dynamic child must export `unstable_settings = { initialRouteName: 'index' }` as a safety net for cross-stack deep pushes.
 
 ## UX Resilience Rules
@@ -428,13 +311,13 @@ Changed code is not fixed code. Every fix must be verified.
 
 These rules catch bugs that survive type-checking and only surface at runtime. Learned from adversarial review (2026-04-05).
 
-- **No internal mocks in integration tests.** Never `jest.mock` your own database, services, or middleware in integration tests. Mock only true external boundaries (Stripe, Clerk JWKS, email providers, push notification services). Internal mocks hide real bugs.
-- **No new internal `jest.mock()` (GC1 ratchet).** CI fails any PR that adds a relative-path `jest.mock('./...')` or `jest.mock('../...')` line in `*.test.ts` / `*.test.tsx`. Existing legacy sites are NOT blocked by the ratchet but are NOT considered acceptable state — they are backlog for the GC6 burn-down. To stub a few named exports of an internal module, use `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`). External-boundary mocks (LLM via `routeAndCall`, push, email, Stripe, Clerk JWKS) use bare specifiers and are unaffected. The `// gc1-allow: <reason>` escape is reserved for cases where the code under test genuinely cannot be exercised (no real implementation available in the test environment); it is not an "I don't feel like wiring the real thing today" escape.
-- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
-- **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
-- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
+- **Internal mocks are backlog, never acceptable state.** Never `jest.mock` your own database, services, or middleware; mock only true external boundaries (Stripe, Clerk JWKS, LLM via `routeAndCall`, push, email — bare specifiers). To stub named exports of an internal module: `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`).
+- **GC1 (CI-armed):** any new relative-path `jest.mock` of an internal module in `*.test.ts` / `*.test.tsx` fails CI. The `// gc1-allow: <reason>` escape applies only when the real code genuinely cannot run in the test environment — never convenience.
+- **GC6 — every test-file edit:** remove the file's internal mocks (relative-path or `@eduagent/*` specifiers) before the edit is complete; the PostToolUse hook's output is a **blocker on completion**, not a follow-up. Deferral (file paths + count in the commit message) only when burn-down would balloon a focused task. Full workflow: `/my:sweep-mocks`.
+- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
+- **Classify errors before formatting.** When code branches on error *type* and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
+- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence; leaked storage keys waste device storage forever.
 - **Verify JSX handler references exist** after adding any `Pressable` or `Button` — an `onPress={handleX}` that points at a removed or renamed handler type-checks but is dead at runtime.
-- **GC6 — Boy-scout internal mocks when editing test files.** Any time you edit a test file (`*.test.ts` / `*.test.tsx` / `*.integration.test.ts`) for any reason, scan it for `jest.mock('./...')`, `jest.mock('../...')`, or `jest.mock('@eduagent/...')` and remove the internal mocks before the edit is complete. Use the real implementation, or convert to `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`). Run `/my:sweep-mocks` for the full workflow. The PostToolUse hook at `~/.claude/hooks/post-edit-jest-mock-check.sh` surfaces offending lines after every test-file edit; treat that output as a blocker on task completion, not a follow-up. External-boundary mocks (LLM via `routeAndCall`, Stripe, Clerk JWKS, push, email, Inngest framework) use bare specifiers and are not violations. The `// gc1-allow: <reason>` escape applies only when the real code cannot run in the test environment — not as a convenience. **Policy:** internal mocks are not acceptable state, they are backlog. **Why:** GC1 gates new violations; GC6 forces every test-file visit to reduce the legacy backlog. The deferral escape (leave the mocks, record file paths + count in the commit message) exists only when burn-down would balloon a focused task — it does not authorize preserving the mocks indefinitely.
 
 ## Planning Discipline
 
@@ -461,42 +344,18 @@ Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secre
 
 ## PR Review & CI Protocol
 
+Review depth is the work item Review Tier property (Light / Standard / Adversarial), declared at DoR by mechanically applying the ZDX-ADR-0118 trigger table — never chosen at review time (elevation-only re-check at dispatch). Every tier binds the **never-weakening floor**: green CI + a clean automated-review verdict from the configured provider on the current head + disposed bot threads + armed merge gate (`conformance.review-tier-never-weakening`). Adversarial review is a **pre-merge gate**, verdict bound to the reviewed SHA — new commits void it; the merge waits on the delta re-review. Items in Reviewing are picked up by estate-global reviewer services, external to this repo.
+
 Before declaring a PR ready to merge:
 
 1. Read the actual PR diff: `gh pr diff <number>`.
-2. Check all CI checks: `gh pr checks <number>`. Deterministic checks (lint, typecheck, test, build) must pass. Claude Code Review is **advisory**: green = it ran (findings may still exist); red = it did NOT run (token exhaustion / timeout / crash, **or the review workflow itself is broken — a permissions / trigger / YAML regression**) — investigate the run's *actual* failure before attributing it to tokens, not "findings to fix". Silence is never approval; a red review is never rounded up to "green".
-3. Always read the Claude Code Review comment and triage its findings — the check colour does not surface them. The verdict (APPROVED / CHANGES_REQUESTED / BLOCKED + MUST_FIX/SHOULD_FIX/CONSIDER tables) is a TOP-LEVEL PR comment, returned ONLY by `gh api repos/{owner}/{repo}/issues/<number>/comments` (newest = latest head) — NOT `pulls/<number>/comments`, which is diff-anchored inline comments (Codex/CodeRabbit). Also read `gh api repos/{owner}/{repo}/pulls/<number>/reviews`. Fix MUST_FIX / SHOULD_FIX before merge.
+2. Check all CI checks: `gh pr checks <number>`. Deterministic checks (lint, typecheck, test, build) must pass. The automated review check is **advisory**: green = it ran (findings may still exist); red = it did NOT run — investigate the run failure before attributing a cause, and never round a red review up to "green". Silence is never approval.
+3. Always read the review verdict and triage its findings — the check colour does not surface them. Verdicts are **top-level PR comments** (`gh api .../issues/<number>/comments`, newest = latest head) — NOT `pulls/<number>/comments` (diff-anchored inline bot comments). Also read `pulls/<number>/reviews`. Fix MUST_FIX / SHOULD_FIX before merge.
 4. Never dismiss advisory findings just because the check is green — advisory means triage it yourself, not ignore it.
 
-### Claude reviewer-unavailable recovery
+Reviewer outage (`REVIEWER_UNAVAILABLE`), the self-reference case (a PR editing the review workflow cannot receive its own automatic review), a required check stuck on "Waiting for status to be reported", and Playwright web-smoke triage all live in `docs/runbooks/claude-reviewer-recovery.md`. A `REVIEWER_UNAVAILABLE` artifact is a machine-readable non-merge result, never approval — recovery restores the reviewer, never waives the gate.
 
-The `Claude Code Review` workflow runs for every pull request, including documentation-only changes. It makes three reviewer attempts capped at 20 minutes each and initializes `claude-review-verdict.json` before the first attempt. If quota exhaustion, timeout, or another reviewer failure prevents a fresh trusted verdict, the workflow uploads that artifact with `status = REVIEWER_UNAVAILABLE` and `merge_eligible = false`, then fails. This is a machine-readable non-merge result, not an approval or an exception.
-
-After reviewer capacity returns, download the artifact if diagnosis is needed, then execute its `recovery_command` (the command reruns the failed workflow job against the same PR head):
-
-```bash
-gh run download <run-id> --name claude-review-verdict --dir /tmp/claude-review-<run-id>
-jq . /tmp/claude-review-<run-id>/claude-review-verdict.json
-gh run rerun <run-id> --failed --repo cognoco/eduagent-build
-```
-
-PRs that modify `.github/workflows/claude-code-review.yml` are a special self-reference case: `anthropics/claude-code-action` rejects the automatic run while the PR's workflow differs from the default branch. Once reviewer quota is available, a trusted repository member must invoke the unchanged interactive workflow with an exact-head request:
-
-```bash
-pr=<pr-number>
-head="$(gh pr view "$pr" --json headRefOid --jq .headRefOid)"
-gh pr comment "$pr" --body "@claude Perform the final exact-head review for ${head}. Review the full diff against the trusted repository instructions. Post the canonical Claude Code Review verdict, including the exact metadata line '- Reviewed head SHA: ${head}'; do not modify the branch."
-```
-
-Neither recovery route weakens the armed gate. Do not merge until a fresh `claude[bot]` exact clean verdict exists for the current head.
-
-A required check stuck on "Waiting for status to be reported" (never red, never green) is usually **workflow-trigger drift, not failing code** — the check is required in branch protection but its workflow only runs on `push`/`workflow_dispatch`, not `pull_request`. Fix the trigger (a small PR-only job that reports the required check name; guard deploy/build jobs with `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` so PRs can't deploy), not the code. For a Playwright web-smoke failure, read `error-context.md` + the `0-trace.network` log before touching selectors: `net::ERR_FAILED`/CORS in the trace means fix the staging/API target, not the assertion.
-
-When rebasing PRs:
-
-- After rebase, always verify the PR diff.
-- Check for duplicate functions/tests, missing imports, and schema export gaps.
-- Run type checking before pushing.
+When rebasing PRs: verify the PR diff after rebase; check for duplicate functions/tests, missing imports, and schema export gaps; run type checking before pushing.
 
 ## On Compaction
 
@@ -552,4 +411,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-07-29
+Last updated: 2026-08-02 (WI-2052 restructure — operator-ruled content plan; design principle: docs/adr/MMT-ADR-0053)

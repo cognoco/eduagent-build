@@ -48,3 +48,14 @@ This file is the canonical home for the schema-drift pattern. Three prior memory
 - `project_schema_drift_staging_fix.md` — one-time 2026-04-15 incident note. The generic pattern lives above; the incident-specific details are in the git log around 2026-04-14/15.
 
 If you searched for either filename and landed here, this file is what you wanted.
+
+## Dev-Neon journal drift — the concrete forensics (moved from AGENTS.md 2026-08-02)
+
+Dev`s `drizzle.__drizzle_migrations` journal records only ~22 of ~109 repo
+migrations (last ~2026-04-11) because dev has been `db:push`-managed since the
+push→migrate transition. A `drizzle-kit migrate` against dev would replay the ~85
+unjournaled migrations and abort on the first already-exists collision (42701 on
+`learning_profiles.recently_resolved_topics`). Staging (109 journal rows) and
+production (107) are clean and stay `migrate`-managed. Re-journaling dev
+(gap-stamping the ~85 rows) is deliberately deferred — dev works correctly on
+push, so the stamping churn carries risk without benefit.
