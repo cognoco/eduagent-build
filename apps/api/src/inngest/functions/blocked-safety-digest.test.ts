@@ -175,4 +175,45 @@ describe('[WI-1691] blocked-safety digest Inngest functions', () => {
       'deliver-blocked-safety-digest-2026-07-10',
     ]);
   });
+
+  it('surfaces a terminal/config delivery failure instead of reporting completed', async () => {
+    const buckets: BlockedSafetyDailyBucket[] = [
+      {
+        bucketDate: '2026-07-09',
+        dangerousProcedureBlockedCount: 1,
+        minorPiiEchoRedactedCount: 0,
+        suitabilityBlockedCount: 0,
+        deliveredAt: null,
+        createdAt: new Date('2026-07-09T00:00:00.000Z'),
+        updatedAt: new Date('2026-07-09T00:00:00.000Z'),
+      },
+    ];
+    const loadClosed = jest.fn().mockResolvedValue(buckets);
+    const deliver = jest.fn().mockResolvedValue({
+      delivered: false,
+      reason: 'no_api_key',
+      retryability: 'none',
+    });
+    const { step } = createInngestStepRunner();
+
+    await expect(
+      runBlockedSafetyDigestDelivery(
+        { step },
+        { loadClosed, deliver, currentDate: () => '2026-07-11' },
+      ),
+    ).resolves.toEqual({
+      status: 'failed',
+      bucketCount: 1,
+      failedBucketDate: '2026-07-09',
+      reason: 'no_api_key',
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+      extra: {
+        bucketDate: '2026-07-09',
+        reason: 'no_api_key',
+        retryability: 'none',
+      },
+    });
+  });
 });

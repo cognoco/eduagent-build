@@ -1498,7 +1498,7 @@ describe('session-completed integration', () => {
       expect.objectContaining({
         message: expect.stringContaining('waitForEvent timed out'),
       }),
-      expect.objectContaining({ profileId }),
+      expect.objectContaining({ profileId, level: 'warning' }),
     );
 
     captureExceptionSpy.mockRestore();

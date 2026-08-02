@@ -13,6 +13,7 @@ const mockSentryScope = {
   setUser: jest.fn(),
   setTag: jest.fn(),
   setExtra: mockSentrySetExtra,
+  setLevel: jest.fn(),
 };
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: database middleware unit test needs closeDatabase/createDatabase spies

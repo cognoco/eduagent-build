@@ -1,5 +1,4 @@
 const MODE_NAV_PUBLIC_ENV_KEYS = [
-  'EXPO_PUBLIC_E2E',
   'EXPO_PUBLIC_ENABLE_MODE_NAV',
   'EXPO_PUBLIC_ENABLE_MODE_NAV_V1',
   'EXPO_PUBLIC_ENABLE_MODE_NAV_V2',
@@ -25,6 +24,9 @@ export function applyExpoPublicEnvOverrides(contents, env) {
     'EXPO_PUBLIC_API_URL',
     env.EXPO_PUBLIC_API_URL,
   );
+  // This helper only builds the Playwright host. A staging/store value of
+  // false must not disable the guarded routes the web suite is exercising.
+  next = replaceOrAppend(next, 'EXPO_PUBLIC_E2E', 'true');
 
   for (const key of MODE_NAV_PUBLIC_ENV_KEYS) {
     const value = env[key];

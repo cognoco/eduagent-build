@@ -1,5 +1,6 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors';
 import {
+  isDeletedPersonReferenceViolation,
   isUniqueViolation,
   uniqueViolationConstraint,
   unwrapDbError,
@@ -21,7 +22,53 @@ function pgConnectionError(): Error {
   return Object.assign(new Error('connection terminated'), { code: '08006' });
 }
 
+function pgForeignKeyViolation(constraint?: string): Error {
+  return Object.assign(
+    new Error('insert or update violates foreign key constraint'),
+    constraint === undefined
+      ? { code: '23503' }
+      : { code: '23503', constraint },
+  );
+}
+
 describe('db-errors', () => {
+  describe('isDeletedPersonReferenceViolation', () => {
+    it.each([
+      'activation_events_profile_id_person_id_fk',
+      'notification_log_profile_id_person_id_fk',
+      'progress_snapshots_profile_id_person_id_fk',
+      'milestones_profile_id_person_id_fk',
+      'coaching_card_cache_profile_id_person_id_fk',
+      'mentor_activity_ledger_profile_id_person_id_fk',
+      'notification_preferences_profile_id_person_id_fk',
+    ])('detects the known stale-person constraint %s', (constraint) => {
+      expect(isDeletedPersonReferenceViolation(pgForeignKeyViolation(constraint))).toBe(
+        true,
+      );
+    });
+
+    it('detects a known constraint through a Drizzle wrapper', () => {
+      const wrapped = new DrizzleQueryError(
+        'insert',
+        [],
+        pgForeignKeyViolation('activation_events_profile_id_person_id_fk'),
+      );
+      expect(isDeletedPersonReferenceViolation(wrapped)).toBe(true);
+    });
+
+    it.each([
+      pgForeignKeyViolation('guardianship_charge_person_id_person_id_fk'),
+      pgForeignKeyViolation(),
+      Object.assign(new Error('wrong SQLSTATE'), {
+        code: '23505',
+        constraint: 'activation_events_profile_id_person_id_fk',
+      }),
+      new Error('plain'),
+    ])('leaves unrelated integrity failures unmapped', (error) => {
+      expect(isDeletedPersonReferenceViolation(error)).toBe(false);
+    });
+  });
+
   describe('isUniqueViolation', () => {
     it('detects a bare driver unique violation (pre-0.44 shape)', () => {
       expect(isUniqueViolation(pgUniqueViolation('x'))).toBe(true);

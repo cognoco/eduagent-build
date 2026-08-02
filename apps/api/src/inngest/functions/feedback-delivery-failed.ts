@@ -18,6 +18,7 @@ import {
   getStepDatabase,
   getStepResendApiKey,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepSupportEmail,
 } from '../helpers';
 import {
@@ -168,20 +169,46 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           body: `${queued.message}\n\n---\n${queued.metaLines}`,
           type: 'feedback',
         },
-        { resendApiKey, emailFrom, idempotencyKey },
+        {
+          environment: getStepEnvironment(),
+          resendApiKey,
+          emailFrom,
+          idempotencyKey,
+        },
       );
 
       if (!result.sent) {
+        if (result.reason === 'no_api_key') {
+          logger.warn('[feedback-delivery-failed] email config unavailable', {
+            profileId,
+            reason: result.reason,
+          });
+          // A missing key is recoverable configuration drift. Throw so the
+          // function's existing retry budget executes; after exhaustion the
+          // registered inngest/function.failed fleet observer emits the
+          // sanitized terminal signal. Do not capture every attempt here.
+          throw new Error(
+            'feedback-delivery-failed retryable configuration failure: no_api_key',
+          );
+        }
+        if (result.retryability !== 'transient') {
+          logger.warn('[feedback-delivery-failed] email not sent', {
+            profileId,
+            reason: result.reason,
+          });
+          // Non-production recipient blocking is the intentional environment
+          // safety boundary. Suppression and permanent provider rejection are
+          // terminal too, so none of these outcomes has a future consumer.
+          await deleteFeedbackRetry(db, profileId, retryId);
+          return {
+            status: 'not_sent' as const,
+            reason: result.reason,
+            profileId,
+          };
+        }
         const err = new Error(
-          `feedback-delivery-failed retry unsuccessful: ${
-            result.reason ?? 'unknown'
-          }`,
+          `feedback-delivery-failed transient retry failure: ${result.reason}`,
         );
-        captureException(err, {
-          profileId,
-          tags: { surface: 'feedback', signal: 'delivery-failed' },
-          extra: { category: queued.category, reason: result.reason },
-        });
         logger.warn('[feedback-delivery-failed] retry still failed', {
           profileId,
           reason: result.reason,

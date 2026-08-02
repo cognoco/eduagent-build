@@ -108,6 +108,12 @@ jest.mock(
 // deletePersonIfConsentWithdrawnV2 runs a multi-step db.transaction
 // (tx.query.consentGrant.findFirst + tx.delete(person)) — unseedable; mock whole.
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn();
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
 jest.mock(
   '../../services/identity-v2/deletion-v2' /* gc1-allow: deletePersonIfConsentWithdrawnV2 — runs a db.transaction (read consentGrant THEN delete person) that cannot execute against the mocked DB boundary. Twin: apps/api/src/services/identity-v2/consent-v2.integration.test.ts (5 references) */,
   () => {
@@ -118,6 +124,55 @@ jest.mock(
       ...actual,
       deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
         mockDeletePersonIfConsentWithdrawnV2(...args),
+      getPersonClerkUserIdsV2: (...args: unknown[]) =>
+        mockGetPersonClerkUserIdsV2(...args),
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
+      getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
+        personExists: true,
+        personId: args[1] as string,
+        organizationId: 'org-test',
+        clerkUserIds: await mockGetPersonClerkUserIdsV2(...args),
+        loginEmails: [],
+        organizationPersonIds: [args[1] as string],
+        subscriptionStoreTeardownTargets: [],
+      }),
+      attemptPersonIfConsentWithdrawnErasureV2: async (
+        db: unknown,
+        personId: unknown,
+        snapshot: { clerkUserIds: string[] },
+        withdrawnAt: unknown,
+      ) =>
+        (await mockDeletePersonIfConsentWithdrawnV2(db, personId, withdrawnAt))
+          ? {
+              status: 'deleted',
+              clerkUserIds: snapshot.clerkUserIds,
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            }
+          : {
+              status: 'not_eligible',
+              clerkUserIds: [],
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            },
+    };
+  },
+);
+
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
     };
   },
 );
@@ -151,6 +206,8 @@ jest.mock('../../services/settings', () => {
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue('notice-001');
 const mockGetPendingNoticeChildName = jest.fn().mockResolvedValue('Emma');
+const mockDeletePendingNotice = jest.fn().mockResolvedValue(undefined);
+const mockActivatePendingNotice = jest.fn().mockResolvedValue(true);
 jest.mock('../../services/notices', () => {
   const actual = jest.requireActual(
     '../../services/notices',
@@ -161,6 +218,10 @@ jest.mock('../../services/notices', () => {
       mockRecordPendingNotice(...args),
     getPendingNoticeChildName: (...args: unknown[]) =>
       mockGetPendingNoticeChildName(...args),
+    deletePendingNotice: (...args: unknown[]) =>
+      mockDeletePendingNotice(...args),
+    activatePendingNotice: (...args: unknown[]) =>
+      mockActivatePendingNotice(...args),
   };
 });
 
@@ -251,6 +312,8 @@ beforeEach(() => {
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
   // deletePersonIfConsentWithdrawnV2 returns true (= deleted) by default.
   mockDeletePersonIfConsentWithdrawnV2.mockResolvedValue(true);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   // archivePersonOnRevocationV2 returns true (= archived) by default.
   mockArchivePersonOnRevocationV2.mockResolvedValue(true);
 });
@@ -503,7 +566,7 @@ describe('consentRevocation', () => {
         { bypassPreferenceCheck: true },
       );
 
-      // Step ordering: notify-child before delete-child-profile before notify-parent.
+      // Step ordering: notify-child before durable erasure before notify-parent.
       expect(runner.runNames()).toEqual([
         'clear-unread-nudges',
         'send-warning-push',
@@ -511,9 +574,82 @@ describe('consentRevocation', () => {
         'load-child-profile',
         'choose-final-action',
         'notify-child',
-        'delete-child-profile',
+        'prepare-child-deletion-notice',
+        'child-revocation-person-erasure-capture-1',
+        'child-revocation-person-erasure-database-1',
+        'activate-child-deletion-notice',
         'notify-parent',
       ]);
+    });
+
+    it('deletes every captured Clerk identity after the child DB erasure', async () => {
+      mockGetPersonClerkUserIdsV2.mockResolvedValue([
+        'clerk-child-001',
+        'clerk-child-002',
+      ]);
+
+      const { runner } = await executeRevocation({
+        childProfileId: 'child-001',
+        parentProfileId: 'parent-001',
+        revokedAt: '2026-05-01T00:00:01.000Z',
+      });
+
+      expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+      expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'clerk-child-001' }),
+      );
+      expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'clerk-child-002' }),
+      );
+      expect(runner.runNames()).toEqual(
+        expect.arrayContaining([
+          'child-revocation-person-erasure-capture-1',
+          'child-revocation-person-erasure-database-1',
+          'child-revocation-person-erasure-clerk-users',
+        ]),
+      );
+      expect(mockActivatePendingNotice).toHaveBeenCalledWith(
+        expect.anything(),
+        'parent-001',
+        'notice-001',
+      );
+    });
+
+    it('[WI-2788] leaves the prepared deletion notice hidden when DB erasure fails', async () => {
+      mockDeletePersonIfConsentWithdrawnV2.mockRejectedValueOnce(
+        new Error('synthetic DB erasure failure'),
+      );
+
+      await expect(
+        executeRevocation({
+          childProfileId: 'child-001',
+          parentProfileId: 'parent-001',
+          revokedAt: '2026-05-01T00:00:01.000Z',
+        }),
+      ).rejects.toThrow('synthetic DB erasure failure');
+
+      expect(mockRecordPendingNotice).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: 'consent_deleted', ready: false }),
+      );
+      expect(mockActivatePendingNotice).not.toHaveBeenCalled();
+    });
+
+    it('[WI-2788] leaves the prepared deletion notice hidden when Clerk cleanup fails', async () => {
+      mockGetPersonClerkUserIdsV2.mockResolvedValueOnce(['clerk-child-001']);
+      mockDeleteClerkUser.mockRejectedValueOnce(
+        new Error('synthetic Clerk cleanup failure'),
+      );
+
+      await expect(
+        executeRevocation({
+          childProfileId: 'child-001',
+          parentProfileId: 'parent-001',
+          revokedAt: '2026-05-01T00:00:01.000Z',
+        }),
+      ).rejects.toThrow('synthetic Clerk cleanup failure');
+
+      expect(mockActivatePendingNotice).not.toHaveBeenCalled();
     });
   });
 

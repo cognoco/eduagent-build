@@ -76,6 +76,7 @@ export async function recordBlockedSafetyDigestEvent(
 
 interface BlockedSafetyDigestEmailConfig {
   to: string;
+  environment: string | undefined;
   resendApiKey?: string;
   emailFrom?: string;
 }
@@ -91,7 +92,19 @@ export async function deliverBlockedSafetyDigestBucket(
   config: BlockedSafetyDigestEmailConfig,
   send: SendDigestEmail = sendEmail,
   now: Date = new Date(),
-): Promise<{ delivered: true } | { delivered: false; reason: 'empty' }> {
+): Promise<
+  | { delivered: true }
+  | { delivered: false; reason: 'empty' }
+  | {
+      delivered: false;
+      reason:
+        | 'no_api_key'
+        | 'suppressed'
+        | 'non_production_recipient'
+        | 'resend_api_error';
+      retryability: 'none' | 'permanent';
+    }
+> {
   return db.transaction(async (tx) => {
     // Serialize every delivery attempt for this UTC bucket. The lock is held
     // through send + mark so an overlapping replay re-reads deliveredAt only
@@ -127,6 +140,7 @@ export async function deliverBlockedSafetyDigestBucket(
         type: 'blocked_safety_digest',
       },
       {
+        environment: config.environment,
         resendApiKey: config.resendApiKey,
         emailFrom: config.emailFrom,
         idempotencyKey: buildEmailIdempotencyKey(
@@ -140,8 +154,15 @@ export async function deliverBlockedSafetyDigestBucket(
     );
 
     if (!result.sent) {
+      if (result.retryability !== 'transient') {
+        return {
+          delivered: false,
+          reason: result.reason,
+          retryability: result.retryability,
+        };
+      }
       throw new Error(
-        `blocked-safety digest email failed: ${result.reason ?? 'unknown'}`,
+        `blocked-safety digest transient email failure: ${result.reason}`,
       );
     }
 

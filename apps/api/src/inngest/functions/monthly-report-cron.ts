@@ -27,7 +27,11 @@ import {
   progressSnapshots,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase, getStepResendApiKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepEnvironment,
+  getStepResendApiKey,
+} from '../helpers';
 import {
   generateMonthlyReportData,
   generateReportHighlights,
@@ -673,6 +677,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           struggleLines,
         );
         const result = await sendEmail(emailPayload, {
+          environment: getStepEnvironment(),
           resendApiKey: getStepResendApiKey(),
           idempotencyKey: buildLegacyEmailIdempotencyKey(
             'monthly',
@@ -680,6 +685,16 @@ export const monthlyReportGenerate = inngest.createFunction(
             reportResult.reportMonth,
           ),
         });
+        if (!result.sent && result.reason === 'no_api_key') {
+          throw new Error(
+            'monthly-report-generate retryable email configuration failure: no_api_key',
+          );
+        }
+        if (!result.sent && result.retryability === 'transient') {
+          throw new Error(
+            `monthly-report-generate transient email failure: ${result.reason}`,
+          );
+        }
         if (result.sent) {
           await logNotification(
             db,

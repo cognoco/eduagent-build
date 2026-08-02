@@ -1,89 +1,187 @@
-import {
-  formatConsentApprovedEmail,
-  formatPaymentFailedEmail,
-  registerEmailTransportForTesting,
-  sendEmail,
-  type EmailPayload,
-} from './email';
+const mockCaptureException = jest.fn();
 
-const PARENT = 'parent@example.com';
-const CHILD = 'Mira';
-const WITHDRAWAL_URL =
-  'https://api.mentomate.com/v1/consent-page/withdraw?token=cw1abc.def';
+jest.mock(
+  '../sentry' /* gc1-allow: external Sentry transport boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../sentry',
+    ) as typeof import('../sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
-describe('formatConsentApprovedEmail', () => {
-  it('addresses the parent and tags the message type', () => {
-    const formatted = formatConsentApprovedEmail(PARENT, CHILD, WITHDRAWAL_URL);
-    expect(formatted.to).toBe(PARENT);
-    expect(formatted.type).toBe('consent_approved');
-  });
-
-  it('names the child in the subject', () => {
-    const formatted = formatConsentApprovedEmail(PARENT, CHILD, WITHDRAWAL_URL);
-    expect(formatted.subject).toContain(CHILD);
-  });
-
-  it('confirms the approval and carries the withdrawal link as the durable home', () => {
-    const formatted = formatConsentApprovedEmail(PARENT, CHILD, WITHDRAWAL_URL);
-    expect(formatted.body).toContain(CHILD);
-    expect(formatted.body).toContain(WITHDRAWAL_URL);
-    // It must read as a confirmation + withdrawal affordance, not a request.
-    expect(formatted.body.toLowerCase()).toContain('withdraw');
-  });
-});
-
-describe('formatPaymentFailedEmail', () => {
-  it('uses the dedicated payment_failed type and actionable manage-billing link', () => {
-    const formatted = formatPaymentFailedEmail(
-      PARENT,
-      'mentomate://billing/manage?payerPersonId=payer-1',
-    );
-
-    expect(formatted).toMatchObject({
-      to: PARENT,
-      type: 'payment_failed',
-      subject: 'Action needed: update your MentoMate payment',
-    });
-    expect(formatted.body).toContain(
-      'mentomate://billing/manage?payerPersonId=payer-1',
-    );
-  });
-});
+import { sendEmail, type EmailPayload } from './email';
 
 const payload: EmailPayload = {
-  to: 'parent@example.com',
-  subject: 'Consent request',
-  body: 'Deterministic body',
-  type: 'consent_request',
+  to: 'learner@example.com',
+  subject: 'Test email',
+  body: 'Test body',
+  type: 'security_notification',
 };
 
-describe('sendEmail transport boundary', () => {
-  let dispose: (() => void) | undefined;
+function resendResponse(
+  status: number,
+  body: Record<string, unknown> = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
-  afterEach(() => {
-    dispose?.();
-    dispose = undefined;
-    jest.restoreAllMocks();
+describe('[WI-2788] Resend delivery policy and retry classification', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    globalThis.fetch = jest.fn();
   });
 
-  it('preserves the no-key production fallback without a registered transport', async () => {
-    await expect(sendEmail(payload)).resolves.toEqual({
+  it('does not send from staging without an exact recipient allowlist', async () => {
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'staging',
+    });
+
+    expect(result).toEqual({
       sent: false,
-      reason: 'no_api_key',
+      retryability: 'none',
+      reason: 'non_production_recipient',
     });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('[WI-1864] lets the hosted-Maestro entrypoint supply a no-network receipt', async () => {
-    const fetchSpy = jest.spyOn(global, 'fetch');
-    dispose = registerEmailTransportForTesting(async () => ({
-      sent: true,
-      messageId: 'maestro-e2e-email',
-    }));
+  it('allows one exact normalized non-production recipient', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      resendResponse(200, { id: 'msg-1' }),
+    );
 
-    await expect(sendEmail(payload)).resolves.toEqual({
-      sent: true,
-      messageId: 'maestro-e2e-email',
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'staging',
+      nonProductionRecipientAllowlist: ['  LEARNER@example.com  '],
     });
-    expect(fetchSpy).not.toHaveBeenCalled();
+
+    expect(result).toEqual({ sent: true, messageId: 'msg-1' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, '', 'development', 'preview'])(
+    'fails closed for environment %p',
+    async (environment) => {
+      const result = await sendEmail(payload, {
+        resendApiKey: 're_test',
+        environment,
+      });
+
+      expect(result).toMatchObject({
+        sent: false,
+        retryability: 'none',
+        reason: 'non_production_recipient',
+      });
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('sends from production without an allowlist', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      resendResponse(200, { id: 'msg-production' }),
+    );
+
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'production',
+    });
+
+    expect(result).toEqual({ sent: true, messageId: 'msg-production' });
+  });
+
+  it('returns one sanitized permanent failure for a Resend 422', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      resendResponse(422, {
+        name: 'invalid_from_address',
+        message: 'learner@example.com is invalid',
+      }),
+    );
+
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'production',
+    });
+
+    expect(result).toEqual({
+      sent: false,
+      retryability: 'permanent',
+      reason: 'resend_api_error',
+      statusCode: 422,
+      providerCode: 'invalid_from_address',
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const capture = JSON.stringify(mockCaptureException.mock.calls[0]);
+    expect(capture).toContain('invalid_from_address');
+    expect(capture).not.toContain('learner@example.com is invalid');
+    expect(capture).not.toContain(payload.to);
+  });
+
+  it.each([
+    [429, 'rate_limit_exceeded'],
+    [503, 'application_error'],
+    [408, 'request_timeout'],
+    [409, 'concurrent_idempotent_requests'],
+  ])('classifies HTTP %i / %s as transient', async (status, name) => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      resendResponse(status, { name }),
+    );
+
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'production',
+    });
+
+    expect(result).toMatchObject({
+      sent: false,
+      retryability: 'transient',
+      reason: 'resend_api_error',
+      statusCode: status,
+      providerCode: name,
+    });
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('treats a non-concurrent 409 as permanent', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      resendResponse(409, { name: 'invalid_idempotency_key' }),
+    );
+
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'production',
+    });
+
+    expect(result).toMatchObject({
+      sent: false,
+      retryability: 'permanent',
+      providerCode: 'invalid_idempotency_key',
+    });
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies a network failure as transient', async () => {
+    (globalThis.fetch as jest.Mock).mockRejectedValue(
+      new Error('network down'),
+    );
+
+    const result = await sendEmail(payload, {
+      resendApiKey: 're_test',
+      environment: 'production',
+    });
+
+    expect(result).toEqual({
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    });
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

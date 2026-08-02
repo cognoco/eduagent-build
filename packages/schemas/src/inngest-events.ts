@@ -70,6 +70,7 @@ export const billingAlertDeliveryFailureReasonSchema = z.union([
     'no_email',
     'no_api_key',
     'suppressed',
+    'non_production_recipient',
     'unknown',
   ]),
   z.string().regex(/^(?:expo|resend)_api_error_[1-5][0-9]{2}$/),

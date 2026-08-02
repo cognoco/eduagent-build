@@ -1266,10 +1266,12 @@ describe('refreshProgressSnapshot', () => {
       'database',
       'warning',
       expect.objectContaining({
-        error: connectionError.message,
         operation: 'load_progress_state',
         retryable: true,
       }),
+    );
+    expect(jest.mocked(addBreadcrumb).mock.calls[0]?.[3]).not.toHaveProperty(
+      'error',
     );
   });
 

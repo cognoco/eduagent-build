@@ -1,5 +1,16 @@
 // Postgres SQLSTATE for a unique_violation.
 const UNIQUE_VIOLATION = '23505';
+const FOREIGN_KEY_VIOLATION = '23503';
+
+const DELETED_PERSON_REFERENCE_CONSTRAINTS = new Set([
+  'activation_events_profile_id_person_id_fk',
+  'notification_log_profile_id_person_id_fk',
+  'progress_snapshots_profile_id_person_id_fk',
+  'milestones_profile_id_person_id_fk',
+  'coaching_card_cache_profile_id_person_id_fk',
+  'mentor_activity_ledger_profile_id_person_id_fk',
+  'notification_preferences_profile_id_person_id_fk',
+]);
 
 // Bound the cause walk so a pathological self-referential chain can't loop.
 const MAX_CAUSE_DEPTH = 10;
@@ -48,6 +59,28 @@ export function isUniqueViolation(error: unknown): boolean {
     typeof unwrapped === 'object' &&
     unwrapped !== null &&
     (unwrapped as { code?: unknown }).code === UNIQUE_VIOLATION
+  );
+}
+
+/**
+ * True only for the known profile_id → person.id write failures caused by an
+ * authenticated request racing with hard deletion of that same person.
+ *
+ * This deliberately enumerates the affected write constraints. Mapping every
+ * foreign-key violation would hide unrelated integrity and deletion-order bugs.
+ */
+export function isDeletedPersonReferenceViolation(error: unknown): boolean {
+  const unwrapped = unwrapDbError(error);
+  if (typeof unwrapped !== 'object' || unwrapped === null) return false;
+
+  const driverError = unwrapped as {
+    code?: unknown;
+    constraint?: unknown;
+  };
+  return (
+    driverError.code === FOREIGN_KEY_VIOLATION &&
+    typeof driverError.constraint === 'string' &&
+    DELETED_PERSON_REFERENCE_CONSTRAINTS.has(driverError.constraint)
   );
 }
 

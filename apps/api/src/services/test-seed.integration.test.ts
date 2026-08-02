@@ -233,6 +233,103 @@ const RUN = !!process.env.DATABASE_URL;
       expect(orgAfter).toEqual([]);
     });
 
+    it.each([
+      'learning-active',
+      'v2-account-non-owner-child',
+      'mentor-audit-consent-us-under-threshold',
+    ] as const)(
+      '[WI-2788] reuses a stranded seed login row for %s',
+      async (scenario) => {
+        const prefix = `wi2788-login-reuse-${generateUUIDv7()}-`;
+        const email = `${prefix}learner@example.com`;
+        const oldPersonId = generateUUIDv7();
+        const loginId = generateUUIDv7();
+        const createdAt = new Date('2026-01-02T03:04:05.000Z');
+
+        await db.insert(person).values({
+          id: oldPersonId,
+          displayName: 'Stranded seed person',
+          birthDate: '2000-01-01',
+          residenceJurisdiction: 'ROW',
+        });
+        createdPersonIds.push(oldPersonId);
+        await db.insert(login).values({
+          id: loginId,
+          personId: oldPersonId,
+          clerkUserId: `${SEED_CLERK_PREFIX}${generateUUIDv7()}`,
+          email,
+          createdAt,
+        });
+        await db
+          .update(person)
+          .set({ loginId })
+          .where(eq(person.id, oldPersonId));
+
+        try {
+          const result = await seedScenario(db, scenario, email);
+          const [reusedLogin] = await db
+            .select({
+              id: login.id,
+              personId: login.personId,
+              clerkUserId: login.clerkUserId,
+              createdAt: login.createdAt,
+            })
+            .from(login)
+            .where(eq(login.email, email));
+
+          expect(reusedLogin).toMatchObject({
+            id: loginId,
+            personId: result.profileId,
+            clerkUserId: expect.stringMatching(/^clerk_seed_/),
+          });
+          expect(reusedLogin?.createdAt.getTime()).toBe(createdAt.getTime());
+
+          const oldPersons = await db
+            .select({ id: person.id })
+            .from(person)
+            .where(eq(person.id, oldPersonId));
+          expect(oldPersons).toEqual([]);
+        } finally {
+          await resetDatabase(db, {}, { prefix, preserveClerkUsers: true });
+        }
+      },
+    );
+
+    it('[WI-2788] refuses to reuse a stranded non-seed login row', async () => {
+      const prefix = `wi2788-login-real-${generateUUIDv7()}-`;
+      const email = `${prefix}learner@example.com`;
+      const oldPersonId = generateUUIDv7();
+      const loginId = generateUUIDv7();
+
+      await db.insert(person).values({
+        id: oldPersonId,
+        displayName: 'Real person',
+        birthDate: '2000-01-01',
+        residenceJurisdiction: 'ROW',
+      });
+      createdPersonIds.push(oldPersonId);
+      await db.insert(login).values({
+        id: loginId,
+        personId: oldPersonId,
+        clerkUserId: `user_real_${generateUUIDv7()}`,
+        email,
+      });
+      await db
+        .update(person)
+        .set({ loginId })
+        .where(eq(person.id, oldPersonId));
+
+      await expect(seedScenario(db, 'learning-active', email)).rejects.toThrow(
+        `Refusing to reuse non-seed login for seed email ${email}`,
+      );
+
+      const [unchangedLogin] = await db
+        .select({ id: login.id, personId: login.personId })
+        .from(login)
+        .where(eq(login.email, email));
+      expect(unchangedLogin).toEqual({ id: loginId, personId: oldPersonId });
+    });
+
     it('[WI-2820] survives eight back-to-back seed-reset cycles for the same email', async () => {
       const prefix = `wi2820-${generateUUIDv7()}-`;
       const email = `${prefix}repeat@example.com`;

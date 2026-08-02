@@ -192,6 +192,39 @@ export const login = pgTable(
   (table) => [index('login_person_id_idx').on(table.personId)],
 );
 
+// ---------------------------------------------------------------------------
+// 2a. pending_clerk_erasure
+// Digest-only fence between the local identity delete and Clerk cleanup. It
+// outlives the login row long enough to stop a still-valid Clerk JWT from
+// bootstrapping a replacement graph while external erasure is pending.
+// ---------------------------------------------------------------------------
+
+export const pendingClerkErasure = pgTable(
+  'pending_clerk_erasure',
+  {
+    clerkUserIdDigest: text('clerk_user_id_digest').primaryKey(),
+    erasureSetDigest: text('erasure_set_digest').notNull(),
+    releaseAfter: timestamp('release_after', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      'pending_clerk_erasure_user_digest_valid',
+      sql`${table.clerkUserIdDigest} ~ '^[a-f0-9]{64}$'`,
+    ),
+    check(
+      'pending_clerk_erasure_set_digest_valid',
+      sql`${table.erasureSetDigest} ~ '^[a-f0-9]{64}$'`,
+    ),
+    index('pending_clerk_erasure_release_after_idx').on(table.releaseAfter),
+  ],
+);
+
 // Wire person.login_id FK back to login (after login is declared).
 // Drizzle handles forward-ref FKs via the references(() => ...) pattern.
 // We declare this on person here separately because person is declared first

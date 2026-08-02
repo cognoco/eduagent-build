@@ -390,6 +390,7 @@ describe('Inngest helpers', () => {
           message: expect.stringContaining('memoryFactsDedupEnabled'),
         }),
         expect.objectContaining({
+          level: 'warning',
           extra: expect.objectContaining({
             bindingKey: 'memoryFactsDedupEnabled',
           }),

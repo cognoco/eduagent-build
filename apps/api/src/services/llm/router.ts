@@ -117,6 +117,7 @@ async function captureLlmFallbackSignal(input: {
     // a static wrapper import here binds the SDK before those mocks exist.
     const { captureException } = await import('../sentry');
     captureException(new Error('LLM provider fallback activated'), {
+      level: 'warning',
       tags: {
         surface: 'llm-router',
         signal: 'provider-fallback',

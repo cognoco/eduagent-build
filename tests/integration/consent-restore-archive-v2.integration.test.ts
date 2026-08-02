@@ -227,17 +227,17 @@ async function cleanupV2Seed(
     //   a. Seed child with archivedAt set > 30 days ago (retention-eligible).
     //   b. Restore consent (clears archivedAt, appends granted grant).
     //   c. Run archive-cleanup step body (v2 path, IDENTITY_V2_ENABLED=true).
-    //   d. Assert: returns {status:'complete'}, person survives, archivedAt null.
+    //   d. Assert: returns {status:'not_eligible'}, person survives, archivedAt null.
     //
     // Proves the v2 path (not legacy) is exercised by confirming:
     //   - Before restore: person.archivedAt is set AND consent is WITHDRAWN.
     //   - After restore: person.archivedAt is null AND consent is CONSENTED.
-    //   - Archive-cleanup early-exits at the CONSENTED check (consent_restored),
-    //     NOT at the null-archivedAt guard (not_archived) — i.e. the C1 restore
-    //     race is exercised and the right guard fires.
+    //   - Archive-cleanup's atomic erasure predicate rejects the restored,
+    //     unarchived person as not eligible — i.e. the C1 restore race is
+    //     exercised and the delete does not fire.
     // -------------------------------------------------------------------------
 
-    it('archive-cleanup v2 path: bails via consent_restored (not not_archived) after restoreConsentV2 — C1 race exercised', async () => {
+    it('archive-cleanup v2 path: returns not_eligible after restoreConsentV2 — C1 race exercised', async () => {
       const db = createDatabase(process.env.DATABASE_URL!);
 
       // Confirm preconditions: archivedAt set + consent WITHDRAWN.
@@ -289,9 +289,10 @@ async function cleanupV2Seed(
         step: mockStep,
       });
 
-      // The Inngest function returns { status: 'complete', profileId } always.
+      // The atomic erasure contract reports that the restored person is no
+      // longer eligible for archive deletion.
       expect(result).toMatchObject({
-        status: 'complete',
+        status: 'not_eligible',
         profileId: childPersonId,
       });
 

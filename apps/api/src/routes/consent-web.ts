@@ -42,6 +42,7 @@ import { BRAND_COLOR_PRIMARY } from '../services/brand';
 type ConsentWebEnv = {
   Bindings: {
     DATABASE_URL: string;
+    ENVIRONMENT?: string;
     CONSENT_POLICY_VERSION: string;
     // [P0 email-consent-withdrawal] HMAC secret for the stateless withdrawal
     // token; the API origin the absolute withdrawal link points back at; and
@@ -544,6 +545,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
                 withdrawalUrl,
               ),
               {
+                environment: c.env.ENVIRONMENT,
                 resendApiKey: c.env.RESEND_API_KEY,
                 emailFrom: c.env.EMAIL_FROM,
                 db,

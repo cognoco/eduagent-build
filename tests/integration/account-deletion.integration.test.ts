@@ -17,6 +17,7 @@
  * 6. Both mutation endpoints require authentication (401 without token)
  */
 
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { eq, sql } from 'drizzle-orm';
@@ -43,6 +44,7 @@ import {
   nudges,
   organization,
   parkingLotItems,
+  pendingClerkErasure,
   pendingNotices,
   person,
   practiceActivityEvents,
@@ -80,6 +82,7 @@ import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import {
+  clerkErasureDigest,
   executeDeletionV2,
   scheduleDeletionV2,
 } from '../../apps/api/src/services/identity-v2/deletion-v2';
@@ -90,6 +93,23 @@ const TEST_ENV = buildIntegrationEnv();
 
 const AUTH_USER_ID = 'integration-deletion-user';
 const AUTH_EMAIL = 'integration-deletion@integration.test';
+const ownedDestructiveIdentities: Array<{
+  clerkUserId: string;
+  email: string;
+}> = [];
+
+function ownDestructiveIdentity(label: string): {
+  clerkUserId: string;
+  email: string;
+} {
+  const suffix = randomUUID();
+  const identity = {
+    clerkUserId: `integration-deletion-${label}-${suffix}`,
+    email: `integration-deletion-${label}-${suffix}@integration.test`,
+  };
+  ownedDestructiveIdentities.push(identity);
+  return identity;
+}
 
 async function loadDeletionState(accountId: string): Promise<{
   deletionScheduledAt: Date | null;
@@ -133,7 +153,12 @@ async function createOwnerProfile(): Promise<string> {
   return profile.profileId;
 }
 
-async function createOwnerProfileRecord(): Promise<{
+async function createOwnerProfileRecord(
+  identity: { clerkUserId: string; email: string } = {
+    clerkUserId: AUTH_USER_ID,
+    email: AUTH_EMAIL,
+  },
+): Promise<{
   profileId: string;
   accountId: string;
 }> {
@@ -141,7 +166,10 @@ async function createOwnerProfileRecord(): Promise<{
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      headers: buildAuthHeaders({
+        sub: identity.clerkUserId,
+        email: identity.email,
+      }),
       body: JSON.stringify({
         displayName: 'Deletion Test User',
         birthYear: 2000,
@@ -185,6 +213,43 @@ beforeEach(async () => {
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
   });
+});
+
+afterEach(async () => {
+  const db = createIntegrationDb();
+  const identities = [...ownedDestructiveIdentities];
+  const failures: unknown[] = [];
+  for (const identity of identities) {
+    const results = await Promise.allSettled([
+      cleanupAccounts({
+        emails: [identity.email],
+        clerkUserIds: [identity.clerkUserId],
+      }),
+      db
+        .delete(pendingClerkErasure)
+        .where(
+          eq(
+            pendingClerkErasure.clerkUserIdDigest,
+            clerkErasureDigest(identity.clerkUserId),
+          ),
+        ),
+    ]);
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    if (rejected.length === 0) {
+      const index = ownedDestructiveIdentities.indexOf(identity);
+      if (index >= 0) ownedDestructiveIdentities.splice(index, 1);
+    } else {
+      failures.push(...rejected.map((result) => result.reason));
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      'Failed to clean one or more destructive account-deletion fixtures',
+    );
+  }
 });
 
 afterAll(async () => {
@@ -439,7 +504,9 @@ legacyAccountDeletionCascadeDescribe(
   'Integration: account deletion cascade',
   () => {
     it('cascade-deletes all retention-pipeline rows for the deleted account', async () => {
-      const { profileId, accountId } = await createOwnerProfileRecord();
+      const { profileId, accountId } = await createOwnerProfileRecord(
+        ownDestructiveIdentity('retention'),
+      );
       const db = createIntegrationDb();
 
       const [subject] = await db
@@ -541,7 +608,11 @@ legacyAccountDeletionCascadeDescribe(
     // The test IS the audit. A new PII table without cascade will fail here.
     // ---------------------------------------------------------------------------
     it('cascade-deletes every PII-bearing table for the deleted account (BUG-368)', async () => {
-      const { profileId, accountId } = await createOwnerProfileRecord();
+      // Each destructive audit writes a pending Clerk-erasure fence by design.
+      // Never make a later test depend on bootstrapping the same credential.
+      const { profileId, accountId } = await createOwnerProfileRecord(
+        ownDestructiveIdentity('pii'),
+      );
       const db = createIntegrationDb();
 
       // Seed a SECOND account + profile so we can also assert the foreign

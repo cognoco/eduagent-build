@@ -725,6 +725,7 @@ describe('LLM Router', () => {
         expect.objectContaining({ message: 'LLM provider fallback activated' }),
       );
       expect(capturedContext).toEqual({
+        level: 'warning',
         tags: {
           surface: 'llm-router',
           signal: 'provider-fallback',
@@ -1112,6 +1113,7 @@ describe('LLM Router', () => {
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'LLM provider fallback activated' }),
         {
+          level: 'warning',
           tags: {
             surface: 'llm-router',
             signal: 'provider-fallback',

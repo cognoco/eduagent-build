@@ -928,12 +928,13 @@ export async function requestConsentV2(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.reason === 'no_api_key') {
-      // Config issue, not delivery failure — keep the request row.
+    if (emailResult.retryability !== 'transient') {
+      // Configuration and terminal provider outcomes must preserve the
+      // request set so the consent state remains auditable and resumable.
       return { emailDelivered: false };
     }
     await rollbackCounter(db, write.requestIds, write.isRecipientChange);
-    throw new EmailDeliveryError(emailResult.reason ?? undefined);
+    throw new EmailDeliveryError(emailResult.reason);
   }
 
   return { emailDelivered: true };
@@ -1027,11 +1028,11 @@ export async function resendConsentV2(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.reason === 'no_api_key') {
+    if (emailResult.retryability !== 'transient') {
       return { emailDelivered: false };
     }
     await rollbackCounter(db, write.requestIds, false);
-    throw new EmailDeliveryError(emailResult.reason ?? undefined);
+    throw new EmailDeliveryError(emailResult.reason);
   }
 
   return { emailDelivered: true };

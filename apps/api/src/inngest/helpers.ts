@@ -169,6 +169,7 @@ function warnMissingBinding(bindingKey: keyof EnvBindings): void {
       `Inngest env binding absent: ${String(bindingKey)} — request context may not be wired or AsyncLocalStorage context lost`,
     ),
     {
+      level: 'warning',
       extra: {
         event: 'inngest.env_binding_absent',
         bindingKey: String(bindingKey),

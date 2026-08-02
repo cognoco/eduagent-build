@@ -199,6 +199,7 @@ async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
 type ConsentRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
+    ENVIRONMENT?: string;
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
@@ -394,6 +395,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             appUrl: apiOrigin,
             audit,
             emailOptions: {
+              environment: c.env.ENVIRONMENT,
               resendApiKey: c.env.RESEND_API_KEY,
               emailFrom: c.env.EMAIL_FROM,
             },
@@ -489,6 +491,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           childName,
           appUrl: apiOrigin,
           emailOptions: {
+            environment: c.env.ENVIRONMENT,
             resendApiKey: c.env.RESEND_API_KEY,
             emailFrom: c.env.EMAIL_FROM,
           },

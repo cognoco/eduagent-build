@@ -8,6 +8,21 @@
 // ---------------------------------------------------------------------------
 
 const mockRouteAndCall = jest.fn();
+const mockFindOwnedCurriculumTopic = jest.fn();
+
+jest.mock(
+  '../../services/curriculum-topic-ownership' /* gc1-allow: multi-join ownership query is inexpressible on the unit mock DB; integration tests own real semantics */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/curriculum-topic-ownership',
+    ) as typeof import('../../services/curriculum-topic-ownership');
+    return {
+      ...actual,
+      findOwnedCurriculumTopic: (...args: unknown[]) =>
+        mockFindOwnedCurriculumTopic(...args),
+    };
+  },
+);
 
 jest.mock('../../services/llm', () => {
   const actual = jest.requireActual(
@@ -98,6 +113,11 @@ beforeEach(() => {
   mockDb.query.curriculumTopics.findMany.mockResolvedValue([
     { title: 'Intro' },
   ]);
+  mockFindOwnedCurriculumTopic.mockResolvedValue({
+    topicId: 'topic-1',
+    topicTitle: 'How Photosynthesis Works',
+    bookId: 'book-1',
+  });
   // existing-suggestions count query: select().from().where() chain
   const whereThunk = jest.fn().mockResolvedValue([{ count: 0 }]);
   mockDb.select.mockReturnValue({
@@ -120,7 +140,7 @@ beforeEach(() => {
 
 const validEventData = {
   bookId: 'book-1',
-  topicTitle: 'How Photosynthesis Works',
+  topicId: 'topic-1',
   profileId: 'profile-1',
   sessionId: 'session-1',
 };
@@ -145,6 +165,53 @@ describe('post-session-suggestions [BUG-157] function-level guards', () => {
 });
 
 describe('post-session-suggestions [BUG-639 / J-3]', () => {
+  it('[WI-2788] accepts and skips an explicit no-topic completion without DB or LLM work', async () => {
+    const result = await runHandler({
+      ...validEventData,
+      bookId: null,
+      topicId: null,
+    });
+
+    expect(result).toEqual({ status: 'skipped', reason: 'no_topic' });
+    expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+    expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] normalizes the legacy no-topic completion with both IDs omitted', async () => {
+    const result = await runHandler({
+      profileId: validEventData.profileId,
+      sessionId: validEventData.sessionId,
+    });
+
+    expect(result).toEqual({ status: 'skipped', reason: 'no_topic' });
+    expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+    expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ bookId: 'book-1', topicId: null }],
+    [{ bookId: null, topicId: 'topic-1' }],
+    [{ bookId: 'book-1' }],
+    [{ topicId: 'topic-1' }],
+    [{ bookId: 'book-1', topicTitle: 'Legacy topic title' }],
+  ])(
+    '[WI-2788] normalizes and skips a mixed or legacy filing target: %o',
+    async (target) => {
+      const result = await runHandler({
+        profileId: validEventData.profileId,
+        sessionId: validEventData.sessionId,
+        ...target,
+      });
+
+      expect(result).toEqual({ status: 'skipped', reason: 'no_topic' });
+      expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+      expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+      expect(mockRouteAndCall).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns skipped:invalid_json when LLM emits malformed JSON (no throw, no retry)', async () => {
     mockRouteAndCall.mockResolvedValue({
       response: 'this is not JSON at all {oops',
@@ -217,14 +284,16 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
     mockDb.query.curriculumTopics.findMany.mockResolvedValue([
       { title: 'Call +1 415 555 2671' },
     ]);
+    mockFindOwnedCurriculumTopic.mockResolvedValue({
+      topicId: 'topic-1',
+      topicTitle: 'Email topic@example.com',
+      bookId: 'book-1',
+    });
     mockRouteAndCall.mockResolvedValue({
       response: '{"suggestions": ["Light Reactions", "Dark Reactions"]}',
     });
 
-    await runHandler({
-      ...validEventData,
-      topicTitle: 'Email topic@example.com',
-    });
+    await runHandler(validEventData);
 
     const messages = mockRouteAndCall.mock.calls[0]?.[0] as Array<{
       role: string;
@@ -242,6 +311,50 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
     expect(messages[0]?.content).toContain(
       '<completed_topic>Email topic@example.com</completed_topic>',
     );
+  });
+
+  it('[WI-2788] rehydrates the completed topic and ignores a scrubbed event title', async () => {
+    mockFindOwnedCurriculumTopic.mockResolvedValue({
+      topicId: 'topic-1',
+      topicTitle: 'Real database title',
+      bookId: 'book-1',
+    });
+    mockRouteAndCall.mockResolvedValue({
+      response: '{"suggestions": ["A", "B"]}',
+    });
+
+    await runHandler({
+      ...validEventData,
+      topicTitle: '[pii-scrubbed]',
+    });
+
+    expect(mockFindOwnedCurriculumTopic).toHaveBeenCalledWith(mockDb, {
+      profileId: 'profile-1',
+      topicId: 'topic-1',
+    });
+    const messages = mockRouteAndCall.mock.calls[0]?.[0] as Array<{
+      content: string;
+    }>;
+    expect(messages[0]?.content).toContain(
+      '<completed_topic>Real database title</completed_topic>',
+    );
+    expect(messages[0]?.content).not.toContain('[pii-scrubbed]');
+  });
+
+  it.each([
+    ['missing topic', null, 'topic not found or ownership mismatch'],
+    [
+      'wrong book',
+      { topicId: 'topic-1', topicTitle: 'Other', bookId: 'book-2' },
+      'topic/book mismatch',
+    ],
+  ])('skips a %s without calling the LLM', async (_label, topic, reason) => {
+    mockFindOwnedCurriculumTopic.mockResolvedValue(topic);
+
+    await expect(runHandler(validEventData)).resolves.toEqual(
+      expect.objectContaining({ status: 'skipped', reason }),
+    );
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
   });
 
   it('strips markdown ```json fences before parsing', async () => {

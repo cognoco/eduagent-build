@@ -70,6 +70,7 @@ const mockScope = {
   setExtra: (key: string, value: unknown) => {
     alarmExtras[key] = value;
   },
+  setLevel: jest.fn(),
 };
 jest.mock('@sentry/cloudflare', () => ({
   withScope: (cb: (scope: typeof mockScope) => void) => cb(mockScope),

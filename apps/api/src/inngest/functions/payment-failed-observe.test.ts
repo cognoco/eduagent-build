@@ -7,6 +7,7 @@ const mockSendEmail = jest.fn();
 
 jest.mock(/* gc1-allow: step dependency boundary */ '../helpers', () => ({
   getStepDatabase: () => mockDb,
+  getStepEnvironment: () => 'production',
   getStepResendApiKey: () => 'resend-test-key',
   getStepEmailFrom: () => 'billing@mentomate.test',
 }));
@@ -151,6 +152,7 @@ describe('paymentFailedObserve', () => {
       }),
       {
         db: mockDb,
+        environment: 'production',
         resendApiKey: 'resend-test-key',
         emailFrom: 'billing@mentomate.test',
         idempotencyKey: 'stripe-payment-failed:evt-123',
@@ -238,6 +240,53 @@ describe('paymentFailedObserve', () => {
       ]),
     );
     expect(JSON.stringify(events)).not.toContain('payer@example.test');
+  });
+
+  it('normalizes Resend failures to the controlled status-bearing reason', async () => {
+    mockSendEmail.mockResolvedValue({
+      sent: false,
+      retryability: 'permanent',
+      reason: 'resend_api_error',
+      statusCode: 422,
+      providerCode: 'validation_error',
+    });
+
+    const { sendEventCalls } = await runHandler();
+
+    expect(mockRecordBillingAlertDeliveryOutcome).toHaveBeenCalledWith(mockDb, {
+      alertId: ALERT_ID,
+      channel: 'email',
+      sent: false,
+      reason: 'resend_api_error_422',
+    });
+    expect(sendEventCalls).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          name: 'app/billing.alert_delivery_failed',
+          data: expect.objectContaining({
+            channel: 'email',
+            reason: 'resend_api_error_422',
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it('throws a transient email result inside the durable send step so Inngest retries', async () => {
+    mockSendEmail.mockResolvedValue({
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    });
+
+    await expect(runHandler()).rejects.toThrow(
+      'payment-failed-observe transient email failure: network_error',
+    );
+
+    expect(mockRecordBillingAlertDeliveryOutcome).not.toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({ channel: 'email' }),
+    );
   });
 
   it('does not fan out when another run already inserted the source event', async () => {

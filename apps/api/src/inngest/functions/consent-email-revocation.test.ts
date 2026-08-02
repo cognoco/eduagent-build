@@ -22,23 +22,28 @@ import {
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock(
-  '@eduagent/database' /* gc1-allow: external-boundary */,
+  '@eduagent/database' /* gc1-allow: unit database seam; real DB semantics are covered by integration tests */,
   () => mockDatabaseModule.module,
 );
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client', () => {
-  const actual = jest.requireActual('../client') as typeof import('../client');
-  const realInngest = jest.requireActual('inngest').Inngest;
-  const realInstance = new realInngest({ id: 'eduagent-test' });
-  return {
-    ...actual,
-    inngest: {
-      createFunction: realInstance.createFunction.bind(realInstance),
-      send: (...args: unknown[]) => mockInngestSend(...args),
-    },
-  };
-});
+jest.mock(
+  '../client' /* gc1-allow: Inngest framework transport capture is required to invoke the workflow handler in a unit test */,
+  () => {
+    const actual = jest.requireActual(
+      '../client',
+    ) as typeof import('../client');
+    const realInngest = jest.requireActual('inngest').Inngest;
+    const realInstance = new realInngest({ id: 'eduagent-test' });
+    return {
+      ...actual,
+      inngest: {
+        createFunction: realInstance.createFunction.bind(realInstance),
+        send: (...args: unknown[]) => mockInngestSend(...args),
+      },
+    };
+  },
+);
 
 const mockIsConsentRevocationGenerationCurrentV2 = jest.fn();
 const mockGetPersonDisplayNameV2 = jest.fn();
@@ -58,46 +63,113 @@ jest.mock(
   },
 );
 
-// [GC6] deletePersonIfConsentWithdrawnV2 requires a real DB with transaction
-// support (advisory lock + multi-step ORM operations). The createMockDb() proxy
-// cannot provide the necessary transaction / query behavior without a full DB
-// fixture. This gc1-allow mock follows the same pattern as the other DB-backed
-// identity-v2 function mocks above.
+// [GC6] Internal-service exception: the real snapshot/atomic-erasure path
+// requires a transaction, advisory lock, and graph queries that createMockDb()
+// cannot provide. This suite pins the durable Inngest step ABI, so its adapters
+// deliberately return persisted step-result shapes; deletion-v2 integration
+// tests own the real result semantics. requireActual preserves untouched
+// exports and limits the exception to these DB-backed effects.
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn().mockResolvedValue(true);
-jest.mock('../../services/identity-v2/deletion-v2', () => {
-  const actual = jest.requireActual(
-    '../../services/identity-v2/deletion-v2',
-  ) as typeof import('../../services/identity-v2/deletion-v2');
-  return {
-    ...actual,
-    deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
-      mockDeletePersonIfConsentWithdrawnV2(...args),
-  };
-});
+const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
+const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
+const mockEnsurePendingClerkErasures = jest.fn().mockResolvedValue(true);
+const mockMarkPendingClerkErasuresComplete = jest
+  .fn()
+  .mockResolvedValue(undefined);
+jest.mock(
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: real erasure path requires a transaction and advisory lock unavailable on the unit DB; deletion-v2 integration tests own real semantics */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/deletion-v2',
+    ) as typeof import('../../services/identity-v2/deletion-v2');
+    return {
+      ...actual,
+      deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
+        mockDeletePersonIfConsentWithdrawnV2(...args),
+      getPersonClerkUserIdsV2: (...args: unknown[]) =>
+        mockGetPersonClerkUserIdsV2(...args),
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
+      getPersonErasureSnapshotV2: async (...args: unknown[]) => ({
+        personExists: true,
+        personId: args[1] as string,
+        organizationId: 'org-test',
+        clerkUserIds: await mockGetPersonClerkUserIdsV2(...args),
+        loginEmails: [],
+        organizationPersonIds: [args[1] as string],
+        subscriptionStoreTeardownTargets: [],
+      }),
+      attemptPersonIfConsentWithdrawnErasureV2: async (
+        db: unknown,
+        personId: unknown,
+        snapshot: { clerkUserIds: string[] },
+        withdrawnAt: unknown,
+      ) =>
+        (await mockDeletePersonIfConsentWithdrawnV2(db, personId, withdrawnAt))
+          ? {
+              status: 'deleted',
+              clerkUserIds: snapshot.clerkUserIds,
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            }
+          : {
+              status: 'not_eligible',
+              clerkUserIds: [],
+              organizationId: 'org-test',
+              organizationDeleted: false,
+              subscriptionStoreTeardownTargets: [],
+            },
+    };
+  },
+);
+
+// Clerk deletion is a live external API boundary; only that outbound call is
+// replaced in this workflow test.
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
+);
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock('../../services/notifications', () => {
-  const actual = jest.requireActual(
-    '../../services/notifications',
-  ) as typeof import('../../services/notifications');
-  return {
-    ...actual,
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-  };
-});
+jest.mock(
+  '../../services/notifications' /* gc1-allow: workflow unit test isolates the live Expo push transport; requireActual preserves other exports */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+    };
+  },
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => {
-  const actual = jest.requireActual(
-    '../../services/settings',
-  ) as typeof import('../../services/settings');
-  return {
-    ...actual,
-    getRecentNotificationCount: (...args: unknown[]) =>
-      mockGetRecentNotificationCount(...args),
-  };
-});
+jest.mock(
+  '../../services/settings' /* gc1-allow: notification-count DB read is unavailable on the unit proxy DB */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+    };
+  },
+);
 
 import { consentEmailRevocation } from './consent-email-revocation';
 
@@ -130,6 +202,8 @@ beforeEach(() => {
   mockIsConsentRevocationGenerationCurrentV2.mockResolvedValue(true);
   mockGetPersonDisplayNameV2.mockResolvedValue('Alex');
   mockDeletePersonIfConsentWithdrawnV2.mockResolvedValue(true);
+  mockGetPersonClerkUserIdsV2.mockResolvedValue([]);
+  mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   mockSendPushNotification.mockResolvedValue({ sent: true });
   mockGetRecentNotificationCount.mockResolvedValue(0);
 });
@@ -337,8 +411,36 @@ describe('still-withdrawn path', () => {
       'send-warning-push',
       'check-restoration',
       'notify-child',
-      'delete-charge-person',
+      'email-revocation-person-erasure-capture-1',
+      'email-revocation-person-erasure-database-1',
     ]);
+  });
+
+  it('deletes every captured Clerk identity after the person erasure commits', async () => {
+    mockGetPersonClerkUserIdsV2.mockResolvedValue([
+      'clerk-charge-001',
+      'clerk-charge-002',
+    ]);
+
+    const { runner } = await executeEmailRevocation({
+      chargePersonId: 'charge-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'clerk-charge-001' }),
+    );
+    expect(mockDeleteClerkUser).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'clerk-charge-002' }),
+    );
+    expect(runner.runNames()).toEqual(
+      expect.arrayContaining([
+        'email-revocation-person-erasure-capture-1',
+        'email-revocation-person-erasure-database-1',
+        'email-revocation-person-erasure-clerk-users',
+      ]),
+    );
   });
 
   it('pushes consent_warning at day 6 and consent_expired to child before delete', async () => {

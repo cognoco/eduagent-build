@@ -934,7 +934,10 @@ describe('sessionCompleted', () => {
       expect.objectContaining({
         message: expect.stringContaining('waitForEvent timed out'),
       }),
-      expect.objectContaining({ profileId: validProfileId }),
+      expect.objectContaining({
+        profileId: validProfileId,
+        level: 'warning',
+      }),
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('filing waitForEvent timed out'),

@@ -16,6 +16,7 @@ import { inngest } from '../client';
 import {
   getStepDatabase,
   getStepEmailFrom,
+  getStepEnvironment,
   getStepResendApiKey,
   getStepSupportEmail,
 } from '../helpers';
@@ -73,9 +74,19 @@ export async function runBlockedSafetyDigestIngest(
 interface DeliveryDependencies {
   currentDate(): string;
   loadClosed(currentUtcDate: string): Promise<BlockedSafetyDailyBucket[]>;
-  deliver(
-    bucket: BlockedSafetyDailyBucket,
-  ): Promise<{ delivered: boolean; reason?: 'empty' }>;
+  deliver(bucket: BlockedSafetyDailyBucket): Promise<
+    | { delivered: true }
+    | { delivered: false; reason: 'empty' }
+    | {
+        delivered: false;
+        reason:
+          | 'no_api_key'
+          | 'suppressed'
+          | 'non_production_recipient'
+          | 'resend_api_error';
+        retryability: 'none' | 'permanent';
+      }
+  >;
 }
 
 const defaultDeliveryDependencies: DeliveryDependencies = {
@@ -88,6 +99,7 @@ const defaultDeliveryDependencies: DeliveryDependencies = {
   deliver: (bucket) =>
     deliverBlockedSafetyDigestBucket(getStepDatabase(), bucket, {
       to: getStepSupportEmail(),
+      environment: getStepEnvironment(),
       resendApiKey: getStepResendApiKey(),
       emailFrom: getStepEmailFrom(),
     }),
@@ -103,9 +115,28 @@ export async function runBlockedSafetyDigestDelivery(
   );
 
   for (const bucket of buckets) {
-    await step.run(`deliver-blocked-safety-digest-${bucket.bucketDate}`, () =>
-      dependencies.deliver(bucket),
+    const result = await step.run(
+      `deliver-blocked-safety-digest-${bucket.bucketDate}`,
+      () => dependencies.deliver(bucket),
     );
+    if (!result.delivered && result.reason !== 'empty') {
+      captureException(
+        new Error('Blocked-safety digest email was not delivered'),
+        {
+          extra: {
+            bucketDate: bucket.bucketDate,
+            reason: result.reason,
+            retryability: result.retryability,
+          },
+        },
+      );
+      return {
+        status: 'failed' as const,
+        bucketCount: buckets.length,
+        failedBucketDate: bucket.bucketDate,
+        reason: result.reason,
+      };
+    }
   }
 
   return { status: 'completed' as const, bucketCount: buckets.length };

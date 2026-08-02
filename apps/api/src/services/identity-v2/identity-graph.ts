@@ -53,6 +53,7 @@ import {
   createPendingConsentRequest,
   recordAdultSelfConsentV2,
 } from './consent-v2';
+import { assertClerkIdentityBootstrapAllowedTx } from './deletion-v2';
 
 const logger = createLogger();
 
@@ -244,6 +245,8 @@ export async function createIdentityGraph(
   try {
     return await db.transaction(async (tx) => {
       const txDb = tx as unknown as Database;
+
+      await assertClerkIdentityBootstrapAllowedTx(txDb, input.clerkUserId);
 
       // (1) BUG-411 email-reclaim guard — before any insert. login.email is
       // UNIQUE; a same-email/different-Clerk registration must be blocked

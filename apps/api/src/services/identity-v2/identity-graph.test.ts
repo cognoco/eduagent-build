@@ -14,6 +14,8 @@
 // path and concurrent-race path live in identity-graph.integration.test.ts.
 // ---------------------------------------------------------------------------
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import type { Database } from '@eduagent/database';
 import { ConflictError } from '../../errors';
 import { createIdentityGraph } from './identity-graph';
@@ -160,5 +162,22 @@ describe('[WI-1166] createIdentityGraph — LOGIN_EMAIL_UNIQUE race null-clerkUs
       (emittedEvent?.[0] as { data?: { existingClerkUserId?: string } })?.data
         ?.existingClerkUserId,
     ).toBe('victim_clerk');
+  });
+});
+
+describe('[WI-2788] createIdentityGraph — pending Clerk erasure fence', () => {
+  it('checks the erasure fence before inserting a replacement login', () => {
+    const source = readFileSync(join(__dirname, 'identity-graph.ts'), 'utf8');
+    const createGraph = source.slice(
+      source.indexOf('export async function createIdentityGraph('),
+    );
+    const fenceAt = createGraph.indexOf(
+      'assertClerkIdentityBootstrapAllowedTx(txDb, input.clerkUserId)',
+    );
+    const loginInsertAt = createGraph.indexOf('.insert(login)');
+
+    expect(fenceAt).toBeGreaterThanOrEqual(0);
+    expect(loginInsertAt).toBeGreaterThanOrEqual(0);
+    expect(fenceAt).toBeLessThan(loginInsertAt);
   });
 });

@@ -18,6 +18,7 @@ import {
 import { buildNowFeed } from '../now-feed';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { paymentFailedObserve } from '../../inngest/functions/payment-failed-observe';
+import { runWithInngestRequestContext } from '../../inngest/helpers';
 import {
   getBillingAlertDeliveryTarget,
   recordBillingAlertDeliveryOutcome,
@@ -26,6 +27,7 @@ import {
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
+const TEST_RESEND_API_KEY = 'resend-payment-failed-integration';
 
 // The past-due grace deadline must stay in the FUTURE relative to the run:
 // once it passes, access correctly resolves to `free_fallback` instead of
@@ -45,10 +47,18 @@ const PERIOD_END_AT_ISO = PERIOD_END_AT.toISOString();
   const subscriptionId = generateUUIDv7();
   let originalFetch: typeof globalThis.fetch;
   let previousResendApiKey: string | undefined;
+  let integrationDatabaseUrl: string;
   let requestedUrls: string[];
 
   beforeAll(async () => {
-    db = createDatabase(process.env.DATABASE_URL!);
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error(
+        'DATABASE_URL is not set for payment alert integration tests',
+      );
+    }
+    integrationDatabaseUrl = databaseUrl;
+    db = createDatabase(databaseUrl);
     await db.insert(organization).values({
       id: organizationId,
       name: 'Payment alert integration org',
@@ -103,7 +113,7 @@ const PERIOD_END_AT_ISO = PERIOD_END_AT.toISOString();
       periodEndAt: PERIOD_END_AT,
     });
     previousResendApiKey = process.env['RESEND_API_KEY'];
-    process.env['RESEND_API_KEY'] = 'resend-payment-failed-integration';
+    process.env['RESEND_API_KEY'] = TEST_RESEND_API_KEY;
   });
 
   afterAll(async () => {
@@ -295,20 +305,29 @@ const PERIOD_END_AT_ISO = PERIOD_END_AT.toISOString();
     const invoke = async () => {
       const runner = createInngestStepRunner();
       const handler = (paymentFailedObserve as any).fn;
-      const result = await handler({
-        event: {
-          id: 'stripe-payment-failed:evt-handler-integration',
-          name: 'app/payment.failed',
-          data: {
-            subscriptionId,
-            stripeSubscriptionId: 'sub_handler_integration',
-            accountId: organizationId,
-            attempt: 1,
-            timestamp: '2026-07-11T13:00:00.000Z',
-          },
+      const result = await runWithInngestRequestContext(
+        {
+          environment: 'production',
+          databaseUrl: integrationDatabaseUrl,
+          resendApiKey: TEST_RESEND_API_KEY,
+          emailFrom: 'test@mentomate.test',
         },
-        step: runner.step,
-      });
+        () =>
+          handler({
+            event: {
+              id: 'stripe-payment-failed:evt-handler-integration',
+              name: 'app/payment.failed',
+              data: {
+                subscriptionId,
+                stripeSubscriptionId: 'sub_handler_integration',
+                accountId: organizationId,
+                attempt: 1,
+                timestamp: '2026-07-11T13:00:00.000Z',
+              },
+            },
+            step: runner.step,
+          }),
+      );
       return result;
     };
 

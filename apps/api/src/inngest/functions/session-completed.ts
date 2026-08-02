@@ -485,7 +485,10 @@ export const sessionCompleted = inngest.createFunction(
         const timeoutErr = new Error(
           'session-completed: filing waitForEvent timed out after 60s',
         );
-        sentry.captureException(timeoutErr, { profileId });
+        sentry.captureException(timeoutErr, {
+          profileId,
+          level: 'warning',
+        });
         // [logging sweep] structured logger so PII fields land as JSON context
         logger.warn(
           '[session-completed] filing waitForEvent timed out — proceeding with stale topic placement',
