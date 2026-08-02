@@ -38,6 +38,10 @@ import {
 } from '../linking-ceremony';
 
 const AS_OF = new Date('2026-08-01T12:00:00.000Z');
+// Invite redemption deliberately rechecks expiry against PostgreSQL now().
+// Keep ordinary fixtures live independent of the wall-clock date on which the
+// suite runs; expiry-specific cases pass an explicit boundary instead.
+const LIVE_INVITE_EXPIRES_AT = new Date('2099-01-01T00:00:00.000Z');
 const POLICY_EFFECTIVE_AT = new Date(
   AS_OF.getTime() -
     1 -
@@ -97,7 +101,7 @@ async function invite(
   inviterPersonId: string,
   familyOrgId: string,
   invitedEmail: string,
-  expiresAt = new Date(AS_OF.getTime() + 86_400_000),
+  expiresAt = LIVE_INVITE_EXPIRES_AT,
 ) {
   const token = randomUUID();
   const [row] = await db
@@ -467,6 +471,174 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
         asOf: AS_OF,
       }),
     ).resolves.toEqual({ status: 'withdrawn' });
+  });
+
+  it.each(['decline', 'withdraw', 'expire'] as const)(
+    'revokes journey-created consent and visibility when a guardian-completed join ends by %s',
+    async (terminalAction) => {
+      const inviter = await identity(`${terminalAction}-cleanup-inviter`, 1980);
+      const learner = await identity(`${terminalAction}-cleanup-learner`, 2012);
+      const guardian = await identity(
+        `${terminalAction}-cleanup-guardian`,
+        1978,
+      );
+      const { issued, completed } = await completeGuardianJourney(
+        inviter,
+        learner,
+        guardian,
+      );
+      if (
+        completed.status !== 'ready_to_join' ||
+        !completed.visibilityContract
+      ) {
+        throw new Error(
+          'guardian fixture did not create a visibility contract',
+        );
+      }
+      const contractId = completed.visibilityContract.id;
+      await acceptLink(db, contractId, {
+        actorPersonId: inviter.personId,
+        audience: 'supporter',
+        contractVersion: completed.visibilityContract.contractVersion,
+        now: AS_OF,
+      });
+      await expect(
+        findAcceptedContractForSupportee(db, {
+          supporterPersonId: inviter.personId,
+          supporteePersonId: learner.personId,
+        }),
+      ).resolves.toMatchObject({ id: contractId });
+
+      const terminalAt = new Date(AS_OF.getTime() + 2_000);
+      if (terminalAction === 'decline') {
+        await expect(
+          declineFamilyJoinJourney(db, {
+            callerPersonId: learner.personId,
+            token: issued.token,
+            asOf: terminalAt,
+          }),
+        ).resolves.toEqual({ status: 'declined' });
+      } else if (terminalAction === 'withdraw') {
+        await expect(
+          withdrawFamilyJoinJourney(db, {
+            callerPersonId: inviter.personId,
+            inviteId: issued.row.id,
+            asOf: terminalAt,
+          }),
+        ).resolves.toEqual({ status: 'withdrawn' });
+      } else {
+        await db
+          .update(familyJoinInvite)
+          .set({ tokenExpiresAt: new Date(AS_OF.getTime() + 1_000) })
+          .where(eq(familyJoinInvite.id, issued.row.id));
+        await expect(
+          startOrResumeFamilyJoinJourney(db, {
+            callerPersonId: learner.personId,
+            token: issued.token,
+            familyMembershipDecision: 'accept',
+            destinationProcessingAssent: true,
+            supportershipDecision: 'accept',
+            asOf: terminalAt,
+          }),
+        ).resolves.toEqual({ status: 'expired' });
+      }
+
+      await expect(
+        db.query.supportVisibilityContracts.findFirst({
+          where: eq(supportVisibilityContracts.id, contractId),
+        }),
+      ).resolves.toMatchObject({
+        status: 'revoked',
+        supporterAcceptedAt: null,
+        supporteeAcceptedAt: null,
+      });
+      const grants = await db.query.consentGrant.findMany({
+        where: and(
+          eq(consentGrant.chargePersonId, learner.personId),
+          eq(consentGrant.organizationId, inviter.organizationId),
+        ),
+      });
+      expect(grants).toHaveLength(CONSENT_PURPOSES.length);
+      expect(
+        grants.every(
+          (grant) => grant.withdrawnAt?.getTime() === terminalAt.getTime(),
+        ),
+      ).toBe(true);
+      await expect(
+        findAcceptedContractForSupportee(db, {
+          supporterPersonId: inviter.personId,
+          supporteePersonId: learner.personId,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    },
+  );
+
+  it('preserves newer independent consent when a guardian-completed journey terminates', async () => {
+    const inviter = await identity('independent-consent-inviter', 1980);
+    const learner = await identity('independent-consent-learner', 2012);
+    const guardian = await identity('independent-consent-guardian', 1978);
+    const { issued } = await completeGuardianJourney(
+      inviter,
+      learner,
+      guardian,
+      false,
+    );
+    const journeyGrants = await db.query.consentGrant.findMany({
+      where: and(
+        eq(consentGrant.chargePersonId, learner.personId),
+        eq(consentGrant.organizationId, inviter.organizationId),
+      ),
+    });
+    expect(journeyGrants).toHaveLength(CONSENT_PURPOSES.length);
+    const source = journeyGrants[0];
+    if (!source) throw new Error('guardian fixture did not create consent');
+    const independentAt = new Date(AS_OF.getTime() + 1_000);
+    const [independent] = await db
+      .insert(consentGrant)
+      .values({
+        chargePersonId: source.chargePersonId,
+        organizationId: source.organizationId,
+        purpose: source.purpose,
+        lawfulBasis: source.lawfulBasis,
+        granted: true,
+        grantedAt: independentAt,
+        priorValue: true,
+        assuranceToken: `independent:${randomUUID()}`,
+        assuranceMethod: source.assuranceMethod,
+        snapshotAgeAtGrant: source.snapshotAgeAtGrant,
+        snapshotJurisdictionAtGrant: source.snapshotJurisdictionAtGrant,
+        auditFact: {
+          ...(source.auditFact as Record<string, unknown>),
+          source: 'independent_guardian_reconsent',
+          guardianPersonId: guardian.personId,
+        },
+      })
+      .returning();
+    if (!independent) throw new Error('independent consent was not inserted');
+
+    const declinedAt = new Date(AS_OF.getTime() + 2_000);
+    await declineFamilyJoinJourney(db, {
+      callerPersonId: learner.personId,
+      token: issued.token,
+      asOf: declinedAt,
+    });
+
+    const retiredJourneyGrants = await db.query.consentGrant.findMany({
+      where: inArray(
+        consentGrant.id,
+        journeyGrants.map((grant) => grant.id),
+      ),
+    });
+    expect(
+      retiredJourneyGrants.every(
+        (grant) => grant.withdrawnAt?.getTime() === declinedAt.getTime(),
+      ),
+    ).toBe(true);
+    await expect(
+      db.query.consentGrant.findFirst({
+        where: eq(consentGrant.id, independent.id),
+      }),
+    ).resolves.toMatchObject({ withdrawnAt: null });
   });
 
   it('binds an alternate verified guardian to the destination and keeps supporter acceptance pending', async () => {
@@ -853,6 +1025,54 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
             'family_join_destination_self_consent',
       ),
     ).toBe(true);
+  });
+
+  it('keeps a completed join resumable after the invitation expires', async () => {
+    const inviter = await identity('joined-retry-inviter', 1980);
+    const learner = await identity('joined-retry-learner', 2000);
+    const issued = await invite(
+      inviter.personId,
+      inviter.organizationId,
+      learner.email,
+    );
+    if (!issued.row.tokenExpiresAt) {
+      throw new Error('family invite fixture has no expiry');
+    }
+    const afterExpiry = new Date(issued.row.tokenExpiresAt.getTime() + 1);
+
+    await startOrResumeFamilyJoinJourney(db, {
+      callerPersonId: learner.personId,
+      token: issued.token,
+      familyMembershipDecision: 'accept',
+      destinationProcessingAssent: true,
+      supportershipDecision: 'accept',
+      asOf: AS_OF,
+    });
+    await expect(
+      finalizeFamilyJoinJourney(db, {
+        callerPersonId: learner.personId,
+        token: issued.token,
+        asOf: AS_OF,
+      }),
+    ).resolves.toMatchObject({ status: 'joined', alreadyMember: false });
+
+    await expect(
+      finalizeFamilyJoinJourney(db, {
+        callerPersonId: learner.personId,
+        token: issued.token,
+        asOf: afterExpiry,
+      }),
+    ).resolves.toMatchObject({ status: 'joined', alreadyMember: true });
+    await expect(
+      startOrResumeFamilyJoinJourney(db, {
+        callerPersonId: learner.personId,
+        token: issued.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'accept',
+        asOf: afterExpiry,
+      }),
+    ).resolves.toMatchObject({ status: 'joined', alreadyMember: true });
   });
 
   it('rolls back destination consent, visibility, and invite redemption when the membership move fails', async () => {

@@ -182,12 +182,6 @@ export async function startOrResumeFamilyJoinJourney(
     if (invite.status === 'withdrawn' || existing?.state === 'withdrawn') {
       return { status: 'withdrawn' };
     }
-    if (
-      !invite.tokenExpiresAt ||
-      invite.tokenExpiresAt.getTime() <= asOf.getTime()
-    ) {
-      return { status: 'expired' };
-    }
     if (invite.status === 'accepted' || existing?.state === 'joined') {
       if (invite.status !== 'accepted' || existing?.state !== 'joined') {
         throw new ConflictError(FAMILY_JOIN_UNAVAILABLE);
@@ -198,6 +192,20 @@ export async function startOrResumeFamilyJoinJourney(
         existing,
       );
       return joinedJourneyResult(existing, visibilityContract, true, null);
+    }
+    if (
+      !invite.tokenExpiresAt ||
+      invite.tokenExpiresAt.getTime() <= asOf.getTime()
+    ) {
+      if (existing && existing.state !== 'joined') {
+        await retireFamilyJoinArtifacts(
+          tx,
+          existing,
+          asOf,
+          'family_join_expired',
+        );
+      }
+      return { status: 'expired' };
     }
 
     await tx.execute(
@@ -220,7 +228,12 @@ export async function startOrResumeFamilyJoinJourney(
       existing?.guardianCompletedAt &&
       !preservesGuardianCompletion(existing, posture)
     ) {
-      await invalidateSupersededGuardianAuthority(tx, existing, asOf);
+      await invalidateJourneyAuthority(
+        tx,
+        existing,
+        asOf,
+        'family_join_posture_recomputed',
+      );
     }
     await syncDestinationConsentRequests(tx, {
       chargePersonId: input.callerPersonId,
@@ -545,13 +558,6 @@ export async function finalizeFamilyJoinJourney(
     if (invite.status === 'withdrawn' || journey.state === 'withdrawn') {
       return { status: 'withdrawn' } as const;
     }
-    if (
-      !invite.tokenExpiresAt ||
-      invite.tokenExpiresAt.getTime() <= asOf.getTime()
-    ) {
-      return { status: 'expired' } as const;
-    }
-
     if (invite.status === 'accepted' || journey.state === 'joined') {
       if (invite.status !== 'accepted' || journey.state !== 'joined') {
         throw new ConflictError(FAMILY_JOIN_UNAVAILABLE);
@@ -562,6 +568,20 @@ export async function finalizeFamilyJoinJourney(
         journey,
       );
       return joinedJourneyResult(journey, visibilityContract, true, null);
+    }
+    if (
+      !invite.tokenExpiresAt ||
+      invite.tokenExpiresAt.getTime() <= asOf.getTime()
+    ) {
+      if (journey.state !== 'joined') {
+        await retireFamilyJoinArtifacts(
+          tx,
+          journey,
+          asOf,
+          'family_join_expired',
+        );
+      }
+      return { status: 'expired' } as const;
     }
     if (invite.status !== 'bound' || journey.state !== 'ready_to_join') {
       throw new ConflictError(FAMILY_JOIN_UNAVAILABLE);
@@ -769,6 +789,12 @@ export async function declineFamilyJoinJourney(
       throw new ConflictError(FAMILY_JOIN_UNAVAILABLE);
     }
     if (existing) {
+      await retireFamilyJoinArtifacts(
+        tx,
+        existing,
+        asOf,
+        'family_join_declined',
+      );
       await tx
         .update(familyJoinJourney)
         .set({ state: 'declined', declinedAt: asOf, updatedAt: asOf })
@@ -825,6 +851,12 @@ export async function withdrawFamilyJoinJourney(
       throw new ConflictError(FAMILY_JOIN_UNAVAILABLE);
     }
     if (existing) {
+      await retireFamilyJoinArtifacts(
+        tx,
+        existing,
+        asOf,
+        'family_join_withdrawn',
+      );
       await tx
         .update(familyJoinJourney)
         .set({ state: 'withdrawn', withdrawnAt: asOf, updatedAt: asOf })
@@ -844,21 +876,22 @@ async function resolveInvitedCharge(
   callerPersonId: string,
   invitedEmail: string,
 ) {
-  const [loginRow, charge] = await Promise.all([
-    db.query.login.findFirst({
-      where: eq(login.personId, callerPersonId),
-    }),
-    db.query.person.findFirst({
-      where: eq(person.id, callerPersonId),
-      columns: {
-        id: true,
-        birthDate: true,
-        residenceJurisdiction: true,
-        residenceKnowing: true,
-        loginId: true,
-      },
-    }),
-  ]);
+  // This helper also runs on a node-postgres transaction client. Keep its
+  // reads sequential: concurrent client.query calls are deprecated in pg 8
+  // and rejected in pg 9.
+  const loginRow = await db.query.login.findFirst({
+    where: eq(login.personId, callerPersonId),
+  });
+  const charge = await db.query.person.findFirst({
+    where: eq(person.id, callerPersonId),
+    columns: {
+      id: true,
+      birthDate: true,
+      residenceJurisdiction: true,
+      residenceKnowing: true,
+      loginId: true,
+    },
+  });
   if (
     !loginRow ||
     !charge ||
@@ -975,26 +1008,56 @@ function preservesGuardianCompletion(
   );
 }
 
-async function invalidateSupersededGuardianAuthority(
+type JourneyAuthorityInvalidationReason =
+  | 'family_join_posture_recomputed'
+  | 'family_join_declined'
+  | 'family_join_withdrawn'
+  | 'family_join_expired';
+
+async function retireFamilyJoinArtifacts(
   db: Database,
   journey: FamilyJoinJourney,
   asOf: Date,
+  reason: Exclude<
+    JourneyAuthorityInvalidationReason,
+    'family_join_posture_recomputed'
+  >,
 ): Promise<void> {
-  const guardianGrantIds = (
-    await db.query.consentGrant.findMany({
-      where: and(
-        eq(consentGrant.chargePersonId, journey.chargePersonId),
-        eq(consentGrant.organizationId, journey.familyOrgId),
-        isNull(consentGrant.withdrawnAt),
+  await invalidateJourneyAuthority(db, journey, asOf, reason);
+  await clearDestinationConsentRequests(
+    db,
+    journey.chargePersonId,
+    journey.familyOrgId,
+  );
+}
+
+async function invalidateJourneyAuthority(
+  db: Database,
+  journey: FamilyJoinJourney,
+  asOf: Date,
+  reason: JourneyAuthorityInvalidationReason,
+): Promise<void> {
+  // Retire only the grants linked from this journey's destination request set.
+  // Guardian identity alone is too broad: the same guardian may have recorded
+  // a newer, independent re-consent after this journey completed its step.
+  const linkedRequests = journey.guardianPersonId
+    ? await db.query.consentRequest.findMany({
+        where: and(
+          eq(consentRequest.chargePersonId, journey.chargePersonId),
+          eq(consentRequest.organizationId, journey.familyOrgId),
+          eq(consentRequest.status, 'approved'),
+          eq(consentRequest.guardianPersonId, journey.guardianPersonId),
+        ),
+        columns: { consentGrantId: true },
+      })
+    : [];
+  const guardianGrantIds = [
+    ...new Set(
+      linkedRequests.flatMap((request) =>
+        request.consentGrantId ? [request.consentGrantId] : [],
       ),
-    })
-  )
-    .filter(
-      (grant) =>
-        auditRecord(grant.auditFact).guardianPersonId ===
-        journey.guardianPersonId,
-    )
-    .map((grant) => grant.id);
+    ),
+  ];
   if (guardianGrantIds.length > 0) {
     await db
       .update(consentGrant)
@@ -1042,7 +1105,7 @@ async function invalidateSupersededGuardianAuthority(
     actorPersonId: journey.chargePersonId,
     eventType: 'authority_invalidated',
     payload: {
-      reason: 'family_join_posture_recomputed',
+      reason,
       invalidatedAt: asOf.toISOString(),
       priorGuardianPersonId: journey.guardianPersonId,
       priorPolicyVersion: journey.policyVersion,

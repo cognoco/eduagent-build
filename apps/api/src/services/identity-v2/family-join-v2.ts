@@ -143,10 +143,10 @@ async function assertSelfDirectedFamilyJoiner(
   teenPersonId: string,
   journeyGuardianPersonId?: string | null,
 ): Promise<void> {
-  const [charges, guardians] = await Promise.all([
-    getChargePersonIds(db, teenPersonId),
-    getGuardianPersonIds(db, teenPersonId),
-  ]);
+  // This assertion runs inside the family-join transaction. node-postgres
+  // transaction clients support one statement at a time (pg 9 enforces it).
+  const charges = await getChargePersonIds(db, teenPersonId);
+  const guardians = await getGuardianPersonIds(db, teenPersonId);
   if (charges.length > 0) {
     throw new ForbiddenError(
       'Accepting account is a guardian and cannot join as a learner.',
