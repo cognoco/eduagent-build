@@ -565,6 +565,7 @@ export function ChatShell({
     } else {
       setPendingTranscript('');
       discardedRef.current = false; // BUG-359: allow effect to capture new transcript
+      ownCaptureRef.current = true; // WI-2551: this composer owns the capture
       // Stop TTS when user starts recording
       stopSpeaking();
       await startListening();
@@ -589,6 +590,14 @@ export function ChatShell({
   // re-record or new recording.
   const discardedRef = useRef(false);
 
+  // WI-2551 (PR #2861 P1): the native recognizer is a singleton, so this
+  // hook instance receives result events from EVERY capture — including one
+  // started by the parking-lot or drafted-note mic while this composer is
+  // mounted underneath. Only fold a transcript into the pending draft when
+  // ChatShell itself started the capture; the window closes when the engine
+  // settles so a later foreign capture cannot leak into a sendable message.
+  const ownCaptureRef = useRef(false);
+
   useEffect(() => {
     if (!pendingVoiceStartRef.current || !isVoiceEnabled) return;
     pendingVoiceStartRef.current = false;
@@ -598,10 +607,16 @@ export function ChatShell({
   // Sync transcript from STT hook to pending transcript when recording stops
   useEffect(() => {
     if (discardedRef.current) return;
+    if (!ownCaptureRef.current) return;
     if (!isListening && transcript.trim()) {
       setPendingTranscript(transcript);
+      // The engine has fully settled: this capture is consumed. Close the
+      // acceptance window so a foreign capture's transcript cannot land here.
+      if (speechStatus === 'idle' || speechStatus === 'error') {
+        ownCaptureRef.current = false;
+      }
     }
-  }, [isListening, transcript]);
+  }, [isListening, transcript, speechStatus]);
 
   // Surface STT errors — previously swallowed silently.
   // BUG-141: Classify-before-format. Use the OS permission-status enum from

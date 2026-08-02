@@ -549,18 +549,53 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
 
   describe('transcript preview', () => {
-    it('shows transcript preview when transcript is available and not listening', () => {
-      mockSttState = {
-        ...mockSttState,
-        isListening: false,
-        transcript: 'Photosynthesis is the process...',
-      };
-      renderChatShell({ verificationType: 'teach_back' });
+    // WI-2551 (PR #2861 P1): ChatShell only folds transcripts from captures
+    // it started itself — a preset foreign transcript no longer previews. All
+    // preview tests therefore begin a real owned capture via the record
+    // button before the transcript arrives.
+    async function captureOwnTranscript(
+      rerender: (ui: React.ReactElement) => void,
+      props: React.ComponentProps<typeof ChatShell>,
+      transcript: string,
+    ): Promise<void> {
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('voice-record-button'));
+      });
+      mockSttState = { ...mockSttState, isListening: false, transcript };
+      rerender(<ChatShell {...props} />);
+    }
+
+    it('shows transcript preview when transcript is available and not listening', async () => {
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+      await captureOwnTranscript(
+        rerender,
+        props,
+        'Photosynthesis is the process...',
+      );
 
       screen.getByDisplayValue('Photosynthesis is the process...');
       screen.getByTestId('voice-send-button');
       screen.getByTestId('voice-discard-button');
       screen.getByTestId('voice-rerecord-button');
+    });
+
+    it('does not preview a transcript from a capture this composer never started (foreign capture isolation)', () => {
+      // A parking-lot or drafted-note mic shares the singleton recognizer;
+      // its results reach this hook instance too. Without an own capture the
+      // transcript must never become a sendable draft.
+      mockSttState = {
+        ...mockSttState,
+        isListening: false,
+        transcript: 'Dictated into the parking lot',
+      };
+      renderChatShell({ verificationType: 'teach_back' });
+
+      expect(screen.queryByTestId('voice-send-button')).toBeNull();
+      expect(
+        screen.queryByDisplayValue('Dictated into the parking lot'),
+      ).toBeNull();
     });
 
     it('does NOT show transcript preview when listening', () => {
@@ -574,14 +609,13 @@ describe('ChatShell', () => {
       expect(screen.queryByTestId('voice-send-button')).toBeNull();
     });
 
-    it('submits transcript as message on Send press', () => {
+    it('submits transcript as message on Send press', async () => {
       const onSend = jest.fn();
-      mockSttState = {
-        ...mockSttState,
-        isListening: false,
-        transcript: 'My explanation',
-      };
-      renderChatShell({ verificationType: 'teach_back', onSend });
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+        onSend,
+      });
+      await captureOwnTranscript(rerender, props, 'My explanation');
 
       fireEvent.press(screen.getByTestId('voice-send-button'));
 
@@ -589,13 +623,11 @@ describe('ChatShell', () => {
       expect(mockClearTranscript).toHaveBeenCalled();
     });
 
-    it('clears transcript on Discard press', () => {
-      mockSttState = {
-        ...mockSttState,
-        isListening: false,
-        transcript: 'Discard me',
-      };
-      renderChatShell({ verificationType: 'teach_back' });
+    it('clears transcript on Discard press', async () => {
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+      await captureOwnTranscript(rerender, props, 'Discard me');
 
       fireEvent.press(screen.getByTestId('voice-discard-button'));
 
@@ -604,7 +636,7 @@ describe('ChatShell', () => {
 
     // 4B.11: STT-to-transcript race condition — stopListening() resolves before
     // expo-speech-recognition has populated the transcript in state.
-    it('captures transcript that arrives after stopListening resolves (STT race)', () => {
+    it('captures transcript that arrives after stopListening resolves (STT race)', async () => {
       // Phase 1: Recording just stopped, but transcript is still empty (race window)
       mockSttState = {
         ...mockSttState,
@@ -613,6 +645,10 @@ describe('ChatShell', () => {
       };
       const { rerender, props } = renderChatShell({
         verificationType: 'teach_back',
+      });
+      // The composer started (and stopped) this capture itself.
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('voice-record-button'));
       });
 
       // No preview should appear — transcript is empty even though we stopped
@@ -631,16 +667,11 @@ describe('ChatShell', () => {
       screen.getByTestId('voice-send-button');
     });
 
-    it('does not re-populate preview with late STT after discard', () => {
-      // Start with a transcript available
-      mockSttState = {
-        ...mockSttState,
-        isListening: false,
-        transcript: 'First attempt',
-      };
+    it('does not re-populate preview with late STT after discard', async () => {
       const { rerender, props } = renderChatShell({
         verificationType: 'teach_back',
       });
+      await captureOwnTranscript(rerender, props, 'First attempt');
 
       // Preview shows the transcript
       screen.getByDisplayValue('First attempt');
@@ -662,15 +693,10 @@ describe('ChatShell', () => {
     });
 
     it('allows transcript capture after discard + new mic press', async () => {
-      // Start with discarded state
-      mockSttState = {
-        ...mockSttState,
-        isListening: false,
-        transcript: 'Old attempt',
-      };
       const { rerender, props } = renderChatShell({
         verificationType: 'teach_back',
       });
+      await captureOwnTranscript(rerender, props, 'Old attempt');
 
       // Discard the transcript
       fireEvent.press(screen.getByTestId('voice-discard-button'));
@@ -698,12 +724,10 @@ describe('ChatShell', () => {
     });
 
     it('clears and restarts listening on Re-record press', async () => {
-      mockSttState = {
-        ...mockSttState,
-        isListening: false,
-        transcript: 'Re-record me',
-      };
-      renderChatShell({ verificationType: 'teach_back' });
+      const { rerender, props } = renderChatShell({
+        verificationType: 'teach_back',
+      });
+      await captureOwnTranscript(rerender, props, 'Re-record me');
 
       await act(async () => {
         fireEvent.press(screen.getByTestId('voice-rerecord-button'));
