@@ -23,6 +23,11 @@ const LOOPBACK_ONLY_REPAIR_PATH = resolve(
 const LOCAL_JEST_CONFIG = 'apps/api/jest.integration.config.cjs';
 const REMOTE_JEST_CONFIG = 'apps/api/jest.integration.remote.config.cjs';
 const CROSS_PACKAGE_JEST_CONFIG = 'tests/integration/jest.config.cjs';
+const SCHEMA_VERIFY_SCRIPT = join(
+  REPO_ROOT,
+  'scripts',
+  'verify-api-integration-schema.mjs',
+);
 
 function refuse(reason) {
   throw new Error(`API integration launch refused before Jest: ${reason}`);
@@ -195,6 +200,21 @@ function assertDatabaseContract() {
   return { isLocal: false };
 }
 
+function assertRemoteSchemaCompatible() {
+  const result = spawnSync(process.execPath, [SCHEMA_VERIFY_SCRIPT], {
+    cwd: REPO_ROOT,
+    env: process.env,
+    encoding: 'utf8',
+  });
+  if (result.error) {
+    refuse('schema compatibility verification could not start.');
+  }
+  if (result.status !== 0) {
+    const reason = result.stderr.trim();
+    refuse(reason || 'schema compatibility verification failed.');
+  }
+}
+
 function main() {
   const [mode, ...forwardedArgs] = process.argv.slice(2);
 
@@ -202,7 +222,8 @@ function main() {
     if (forwardedArgs.length) {
       refuse('--check-only does not accept arguments.');
     }
-    assertDatabaseContract();
+    const { isLocal } = assertDatabaseContract();
+    if (!isLocal) assertRemoteSchemaCompatible();
     return 0;
   }
 
@@ -218,6 +239,7 @@ function main() {
     ) {
       refuse('the curriculum dedup repair suite is loopback-only.');
     }
+    if (!isLocal) assertRemoteSchemaCompatible();
     const launch = assertPinnedPnpm();
     const jestConfig = isLocal ? LOCAL_JEST_CONFIG : REMOTE_JEST_CONFIG;
     return run(launch.binary, [
@@ -236,7 +258,8 @@ function main() {
       refuse('--nx does not accept arguments; use --jest for targeted runs.');
     }
     // Defense in depth: --jest repeats both checks after Nx re-invokes this script.
-    assertDatabaseContract();
+    const { isLocal } = assertDatabaseContract();
+    if (!isLocal) assertRemoteSchemaCompatible();
     const launch = assertPinnedPnpm();
     return run(launch.binary, [
       ...launch.args,
@@ -248,7 +271,8 @@ function main() {
   }
 
   if (mode === '--cross-package') {
-    assertDatabaseContract();
+    const { isLocal } = assertDatabaseContract();
+    if (!isLocal) assertRemoteSchemaCompatible();
     const launch = assertPinnedPnpm();
     return run(launch.binary, [
       ...launch.args,

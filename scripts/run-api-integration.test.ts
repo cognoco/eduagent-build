@@ -70,6 +70,7 @@ describe('run-api-integration.mjs', () => {
   let pnpmMarker: string;
   let pnpmLaunchMarker: string;
   let dopplerMarker: string;
+  let schemaVerifyMarker: string;
 
   beforeEach(() => {
     binDir = mkdtempSync(join(tmpdir(), 'api-integration-bin-'));
@@ -77,6 +78,7 @@ describe('run-api-integration.mjs', () => {
     pnpmMarker = join(binDir, 'pnpm.log');
     pnpmLaunchMarker = join(binDir, 'pnpm-launch.log');
     dopplerMarker = join(binDir, 'doppler.log');
+    schemaVerifyMarker = join(binDir, 'schema-verify.log');
 
     writeExecutable(
       binDir,
@@ -126,6 +128,8 @@ describe('run-api-integration.mjs', () => {
       FAKE_PNPM_LAUNCH_MARKER: pnpmLaunchMarker,
       FAKE_COREPACK_MARKER: corepackMarker,
       DOPPLER_RUN_FAKE_EXEC_CHILD: '1',
+      FAKE_SCHEMA_VERIFY_RESULT: 'compatible',
+      FAKE_SCHEMA_VERIFY_MARKER: schemaVerifyMarker,
       NODE_OPTIONS: [
         process.env.NODE_OPTIONS,
         `--require=${FAKE_DOPPLER_PRELOAD}`,
@@ -208,7 +212,25 @@ describe('run-api-integration.mjs', () => {
     expect(readPnpmCommands(pnpmLaunchMarker)).toContain(
       'exec jest --config tests/integration/jest.config.cjs --no-coverage --runInBand',
     );
+    expect(readMarker(schemaVerifyMarker)).toContain('compatible');
   });
+
+  test.each(['stale-marker', 'unmarked-nonempty', 'unauthorized'])(
+    'remote schema state %s refuses before Jest or Nx dispatch',
+    (schemaState) => {
+      const result = run(['--nx'], {
+        ...dedicatedDatabase,
+        FAKE_SCHEMA_VERIFY_RESULT: schemaState,
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/schema drift.*refused before Jest/i);
+      expect(result.stderr).toMatch(/operator authorization/i);
+      expect(readPnpmCommands(pnpmLaunchMarker)).not.toMatch(
+        /exec (?:jest|nx)/,
+      );
+    },
+  );
 
   test.each([
     {
@@ -446,6 +468,18 @@ describe('run-api-integration.mjs', () => {
       'exec jest --config apps/api/jest.integration.remote.config.cjs --forceExit',
     );
     expect(readMarker(pnpmMarker)).toBe('');
+    expect(readMarker(schemaVerifyMarker)).toContain('compatible');
+  });
+
+  test('local integration target does not require the remote marker preflight', () => {
+    const result = run(['--jest'], {
+      ...localDatabase,
+      FAKE_SCHEMA_VERIFY_RESULT: 'stale-marker',
+    });
+
+    expect(result.status).toBe(0);
+    expect(readMarker(schemaVerifyMarker)).toBe('');
+    expect(readPnpmCommands(pnpmLaunchMarker)).toContain('exec jest');
   });
 
   test.each([

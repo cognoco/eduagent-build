@@ -39,7 +39,7 @@
     "db:check:dev-schema": "node scripts/doppler-run.mjs run -c dev -- node packages/database/scripts/check-development-schema.mjs",
     "db:reconcile:dev-schema": "node scripts/doppler-run.mjs run -c dev -- node packages/database/scripts/reconcile-development-schema.mjs --target=dev",
     "db:reconcile:dev-integration-schema": "node scripts/doppler-run.mjs run -c dev_integration -- node packages/database/scripts/reconcile-development-schema.mjs --target=dev_integration",
-    "db:bootstrap:api-integration": "node scripts/doppler-run.mjs run --project mentomate --config dev_integration -- node scripts/bootstrap-api-integration-schema.mjs",
+    "db:bootstrap:api-integration": "node scripts/run-api-integration-schema-bootstrap.mjs",
     "db:check-identity-fks": "node packages/database/scripts/check-identity-fk-drift.mjs",
     "db:check:rls-test-role": "node packages/database/scripts/setup-rls-isolation-test-role.mjs",
     "db:setup:rls-test-role:local": "node packages/database/scripts/setup-rls-isolation-test-role.mjs --apply-local",
