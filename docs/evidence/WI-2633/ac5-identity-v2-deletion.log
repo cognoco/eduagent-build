@@ -1,0 +1,2230 @@
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:api:integration /home/vetinari/nexus/_dev/eduagent-build
+> node scripts/run-api-integration.mjs --jest --testPathPatterns 'identity-v2/.*integration|account-deletion.*integration|deletion.*integration'
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+apps/api                                 |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+apps/mobile                              |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/database                        |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/retention                       |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/schemas                         |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/test-utils                      |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/consent-v2.integration.test.ts (80.231 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:32.680Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:204:7)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:33.406Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at apps/api/src/services/identity-v2/consent-v2.integration.test.ts:237:11
+      at NeonSession.transaction (node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:270:19)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:235:7)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:34.337Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:268:7)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:35.440Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:316:7)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:36.606Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedPendingDenyForPayer (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:399:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:414:43)
+
+    console.log
+      {"timestamp":"2026-08-02T10:56:36.957Z","level":"info","message":"billing.store_teardown.stripe.cancelled","context":{"stripeSubscriptionId":"sub_019fc21e-5759-7475-960e-159758d2babc"}}
+
+      at log (apps/api/src/services/logger.ts:84:17)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:37.867Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedPendingDenyForPayer (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:399:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:463:36)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:39.007Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:497:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:40.204Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedPendingDenyForPayer (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:399:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:528:36)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:47.341Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:789:36)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:48.777Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:806:36)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:50.024Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:831:36)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:51.993Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:861:50)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:52.707Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:871:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:54.189Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:892:13)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:55.401Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:904:38)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:56:58.086Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at seedApprovedNoEdge (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:773:9)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:974:38)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:13.497Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1454:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:13.641Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at resendConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:1019:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1466:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:13.782Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at resendConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:1019:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1466:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:13.924Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at resendConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:1019:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1466:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:14.685Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1498:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:14.884Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1512:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:15.084Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1512:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:15.283Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1512:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:16.748Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1601:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:19.938Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1740:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:21.683Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1781:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:21.911Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1802:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:22.109Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1802:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:22.308Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1802:11)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:23.097Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1827:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:23.297Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1838:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:23.468Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at resendConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:1019:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:1855:9)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:57:35.559Z","level":"warn","message":"[email] RESEND_API_KEY not configured — skipping email send"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at sendEmail (apps/api/src/services/notifications/email.ts:121:12)
+      at requestConsentV2 (apps/api/src/services/identity-v2/consent-v2.ts:920:38)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/consent-v2.integration.test.ts:2508:9)
+
+FAIL @eduagent/api:integration apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts (65.563 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:58:12.540Z","level":"warn","message":"[llm] No LLM API keys set — skipping provider registration (test environment)"}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at apps/api/src/middleware/llm.ts:149:16
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:23)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:46
+      at apps/api/src/middleware/metering.ts:547:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:23)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:46
+      at apps/api/src/middleware/consent.ts:147:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:23)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:46
+      at apps/api/src/middleware/profile-scope.ts:261:11
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:806:26)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc21f-d010-73a6-bf7c-3260a50d773c,caccea19b678389d4a3e44b8a57ebc31c6a43f5f069fa9155a2ca3fd3b91b6de,a223e65f8deeb81baa6c080da70e1abbb3c85f2d7f11ec4a6e9773b24763adfc,019fc21f-ca72-7320-999f-f177338e1af9,019fc21f-cc03-7a57-a9d1-7ebc09566dfd,019fc21f-cbe6-7b1b-8bca-313104dd8537,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:12.561Z,2026-08-02T10:58:12.561Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:806:26) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc21f-d010-73a6-bf7c-3260a50d773c',
+          'caccea19b678389d4a3e44b8a57ebc31c6a43f5f069fa9155a2ca3fd3b91b6de',
+          'a223e65f8deeb81baa6c080da70e1abbb3c85f2d7f11ec4a6e9773b24763adfc',
+          '019fc21f-ca72-7320-999f-f177338e1af9',
+          '019fc21f-cc03-7a57-a9d1-7ebc09566dfd',
+          '019fc21f-cbe6-7b1b-8bca-313104dd8537',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:12.561Z',
+          '2026-08-02T10:58:12.561Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:806:26) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:806:26)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:12.712Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":617}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:806:26)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc21f-d5ec-7b39-914d-840677944050,3c61ab226f61bc7dcc3820f14271fca86a1803ebf7cac905941290c82fd6ac33,354bd465b656bd3d8f1e5b9bd00036f9dd3b4e408684f1ba3de01c6deda7e12d,019fc21f-d0c4-71f6-8e8d-daead81c281e,019fc21f-d25b-759a-81ad-42c24275160b,019fc21f-d240-7ebc-bee6-11912c6fa09b,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:14.062Z,2026-08-02T10:58:14.062Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:927:21) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc21f-d5ec-7b39-914d-840677944050',
+          '3c61ab226f61bc7dcc3820f14271fca86a1803ebf7cac905941290c82fd6ac33',
+          '354bd465b656bd3d8f1e5b9bd00036f9dd3b4e408684f1ba3de01c6deda7e12d',
+          '019fc21f-d0c4-71f6-8e8d-daead81c281e',
+          '019fc21f-d25b-759a-81ad-42c24275160b',
+          '019fc21f-d240-7ebc-bee6-11912c6fa09b',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:14.062Z',
+          '2026-08-02T10:58:14.062Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:927:21) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:927:21)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:14.158Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":530}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:927:21)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc21f-d7f6-7031-b72f-a2e67db76a88,3c61ab226f61bc7dcc3820f14271fca86a1803ebf7cac905941290c82fd6ac33,354bd465b656bd3d8f1e5b9bd00036f9dd3b4e408684f1ba3de01c6deda7e12d,019fc21f-d0c4-71f6-8e8d-daead81c281e,019fc21f-d25b-759a-81ad-42c24275160b,019fc21f-d240-7ebc-bee6-11912c6fa09b,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:14.586Z,2026-08-02T10:58:14.586Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:932:22) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc21f-d7f6-7031-b72f-a2e67db76a88',
+          '3c61ab226f61bc7dcc3820f14271fca86a1803ebf7cac905941290c82fd6ac33',
+          '354bd465b656bd3d8f1e5b9bd00036f9dd3b4e408684f1ba3de01c6deda7e12d',
+          '019fc21f-d0c4-71f6-8e8d-daead81c281e',
+          '019fc21f-d25b-759a-81ad-42c24275160b',
+          '019fc21f-d240-7ebc-bee6-11912c6fa09b',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:14.586Z',
+          '2026-08-02T10:58:14.586Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:932:22) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:932:22)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:14.680Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":521}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:932:22)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc21f-e43f-7165-904a-fa6b6e79d280,c5d5d91c81d0267208410b7d826d9a9a1b952cea4373a894ad23f83841e40e7c,d1c22576c3cde6be33012233ac2aa3ce9e3f99faede61569ee7ae4d9e5df7614,019fc21f-dd53-7638-8f06-01439940e765,019fc21f-deda-7d72-a434-5743cfb79102,019fc21f-debf-7756-81ff-98407565d34b,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:17.730Z,2026-08-02T10:58:17.730Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1027:21) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc21f-e43f-7165-904a-fa6b6e79d280',
+          'c5d5d91c81d0267208410b7d826d9a9a1b952cea4373a894ad23f83841e40e7c',
+          'd1c22576c3cde6be33012233ac2aa3ce9e3f99faede61569ee7ae4d9e5df7614',
+          '019fc21f-dd53-7638-8f06-01439940e765',
+          '019fc21f-deda-7d72-a434-5743cfb79102',
+          '019fc21f-debf-7756-81ff-98407565d34b',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:17.730Z',
+          '2026-08-02T10:58:17.730Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1027:21) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1027:21)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:17.824Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":512}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1027:21)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc21f-e647-7529-a02e-7c1e9b14017b,c5d5d91c81d0267208410b7d826d9a9a1b952cea4373a894ad23f83841e40e7c,35d66145f1e6b255fb91859281beef5345ef0f07068dccc6fd7760ac3f91be52,019fc21f-dd53-7638-8f06-01439940e765,019fc21f-e0c6-79b8-a47d-94f35cbb36b9,019fc21f-e0ab-7753-becb-6166c3330e82,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:18.251Z,2026-08-02T10:58:18.251Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1039:23) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc21f-e647-7529-a02e-7c1e9b14017b',
+          'c5d5d91c81d0267208410b7d826d9a9a1b952cea4373a894ad23f83841e40e7c',
+          '35d66145f1e6b255fb91859281beef5345ef0f07068dccc6fd7760ac3f91be52',
+          '019fc21f-dd53-7638-8f06-01439940e765',
+          '019fc21f-e0c6-79b8-a47d-94f35cbb36b9',
+          '019fc21f-e0ab-7753-becb-6166c3330e82',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:18.251Z',
+          '2026-08-02T10:58:18.251Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1039:23) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1039:23)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:18.343Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":518}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1039:23)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: select "id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at" from "guardian_authority_redemptions" where "guardian_authority_redemptions"."id" = $1 limit $2
+      params: 5e8a6054-fbf0-4e5d-b47b-16b84e38d975,1
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 32 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1221:24) {
+        query: 'select "id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at" from "guardian_authority_redemptions" where "guardian_authority_redemptions"."id" = $1 limit $2',
+        params: [ '5e8a6054-fbf0-4e5d-b47b-16b84e38d975', 1 ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at verifyDurableGuardianAuthorityToken (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:156:24)
+            at attachGuardianConsentFromDurableAuthorityToken (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:434:21)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:316:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1221:24) {
+          length: 130,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '387',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1221:24)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:50.892Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment","status":500,"latencyMs":463}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1221:24)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc220-6c90-7d76-92a5-d577501f7c63,4216de2defcee0c5a41199cd956ff60b16caf2f1b10ad1185bce52b83d8ec6f2,46d60363e8b9a2f3eac6fc2eba7f117f5b9f636eaf29fe7596ca841b710c0c94,019fc220-65e7-7df8-a2a7-3475931739ae,019fc220-676f-71b5-a642-a85ac7474dda,019fc220-6753-775a-981b-f2a7ce751cf9,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:52.627Z,2026-08-02T10:58:52.627Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1274:26) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc220-6c90-7d76-92a5-d577501f7c63',
+          '4216de2defcee0c5a41199cd956ff60b16caf2f1b10ad1185bce52b83d8ec6f2',
+          '46d60363e8b9a2f3eac6fc2eba7f117f5b9f636eaf29fe7596ca841b710c0c94',
+          '019fc220-65e7-7df8-a2a7-3475931739ae',
+          '019fc220-676f-71b5-a642-a85ac7474dda',
+          '019fc220-6753-775a-981b-f2a7ce751cf9',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:52.627Z',
+          '2026-08-02T10:58:52.627Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1274:26) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1274:26)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:52.719Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":520}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1274:26)
+
+    console.error
+      [unhandled] DrizzleQueryError: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+      params: 019fc220-7226-7552-b9ca-e2f63d9f3692,8c1225d7402761df60b29656a32d5b5e988c617293fd06bc4757418be7eb0c6d,a1e66d1e359044ec658f58f874779f35b1030fccc5a43a18785ab6b0491a5770,019fc220-6d0d-7e7e-a131-99cffb4a8f37,019fc220-6e97-731e-9a86-9121f4cd7268,019fc220-6e7a-7db3-b2d3-12580ece0fe2,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-08-02T10:58:54.056Z,2026-08-02T10:58:54.056Z
+          at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+          at processTicksAndRejections (node:internal/process/task_queues:104:5)
+          at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+          ... 31 lines matching cause stack trace ...
+          at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1335:24) {
+        query: 'insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"',
+        params: [
+          '019fc220-7226-7552-b9ca-e2f63d9f3692',
+          '8c1225d7402761df60b29656a32d5b5e988c617293fd06bc4757418be7eb0c6d',
+          'a1e66d1e359044ec658f58f874779f35b1030fccc5a43a18785ab6b0491a5770',
+          '019fc220-6d0d-7e7e-a131-99cffb4a8f37',
+          '019fc220-6e97-731e-9a86-9121f4cd7268',
+          '019fc220-6e7a-7db3-b2d3-12580ece0fe2',
+          'XG',
+          'XG-WI-2533-v1',
+          'guardian',
+          'ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33',
+          '2026-08-02T10:58:54.056Z',
+          '2026-08-02T10:58:54.056Z'
+        ],
+        cause: error: relation "guardian_authority_redemptions" does not exist
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+            at processTicksAndRejections (node:internal/process/task_queues:104:5)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+            at NeonPreparedQuery.queryWithCache (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+            at NeonPreparedQuery.execute (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+            at initiateGuardianAuthorityVerification (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/routes/consent.ts:258:24
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/llm.ts:167:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/metering.ts:547:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/consent.ts:147:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/profile-scope.ts:261:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/database.ts:107:7
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            ... collapsed 3 duplicate lines matching above 1 lines 3 times...
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/env-validation.ts:148:5
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/middleware/request-logger.ts:15:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at secureHeaders2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at cors2 (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/apps/api/src/index.ts:461:3
+            at dispatch (/home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+            at /home/vetinari/nexus/_dev/eduagent-build/node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+            at Object.<anonymous> (/home/vetinari/nexus/_dev/eduagent-build/apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1335:24) {
+          length: 129,
+          severity: 'ERROR',
+          code: '42P01',
+          detail: undefined,
+          hint: undefined,
+          position: '13',
+          internalPosition: undefined,
+          internalQuery: undefined,
+          where: undefined,
+          schema: undefined,
+          table: undefined,
+          column: undefined,
+          dataType: undefined,
+          constraint: undefined,
+          file: 'parse_relation.c',
+          line: '1449',
+          routine: 'parserOpenTable'
+        }
+      }
+
+      658 |   // Only log to console in non-production (avoid leaking stack traces / internal paths)
+      659 |   if (c.env.ENVIRONMENT !== 'production') {
+    > 660 |     console.error('[unhandled]', err);
+          |             ^
+      661 |   }
+      662 |
+      663 |   return c.json(
+
+      at apps/api/src/index.ts:660:13
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:47:25)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/validator/validator.js:102:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/llm.ts:167:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/metering.ts:547:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/consent.ts:147:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/profile-scope.ts:261:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/database.ts:107:7
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/env-validation.ts:148:5
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/middleware/request-logger.ts:15:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1335:24)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:54.149Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":500,"latencyMs":521}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1335:24)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:55.479Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment/initiate","status":503,"latencyMs":421}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1376:26)
+
+    console.error
+      {"timestamp":"2026-08-02T10:58:55.899Z","level":"error","message":"Request failed","context":{"method":"POST","path":"/v1/consent/guardian-attachment","status":503,"latencyMs":418}}
+
+      76 |     switch (level) {
+      77 |       case 'error':
+    > 78 |         console.error(output);
+         |                 ^
+      79 |         break;
+      80 |       case 'warn':
+      81 |         console.warn(output);
+
+      at log (apps/api/src/services/logger.ts:78:17)
+      at Object.error (apps/api/src/services/logger.ts:103:26)
+      at apps/api/src/middleware/request-logger.ts:40:12
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at secureHeaders2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/secure-headers/secure-headers.js:101:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at cors2 (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/middleware/cors/index.js:97:5)
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at apps/api/src/index.ts:461:3
+      at dispatch (node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/compose.js:43:17)
+      at node_modules/.pnpm/hono@4.12.27/node_modules/hono/dist/cjs/hono-base.js:327:25
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1391:26)
+
+  ● credentialed learner guardian attachment (integration) › requires present, non-future learner assent for joint-child-guardian policy
+
+    expect(received).rejects.toBeInstanceOf(expected)
+
+    Expected constructor: GuardianAttachmentRejectedError
+    Received constructor: DrizzleQueryError
+
+      650 |             fetchImpl: verifierResponse(null),
+      651 |           }),
+    > 652 |         ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+          |                   ^
+      653 |         await expect(
+      654 |           initiateGuardianAuthorityVerification(db, {
+      655 |             callerPersonId: adult.personId,
+
+      at Object.toBeInstanceOf (node_modules/.pnpm/expect@30.2.0/node_modules/expect/build/index.js:2155:20)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:652:19)
+
+  ● credentialed learner guardian attachment (integration) › executes the authenticated verifier-mint-redemption HTTP path and invalidates the email token
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 500
+
+      816 |         env,
+      817 |       );
+    > 818 |       expect(initiation.status).toBe(200);
+          |                                 ^
+      819 |       const initiationBody = (await initiation.json()) as {
+      820 |         authorityToken: string;
+      821 |       };
+
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:818:33)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] recovers the original authority after response loss without redeeming the handle twice
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 500
+
+      936 |       );
+      937 |
+    > 938 |       expect(first.status).toBe(200);
+          |                            ^
+      939 |       expect(second.status).toBe(200);
+      940 |       await expect(second.json()).resolves.toEqual(await first.json());
+      941 |       expect(verifierRequestCount - callsBefore).toBe(1);
+
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:938:28)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] releases a transient verifier reservation so the same ceremony can retry
+
+    expect(received).resolves.toEqual()
+
+    Received promise rejected instead of resolved
+    Rejected to value: [Error: Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+    params: 019fc21f-dce0-7eff-b34b-195c9954356f,3a790361f3945e4a4eb4310c6af2beb60587d191964666933f446122e478aa06,d37ca7b56bb9988aa791614d0234efd389eb927dceca3f24cd4ad6643327a989,019fc21f-d875-71f2-bcd3-38f26d4cfd55,019fc21f-d9fe-71e8-a893-a748dda00c4c,019fc21f-d9e3-75ac-84d7-99e7884d708b,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-07-30T12:00:00.000Z,2026-07-30T12:00:00.000Z]
+
+      993 |         initiateGuardianAuthorityVerification(db, input),
+      994 |       ).rejects.toThrow();
+    > 995 |       await expect(
+          |             ^
+      996 |         initiateGuardianAuthorityVerification(db, input),
+      997 |       ).resolves.toEqual({ authorityToken: expect.any(String) });
+      998 |       expect(attempts).toBe(2);
+
+      at expect (node_modules/.pnpm/expect@30.2.0/node_modules/expect/build/index.js:2116:15)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:995:13)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] rejects a verifier handle replayed against a different learner tuple
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 500
+
+      1050 |       );
+      1051 |
+    > 1052 |       expect(first.status).toBe(200);
+           |                            ^
+      1053 |       expect(mutated.status).toBe(403);
+      1054 |       expect(verifierRequestCount - callsBefore).toBe(1);
+      1055 |     });
+
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1052:28)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] lets only one database connection redeem a concurrent duplicate handle
+
+    thrown: "Exceeded timeout of 30000 ms for a test.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+      1055 |     });
+      1056 |
+    > 1057 |     it('[WI-2986] lets only one database connection redeem a concurrent duplicate handle', async () => {
+           |     ^
+      1058 |       const adult = await seedIdentity('adult-verifier-contention', 40);
+      1059 |       const learner = await seedIdentity('learner-verifier-contention', 14);
+      1060 |       const secondConnection = createDatabase(process.env.DATABASE_URL!);
+
+      at apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1057:5
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:142:33)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] lets only one database connection redeem a concurrent duplicate handle
+
+    Failed query: insert into "guardian_authority_redemptions" ("id", "verifier_handle_digest", "command_binding_digest", "status", "guardian_person_id", "charge_person_id", "organization_id", "jurisdiction", "policy_version", "authorization_form", "purpose_set_digest", "assurance_method", "evidence_id", "qualification", "learner_assent_at", "issued_at", "not_before", "expires_at", "authority_token_digest", "created_at", "updated_at") values ($1, $2, $3, default, $4, $5, $6, $7, $8, $9, $10, default, default, default, default, default, default, default, default, $11, $12) on conflict ("verifier_handle_digest") do nothing returning "id"
+    params: 019fc21f-ea7a-7c03-bc3f-d7dd243bc0cd,95910b293bae5429b304f469048811e887b25eff9ec12d9019eb884dc970c863,03693ad444cbaa213c0a4df143f3977c843f7d371d7582efe5382fbdd7644246,019fc21f-e6c1-73df-ba76-08141c375129,019fc21f-e83f-7bb5-8ab6-c1606d5e2834,019fc21f-e824-7804-b379-6e1fb646280c,XG,XG-WI-2533-v1,guardian,ac7e7a95efb2e42be66b69d138498df723b955fba946d0ae01a451940aea8b33,2026-07-30T12:00:00.000Z,2026-07-30T12:00:00.000Z
+
+      222 |   );
+      223 |
+    > 224 |   const [reservation] = await db
+          |                         ^
+      225 |     .insert(guardianAuthorityRedemptions)
+      226 |     .values({
+      227 |       verifierHandleDigest: handleDigest,
+
+      at NeonPreparedQuery.queryWithCache (node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:73:11)
+      at NeonPreparedQuery.execute (node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+      at initiateGuardianAuthorityVerification (apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+
+    Cause:
+    error: relation "guardian_authority_redemptions" does not exist
+
+      222 |   );
+      223 |
+    > 224 |   const [reservation] = await db
+          |                         ^
+      225 |     .insert(guardianAuthorityRedemptions)
+      226 |     .values({
+      227 |       verifierHandleDigest: handleDigest,
+
+      at node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.js:1345:74
+      at node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:153:11
+      at NeonPreparedQuery.queryWithCache (node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/pg-core/session.ts:71:12)
+      at NeonPreparedQuery.execute (node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:152:18)
+      at initiateGuardianAuthorityVerification (apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:224:25)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] returns no authority when persistence disappears after provider success
+
+    expect(received).rejects.toBeInstanceOf(expected)
+
+    Expected constructor: GuardianAttachmentRejectedError
+    Received constructor: DrizzleQueryError
+
+      1183 |           },
+      1184 |         }),
+    > 1185 |       ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+           |                 ^
+      1186 |       expect(providerApproved).toBe(true);
+      1187 |       await expect(
+      1188 |         db
+
+      at Object.toBeInstanceOf (node_modules/.pnpm/expect@30.2.0/node_modules/expect/build/index.js:2155:20)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1185:17)
+
+  ● credentialed learner guardian attachment (integration) › [WI-2986] rejects a correctly signed token without its durable redemption receipt
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 403
+    Received: 500
+
+      1241 |       );
+      1242 |
+    > 1243 |       expect(response.status).toBe(403);
+           |                               ^
+      1244 |       await expect(
+      1245 |         db.query.guardianship.findMany({
+      1246 |           where: eq(guardianship.chargePersonId, learner.personId),
+
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1243:31)
+
+  ● credentialed learner guardian attachment (integration) › requires a fresh organization-specific HTTP ceremony after an org move
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 500
+
+      1284 |         env,
+      1285 |       );
+    > 1286 |       expect(initiation.status).toBe(200);
+           |                                 ^
+      1287 |       const { authorityToken } = (await initiation.json()) as {
+      1288 |         authorityToken: string;
+      1289 |       };
+
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1286:33)
+
+  ● credentialed learner guardian attachment (integration) › fails closed at the authenticated initiation route for a denied VPC result
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 403
+    Received: 500
+
+      1349 |       );
+      1350 |
+    > 1351 |       expect(response.status).toBe(403);
+           |                               ^
+      1352 |       await expect(
+      1353 |         db.query.guardianship.findMany({
+      1354 |           where: eq(guardianship.chargePersonId, learner.personId),
+
+      at Object.<anonymous> (apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts:1351:31)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/family-join-v2.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/consent-status-v2.integration.test.ts (9.433 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/deletion-v2.integration.test.ts (14.808 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+    console.log
+      {"timestamp":"2026-08-02T10:59:10.432Z","level":"info","message":"account_deletion.completed","context":{"event":"account_deletion.completed","accountId":"019fc220-acf6-7a55-b23f-d8a3cd630867","databaseDeletion":"deleted","clerkErasure":"not_applicable","subscriptionStoreTeardown":"requested"}}
+
+      at log (apps/api/src/services/logger.ts:84:17)
+
+    console.log
+      {"timestamp":"2026-08-02T10:59:21.235Z","level":"info","message":"account_deletion.completed","context":{"event":"account_deletion.completed","accountId":"019fc220-d786-7067-9b72-7da700f40b14","databaseDeletion":"deleted","clerkErasure":"not_applicable","subscriptionStoreTeardown":"not_applicable"}}
+
+      at log (apps/api/src/services/logger.ts:84:17)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/export-v2.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/identity-graph.integration.test.ts (9.878 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:59:32.524Z","level":"warn","message":"account.reclaim_attempt_blocked","context":{"incomingClerkUserId":"clerk_019fc221-07f5-7c09-a01b-6474798ee344","existingClerkUserId":"clerk_019fc221-0765-74a7-8d02-79174d870b5c","emailHash":"2f7e0a5b48b966fceac43e9e025a397b03366d0985f3253df628d7e04b4a6ccf"}}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at refuseReclaim (apps/api/src/services/identity-v2/identity-graph.ts:135:10)
+      at apps/api/src/services/identity-v2/identity-graph.ts:258:15
+      at NeonSession.transaction (node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_54985a782662acbce765ca9224e6eb0e/node_modules/src/neon-serverless/session.ts:270:19)
+      at createIdentityGraph (apps/api/src/services/identity-v2/identity-graph.ts:245:12)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/identity-graph.integration.test.ts:420:5)
+
+    console.warn
+      {"timestamp":"2026-08-02T10:59:33.976Z","level":"warn","message":"account.reclaim_attempt_blocked","context":{"incomingClerkUserId":"clerk_019fc221-0c34-79da-bdff-68f42a1f9337","existingClerkUserId":"clerk_019fc221-0c34-79da-bdff-68f5c64cd524","emailHash":"c9b63ae27dad79e64670f1494bec1697ae394833c5cf1bcba499770b39ee8260"}}
+
+      79 |         break;
+      80 |       case 'warn':
+    > 81 |         console.warn(output);
+         |                 ^
+      82 |         break;
+      83 |       default:
+      84 |         console.log(output);
+
+      at log (apps/api/src/services/logger.ts:81:17)
+      at Object.warn (apps/api/src/services/logger.ts:102:25)
+      at refuseReclaim (apps/api/src/services/identity-v2/identity-graph.ts:135:10)
+      at createIdentityGraph (apps/api/src/services/identity-v2/identity-graph.ts:471:22)
+          at async Promise.allSettled (index 0)
+      at Object.<anonymous> (apps/api/src/services/identity-v2/identity-graph.integration.test.ts:447:21)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/dashboard-v2.integration.test.ts (6.123 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/profile-v2.integration.test.ts (7.461 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/ownership-v2.integration.test.ts (6.552 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/country-policy-loader.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/solo-progress-reports-v2.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/family-bridge-v2.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/onboarding-v2.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/guardianship.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/has-own-account-migration.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/identity-v2/membership-person-unique.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+
+Test Suites: 1 failed, 2 skipped, 16 passed, 17 of 19 total
+Tests:       10 failed, 42 skipped, 208 passed, 260 total
+Snapshots:   0 total
+Time:        222.351 s
+Ran all test suites matching identity-v2/.*integration|account-deletion.*integration|deletion.*integration.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+ ELIFECYCLE  Command failed with exit code 1.

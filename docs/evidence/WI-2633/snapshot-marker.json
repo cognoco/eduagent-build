@@ -1,0 +1,15 @@
+{
+  "workItem": "WI-2633",
+  "project": "lingering-violet-30592106",
+  "snapshotBranchId": "br-rough-heart-ag22kigb",
+  "snapshotBranchName": "wi2633-precheck-20260802",
+  "parentBranchId": "br-weathered-silence-agw4on4x",
+  "parentBranchName": "dev",
+  "parentLsn": "0/31B53E00",
+  "createdAt": "2026-08-02T10:48:57Z",
+  "compute": "none (no endpoints created)",
+  "purpose": "Pre-mutation restore point for the WI-2633 guarded DELETE of three orphaned quota_pools rows on the dev branch.",
+  "authorization": "Operator-authorized 2026-08-02 in the SS-1 orchestrator session: Option A (delete) approved, mutation authorized, Neon restore-branch creation authorized.",
+  "source": "Pattern mirrors docs/evidence/WI-2487/snapshot-marker.json (OPQ-136 precedent).",
+  "scope": "dev branch only. Migration 0129_m_repoint.sql is a no-op on staging/prod (legacy tables already dropped there); staging and production were not touched."
+}
