@@ -731,3 +731,178 @@ Basis of the cross-subject `interleaved` session type. **In code:**
   screen names start colliding.
 - Navigation/identity vocabulary (tab shapes, proxy mode) lives in `CLAUDE.md` /
   `docs/compliance/audience-matrix.md`; pull it in here if it ever causes a "note"/"star"-class mix-up.
+
+---
+
+## 11. Notice / journal / scope vocabulary — the newer V2 & MVP surfaces
+
+The vocabulary of the mentor-notice MVP, the V2 Journal/Now surfaces, and the
+V2 relationship-scope model. Each entry names the authority that defines it —
+these terms are **defined by ADR or spec**, not by this file; where the
+authority is unsettled the entry says so.
+
+### 11a · Notice vocabulary (authority: `MMT-ADR-0036`, Accepted)
+
+> ⚠ **The whole mentor-notice feature is flag-dark.** Everything below is the
+> *designed* model — built and tested, but off in every environment
+> (`MENTOR_NOTICE_ENABLED` defaults `'false'`, `apps/api/src/config.ts:191`; no
+> deployment config sets it on; dormancy disclosed at `docs/architecture.md`
+> → "Mentor-notice authority and state boundary" and `docs/project_context.md`).
+> Never write about notices as a live surface.
+
+#### Mentor notice
+A low-stakes, **learner-visible durable record of a concrete learning gap** the
+mentor noticed in a homework or ordinary single-subject learning session,
+followed by an optional short re-check. Learner-only: no guardian, supporter,
+payer, or proxy read ever sees a notice concept, hint, or receipt (server
+compares authenticated actor with subject learner). The LLM only *proposes*;
+one server-owned service authorizes, validates evidence, and owns the state
+machine. At most one actionable notice is exposed at a time — no visible queue
+of shortcomings. Status: `open | locked_in | dismissed | faded | not_yet`.
+**Authority:** `MMT-ADR-0036` §1–2, §4–5.
+**In code:** `mentorNoticeSchema` / `mentorNoticeStatusSchema`
+(`packages/schemas/src/mentor-notices.ts:5,42`).
+
+#### noticed_gap (proposal signal)
+The bounded structured **envelope signal by which the LLM proposes** a mentor
+notice: a learner-safe concept, an optional correction hint, and a durable
+learner-answer evidence reference — no `topicId`. A proposal, never an
+authorization: only a server-accepted transition may reach API, SSE, or UI.
+**Authority:** `MMT-ADR-0036` §4.1–4.4.
+**In code:** `signals.noticed_gap` (`packages/schemas/src/llm-envelope.ts:473`).
+
+#### Re-check
+The optional focused follow-up on an accepted notice: capped at **three learner
+responses**, judged by an **independent server-side judge** that excludes the
+tutor's producer vendor — the tutor never grades its own correction. Judge
+outcomes: `locked_in | not_yet | dismissed | deferred` (plus `continue`, which
+transitions nothing at any response). Attempt lifecycle is separate from notice
+status: hitting the cap after a valid `continue` ends the *attempt*; the notice
+stays unresolved and re-offerable.
+**Authority:** `MMT-ADR-0036` §2.3–2.4 (2026-07-26 amendment).
+**In code:** `mentorNoticeRecheckOutcomeSchema`
+(`packages/schemas/src/mentor-notices.ts:25`).
+
+#### answerEventId (evidence identity)
+The **immutable UUID scalar** identifying the learner answer event that
+evidences a notice — deliberately *not* a database foreign key, so transcript
+purge can delete the event text while the active notice keeps its provenance
+identity. Creation validates the referenced event is the same learner's
+`user_message` in the same session.
+**Authority:** `MMT-ADR-0036` §5.5–5.6.
+
+#### Learning day
+The deferral unit for "Not now": begins at **local 04:00** in the learner's
+stored IANA time zone (before 04:00 belongs to the preceding civil date; UTC
+fallback if the zone is invalid). "Not now" records `deferred` for the current
+learning day — ⚠ it is **not** dismissal; `dismissed` is terminal and requires
+an explicit learner request.
+**Authority:** `MMT-ADR-0036` §2.6.
+
+#### Fade
+The quiet terminal expiry of an open notice after **21 days** of inactivity.
+Runs even while the feature flag is off, and reads apply the same cutoff, so
+re-enable can never briefly expose a stale record. Terminal for that record;
+fresh evidence may create a later one.
+**Authority:** `MMT-ADR-0036` §2.7. **In code:** status `faded`.
+
+#### Rollout-policy observation
+The versioned enable/disable signal every notice-bearing response carries: a
+monotonically increasing **revision** + enabled value + revision-bound
+projection epoch. Lower revisions are ignored, disabled wins ties, re-enable
+needs a strictly higher revision; missing/malformed policy fails closed.
+**Authority:** `MMT-ADR-0036` §3.3–3.4.
+**In code:** `mentorNoticePolicyObservationSchema`
+(`packages/schemas/src/mentor-notices.ts:104`).
+
+### 11b · Journal & moment vocabulary (authority: shell spec + `MMT-ADR-0022`)
+
+#### Journal (tab)
+The V2 shell's third tab — "the paper trail of the relationship". Landing is
+**five buttons**: Notes · Sessions · Practice · Memory · Reports (each a single
+list — no sub-tabs; shipped per the journal-redesign spec). ⚠ Not a diary the
+learner writes: it is the browse surface over artifacts other flows produced
+(§4's notes, session recaps, practice history, mentor-memory, Reports).
+**Authority:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §5;
+`docs/specs/2026-06-27-journal-redesign.md` (SHIPPED).
+**In code:** `apps/mobile/src/components/journal/JournalTabView.tsx`; route
+`journal` in `apps/mobile/src/lib/navigation-contract.ts:178`.
+⚠ Unrelated grep collision: Drizzle's migration journal
+(`apps/api/drizzle/meta/_journal.json`) is a different "journal" entirely.
+
+#### Moment
+A recent **notable event** shown to the learner ("you filed a session", a
+milestone reached) — surfaced as cards in the Now feed and the Journal moments
+strip. Moments are **derived on read** from operational tables (sessions,
+`retention_cards`, assessments…) at request time; a new moment kind is a
+read-time projection, **not** a new materialized writer.
+**Authority:** `MMT-ADR-0022`; `docs/architecture.md` → "Activity Feed —
+Derived Moments + Seen-State".
+
+#### Activity ledger
+⚠ **Seen-state, not an event-of-record.** `mentor_activity_ledger` is a narrow
+store tracking `surfaced_at` so a moment is shown approximately once, plus the
+rare genuinely non-reconstructable moment. It is *not* a materialized log of
+all moments, not a compliance substrate, and its residual writes are
+best-effort (`safeWrite` — a dropped row costs one cosmetic card). Visibility
+is self-only; there is no per-row visibility flag.
+**Authority:** `MMT-ADR-0022`.
+**In code:** `packages/database/src/schema/activity-ledger.ts:20`.
+
+#### Now feed
+The deterministic **ranked feed** on the V2 Mentor tab: `GET /now` returns at
+most one anchor + ≤2 modules (≤3 cards), each a tappable next action, plus
+moment cards. No LLM in the ranking. Card kinds are a closed enum
+(`billing_alert`, `unfinished_session`, `mentor_notice`, `retention_due`,
+`parked_item`, `needs_deepening`, `challenge_ready`, `ledger_moment`,
+`support_hub_pointer`); reads are scoped `self | supporter-hub | person`.
+**Authority:** shell spec §8.1; `MMT-ADR-0022` (derive-on-read).
+**In code:** `nowCardKindSchema` / `nowScopeSchema`
+(`packages/schemas/src/now-feed.ts:5,8`), `apps/api/src/services/now-feed.ts`.
+
+### 11c · Scope vocabulary (⚠ authority split — read this note first)
+
+> ⚠ **`MMT-ADR-0024` (scope chip supersedes nav contract) is Proposed with
+> explicit non-reliance in force** (recorded 2026-08-01): no work may cite it
+> as ratified authority. Each scope-chip semantic is governed by the alternate
+> contract named in that ADR's § Disposition non-reliance table —
+> `MMT-ADR-0037` (Accepted) for chip composition/IA, `MMT-ADR-0027`/`0028` for
+> visibility, the shell spec + live code for the rest. The entries below are
+> **descriptive of live code and settled canon**, not of ADR-0024.
+
+#### Scope (relationship scope)
+Whose surface is active in the V2 shell — the relationship lens the signed-in
+human is currently looking through. Three kinds: **`me`** (their own
+learning), **`person`** (one named supportee, derived from an active
+`supportership` edge), **`supporter-hub`** (the cross-person overview).
+⚠ Distinct from §8's app mode / proxy mode: scope is the V2 axis; the V0/V1
+mode/proxy/tab-shape machinery stays live and flag-isolated until the S6
+retirement ruling (`MMT-ADR-0037` decision 5).
+**In code:** `scopeKindSchema` (`packages/schemas/src/scope.ts:4`).
+
+#### Scope chip
+The V2 chip UI for switching relationship scope. Composition and IA are
+governed by **`MMT-ADR-0037` decisions 1–3** (Accepted): Support hub only at 0
+or 2+ supportees (single-supportee lands directly in that person's scope); Me
+always present (empty-state doorway when no self-learning exists). ⚠ The
+running resolver still implements the older pre-0037 composition (Me
+conditional, hub unconditional) — implementation debt under 0037, audited
+2026-08-01 in ADR-0024's § Disposition, not evidence of different authority.
+**In code:** `apps/mobile/src/components/chrome/ScopeChip.tsx`,
+`apps/mobile/src/lib/scope-context.tsx`,
+`apps/api/src/services/scope-resolution.ts`.
+
+#### Scope descriptor / `/scopes`
+The wire contract for the scope list: the server returns an ordered list of
+typed descriptors (discriminated on `kind`) the client renders as chips.
+Status: **working contract** (live code + tests; canon ratification still owed
+at ADR-0024's eventual acceptance change-set).
+**In code:** `scopeDescriptorSchema` / `supporterScopeListSchema`
+(`packages/schemas/src/scope.ts`), `apps/api/src/services/scope-resolution.ts`.
+
+#### Scope-preserving tabs
+The rule that bottom tabs (Mentor / Subjects / Journal) change only the view
+**within** the active scope — never silently switch scope. Support hub →
+Subjects must not become Emma → Subjects; scope changes only via an explicit
+chip tap or deep link. Status: working contract.
+**Authority:** shell spec §6.3.
