@@ -40,6 +40,7 @@ import {
 import {
   assertOwnerProfile,
   assertCallerIsAccountOwner,
+  assertCanReadProfile,
 } from '../services/family-access';
 import {
   cloneTopicFromChild,
@@ -134,6 +135,10 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   .get('/subjects/:subjectId/curriculum', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const curriculum = await getCurriculum(db, profileId, subjectId);
     return c.json(getCurriculumResponseSchema.parse({ curriculum }));
@@ -311,6 +316,10 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
   .get('/subjects/:subjectId/curriculum/topics/:topicId/explain', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2877] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
     // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).

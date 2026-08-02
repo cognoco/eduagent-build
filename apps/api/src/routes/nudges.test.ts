@@ -114,9 +114,11 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
 
 import { app } from '../index';
 import { nudgeRoutes } from './nudges';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
 import {
   ConsentRequiredError,
+  ERROR_CODES,
   ForbiddenError,
   RateLimitedError,
 } from '@eduagent/schemas';
@@ -459,5 +461,63 @@ describe('[WI-159 / DS-070] nudges proxy-mode guard', () => {
     });
     expect(res.status).toBe(403);
     expect(mockMarkAllNudgesRead).not.toHaveBeenCalled();
+  });
+});
+
+// ---- [WI-2877] read-authority guard (G20) ----
+// Direct-mount harness WITHOUT profileScopeMiddleware: no
+// profileAuthorityVerifiedFor proof exists, so this case exercises the route
+// guard's own fail-closed fallback (verifyPersonOwnershipV2) — the
+// defense-in-depth layer for standalone/direct mounting. In the full app the
+// same spoof is rejected centrally by profileScopeMiddleware (WI-2128) before
+// any route runs (see profile-scope.test.ts).
+
+describe('[WI-2877] read-authority guard', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, VICTIM_PROFILE_ID);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', nudgeRoutes);
+    return direct;
+  }
+
+  it('GET /nudges rejects a cross-profile read with 403 via the fallback when no central proof exists', async () => {
+    // The caller's person holds no self/guardianship authority over the
+    // installed profile.
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+
+    const res = await makeUnprovenApp().request('/nudges');
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+    expect(mockListUnreadNudges).not.toHaveBeenCalled();
   });
 });
