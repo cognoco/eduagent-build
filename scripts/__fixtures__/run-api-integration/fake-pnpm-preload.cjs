@@ -1,6 +1,7 @@
 const childProcess = require('node:child_process');
 const { appendFileSync } = require('node:fs');
 const { syncBuiltinESMExports } = require('node:module');
+const { basename } = require('node:path');
 
 const realSpawnSync = childProcess.spawnSync;
 
@@ -11,7 +12,7 @@ childProcess.spawnSync = function fakePnpmSpawnSync(
 ) {
   if (
     command === process.execPath &&
-    args[0]?.endsWith('/scripts/verify-api-integration-schema.mjs') &&
+    basename(args[0] ?? '') === 'verify-api-integration-schema.mjs' &&
     process.env.FAKE_SCHEMA_VERIFY_RESULT
   ) {
     appendFileSync(
