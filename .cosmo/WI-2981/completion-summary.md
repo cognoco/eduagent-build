@@ -2,38 +2,70 @@
 
 ## What was done
 
-Changed CI workflow concurrency so pull-request heads retain PR-scoped
-cancellation while main pushes use an independently attributable commit-SHA
-group; OTA preview publication is separately serialized and guarded against a
-stale main tip, with stale guards treated as clean skips rather than failures.
+Reworked the WI-2981 proof after independent review rejected the first
+submission. The rejection was correct: the deterministic model's variant B fed
+`schedule()` three *distinct* SHA groups (`ci-main-main-1/2/3`), so it never
+entered the same-group replacement branch and never reproduced the baseline
+defect, and its retention check compared set sizes — which held trivially
+whatever the workflow said. Only that proof gap was fixed.
+
+This change is **test-and-evidence only**. `.github/workflows/ci.yml` is
+byte-identical to `origin/main`; the production concurrency fix landed
+previously in `2b6ffb064` and its semantics are untouched.
 
 ## What changed
 
-- Updated `.github/workflows/ci.yml` concurrency group and explanatory comments.
-- Added job-level `ota-preview` cancellation and a live-main-tip check before
-  the OTA publish step; stale tips emit `matches=false` and exit successfully.
-- Strengthened `scripts/ci-concurrency-contract.test.ts` with an exact group
-  contract, deterministic A-D scheduling model, OTA serialization, and live-tip
-  publication assertions for stale skip/current allow behavior.
-- Captured deterministic RED/GREEN and revert/restoration evidence in
-  `red-green.md` and `evidence.json`.
+- `scripts/ci-concurrency-contract.test.ts`
+  - Added a small dependency-free GitHub Actions expression evaluator (context
+    paths, single-quoted strings, `format()`, `==`/`!=`, `!`, operand-returning
+    `&&`/`||`, GitHub's falsy set) and used it to *derive* concurrency groups
+    from the parsed workflow file instead of hand-writing them.
+  - Replaced variant B with two tests that execute the defect: the pre-fix
+    expression collapses `sha-1/2/3` onto one `ci-refs/heads/main` group, and
+    `sha-3` displaces pending `sha-2` (retained `['sha-1','sha-3']`).
+  - The workflow-derived counterpart asserts all three SHAs retained by exact
+    ordered value — no set-size comparisons anywhere.
+  - The baseline and the current workflow run through the **same** evaluator,
+    so the comparison is not a hand-written strawman.
+  - Kept variants A and D and the OTA serialization/live-tip tests; kept PR
+    cancellation but made it group-name agnostic so it asserts behavior and
+    stays honest under mutation.
+- `.cosmo/WI-2981/red-green.md` — rewritten (not appended) with the mutation
+  proof, the RED tests named individually, and the withdrawn OTA claim.
+- `.cosmo/WI-2981/evidence.json` — claims realigned to the live AC1–AC4 set
+  (previously mislabelled AC-1..AC-6) and pointers made explicit
+  `.cosmo/WI-2981/...` paths instead of bare names.
 
 ## Verification
 
-- Focused contract suite: correction RED failed on the stale guard's non-zero
-  exit; GREEN and restored candidate passed all 9 tests.
-- Historical cancelled zero-job runs recorded: `30688886377`, `30688890531`,
-  and `30688912863`.
-- Workflow security and YAML checks remained green; no deployment authority,
-  permissions, triggers, required checks, or merge gates changed.
+- Current workflow: **13/13 passed**, exit 0.
+- Mutation (only the concurrency `group:` line reverted to the pre-fix
+  expression): **5 failed / 8 passed**, exit 1. The retention assertion itself
+  failed — expected `['sha-1','sha-2','sha-3']`, received `['sha-1','sha-3']`.
+  PR cancellation and all OTA tests stayed green, so the RED is attributable to
+  the concurrency key alone.
+- Restored via `git checkout -- .github/workflows/ci.yml`;
+  `git diff origin/main -- .github/workflows/ci.yml` is empty; rerun 13/13.
+- `pnpm run test:scripts` — 74 suites passed (1 skipped), 1248 tests, exit 0.
+- `pnpm check:github-workflow-security` passed; workflow YAML parses; Prettier
+  clean; `tsc --noEmit` on the contract test exit 0.
 
-## Caveats
+## Caveats / Follow-ups
 
-GitHub-hosted rapid-merge and OTA race execution were not reproduced in this
-branch; the deterministic contract proves the concurrency-key, serialization,
-and live-tip invariants.
+Caveats:
 
-## Follow-ups
+- GitHub-hosted rapid-merge racing was not executed; the contract is a
+  deterministic model of GitHub's one-running/one-pending queue, now bound to
+  the real workflow expression so it cannot pass against the defective group.
+- The earlier claim that a superseded OTA run "remains green" is **withdrawn**.
+  `ota-update` sets `cancel-in-progress: true` on the `ota-preview` group, so a
+  superseded OTA job can be cancelled outright. The real contract is that no
+  stale publish occurs and the guard step itself exits 0 rather than failing.
+- No claim is made about branch-protection required checks; that configuration
+  is GitHub-side, not declared in this repo, and untouched here.
+- The evaluator covers the operators these concurrency keys use; it is not a
+  complete GitHub expression implementation and throws on unsupported syntax.
 
-The shepherd should review the opened PR and retain the contract suite as the
-regression guard for future CI concurrency edits.
+Follow-ups: none. The contract suite remains the regression guard for future CI
+concurrency edits and will now fail behaviorally, not just on a string pin, if
+the main group loses its SHA scoping.
