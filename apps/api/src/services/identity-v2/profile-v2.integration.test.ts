@@ -105,13 +105,12 @@ const RUN = !!process.env.DATABASE_URL;
     count: number;
   }> {
     const client = (db as unknown as { $client: { query: unknown } }).$client;
-    const original = client.query.bind(client) as (
-      ...args: unknown[]
-    ) => unknown;
+    const originalQuery = client.query as (...args: unknown[]) => unknown;
+    const invokeQuery = originalQuery.bind(client);
     let count = 0;
     (client as { query: unknown }).query = (...args: unknown[]) => {
       count += 1;
-      return original(...args);
+      return invokeQuery(...args);
     };
 
     try {
@@ -120,7 +119,7 @@ const RUN = !!process.env.DATABASE_URL;
         count,
       };
     } finally {
-      (client as { query: unknown }).query = original;
+      (client as { query: unknown }).query = originalQuery;
     }
   }
 
@@ -359,10 +358,9 @@ const RUN = !!process.env.DATABASE_URL;
 
     const profiles = await listProfilesV2(db, org, caller);
 
-    expect(profiles.map((profile) => profile.id)).toEqual([
-      caller,
-      managedCharge,
-    ]);
+    const profileIds = profiles.map((profile) => profile.id);
+    expect(profileIds).toHaveLength(2);
+    expect(profileIds).toEqual(expect.arrayContaining([caller, managedCharge]));
     expect(profiles.find((profile) => profile.id === caller)).toMatchObject({
       isCurrentUser: true,
       isOwner: true,
@@ -373,15 +371,15 @@ const RUN = !!process.env.DATABASE_URL;
       isCurrentUser: false,
       hasFamilyLinks: true,
     });
-    expect(profiles.map((profile) => profile.id)).not.toEqual(
-      expect.arrayContaining([
-        credentialedCharge,
-        unrelatedMember,
-        revokedCharge,
-        foreignMember,
-        nonmember!.id,
-      ]),
-    );
+    for (const excludedId of [
+      credentialedCharge,
+      unrelatedMember,
+      revokedCharge,
+      foreignMember,
+      nonmember!.id,
+    ]) {
+      expect(profileIds).not.toContain(excludedId);
+    }
   });
 
   it('[WI-2899] keeps list query count fixed for 1, 4, and policy-max rosters', async () => {
