@@ -14,6 +14,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireAccount, type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { apiError } from '../errors';
 import {
   buildKnowledgeInventory,
@@ -46,6 +47,10 @@ const milestonesQuerySchema = z.object({
 export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
   .get('/progress/inventory', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2881] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
 
     const inventory = await buildKnowledgeInventory(db, profileId);
     return c.json(knowledgeInventorySchema.parse(inventory));
@@ -55,6 +60,8 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     zValidator('query', historyQuerySchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2881] Read-authority guard — see /progress/inventory above.
+      await assertCanReadProfile(c, profileId);
       const query = c.req.valid('query');
 
       const history = await buildProgressHistory(db, profileId, query);
@@ -66,6 +73,8 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     zValidator('query', milestonesQuerySchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2881] Read-authority guard — see /progress/inventory above.
+      await assertCanReadProfile(c, profileId);
       const query = c.req.valid('query');
 
       // [F-144] listRecentMilestones backfills (writes) missed milestones. In

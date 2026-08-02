@@ -32,6 +32,7 @@ import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   assertOwnerProfile,
   assertCallerIsAccountOwner,
+  assertCanReadProfile,
 } from '../services/family-access';
 import {
   getNotificationPrefs,
@@ -82,6 +83,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get notification preferences
   .get('/settings/notifications', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2881] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const preferences = await getNotificationPrefs(db, profileId);
     return c.json(getNotificationsResponseSchema.parse({ preferences }));
   })
@@ -181,6 +186,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
     await assertCallerIsAccountOwner(c);
     const { db, profileId } = withProfile(c);
+    // [WI-2881] Read-authority guard — see /settings/notifications above.
+    // The owner gates above bind the caller to account-owner authority, not
+    // to read authority over the selected profile.
+    await assertCanReadProfile(c, profileId);
     const value = await getWithdrawalArchivePreference(db, profileId);
     return c.json(
       getWithdrawalArchivePreferenceResponseSchema.parse({ value }),
@@ -222,6 +231,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
 
   .get('/settings/family-pool-breakdown-sharing', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2881] Read-authority guard — see /settings/notifications above.
+    await assertCanReadProfile(c, profileId);
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const accountId = requireAccount(c.get('account')).id;
 
