@@ -226,9 +226,21 @@ export const ROUTE_OWNED_LLM_CONSENT_BOUNDARIES: readonly RouteOwnedLlmConsentBo
       routeFile: 'apps/api/src/routes/homework.ts',
       routeStartToken: ".post('/ocr'",
       routeEndToken: '',
-      classification: 'independent-mixed-residue',
+      classification: 'route-owned',
       rationale:
-        'Content-length, multipart, MIME, and file-size returns still follow the route gate.',
+        'Validated image uploads gate after deterministic Content-Length, multipart, MIME, and file-size exits and before provider construction or dispatch.',
+      preConsentBranchTokens: [
+        "const contentLengthHeader = c.req.header('content-length');",
+        'if (!(file instanceof File)) {',
+        '!OCR_CONSTRAINTS.acceptedMimeTypes.includes(',
+        'if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: [
+        'provider = getOcrProvider(',
+        'const result = await provider.extractText(',
+      ],
+      llmCallSiteFile: 'apps/api/src/services/ocr.ts',
     },
     {
       id: 'quiz.round-generation',
