@@ -257,6 +257,7 @@ describe('noticesSuppressedForPayload', () => {
     // the same state assembled while storage was unreadable — is asserted
     // separately below, and is the one whose verdict this Work Item inverts.
     trusted: true,
+    malformedSuppressed: false,
   };
 
   it('suppresses until hydrated, whatever the payload says', () => {
@@ -319,6 +320,7 @@ describe('noticesSuppressedForPayload', () => {
             observed: false,
             hydrated: true,
             trusted: true,
+            malformedSuppressed: false,
           },
           undefined,
         ),
@@ -355,6 +357,7 @@ describe('noticesSuppressedForPayload', () => {
             observed: false,
             hydrated: true,
             trusted: false,
+            malformedSuppressed: false,
           },
           undefined,
         ),
@@ -369,6 +372,7 @@ describe('noticesSuppressedForPayload', () => {
             observed: true,
             hydrated: true,
             trusted: true,
+            malformedSuppressed: false,
           },
           undefined,
         ),
@@ -385,6 +389,7 @@ describe('noticesSuppressedForPayload', () => {
             observed: true,
             hydrated: true,
             trusted: true,
+            malformedSuppressed: false,
           },
           undefined,
         ),
@@ -410,6 +415,7 @@ describe('noticesSuppressedForPayload', () => {
       observed: true,
       hydrated: true,
       trusted: false,
+      malformedSuppressed: false,
     };
 
     // Every shape `observationSignal` can return, including the two that would
@@ -1948,5 +1954,184 @@ describe('useMentorNoticePolicy', () => {
       expect(result.current.suppressed(undefined)).toBe(false);
       expect(result.current.suppressed(observation(7, true))).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2781] A MALFORMED POLICY FIELD MUST NOT SET A DURABLE DISABLE
+//
+// Asserted at the OBSERVE SEAM (the hook's `observe`, which is what the four
+// production sites call) rather than against the reducer. A reducer-level
+// assertion sits one layer below the seam and would pass while the defect
+// ships, because the question is what the observe path PERSISTS, not how the
+// pure fold behaves.
+//
+// THE DECISION (AC-1): a malformed FIELD suppresses IN-SESSION ONLY, and the
+// durable write is withheld. Reasoning: 'malformed' means a message arrived
+// that could not be read — an absence of information, not an instruction from
+// the server. Treating it as a durable disable conflates "we could not read one
+// response" with "the server told us to stop", and because a same-revision fold
+// keeps a disable, one corrupted field then bricks notices on that device until
+// a deployment bumps the revision. Fail-closed is preserved for the session; it
+// is the DURABILITY that is wrong, so that is what this bounds.
+//
+// A well-formed observation clears the in-session suppression, because a
+// readable message is exactly the information whose absence caused it.
+// ---------------------------------------------------------------------------
+
+describe('[WI-2781] malformed policy FIELD at the observe seam', () => {
+  const MALFORMED = { rolloutRevision: 'not-a-number' } as unknown as undefined;
+
+  async function drain(): Promise<void> {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+    });
+  }
+
+  beforeEach(async () => {
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+  });
+
+  it('VARIANT (e): does not survive a relaunch — the durable record is untouched', async () => {
+    // The variant the whole item is about. An in-session-only assertion cannot
+    // detect a durability defect, so this one is the load-bearing case.
+    await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
+
+    const first = mountPolicy();
+    await waitFor(() => expect(first.result.current.hydrated).toBe(true));
+    expect(first.result.current.state).toEqual({ revision: 5, enabled: true });
+
+    act(() => first.result.current.observe(MALFORMED));
+    // Fail-closed FOR THE SESSION is intended and preserved.
+    expect(first.result.current.suppressed(undefined)).toBe(true);
+    await drain();
+
+    // ...but nothing about it may reach the disk.
+    const persisted = await AsyncStorage.getItem(stateKey(ACTOR, PROFILE));
+    expect(JSON.parse(persisted as string)).toEqual({
+      revision: 5,
+      enabled: true,
+    });
+
+    // ── relaunch ──
+    resetMentorNoticePolicyStoreForTests();
+    const second = mountPolicy();
+    await waitFor(() => expect(second.result.current.hydrated).toBe(true));
+    expect(second.result.current.state).toEqual({ revision: 5, enabled: true });
+    expect(second.result.current.suppressed(observation(5, true))).toBe(false);
+  });
+
+  it('VARIANT (a): a well-formed observation at the SAME revision recovers in-session', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(MALFORMED));
+    expect(result.current.suppressed(undefined)).toBe(true);
+
+    // No revision bump — the recovery path AC-2 requires.
+    act(() => result.current.observe(observation(5, true)));
+    expect(result.current.suppressed(undefined)).toBe(false);
+    expect(result.current.state).toEqual({ revision: 5, enabled: true });
+  });
+
+  it('VARIANT (b): repeated corruption stays suppressed, and still writes nothing', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(MALFORMED));
+    act(() => result.current.observe(MALFORMED));
+    act(() => result.current.observe(MALFORMED));
+    expect(result.current.suppressed(undefined)).toBe(true);
+    await drain();
+
+    const persisted = await AsyncStorage.getItem(stateKey(ACTOR, PROFILE));
+    expect(JSON.parse(persisted as string)).toEqual({
+      revision: 5,
+      enabled: true,
+    });
+  });
+
+  it('VARIANT (c): corruption while ALREADY disabled leaves the genuine disable durable', async () => {
+    // AC-3's control. The genuine rollback must not be weakened by anything
+    // this item does, so the disable has to still be on disk afterwards.
+    await seedStored(ACTOR, PROFILE, '{"revision":8,"enabled":false}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(MALFORMED));
+    await drain();
+
+    const persisted = await AsyncStorage.getItem(stateKey(ACTOR, PROFILE));
+    expect(JSON.parse(persisted as string)).toEqual({
+      revision: 8,
+      enabled: false,
+    });
+
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.state).toEqual({
+      revision: 8,
+      enabled: false,
+    });
+  });
+
+  it('VARIANT (d): on a never-told device, corruption does not manufacture a told state', async () => {
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(MALFORMED));
+    expect(result.current.suppressed(undefined)).toBe(true);
+    await drain();
+
+    // Writing anything here would move the device from never-told to told on the
+    // strength of a message it could not read, and never-told is what lets a
+    // legitimate cached projection keep painting after a relaunch.
+    expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBeNull();
+  });
+
+  it('AC-3 control: a genuine server disable is still durable, and a HIGHER revision still re-enables', async () => {
+    await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(observation(6, false)));
+    await drain();
+    expect(
+      JSON.parse(
+        (await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))) as string,
+      ),
+    ).toEqual({ revision: 6, enabled: false });
+
+    // Strictly higher re-enables — asserted rather than assumed, per AC-3.
+    act(() => result.current.observe(observation(7, true)));
+    expect(result.current.state).toEqual({ revision: 7, enabled: true });
+    expect(result.current.suppressed(observation(7, true))).toBe(false);
+  });
+
+  it('a malformed field and a genuine disable remain distinguishable', async () => {
+    // AC-4: the two must not collapse into one indistinguishable state.
+    await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
+
+    const corrupted = mountPolicy();
+    await waitFor(() => expect(corrupted.result.current.hydrated).toBe(true));
+    act(() => corrupted.result.current.observe(MALFORMED));
+    await drain();
+    const afterMalformed = await AsyncStorage.getItem(stateKey(ACTOR, PROFILE));
+
+    resetMentorNoticePolicyStoreForTests();
+    await AsyncStorage.clear();
+    await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
+
+    const disabled = mountPolicy();
+    await waitFor(() => expect(disabled.result.current.hydrated).toBe(true));
+    act(() => disabled.result.current.observe(observation(5, false)));
+    await drain();
+    const afterDisable = await AsyncStorage.getItem(stateKey(ACTOR, PROFILE));
+
+    expect(afterMalformed).not.toEqual(afterDisable);
   });
 });
