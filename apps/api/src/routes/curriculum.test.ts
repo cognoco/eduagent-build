@@ -1385,12 +1385,15 @@ describe('[WI-147 / DS-058] curriculum proxy-mode guard', () => {
 });
 
 // ---- [WI-2877] read-authority guard (G16) ----
-// Direct-mount harness WITHOUT profileScopeMiddleware: no
-// profileAuthorityVerifiedFor proof exists, so these cases exercise the route
-// guard's own fail-closed fallback (verifyPersonOwnershipV2) — the
-// defense-in-depth layer for standalone/direct mounting. In the full app the
-// same spoof is rejected centrally by profileScopeMiddleware (WI-2128) before
-// any route runs (see profile-scope.test.ts).
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so the attacks below are credentialed
+// non-owner requests traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
 
 describe('[WI-2877] read-authority guard', () => {
   const VICTIM_PROFILE_ID = 'victim-profile-id';
@@ -1400,7 +1403,13 @@ describe('[WI-2877] read-authority guard', () => {
     const direct = new Hono();
     direct.use('*', async (c, next) => {
       c.set('db' as never, {});
-      c.set('profileId' as never, VICTIM_PROFILE_ID);
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
       c.set('user' as never, { id: 'test-user' });
       c.set('account' as never, { id: 'test-account-id' });
       c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
@@ -1429,18 +1438,20 @@ describe('[WI-2877] read-authority guard', () => {
       () => mockExplainTopicOrdering,
     ],
   ] as const)(
-    'GET %s rejects a cross-profile read with 403 via the fallback when no central proof exists',
+    'GET %s rejects a cross-profile X-Profile-Id spoof with 403 before the service read',
     async (path, getServiceMock) => {
       // The caller's person holds no self/guardianship authority over the
-      // installed profile — the real verifyPersonOwnershipV2 would throw
-      // against a real membership table.
+      // header-selected profile — the real verifyPersonOwnershipV2 would
+      // throw against a real membership table.
       jest
         .mocked(verifyPersonOwnershipV2)
         .mockRejectedValueOnce(
           new Error('caller cannot read selected profile'),
         );
 
-      const res = await makeUnprovenApp().request(path);
+      const res = await makeUnprovenApp().request(path, {
+        headers: { 'X-Profile-Id': VICTIM_PROFILE_ID },
+      });
 
       expect(res.status).toBe(403);
       const body = (await res.json()) as { code: string };
