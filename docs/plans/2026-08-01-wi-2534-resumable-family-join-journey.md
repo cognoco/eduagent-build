@@ -4,7 +4,7 @@ date: 2026-08-01
 profile: code
 work_items: [WI-2534]
 spec: docs/specs/2026-07-30-13-16-family-join-guardian-consent-ceremony.md
-status: in-progress
+status: completed
 ---
 
 # Resumable family-join consent and visibility journey — Implementation Plan
@@ -65,7 +65,7 @@ Out of scope:
 - [x] T5: Finalize membership only after both current gates are satisfied — done when: two-identity PostgreSQL tests prove guardian-required holding, guardian completion, final retry, solo-org teardown, old-org grant receipt archival, fresh destination grants, consent-capable self path, different-guardian path, exact retry, rollback, withdrawal/revocation bounce, and zero accepted person scope until the visibility contract's supporter side is also accepted.
 - [x] T6: Expose authenticated journey routes and deliver a usable invite code — done when: route tests prove neutral invite behavior, verified recipient binding, typed holding/terminal results, adult guardian completion, inviter-only withdrawal, learner decline, anti-enumerating errors, and email guard coverage for a manual code with no unserved URL.
 - [x] T7: Build the resumable mobile ceremony — done when: component/hook/storage tests cover code entry, SecureStore relaunch, separate family/consent/visibility explanations, learner-owned versus guardian-owned supportership choice, same-adult and alternate-adult handoff, provider return, pending, decline, expiry, policy change, retry, success, and safe exit.
-- [ ] T8: Run strict verification and red-green-revert — done when: shared schema, API unit/integration, mobile, i18n, typecheck, lint, migration guards, change-class checks, and a named regression's pass→revert-fail→restore-pass evidence are recorded for completion.
+- [x] T8: Run strict verification and red-green-revert — done when: shared schema, API unit/integration, mobile, i18n, typecheck, lint, migration guards, change-class checks, and a named regression's pass→revert-fail→restore-pass evidence are recorded for completion.
 
 ## Acceptance mapping
 
