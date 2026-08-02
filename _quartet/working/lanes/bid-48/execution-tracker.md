@@ -56,9 +56,32 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-02 21:52 CEST
+## Live reconciliation — 2026-08-02 22:39 CEST
 
 ### Latest authoritative boundary
+
+- WI-2923 landed normally through the sanctioned gate as `fffce11f` and completed to
+  Reviewing, then independent adversarial review returned it to Ready. AC-3 incorrectly
+  claims absent `azp` verification “remains enforced”; correcting that preservation
+  clause is recommended over silently expanding a config-only item into new API auth
+  policy. The separate missing Bug RGR execution proof is ordinary repository-only
+  rework after the ruling; FO-2104 / `OCC-3293F0F6AFD6` records it. No live scenario,
+  Clerk, Doppler, Worker, staging, or production mutation is required.
+- WI-3041 PR #2906 is at repaired head `a095afbc`. FO-2102 /
+  `OCC-AAAA0982E7C9` records the fixed Windows path-portability review finding. Exact
+  Windows and Flag-ON CI are green and main is in the required full API integration
+  suites after every preceding guard/test/build step passed. The worktree remains
+  credential-free and has made no database access or mutation.
+- Merge-gate false-ready occurrence FO-2101 accurately records PR #2878 while exact-head
+  CI was queued. FO-2103 records the sibling PR #2906 refusal but over-attributes the
+  cause to branch policy; the create-only finding contract prohibits correction, so it
+  is flagged for central correction/supersession rather than duplicated.
+- WI-2643 remains Ready behind WI-3041/schema-state handling. WI-2826 and the hosted
+  diagnostic items still await a named disposable target; WI-2795 monitors WI-2788.
+- Direct live reconciliation is 35 Closed, 2 Executing, and 6 Ready across 43
+  authoritative members. Brief/relation parity is intact and BID-48 remains Running.
+
+### Previous authoritative boundary — 2026-08-02 21:52 CEST
 
 - WI-3041 is formally admitted as member 43, refined to DoR, actively claimed, and
   executing hermetically. The operator-authorized one-worktree exception skips

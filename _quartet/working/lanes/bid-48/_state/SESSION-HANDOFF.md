@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-02 21:52 CEST
+Last reconciled: 2026-08-02 22:39 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -24,7 +24,34 @@ Last reconciled: 2026-08-02 21:52 CEST
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-02 21:52 CEST
+### Latest authoritative boundary — 2026-08-02 22:39 CEST
+
+- WI-2923 PR #2878 passed exact-head CI and the sanctioned merge gate, landed normally
+  as `fffce11f`, and completed to Reviewing. Independent adversarial review verified
+  all other evidence but returned it to Ready for two gaps: AC-3 says authorized-party
+  (`azp`) verification “remains enforced” although no baseline implementation exists,
+  and the Bug DoD lacks an executed red→green→revert→restore sequence. FO-2104 /
+  `OCC-3293F0F6AFD6` records the latter. The item is held for a PgM/operator ruling:
+  recommended correction preserves the existing signature, issuer, exact-audience,
+  expiry, and token-age controls and leaves new `azp` policy outside WI-2923; the
+  alternative explicitly expands scope into new auth enforcement. No live Clerk rerun
+  or configuration mutation is needed for the remaining repository-only evidence.
+- WI-3041 published PR #2906, then repaired one valid Windows path-portability review
+  finding at head `a095afbc`; FO-2102 / `OCC-AAAA0982E7C9` records it. Exact-head
+  Windows and Flag-ON CI are green; main has passed repository guards, script tests,
+  lint/typecheck/build, and is running the required full API integration suites. No
+  database credentials or access were used. Two premature merge-gate false-ready
+  observations were stopped before landing: FO-2101 accurately records PR #2878;
+  FO-2103 over-attributes PR #2906's refusal and is flagged for central correction /
+  supersession because the create-only finding workflow forbids hand correction.
+- WI-2643 remains Ready pending the schema-state path governed by WI-3041 and the
+  separate shared-target mutation decision. WI-2826 and hosted diagnostic items remain
+  held for the named disposable hosted target; WI-2795 still monitors external WI-2788.
+- Direct authoritative reconciliation returns 35 Closed, 2 Executing, and 6 Ready
+  across all 43 members after WI-2923's review bounce. Brief/relation parity remains
+  intact and BID-48 remains Running.
+
+### Previous authoritative boundary — 2026-08-02 21:52 CEST
 
 - WI-3041 was formally admitted as member 43, triaged/refined to adversarial DoR,
   claimed as `codex:wi3041-executor:WI-3041`, and dispatched in an isolated worktree.
