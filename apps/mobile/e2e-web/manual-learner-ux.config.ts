@@ -38,7 +38,9 @@ export default defineConfig({
             command: 'pnpm --dir ../api exec wrangler dev --port 8787',
             cwd: mobileDir,
             url: `${apiBaseUrl}/v1/health`,
-            reuseExistingServer: !process.env.CI,
+            // WI-2923: never pair the current audience preflight with a
+            // previously started Worker that may hold stale Clerk bindings.
+            reuseExistingServer: false,
             stdout: 'pipe' as const,
             stderr: 'pipe' as const,
             timeout: 120_000,
