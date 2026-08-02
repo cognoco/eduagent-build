@@ -27,6 +27,10 @@ tags:
       id: 'subjects-screen'
     timeout: 15000
 
+# WI-2550: the shared transcription-only voice control renders beside search.
+- assertVisible:
+    id: 'subjects-browse-search-mic'
+
 # An impossible query must produce the hard no-result state, and clearing it
 # must restore the exact seeded World History row.
 - tapOn:

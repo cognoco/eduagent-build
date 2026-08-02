@@ -23,6 +23,8 @@ interface TopicDetailSheetProps {
   // never wires it (no focused topic to bind to). `content` is the trimmed draft.
   onAddNote?: (topicId: string, content: string) => void | Promise<void>;
   isAddingNote?: boolean;
+  /** Voice locale for the notes mic (WI-2550), threaded from the route. */
+  voiceLocale?: string;
 }
 
 const STATE_KEY: Record<HubTopicState, TranslateKey> = {
@@ -44,6 +46,7 @@ export function TopicDetailSheet({
   onSeeFullTopic,
   onAddNote,
   isAddingNote = false,
+  voiceLocale,
 }: TopicDetailSheetProps): React.ReactElement | null {
   const { t } = useTranslation();
   if (!topic) return null;
@@ -114,6 +117,7 @@ export function TopicDetailSheet({
               canStudy={canStudy}
               emptyMessage={t('subjectHub.notes.emptyTopic')}
               isAddingNote={isAddingNote}
+              voiceLocale={voiceLocale}
               onAddNote={
                 onAddNote
                   ? (content) => onAddNote(topic.topic.id, content)

@@ -20,6 +20,8 @@ import { useRetryCurriculum } from '../../../../hooks/use-books';
 import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
+import { useProfile } from '../../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../../lib/language-locales';
 import { useProgressInventory } from '../../../../hooks/use-progress';
 import {
   goBackOrReplace,
@@ -43,6 +45,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default function SubjectHubRoute(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { activeProfile } = useProfile();
   const params = useLocalSearchParams<{ subjectId?: string | string[] }>();
   const subjectId = firstParam(params.subjectId);
   const [subjectsPredecessorId, setSubjectsPredecessorId] = useState<
@@ -482,6 +485,9 @@ export default function SubjectHubRoute(): React.ReactElement {
             onReviewTopic={handleReviewTopic}
             onAddNote={handleAddNote}
             isAddingNote={isCreatingNote}
+            voiceLocale={getVoiceLocaleForLanguage(
+              activeProfile?.conversationLanguage,
+            )}
           />
           {canManage ? (
             <SubjectHubManageSheet

@@ -1214,6 +1214,8 @@ describe('CameraScreen', () => {
     });
 
     fireEvent.press(getByTestId('confirm-task-button'));
+    // WI-2550: shared transcription-only mic renders with the subject field.
+    getByTestId('camera-subject-mic');
     fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
     fireEvent.press(getByTestId('camera-continue-button'));
 

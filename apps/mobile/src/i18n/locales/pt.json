@@ -4257,7 +4257,6 @@
     },
     "search": {
       "placeholder": "Pesquisar tópicos",
-      "micLabel": "Pesquisar por voz",
       "noResults": "Nenhum tópico corresponde a essa pesquisa."
     },
     "notes": {
@@ -4265,7 +4264,6 @@
       "authorSelf": "Minhas notas",
       "authorMentor": "Salvo do mentor",
       "addNote": "Adicionar uma nota",
-      "micLabel": "Adicionar nota por voz",
       "empty": "Ainda não há notas. Anote uma ideia sobre esta matéria.",
       "saveErrorTitle": "Não foi possível salvar a nota",
       "emptyTopic": "Ainda não há notas. Anote um pensamento sobre este tópico."

@@ -30,6 +30,12 @@ import {
 } from '../../../components/homework/camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
 import { useSpeechRecognition } from '../../../hooks/use-speech-recognition';
+import { useProfile } from '../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../components/common';
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
@@ -86,6 +92,10 @@ export default function CameraScreen(): React.ReactNode {
   } = useSubjects();
   const createSubject = useCreateSubject();
   const speech = useSpeechRecognition();
+  const { activeProfile } = useProfile();
+  const subjectVoiceLocale = getVoiceLocaleForLanguage(
+    activeProfile?.conversationLanguage,
+  );
 
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
@@ -1676,6 +1686,19 @@ export default function CameraScreen(): React.ReactNode {
                   accessibilityLabel={t('homework.typeSubjectLabel')}
                   autoCapitalize="words"
                 />
+                <View className="mb-3">
+                  <VoiceInputControl
+                    value={manualSubjectName}
+                    disabled={subjectResolutionPending}
+                    voiceLocale={subjectVoiceLocale}
+                    testID="camera-subject-mic"
+                    onTranscript={(finalTranscript) =>
+                      setManualSubjectName((prev) =>
+                        appendTranscript(prev, finalTranscript),
+                      )
+                    }
+                  />
+                </View>
                 <Pressable
                   testID="camera-continue-button"
                   onPress={() => void handleManualSubjectContinue()}
@@ -1932,6 +1955,19 @@ export default function CameraScreen(): React.ReactNode {
                           accessibilityLabel={t('homework.typeSubjectLabel')}
                           autoCapitalize="words"
                         />
+                        <View className="mb-3">
+                          <VoiceInputControl
+                            value={manualSubjectName}
+                            disabled={subjectResolutionPending}
+                            voiceLocale={subjectVoiceLocale}
+                            testID="manual-subject-name-mic"
+                            onTranscript={(finalTranscript) =>
+                              setManualSubjectName((prev) =>
+                                appendTranscript(prev, finalTranscript),
+                              )
+                            }
+                          />
+                        </View>
                         <Pressable
                           testID="manual-subject-continue-button"
                           onPress={() =>

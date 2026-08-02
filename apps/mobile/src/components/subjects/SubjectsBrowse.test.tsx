@@ -166,6 +166,8 @@ describe('SubjectsBrowse', () => {
 
     screen.getByText('Algebra');
     expect(screen.queryByText('Spanish')).toBeNull();
+    // WI-2549/WI-2550: the shared transcription-only mic renders beside search.
+    screen.getByTestId('subjects-browse-search-mic');
 
     fireEvent.changeText(screen.getByTestId('subjects-browse-search'), '');
 

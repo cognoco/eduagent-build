@@ -83,15 +83,12 @@ const baseData: SubjectHubData = {
 
 describe('SubjectHub', () => {
   it('renders the hub structure from handed-in data and wires transcription-only search', () => {
-    const onSearchVoice = jest.fn();
-
     render(
       <SubjectHub
         data={baseData}
         onNextUpPress={jest.fn()}
         onStudyTopic={jest.fn()}
         onReviewTopic={jest.fn()}
-        onSearchVoice={onSearchVoice}
       />,
     );
 
@@ -112,13 +109,9 @@ describe('SubjectHub', () => {
     screen.getByText('Mentor saved the light reaction example.');
     expect(screen.queryByText('Cells split in phases.')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('search-mic'));
-    expect(onSearchVoice).toHaveBeenCalledWith({
-      kind: 'transcription',
-      source: 'subject-hub-search',
-      analyzesTone: false,
-      analyzesEmotion: false,
-    });
+    // WI-2550: the search mic is the shared transcription-only
+    // VoiceInputControl, wired directly into the query state.
+    screen.getByTestId('search-mic');
   });
 
   it('renders scrambled vocabulary levels in CEFR progression order', () => {
