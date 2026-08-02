@@ -64,8 +64,9 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     zValidator('query', sessionBookmarksQuerySchema),
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2876] Header-resolved profileId is only org-checked; verify
-      // caller authority (self or guardian of an uncredentialed charge).
+      // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+      // for the installed profile; consume its target-bound proof when
+      // present, else run the fail-closed fallback (direct/unproven mounts).
       await assertCanReadProfile(c, profileId);
       const bookmarks = await listSessionBookmarks(
         c.get('db'),
@@ -81,8 +82,9 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     zValidator('query', bookmarkListQuerySchema),
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2876] Header-resolved profileId is only org-checked; verify
-      // caller authority (self or guardian of an uncredentialed charge).
+      // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+      // for the installed profile; consume its target-bound proof when
+      // present, else run the fail-closed fallback (direct/unproven mounts).
       await assertCanReadProfile(c, profileId);
       const { cursor, limit, subjectId, topicId } = c.req.valid('query');
       const result = await listBookmarks(c.get('db'), profileId, {

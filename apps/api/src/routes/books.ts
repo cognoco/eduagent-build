@@ -81,8 +81,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2876] Header-resolved profileId is only org-checked; verify
-      // caller authority (self or guardian of an uncredentialed charge).
+      // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+      // for the installed profile; consume its target-bound proof when
+      // present, else run the fail-closed fallback (direct/unproven mounts).
       await assertCanReadProfile(c, profileId);
       const { limit, cursor } = c.req.valid('query');
       const result = await getAllProfileBooks(db, profileId, { limit, cursor });
@@ -95,8 +96,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2876] Header-resolved profileId is only org-checked; verify
-      // caller authority (self or guardian of an uncredentialed charge).
+      // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+      // for the installed profile; consume its target-bound proof when
+      // present, else run the fail-closed fallback (direct/unproven mounts).
       await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('param');
 
@@ -117,8 +119,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2876] Header-resolved profileId is only org-checked; verify
-      // caller authority (self or guardian of an uncredentialed charge).
+      // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+      // for the installed profile; consume its target-bound proof when
+      // present, else run the fail-closed fallback (direct/unproven mounts).
       await assertCanReadProfile(c, profileId);
       const { subjectId, bookId } = c.req.valid('param');
 
@@ -392,8 +395,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2876] Header-resolved profileId is only org-checked; verify
-      // caller authority (self or guardian of an uncredentialed charge).
+      // [WI-2876] Central middleware (WI-2128) proves self-or-managed-charge
+      // for the installed profile; consume its target-bound proof when
+      // present, else run the fail-closed fallback (direct/unproven mounts).
       await assertCanReadProfile(c, profileId);
       const { bookId } = c.req.valid('param');
 

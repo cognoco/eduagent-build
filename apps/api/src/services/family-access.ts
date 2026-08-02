@@ -394,11 +394,13 @@ type CanReadProfileSource = CallerAuthoritySource & {
  * would be a privacy regression the owner-as-guardian path does not need,
  * since an owner IS the guardian of their own uncredentialed charges.
  *
- * profileScopeMiddleware / getPersonScope only verify that the client-supplied
- * X-Profile-Id belongs to the caller's organization — NOT that it is the
- * caller's own identity or a charge they guard. Route handlers must call this
- * (not rely on profileMeta/profileId alone) before reading another profile's
- * data.
+ * Since WI-2128 (021ab325b), profileScopeMiddleware / getPersonScope resolve
+ * self-or-managed-charge authority centrally before installing profileId, and
+ * stamp the target-bound `profileAuthorityVerifiedFor` proof this guard
+ * consumes. Route handlers must still call this (not rely on
+ * profileMeta/profileId alone): the guard is the defense-in-depth layer for
+ * routes reached without that middleware (direct/unproven mounts), where it
+ * runs the full fail-closed fallback below.
  *
  * verifyPersonOwnershipV2 throws a bare `Error` for "no authority" (designed
  * for its write callers, which don't map errors to HTTP) and a
@@ -414,14 +416,19 @@ export async function assertCanReadProfile(
   // [WI-2876] Defense-in-depth fast path. Since WI-2128 (021ab325b),
   // profileScopeMiddleware resolves caller authority centrally (getPersonScope
   // → resolvePersonOperationAuthorityV2: self or guardian of a login-less
-  // charge — the same rule verifyPersonOwnershipV2 enforces below) before
-  // installing profileId, and stamps the server-only proof BOUND to the
-  // exact profileId it verified. Skip the duplicate
-  // membership/guardianship/login queries ONLY when the proof names exactly
-  // the target profile and that profile is still the installed one (a
-  // downstream profileId rewrite can therefore never ride a stale proof).
-  // Any other target — or a route mounted without the middleware — takes
-  // the full fail-closed check, so standalone/direct routes lose nothing.
+  // charge) before installing profileId, and stamps the server-only proof
+  // BOUND to the exact profileId it verified. The central predicate is at
+  // least as strict as the fallback below — it additionally excludes
+  // archived Persons, which verifyPersonOwnershipV2 does not check — so
+  // honoring the proof never widens read authority. The proof assumes the
+  // downstream principal/account context is not mutated after the
+  // middleware ran (nothing in the request pipeline does so). Skip the
+  // duplicate membership/guardianship/login queries ONLY when the proof
+  // names exactly the target profile and that profile is still the
+  // installed one (a downstream profileId rewrite can therefore never ride
+  // a stale proof). Any other target — or a route mounted without the
+  // middleware — takes the full fail-closed check, so standalone/direct
+  // routes lose nothing.
   if (
     source.get('profileAuthorityVerifiedFor') === targetProfileId &&
     source.get('profileId') === targetProfileId

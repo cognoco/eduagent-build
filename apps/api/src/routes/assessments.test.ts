@@ -454,10 +454,11 @@ describe('GET /v1/assessments/:assessmentId', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-2876] Read-authority guard (G9/G10). profileId is header-resolved and
-// only org-checked; these cases prove a credentialed non-owner caller
-// spoofing another profile via X-Profile-Id is rejected (403) by
-// assertCanReadProfile BEFORE the assessment read runs.
+// [WI-2876] Read-authority guard (G9/G10). makeApp mounts the routes without
+// profileScopeMiddleware, so no profileAuthorityVerifiedFor proof exists —
+// these cases prove the guard's own fail-closed fallback rejects (403) a
+// caller with no authority over the installed profile BEFORE the assessment
+// read runs.
 // ---------------------------------------------------------------------------
 
 describe('[WI-2876] read-authority guard', () => {
