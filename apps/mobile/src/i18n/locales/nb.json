@@ -561,7 +561,9 @@
       "addChildAccessLabel": "Legg til en barneprofil",
       "breakdownSharingTitle": "Del familiebruk",
       "breakdownSharingDescription": "Vis bruk per profil.",
-      "breakdownSharingError": "Kunne ikke oppdatere innstillingen. Prøv igjen."
+      "breakdownSharingError": "Kunne ikke oppdatere innstillingen. Prøv igjen.",
+      "joinFamily": "Bli med i en familie",
+      "joinFamilyDescription": "Skriv inn engangskoden fra en familieinvitasjon."
     },
     "celebrations": {
       "allTitle": "Alle feiringer",
@@ -4675,6 +4677,79 @@
         "topicsExplored_one": "{{count}} emne utforsket i {{subject}}",
         "topicsExplored_other": "{{count}} emner utforsket i {{subject}}"
       }
+    }
+  },
+  "familyJoinJourney": {
+    "title": "Bli med i en familie",
+    "intro": "Skriv inn engangskoden fra invitasjonen din. Ingenting endres før du har gjennomgått hvert valg og fullført prosessen.",
+    "restored": "Vi har gjenopprettet din ufullførte familieinvitasjon på denne enheten. Gå gjennom valgene på nytt før du fortsetter.",
+    "code": {
+      "label": "Familiekode",
+      "placeholder": "Skriv inn engangskoden din"
+    },
+    "membership": {
+      "title": "Flytt kontoen min til dette familieabonnementet",
+      "description": "Innloggingen og læringshistorikken din forblir din. Fakturering flyttes til familieabonnementet."
+    },
+    "processing": {
+      "title": "Tillat behandling av læringsdata i destinasjonsfamilien",
+      "description": "Dette registrerer samtykke for at MentoMate kan fortsette å levere læringstjenesten din etter flyttingen."
+    },
+    "visibility": {
+      "title": "Synlighet for læring",
+      "description": "Velg separat om den inviterende voksne kan bli din støttespiller og se de avtalte læringssammendragene.",
+      "guardianDescription": "Velg om du vil godkjenne elevens side av dette støtteforholdet. Den inviterende støttespilleren må fortsatt godta separat.",
+      "accept": "Tillat synlighet for støttespiller",
+      "acceptDescription": "Start en separat synlighetsavtale. Ingen læringsdata er synlige før begge parter har godtatt.",
+      "decline": "Hold læringen privat",
+      "declineDescription": "Bli med i familieabonnementet uten å opprette synlighet for støttespiller."
+    },
+    "continue": "Gå gjennom invitasjon",
+    "decline": "Behold kontoen min separat",
+    "safeExit": "Avslutt trygt",
+    "awaitingGuardian": {
+      "title": "En verifisert foresatt må fortsette",
+      "message": "Familieflyttingen er satt på pause. En foresatt kan bruke denne koden etter å ha logget inn på denne eller en annen enhet. Koden alene gir ingen autoritet.",
+      "continueAsGuardian": "Fortsett som foresatt"
+    },
+    "guardian": {
+      "title": "Steg for foresatt",
+      "intro": "Logg inn som den voksne hvis foreldreansvar vil bli uavhengig verifisert. Inviterende og foresatt kan være forskjellige personer.",
+      "authorityTitle": "Uavhengig verifisering av foresatt",
+      "providerRequired": "Fullfør den godkjente identitetsleverandør-sjekken og gå tilbake til denne skjermen. MentoMate lagrer ikke bevis fra leverandøren på denne enheten.",
+      "providerReturned": "Leverandøren returnerte en engangsverifisering. Gå gjennom synlighetsvalget før du løser den inn.",
+      "complete": "Bekreft foresattes beslutning"
+    },
+    "guardianFinished": {
+      "title": "Steg for foresatt fullført",
+      "message": "Eleven må logge inn igjen og fullføre familieflyttingen. Den inviterende støttespilleren har fortsatt en separat synlighetsgodkjenning."
+    },
+    "ready": {
+      "title": "Klar til å bli med",
+      "message": "Det nødvendige samtykket er gyldig. Bekreft familieflyttingen nå; synlighet for støttespiller forblir en separat, tosidig avtale.",
+      "join": "Bli med i familien"
+    },
+    "complete": {
+      "title": "Familieflytting fullført",
+      "message": "Kontoen og læringshistorikken din er nå i familieabonnementet. Eventuell synlighet for støttespiller er begrenset til den separat godkjente avtalen."
+    },
+    "terminal": {
+      "expired": {
+        "title": "Denne invitasjonen er utløpt",
+        "message": "Be den inviterende voksne om å sende en ny familieinvitasjon."
+      },
+      "declined": {
+        "title": "Invitasjon avslått",
+        "message": "Kontoen og læringshistorikken din ble ikke flyttet."
+      },
+      "withdrawn": {
+        "title": "Invitasjon trukket tilbake",
+        "message": "Den inviterende voksne trakk tilbake denne invitasjonen. Ingenting ble flyttet."
+      }
+    },
+    "errors": {
+      "completeDecisions": "Skriv inn familiekoden og gå gjennom alle tre valgene før du fortsetter.",
+      "guardianNotReady": "Familiekoden, retur fra leverandør og valg av synlighet for foresatt er påkrevd."
     }
   }
 }

@@ -53,11 +53,22 @@ function isServedByGet(pathname: string): boolean {
 describe('[WI-1753] family-join invite email — every emitted URL is served', () => {
   // THE INVARIANT. Whatever the email body contains, the API must serve it.
   it('emits no URL that the API does not serve', () => {
-    const email = formatFamilyJoinInviteEmail('teen@example.com');
+    const email = formatFamilyJoinInviteEmail(
+      'teen@example.com',
+      'manual-family-code',
+    );
     const urls = extractUrls(email.body);
 
     const dead = urls.filter((u) => !isServedByGet(new URL(u).pathname));
     expect(dead).toEqual([]);
+  });
+
+  it('delivers the exact manual code the authenticated app journey consumes', () => {
+    const code = 'manual-family-code-7YQ9';
+    const email = formatFamilyJoinInviteEmail('teen@example.com', code);
+
+    expect(email.body).toContain(code);
+    expect(email.body).toContain('open MentoMate');
   });
 
   // TEETH #1 — prove the extractor actually finds URLs. Without this, a broken

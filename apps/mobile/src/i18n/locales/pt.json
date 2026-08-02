@@ -588,7 +588,9 @@
       "addChildAccessLabel": "Adicionar um perfil de criança",
       "breakdownSharingTitle": "Compartilhar uso da família",
       "breakdownSharingDescription": "Mostra uso por perfil.",
-      "breakdownSharingError": "Não foi possível atualizar a configuração. Tente novamente."
+      "breakdownSharingError": "Não foi possível atualizar a configuração. Tente novamente.",
+      "joinFamily": "Juntar-se a uma família",
+      "joinFamilyDescription": "Introduza o código único de um convite familiar."
     },
     "celebrations": {
       "allTitle": "Todas as comemorações",
@@ -4675,6 +4677,79 @@
         "topicsExplored_one": "{{count}} tópico explorado em {{subject}}",
         "topicsExplored_other": "{{count}} tópicos explorados em {{subject}}"
       }
+    }
+  },
+  "familyJoinJourney": {
+    "title": "Juntar-se a uma família",
+    "intro": "Introduza o código único do seu convite. Nada muda até rever cada escolha e concluir o processo.",
+    "restored": "Restaurámos o seu convite familiar inacabado neste dispositivo. Reveja as escolhas novamente antes de continuar.",
+    "code": {
+      "label": "Código familiar",
+      "placeholder": "Introduza o seu código único"
+    },
+    "membership": {
+      "title": "Mover a minha conta para este plano familiar",
+      "description": "O seu início de sessão e histórico de aprendizagem continuam a ser seus. A faturação passa para o plano familiar de destino."
+    },
+    "processing": {
+      "title": "Permitir o processamento da aprendizagem na família de destino",
+      "description": "Isto regista o consentimento para a MentoMate continuar a fornecer o seu serviço de aprendizagem após a mudança."
+    },
+    "visibility": {
+      "title": "Visibilidade da aprendizagem",
+      "description": "Escolha separadamente se o adulto que o convidou pode tornar-se seu apoiante e ver os resumos de aprendizagem acordados.",
+      "guardianDescription": "Escolha se autoriza o lado do aprendiz nesta relação de apoio. O apoiante que o convidou ainda tem de aceitar separadamente.",
+      "accept": "Permitir visibilidade do apoiante",
+      "acceptDescription": "Inicie um acordo de visibilidade separado. Nenhum dado de aprendizagem é visível até que ambos os lados aceitem.",
+      "decline": "Manter a aprendizagem privada",
+      "declineDescription": "Junte-se ao plano familiar sem criar visibilidade para o apoiante."
+    },
+    "continue": "Rever convite",
+    "decline": "Manter a minha conta separada",
+    "safeExit": "Sair em segurança",
+    "awaitingGuardian": {
+      "title": "Um tutor verificado deve continuar",
+      "message": "A mudança de família está em pausa. Um tutor pode usar este código após iniciar sessão neste ou noutro dispositivo. O código por si só não concede qualquer autoridade.",
+      "continueAsGuardian": "Continuar como tutor"
+    },
+    "guardian": {
+      "title": "Passo do tutor",
+      "intro": "Inicie sessão como o adulto cuja responsabilidade parental será verificada de forma independente. O convidante e o tutor podem ser pessoas diferentes.",
+      "authorityTitle": "Verificação independente do tutor",
+      "providerRequired": "Conclua a verificação do fornecedor de identidade aprovado e regresse a este ecrã. A MentoMate não armazena provas do fornecedor neste dispositivo.",
+      "providerReturned": "O fornecedor devolveu um identificador de verificação único. Reveja a escolha de visibilidade antes de o resgatar.",
+      "complete": "Confirmar decisão do tutor"
+    },
+    "guardianFinished": {
+      "title": "Passo do tutor concluído",
+      "message": "O aprendiz deve iniciar sessão novamente e concluir a mudança de família. O apoiante que o convidou ainda tem uma aceitação de visibilidade separada."
+    },
+    "ready": {
+      "title": "Pronto para se juntar",
+      "message": "O consentimento necessário está atualizado. Confirme a mudança de família agora; a visibilidade do apoiante permanece um acordo bilateral separado.",
+      "join": "Juntar-se à família"
+    },
+    "complete": {
+      "title": "Mudança de família concluída",
+      "message": "A sua conta e histórico de aprendizagem estão agora no plano familiar. Qualquer visibilidade do apoiante permanece limitada ao seu contrato aceite separadamente."
+    },
+    "terminal": {
+      "expired": {
+        "title": "Este convite expirou",
+        "message": "Peça ao adulto que o convidou para enviar um novo convite familiar."
+      },
+      "declined": {
+        "title": "Convite recusado",
+        "message": "A sua conta e histórico de aprendizagem não foram movidos."
+      },
+      "withdrawn": {
+        "title": "Convite retirado",
+        "message": "O adulto que o convidou retirou este convite. Nada foi movido."
+      }
+    },
+    "errors": {
+      "completeDecisions": "Introduza o código familiar e reveja as três escolhas antes de continuar.",
+      "guardianNotReady": "O código familiar, o retorno do fornecedor e a escolha de visibilidade do tutor são necessários."
     }
   }
 }

@@ -1156,6 +1156,13 @@
       "when": 1785623424769,
       "tag": "0166_familiar_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1785664649007,
+      "tag": "0167_wi2534_resumable_family_join",
+      "breakpoints": true
     }
   ]
 }

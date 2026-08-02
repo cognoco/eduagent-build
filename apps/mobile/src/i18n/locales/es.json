@@ -561,7 +561,9 @@
       "addChildAccessLabel": "Agregar un perfil de niño",
       "breakdownSharingTitle": "Compartir uso familiar",
       "breakdownSharingDescription": "Muestra uso por perfil.",
-      "breakdownSharingError": "No se pudo actualizar el ajuste. Inténtalo de nuevo."
+      "breakdownSharingError": "No se pudo actualizar el ajuste. Inténtalo de nuevo.",
+      "joinFamily": "Únete a una familia",
+      "joinFamilyDescription": "Introduce el código de un solo uso de una invitación familiar."
     },
     "celebrations": {
       "allTitle": "Todas las celebraciones",
@@ -4675,6 +4677,79 @@
         "topicsExplored_one": "{{count}} tema explorado en {{subject}}",
         "topicsExplored_other": "{{count}} temas explorados en {{subject}}"
       }
+    }
+  },
+  "familyJoinJourney": {
+    "title": "Únete a una familia",
+    "intro": "Introduce el código de un solo uso de tu invitación. Nada cambiará hasta que revises cada opción y termines el proceso.",
+    "restored": "Hemos restaurado tu invitación familiar incompleta en este dispositivo. Revisa las opciones de nuevo antes de continuar.",
+    "code": {
+      "label": "Código familiar",
+      "placeholder": "Introduce tu código de un solo uso"
+    },
+    "membership": {
+      "title": "Mover mi cuenta a este plan familiar",
+      "description": "Tu inicio de sesión y tu historial de aprendizaje seguirán siendo tuyos. La facturación se moverá al plan familiar de destino."
+    },
+    "processing": {
+      "title": "Permitir el procesamiento del aprendizaje en la familia de destino",
+      "description": "Esto registra el consentimiento para que MentoMate siga proporcionando tu servicio de aprendizaje después del cambio."
+    },
+    "visibility": {
+      "title": "Visibilidad del aprendizaje",
+      "description": "Elige por separado si el adulto que te invita puede convertirse en tu mentor y ver los resúmenes de aprendizaje acordados.",
+      "guardianDescription": "Elige si autorizas la parte del aprendiz en esta relación de apoyo. El mentor que invita aún debe aceptar por separado.",
+      "accept": "Permitir visibilidad del mentor",
+      "acceptDescription": "Inicia un acuerdo de visibilidad por separado. No se verán datos de aprendizaje hasta que ambas partes acepten.",
+      "decline": "Mantener el aprendizaje privado",
+      "declineDescription": "Únete al plan familiar sin crear visibilidad para el mentor."
+    },
+    "continue": "Revisar invitación",
+    "decline": "Mantener mi cuenta separada",
+    "safeExit": "Salir de forma segura",
+    "awaitingGuardian": {
+      "title": "Un tutor verificado debe continuar",
+      "message": "El cambio de familia está en pausa. Un tutor puede usar este código después de iniciar sesión en este u otro dispositivo. El código por sí solo no otorga ninguna autoridad.",
+      "continueAsGuardian": "Continuar como tutor"
+    },
+    "guardian": {
+      "title": "Paso del tutor",
+      "intro": "Inicia sesión como el adulto cuya responsabilidad parental será verificada de forma independiente. El invitador y el tutor pueden ser personas diferentes.",
+      "authorityTitle": "Verificación independiente del tutor",
+      "providerRequired": "Completa la verificación del proveedor de identidad aprobado y vuelve a esta pantalla. MentoMate no almacena pruebas del proveedor en este dispositivo.",
+      "providerReturned": "El proveedor ha devuelto un identificador de verificación de un solo uso. Revisa la opción de visibilidad antes de canjearlo.",
+      "complete": "Confirmar decisión del tutor"
+    },
+    "guardianFinished": {
+      "title": "Paso del tutor completado",
+      "message": "El aprendiz debe volver a iniciar sesión y finalizar el cambio de familia. El mentor que invita todavía tiene una aceptación de visibilidad por separado."
+    },
+    "ready": {
+      "title": "Listo para unirte",
+      "message": "El consentimiento requerido está actualizado. Confirma el cambio de familia ahora; la visibilidad del mentor sigue siendo un acuerdo bilateral independiente.",
+      "join": "Unirse a la familia"
+    },
+    "complete": {
+      "title": "Cambio de familia completado",
+      "message": "Tu cuenta y tu historial de aprendizaje están ahora en el plan familiar. Cualquier visibilidad del mentor sigue limitada a su contrato aceptado por separado."
+    },
+    "terminal": {
+      "expired": {
+        "title": "Esta invitación ha caducado",
+        "message": "Pide al adulto que te invitó que te envíe una nueva invitación familiar."
+      },
+      "declined": {
+        "title": "Invitación rechazada",
+        "message": "Tu cuenta y tu historial de aprendizaje no se han movido."
+      },
+      "withdrawn": {
+        "title": "Invitación retirada",
+        "message": "El adulto que te invitó retiró esta invitación. No se ha movido nada."
+      }
+    },
+    "errors": {
+      "completeDecisions": "Introduce el código familiar y revisa las tres opciones antes de continuar.",
+      "guardianNotReady": "Se requiere el código familiar, la respuesta del proveedor y la elección de visibilidad del tutor."
     }
   }
 }

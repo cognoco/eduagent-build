@@ -5,12 +5,13 @@ import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
 const mockReplace = jest.fn();
 const mockFetch = createRoutedMockFetch();
+let mockParams: Record<string, string | undefined> = {
+  chargePersonId: '22222222-2222-4222-8222-222222222222',
+  verificationHandle: 'single-use-provider-handle',
+};
 
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({
-    chargePersonId: '22222222-2222-4222-8222-222222222222',
-    verificationHandle: 'single-use-provider-handle',
-  }),
+  useLocalSearchParams: () => mockParams,
   useRouter: () => ({ replace: mockReplace }),
 }));
 
@@ -41,6 +42,42 @@ describe('GuardianAttachmentScreen', () => {
       status: 'attached',
       consentSatisfied: true,
     });
+    mockParams = {
+      chargePersonId: '22222222-2222-4222-8222-222222222222',
+      verificationHandle: 'single-use-provider-handle',
+    };
+  });
+
+  it('returns a family-journey provider callback without running the generic attachment path', async () => {
+    mockParams = {
+      familyCode: 'family-code',
+      verificationHandle: 'family-provider-handle',
+    };
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: {
+              queries: { retry: false },
+              mutations: { retry: false },
+            },
+          })
+        }
+      >
+        <GuardianAttachmentScreen />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/family-join',
+        params: {
+          code: 'family-code',
+          verificationHandle: 'family-provider-handle',
+        },
+      }),
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('runs verifier initiation before authority-token redemption', async () => {

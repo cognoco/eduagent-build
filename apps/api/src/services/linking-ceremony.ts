@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import {
+  guardianship,
   person,
   supportVisibilityAuditEvents,
   supportVisibilityContracts,
@@ -34,7 +35,8 @@ export async function writeVisibilityAuditEvent(
       | 'contract_accepted'
       | 'appeal_requested'
       | 'supportership_revoked'
-      | 'graduation_restamped';
+      | 'graduation_restamped'
+      | 'authority_invalidated';
     payload: Record<string, unknown>;
   },
 ): Promise<void> {
@@ -345,6 +347,89 @@ export async function acceptLink(
 
     return mapContract(updated);
   });
+}
+
+/**
+ * Accept the supportee side on behalf of a consent-gated learner after the
+ * family-join service has redeemed current guardian authority in the same
+ * transaction. The supporter side remains independent and pending.
+ */
+export async function acceptLinkForSupporteeByGuardianInTransaction(
+  db: Database,
+  input: {
+    contractId: string;
+    guardianPersonId: string;
+    supporteePersonId: string;
+    authorityRedemptionId: string;
+    now: Date;
+  },
+): Promise<VisibilityContract> {
+  // This helper runs inside the family-join transaction. Keep queries
+  // sequential because node-postgres does not support concurrent statements on
+  // one transaction client (and pg 9 removes that deprecated behavior).
+  const contract = await readContractById(db, input.contractId);
+  const currentGuardian = await db.query.guardianship.findFirst({
+    where: and(
+      eq(guardianship.guardianPersonId, input.guardianPersonId),
+      eq(guardianship.chargePersonId, input.supporteePersonId),
+      isNull(guardianship.revokedAt),
+    ),
+    columns: { id: true },
+  });
+  if (
+    !currentGuardian ||
+    contract.supporteePersonId !== input.supporteePersonId
+  ) {
+    throw new ForbiddenError('Current guardian authority is required.');
+  }
+  if (contract.status === 'lapsed' || contract.status === 'revoked') {
+    throw new ConflictError('This visibility contract is no longer active.');
+  }
+  if (contract.supporteeAcceptedAt !== null) return contract;
+  if (contract.status !== 'pending' && contract.status !== 'restamped') {
+    throw new ConflictError('This visibility contract cannot be accepted.');
+  }
+
+  const [updated] = await db
+    .update(supportVisibilityContracts)
+    .set({
+      supporteeAcceptedAt: input.now,
+      status: sql<string>`case when ${supportVisibilityContracts.supporterAcceptedAt} is not null then 'accepted' else ${supportVisibilityContracts.status} end`,
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(supportVisibilityContracts.id, input.contractId),
+        eq(
+          supportVisibilityContracts.supporteePersonId,
+          input.supporteePersonId,
+        ),
+        inArray(supportVisibilityContracts.status, ['pending', 'restamped']),
+        isNull(supportVisibilityContracts.supporteeAcceptedAt),
+      ),
+    )
+    .returning();
+  if (!updated) {
+    const winner = await readContractById(db, input.contractId);
+    if (winner.supporteeAcceptedAt !== null) return winner;
+    throw new ConflictError('This visibility contract cannot be accepted.');
+  }
+
+  await writeVisibilityAuditEvent(db, {
+    supportershipId: updated.supportershipId,
+    contractId: updated.id,
+    actorPersonId: input.guardianPersonId,
+    eventType: 'contract_accepted',
+    payload: {
+      audience: 'supportee',
+      authorizedBy: 'current_guardian',
+      supporteePersonId: input.supporteePersonId,
+      authorityRedemptionId: input.authorityRedemptionId,
+      status: updated.status,
+      contractVersion: updated.contractVersion,
+    },
+  });
+  return mapContract(updated);
 }
 
 export async function getContractForVisibleLink(

@@ -1,13 +1,17 @@
 // ---------------------------------------------------------------------------
-// WI-1753 — family-join routes (cross-account existing-teen family join).
+// WI-1753 / WI-2534 — family-join routes (cross-account existing-learner join).
 //
-// Two authenticated endpoints:
+// Authenticated surfaces:
 //   POST /family-join/invite  — a parent (adult owner/admin of their family org)
 //                               issues an invite by email. ANTI-ENUM (AC-1):
 //                               byte-identical neutral response in every case.
 //   POST /family-join/accept  — the invited teen accepts via the emailed token,
 //                               repointing their membership into the family org
 //                               (delegates to acceptFamilyJoin — family-join-v2).
+//   POST /family-join/journey and its guardian/finalize/decline companions —
+//                               start or resume the durable, separately-consented
+//                               family move, support, and visibility ceremony.
+//   POST /family-join/invites/:inviteId/withdraw — inviter withdrawal.
 //
 // Route/service boundary: these handlers own auth + validation + error mapping
 // only. ALL DB access (inviter resolution + gates, token lookup, invite consume)
@@ -21,19 +25,45 @@ import type { Database } from '@eduagent/database';
 import {
   familyJoinAcceptResultSchema,
   familyJoinAcceptRequestSchema,
+  familyJoinDeclineRequestSchema,
+  familyJoinFinalizeRequestSchema,
+  familyJoinGuardianCompletionRequestSchema,
+  familyJoinGuardianInitiationRequestSchema,
   familyJoinInviteRequestSchema,
+  familyJoinJourneyRequestSchema,
+  familyJoinJourneyResultSchema,
+  familyJoinWithdrawParamsSchema,
+  familyJoinWithdrawRequestSchema,
+  guardianAttachmentInitiationResultSchema,
+  ERROR_CODES,
 } from '@eduagent/schemas';
 
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
-import { BadRequestError, NotFoundError, RateLimitedError } from '../errors';
+import {
+  apiError,
+  BadRequestError,
+  forbidden,
+  NotFoundError,
+  RateLimitedError,
+} from '../errors';
 import {
   initiateFamilyJoinInvite,
   resolveFamilyJoinInviteByToken,
   resolveFamilyJoinInviter,
 } from '../services/identity-v2/family-join-invite';
 import { acceptFamilyJoin } from '../services/identity-v2/family-join-v2';
+import {
+  completeFamilyJoinGuardianStep,
+  declineFamilyJoinJourney,
+  finalizeFamilyJoinJourney,
+  initiateFamilyJoinGuardianVerification,
+  startOrResumeFamilyJoinJourney,
+  withdrawFamilyJoinJourney,
+} from '../services/identity-v2/family-join-journey';
+import { GuardianAttachmentRejectedError } from '../services/identity-v2/guardian-attachment';
+import { GuardianVerifierUnavailableError } from '../services/identity-v2/guardian-attachment-verifier';
 import {
   createSlidingWindowRateLimiter,
   resolveRateLimitIp,
@@ -54,9 +84,16 @@ const familyJoinInviteLimiter = createSlidingWindowRateLimiter({
   maxEntries: FAMILY_JOIN_INVITE_MAP_MAX_ENTRIES,
 });
 
+const familyJoinGuardianLimiter = createSlidingWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  maxEntries: FAMILY_JOIN_INVITE_MAP_MAX_ENTRIES,
+});
+
 /** Test-only reset of the in-memory invite limiter (mirrors consent). */
 export function __resetFamilyJoinInviteRateLimit(): void {
   familyJoinInviteLimiter.reset();
+  familyJoinGuardianLimiter.reset();
 }
 
 type FamilyJoinRouteEnv = {
@@ -66,6 +103,9 @@ type FamilyJoinRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    GUARDIAN_AUTHORITY_TOKEN_SECRET?: string;
+    GUARDIAN_AUTHORITY_VERIFIER_URL?: string;
+    GUARDIAN_AUTHORITY_VERIFIER_KEY?: string;
   };
   Variables: {
     user: AuthUser;
@@ -95,6 +135,28 @@ function withCaller(c: Context<FamilyJoinRouteEnv>): {
     throw new BadRequestError('Identity v2 caller person is required.');
   }
   return { db, callerPersonId };
+}
+
+function assertGuardianVerifierConfigured(c: Context<FamilyJoinRouteEnv>): {
+  tokenSecret: string;
+  verifierUrl: string;
+  verifierKey: string;
+} | null {
+  const tokenSecret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
+  const verifierUrl = c.env.GUARDIAN_AUTHORITY_VERIFIER_URL;
+  const verifierKey = c.env.GUARDIAN_AUTHORITY_VERIFIER_KEY;
+  return tokenSecret && verifierUrl && verifierKey
+    ? { tokenSecret, verifierUrl, verifierKey }
+    : null;
+}
+
+function guardianJourneyRateLimited(c: Context<FamilyJoinRouteEnv>): boolean {
+  return familyJoinGuardianLimiter.isLimited(
+    resolveRateLimitIp(
+      c.req.header('cf-connecting-ip'),
+      c.req.header('x-forwarded-for'),
+    ),
+  );
 }
 
 export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
@@ -147,6 +209,137 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
       // 409) and the caller-authority gates above — none of which depend on
       // whether `invitedEmail` matches an account.
       return c.json({ status: 'sent' as const });
+    },
+  )
+  .post(
+    '/family-join/journey',
+    zValidator('json', familyJoinJourneyRequestSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      const result = await startOrResumeFamilyJoinJourney(db, {
+        ...c.req.valid('json'),
+        callerPersonId,
+      });
+      return c.json(familyJoinJourneyResultSchema.parse(result));
+    },
+  )
+  .post(
+    '/family-join/journey/guardian/initiate',
+    zValidator('json', familyJoinGuardianInitiationRequestSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      if (guardianJourneyRateLimited(c)) {
+        throw new RateLimitedError(
+          'Too many guardian verification attempts. Please try again later.',
+        );
+      }
+      const verifier = assertGuardianVerifierConfigured(c);
+      if (!verifier) {
+        return apiError(
+          c,
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Guardian authority verification is not configured.',
+        );
+      }
+      try {
+        const result = await initiateFamilyJoinGuardianVerification(db, {
+          ...c.req.valid('json'),
+          callerPersonId,
+          ...verifier,
+        });
+        return c.json(guardianAttachmentInitiationResultSchema.parse(result));
+      } catch (error) {
+        if (error instanceof GuardianAttachmentRejectedError) {
+          return forbidden(
+            c,
+            'Guardian authority is not valid for this family journey.',
+          );
+        }
+        if (error instanceof GuardianVerifierUnavailableError) {
+          return apiError(
+            c,
+            503,
+            ERROR_CODES.SERVICE_UNAVAILABLE,
+            error.message,
+          );
+        }
+        throw error;
+      }
+    },
+  )
+  .post(
+    '/family-join/journey/guardian/complete',
+    zValidator('json', familyJoinGuardianCompletionRequestSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      if (guardianJourneyRateLimited(c)) {
+        throw new RateLimitedError(
+          'Too many guardian verification attempts. Please try again later.',
+        );
+      }
+      const tokenSecret = c.env.GUARDIAN_AUTHORITY_TOKEN_SECRET;
+      if (!tokenSecret) {
+        return apiError(
+          c,
+          503,
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          'Guardian authority verification is not configured.',
+        );
+      }
+      try {
+        const result = await completeFamilyJoinGuardianStep(db, {
+          ...c.req.valid('json'),
+          callerPersonId,
+          tokenSecret,
+        });
+        return c.json(familyJoinJourneyResultSchema.parse(result));
+      } catch (error) {
+        if (error instanceof GuardianAttachmentRejectedError) {
+          return forbidden(
+            c,
+            'Guardian authority is not valid for this family journey.',
+          );
+        }
+        throw error;
+      }
+    },
+  )
+  .post(
+    '/family-join/journey/finalize',
+    zValidator('json', familyJoinFinalizeRequestSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      const result = await finalizeFamilyJoinJourney(db, {
+        ...c.req.valid('json'),
+        callerPersonId,
+      });
+      return c.json(familyJoinJourneyResultSchema.parse(result));
+    },
+  )
+  .post(
+    '/family-join/journey/decline',
+    zValidator('json', familyJoinDeclineRequestSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      const result = await declineFamilyJoinJourney(db, {
+        ...c.req.valid('json'),
+        callerPersonId,
+      });
+      return c.json(familyJoinJourneyResultSchema.parse(result));
+    },
+  )
+  .post(
+    '/family-join/invites/:inviteId/withdraw',
+    zValidator('param', familyJoinWithdrawParamsSchema),
+    zValidator('json', familyJoinWithdrawRequestSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      const result = await withdrawFamilyJoinJourney(db, {
+        inviteId: c.req.valid('param').inviteId,
+        callerPersonId,
+      });
+      return c.json(familyJoinJourneyResultSchema.parse(result));
     },
   )
   .post(

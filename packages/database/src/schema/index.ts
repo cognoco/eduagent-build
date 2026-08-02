@@ -1,5 +1,6 @@
 export * from './identity';
 export * from './guardian-authority-redemptions';
+export * from './family-join-journey';
 export * from './activity-ledger';
 export * from './profiles';
 export * from './subjects';

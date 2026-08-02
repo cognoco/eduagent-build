@@ -203,6 +203,8 @@ describe('MoreScreen landing', () => {
     screen.getByText('Preferences');
     screen.getByTestId('more-row-mentor-memory');
     screen.getByTestId('more-row-mentor-language');
+    fireEvent.press(screen.getByTestId('more-row-join-family'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/family-join');
     screen.getByTestId('add-child-link');
     screen.getByTestId('more-row-notifications');
     screen.getByTestId('more-row-account');

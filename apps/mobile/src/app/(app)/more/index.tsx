@@ -159,59 +159,67 @@ export default function MoreScreen() {
           />
         </View>
 
-        {showAddChild ? (
-          <>
-            <SectionHeader>{t('more.family.sectionHeader')}</SectionHeader>
-            <Pressable
-              onPress={handleAddChild}
-              className="bg-surface rounded-card px-4 py-3.5 mb-2"
-              accessibilityLabel={t('more.family.addChildAccessLabel')}
-              accessibilityRole="button"
-              testID="add-child-link"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('more.family.addChild')}
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {t('more.family.addChildDescription')}
-              </Text>
-            </Pressable>
-            {linkedChildren.length > 0 ? (
-              <View
-                className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
-                testID="family-breakdown-sharing-toggle"
+        <SectionHeader>{t('more.family.sectionHeader')}</SectionHeader>
+        <View className="gap-2">
+          <SettingsRow
+            label={t('more.family.joinFamily')}
+            description={t('more.family.joinFamilyDescription')}
+            onPress={() => router.push('/(app)/family-join' as Href)}
+            testID="more-row-join-family"
+          />
+          {showAddChild ? (
+            <>
+              <Pressable
+                onPress={handleAddChild}
+                className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                accessibilityLabel={t('more.family.addChildAccessLabel')}
+                accessibilityRole="button"
+                testID="add-child-link"
               >
-                <View className="flex-1 pr-3">
-                  <Text className="text-body text-text-primary">
-                    {t('more.family.breakdownSharingTitle')}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    {t('more.family.breakdownSharingDescription')}
-                  </Text>
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('more.family.addChild')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1">
+                  {t('more.family.addChildDescription')}
+                </Text>
+              </Pressable>
+              {linkedChildren.length > 0 ? (
+                <View
+                  className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+                  testID="family-breakdown-sharing-toggle"
+                >
+                  <View className="flex-1 pr-3">
+                    <Text className="text-body text-text-primary">
+                      {t('more.family.breakdownSharingTitle')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      {t('more.family.breakdownSharingDescription')}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={familyPoolBreakdownSharing ?? false}
+                    onValueChange={(value) => {
+                      updateFamilyPoolBreakdownSharing.mutate(value, {
+                        onError: () => {
+                          platformAlert(
+                            t('more.errors.couldNotSaveSetting'),
+                            t('more.family.breakdownSharingError'),
+                          );
+                        },
+                      });
+                    }}
+                    disabled={
+                      breakdownSharingLoading ||
+                      updateFamilyPoolBreakdownSharing.isPending
+                    }
+                    accessibilityLabel={t('more.family.breakdownSharingTitle')}
+                    testID="family-breakdown-sharing-toggle-switch"
+                  />
                 </View>
-                <Switch
-                  value={familyPoolBreakdownSharing ?? false}
-                  onValueChange={(value) => {
-                    updateFamilyPoolBreakdownSharing.mutate(value, {
-                      onError: () => {
-                        platformAlert(
-                          t('more.errors.couldNotSaveSetting'),
-                          t('more.family.breakdownSharingError'),
-                        );
-                      },
-                    });
-                  }}
-                  disabled={
-                    breakdownSharingLoading ||
-                    updateFamilyPoolBreakdownSharing.isPending
-                  }
-                  accessibilityLabel={t('more.family.breakdownSharingTitle')}
-                  testID="family-breakdown-sharing-toggle-switch"
-                />
-              </View>
-            ) : null}
-          </>
-        ) : null}
+              ) : null}
+            </>
+          ) : null}
+        </View>
 
         {/* 3. Sub-screen links */}
         <SectionHeader>{t('more.sections.settings')}</SectionHeader>

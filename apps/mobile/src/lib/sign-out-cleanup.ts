@@ -21,6 +21,7 @@ import {
   FAMILY_INTENT_ONBOARDING_RECOVERY_KEY,
 } from './family-intent-onboarding-state';
 import { clearMentorLanguageStateOnSignOut } from './mentor-language-coordination';
+import { FAMILY_JOIN_JOURNEY_KEY } from './family-join-journey-state';
 
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
@@ -156,6 +157,8 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   MENTOR_BORN_PENDING_KEY,
   // family-intent-onboarding-state.ts — transient account-scoped fork state.
   FAMILY_INTENT_ONBOARDING_KEY,
+  // family-join-journey-state.ts — opaque invite continuation and decision state.
+  FAMILY_JOIN_JOURNEY_KEY,
 ];
 
 // [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that

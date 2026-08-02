@@ -12,6 +12,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import {
   consentGrant,
   consentRequest,
+  countryPolicyRegistry,
   familyJoinInvite,
   guardianship,
   login,
@@ -44,17 +45,64 @@ import { clearJWKSCache } from '../middleware/jwt';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
 import { __resetFamilyJoinInviteRateLimit } from './family-join';
 
+const GUARDIAN_TOKEN_SECRET =
+  'family-join-guardian-authority-secret-at-least-32-chars';
+const GUARDIAN_VERIFIER_URL = 'https://family-join-guardian.test/verify';
+const GUARDIAN_VERIFIER_KEY = 'family-join-guardian-test-key';
 const TEST_ENV = {
   ...buildIntegrationEnv(),
   FAMILY_JOIN_ENABLED: 'true',
+  GUARDIAN_AUTHORITY_TOKEN_SECRET: GUARDIAN_TOKEN_SECRET,
+  GUARDIAN_AUTHORITY_VERIFIER_URL: GUARDIAN_VERIFIER_URL,
+  GUARDIAN_AUTHORITY_VERIFIER_KEY: GUARDIAN_VERIFIER_KEY,
 };
 
 const nativeFetch = globalThis.fetch;
 installFetchInterceptor();
 mockClerkJWKS();
 addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
+addFetchHandler(GUARDIAN_VERIFIER_URL, async (_url, init) => {
+  const body = JSON.parse(String(init?.body)) as {
+    expected: {
+      guardianPersonId: string;
+      chargePersonId: string;
+      organizationId: string;
+      jurisdiction: string;
+      policyVersion: string;
+      learnerAssentAt: string | null;
+    };
+  };
+  return new Response(
+    JSON.stringify({
+      decision: 'approved',
+      guardianPersonId: body.expected.guardianPersonId,
+      chargePersonId: body.expected.chargePersonId,
+      organizationId: body.expected.organizationId,
+      jurisdiction: body.expected.jurisdiction,
+      policyVersion: body.expected.policyVersion,
+      assuranceLevel: 'VPC_VERIFIED',
+      assuranceMethod: 'verified_parental_responsibility_credential',
+      evidenceId: `vpc:${randomUUID()}`,
+      qualification: 'biological_parent',
+      learnerAssentAt: body.expected.learnerAssentAt,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
+});
 
 const RUN_ID = randomUUID();
+const POLICY_AS_OF = new Date();
+const POLICY_VERSION = `wi2534-route-${randomUUID()}`;
+const CLOSED_CONTROLLER_GATES = {
+  externalPrivacyLegalReview: true,
+  aiActClassification: true,
+  reliableAgeAndResidence: true,
+  childTransparency: true,
+  adultCommercialRelationship: true,
+  countryAllowlist: true,
+  operationalRightsAndIncidents: true,
+  launchDayLegalRefresh: true,
+};
 const CURRENT_YEAR = new Date().getUTCFullYear();
 const ADULT_BIRTH_YEAR = CURRENT_YEAR - 40;
 const SELF_CONSENT_CAPABLE_BIRTH_YEAR = CURRENT_YEAR - 18;
@@ -68,6 +116,7 @@ interface SeededIdentity {
 }
 
 let db: Database;
+let policyId: string;
 const seededClerkUserIds: string[] = [];
 const seededEmails: string[] = [];
 const seededPersonIds: string[] = [];
@@ -94,6 +143,24 @@ async function seedIdentity(
   seededPersonIds.push(graph.personId);
   seededOrganizationIds.push(graph.organizationId);
 
+  await db
+    .update(person)
+    .set({
+      residenceJurisdiction: 'DE',
+      residenceKnowing: {
+        method: 'self_report',
+        confidence: 0.8,
+        assertedAt: new Date().toISOString(),
+        corroboratingMethods: ['billing_address'],
+      },
+      ageKnowing: {
+        method: 'verified_credential',
+        confidence: 1,
+        lastUpdated: new Date().toISOString(),
+      },
+    })
+    .where(eq(person.id, graph.personId));
+
   return {
     clerkUserId,
     email,
@@ -110,7 +177,7 @@ function authHeaders(identity: SeededIdentity): HeadersInit {
 }
 
 function post(
-  path: '/v1/family-join/invite' | '/v1/family-join/accept',
+  path: string,
   body: unknown,
   identity?: SeededIdentity,
   ipAddress?: string,
@@ -266,8 +333,34 @@ async function cleanupFixtures(): Promise<void> {
   seededOrganizationIds.length = 0;
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   db = createIntegrationDb();
+  const basePolicy = await db.query.countryPolicyRegistry.findFirst({
+    where: eq(countryPolicyRegistry.countryCode, 'DE'),
+  });
+  if (!basePolicy) throw new Error('DE policy fixture is missing');
+  const { id: _id, createdAt: _createdAt, ...copy } = basePolicy;
+  const [inserted] = await db
+    .insert(countryPolicyRegistry)
+    .values({
+      ...copy,
+      launchStatus: 'enabled',
+      launchBlockReason: null,
+      legalVerificationStatus: 'verified',
+      legalReviewedAt: POLICY_AS_OF,
+      legalReviewValidUntil: new Date(
+        POLICY_AS_OF.getTime() + 365 * 24 * 60 * 60 * 1000,
+      ),
+      launchDayReviewRequired: false,
+      processingLocationClass: 'eea_only',
+      policyVersion: POLICY_VERSION,
+      effectiveAt: new Date(POLICY_AS_OF.getTime() - 1),
+      expiresAt: null,
+      controllerGates: CLOSED_CONTROLLER_GATES,
+    })
+    .returning({ id: countryPolicyRegistry.id });
+  if (!inserted) throw new Error('Allowed DE policy was not inserted');
+  policyId = inserted.id;
 });
 
 beforeEach(() => {
@@ -279,7 +372,12 @@ afterEach(async () => {
   await cleanupFixtures();
 });
 
-afterAll(() => {
+afterAll(async () => {
+  if (policyId) {
+    await db
+      .delete(countryPolicyRegistry)
+      .where(eq(countryPolicyRegistry.id, policyId));
+  }
   restoreFetch();
 });
 
@@ -599,5 +697,233 @@ describe('family-join routes (integration)', () => {
         where: eq(organization.id, teen.organizationId),
       }),
     ).resolves.toBeDefined();
+  });
+
+  it('runs the authenticated self-consent journey and returns its committed result on retry', async () => {
+    const parent = await seedIdentity('journey-self-parent', ADULT_BIRTH_YEAR);
+    const learner = await seedIdentity(
+      'journey-self-learner',
+      SELF_CONSENT_CAPABLE_BIRTH_YEAR,
+    );
+    const issued = await inviteThroughRoute(parent, learner.email);
+
+    const started = await post(
+      '/v1/family-join/journey',
+      {
+        token: issued.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'accept',
+      },
+      learner,
+    );
+    expect(started.status).toBe(200);
+    await expect(started.json()).resolves.toMatchObject({
+      status: 'ready_to_join',
+      supportershipAuthority: 'learner',
+      supportershipDecision: 'accept',
+    });
+
+    const finalized = await post(
+      '/v1/family-join/journey/finalize',
+      { token: issued.token },
+      learner,
+    );
+    expect(finalized.status).toBe(200);
+    await expect(finalized.json()).resolves.toMatchObject({
+      status: 'joined',
+      familyOrgId: parent.organizationId,
+      alreadyMember: false,
+      supportershipAuthority: 'learner',
+      supportershipDecision: 'accept',
+      visibilityContract: {
+        supporterPersonId: parent.personId,
+        supporteePersonId: learner.personId,
+        supporterAcceptedAt: null,
+        status: 'pending',
+      },
+    });
+
+    const resumed = await post(
+      '/v1/family-join/journey',
+      {
+        token: issued.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'accept',
+      },
+      learner,
+    );
+    expect(resumed.status).toBe(200);
+    await expect(resumed.json()).resolves.toMatchObject({
+      status: 'joined',
+      alreadyMember: true,
+    });
+  });
+
+  it('uses an alternate authenticated guardian without turning that guardian into the supporter', async () => {
+    const inviter = await seedIdentity(
+      'journey-guardian-inviter',
+      ADULT_BIRTH_YEAR,
+    );
+    const learner = await seedIdentity(
+      'journey-guardian-learner',
+      CONSENT_REQUIRED_BIRTH_YEAR,
+    );
+    const guardian = await seedIdentity(
+      'journey-alternate-guardian',
+      ADULT_BIRTH_YEAR,
+    );
+    await setProfileConsentStatusForTest({
+      profileId: learner.personId,
+      accountId: learner.organizationId,
+      status: 'CONSENTED',
+    });
+    const issued = await inviteThroughRoute(inviter, learner.email);
+
+    const started = await post(
+      '/v1/family-join/journey',
+      {
+        token: issued.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'accept',
+      },
+      learner,
+    );
+    expect(started.status).toBe(200);
+    await expect(started.json()).resolves.toMatchObject({
+      status: 'awaiting_guardian',
+      supportershipAuthority: 'guardian',
+      supportershipDecision: 'pending',
+    });
+
+    const initiation = await post(
+      '/v1/family-join/journey/guardian/initiate',
+      {
+        token: issued.token,
+        verificationHandle: `route-verification-${randomUUID()}`,
+        authorizeSupportership: false,
+      },
+      guardian,
+    );
+    expect(initiation.status).toBe(200);
+    const initiationBody = (await initiation.json()) as {
+      authorityToken: string;
+    };
+    expect(initiationBody.authorityToken).toEqual(expect.any(String));
+
+    const completion = await post(
+      '/v1/family-join/journey/guardian/complete',
+      {
+        token: issued.token,
+        authorityToken: initiationBody.authorityToken,
+        authorizeSupportership: false,
+      },
+      guardian,
+    );
+    expect(completion.status).toBe(200);
+    await expect(completion.json()).resolves.toMatchObject({
+      status: 'ready_to_join',
+      supportershipAuthority: 'guardian',
+      supportershipDecision: 'decline',
+      visibilityContract: null,
+    });
+
+    const finalized = await post(
+      '/v1/family-join/journey/finalize',
+      { token: issued.token },
+      learner,
+    );
+    expect(finalized.status).toBe(200);
+    await expect(finalized.json()).resolves.toMatchObject({
+      status: 'joined',
+      familyOrgId: inviter.organizationId,
+      supportershipAuthority: 'guardian',
+      supportershipDecision: 'decline',
+      visibilityContract: null,
+    });
+    await expect(
+      db.query.guardianship.findFirst({
+        where: and(
+          eq(guardianship.guardianPersonId, guardian.personId),
+          eq(guardianship.chargePersonId, learner.personId),
+        ),
+      }),
+    ).resolves.toBeDefined();
+    await expect(
+      db.query.supportership.findFirst({
+        where: eq(supportership.supporteePersonId, learner.personId),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('exposes learner decline and inviter-only withdrawal as separate terminal actions', async () => {
+    const declineParent = await seedIdentity(
+      'journey-decline-parent',
+      ADULT_BIRTH_YEAR,
+    );
+    const decliningLearner = await seedIdentity(
+      'journey-declining-learner',
+      SELF_CONSENT_CAPABLE_BIRTH_YEAR,
+    );
+    const declineInvite = await inviteThroughRoute(
+      declineParent,
+      decliningLearner.email,
+    );
+    await post(
+      '/v1/family-join/journey',
+      {
+        token: declineInvite.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'decline',
+      },
+      decliningLearner,
+    );
+    const declined = await post(
+      '/v1/family-join/journey/decline',
+      { token: declineInvite.token },
+      decliningLearner,
+    );
+    expect(declined.status).toBe(200);
+    await expect(declined.json()).resolves.toEqual({ status: 'declined' });
+
+    const withdrawParent = await seedIdentity(
+      'journey-withdraw-parent',
+      ADULT_BIRTH_YEAR,
+    );
+    const withdrawLearner = await seedIdentity(
+      'journey-withdraw-learner',
+      SELF_CONSENT_CAPABLE_BIRTH_YEAR,
+    );
+    const withdrawInvite = await inviteThroughRoute(
+      withdrawParent,
+      withdrawLearner.email,
+    );
+    await post(
+      '/v1/family-join/journey',
+      {
+        token: withdrawInvite.token,
+        familyMembershipDecision: 'accept',
+        destinationProcessingAssent: true,
+        supportershipDecision: 'decline',
+      },
+      withdrawLearner,
+    );
+    const withdrawn = await post(
+      `/v1/family-join/invites/${withdrawInvite.inviteId}/withdraw`,
+      {},
+      withdrawParent,
+    );
+    expect(withdrawn.status).toBe(200);
+    await expect(withdrawn.json()).resolves.toEqual({ status: 'withdrawn' });
+
+    const wrongActor = await post(
+      `/v1/family-join/invites/${withdrawInvite.inviteId}/withdraw`,
+      {},
+      decliningLearner,
+    );
+    expect(wrongActor.status).toBe(403);
   });
 });

@@ -594,7 +594,9 @@
       "addChildAccessLabel": "Dodaj profil dziecka",
       "breakdownSharingTitle": "Udostępnij użycie rodziny",
       "breakdownSharingDescription": "Pokaż użycie profili.",
-      "breakdownSharingError": "Nie udało się zaktualizować ustawienia. Spróbuj ponownie."
+      "breakdownSharingError": "Nie udało się zaktualizować ustawienia. Spróbuj ponownie.",
+      "joinFamily": "Dołącz do rodziny",
+      "joinFamilyDescription": "Wprowadź jednorazowy kod z zaproszenia do rodziny."
     },
     "celebrations": {
       "allTitle": "Wszystkie celebracje",
@@ -4863,6 +4865,79 @@
         "topicsExplored_many": "{{subject}}: {{count}} zbadanych tematów",
         "topicsExplored_other": "{{subject}}: {{count}} zbadanych tematów"
       }
+    }
+  },
+  "familyJoinJourney": {
+    "title": "Dołącz do rodziny",
+    "intro": "Wprowadź jednorazowy kod z zaproszenia. Nic się nie zmieni, dopóki nie przejrzysz każdej opcji i nie zakończysz procesu.",
+    "restored": "Przywróciliśmy na tym urządzeniu Twoje niedokończone zaproszenie do rodziny. Przejrzyj opcje ponownie przed kontynuacją.",
+    "code": {
+      "label": "Kod rodziny",
+      "placeholder": "Wprowadź swój jednorazowy kod"
+    },
+    "membership": {
+      "title": "Przenieś moje konto do tego planu rodzinnego",
+      "description": "Twój login i historia nauki pozostają Twoje. Rozliczenia zostaną przeniesione do docelowego planu rodzinnego."
+    },
+    "processing": {
+      "title": "Zezwól na przetwarzanie danych o nauce w docelowej rodzinie",
+      "description": "To jest zgoda dla MentoMate na dalsze świadczenie usług edukacyjnych po przeniesieniu."
+    },
+    "visibility": {
+      "title": "Widoczność postępów w nauce",
+      "description": "Wybierz osobno, czy zapraszająca osoba dorosła może zostać Twoim mentorem i widzieć uzgodnione podsumowania nauki.",
+      "guardianDescription": "Wybierz, czy autoryzować stronę ucznia w tej relacji wsparcia. Zapraszający mentor musi jeszcze osobno wyrazić zgodę.",
+      "accept": "Zezwól na widoczność dla mentora",
+      "acceptDescription": "Rozpocznij osobną umowę o widoczności. Żadne dane o nauce nie będą widoczne, dopóki obie strony nie wyrażą zgody.",
+      "decline": "Zachowaj prywatność nauki",
+      "declineDescription": "Dołącz do planu rodzinnego bez tworzenia widoczności dla mentora."
+    },
+    "continue": "Przejrzyj zaproszenie",
+    "decline": "Zachowaj moje konto jako osobne",
+    "safeExit": "Wyjdź bezpiecznie",
+    "awaitingGuardian": {
+      "title": "Zweryfikowany opiekun musi kontynuować",
+      "message": "Przenoszenie do rodziny jest wstrzymane. Opiekun może użyć tego kodu po zalogowaniu się na tym lub innym urządzeniu. Sam kod nie nadaje żadnych uprawnień.",
+      "continueAsGuardian": "Kontynuuj jako opiekun"
+    },
+    "guardian": {
+      "title": "Krok opiekuna",
+      "intro": "Zaloguj się jako osoba dorosła, której odpowiedzialność rodzicielska zostanie niezależnie zweryfikowana. Zapraszający i opiekun mogą być różnymi osobami.",
+      "authorityTitle": "Niezależna weryfikacja opiekuna",
+      "providerRequired": "Ukończ weryfikację u zatwierdzonego dostawcy tożsamości i wróć do tego ekranu. MentoMate nie przechowuje dowodów od dostawcy na tym urządzeniu.",
+      "providerReturned": "Dostawca zwrócił jednorazowy uchwyt weryfikacyjny. Przejrzyj opcję widoczności przed jego użyciem.",
+      "complete": "Potwierdź decyzję opiekuna"
+    },
+    "guardianFinished": {
+      "title": "Krok opiekuna zakończony",
+      "message": "Uczeń musi zalogować się ponownie i dokończyć przenoszenie do rodziny. Zapraszający mentor wciąż musi osobno zaakceptować widoczność."
+    },
+    "ready": {
+      "title": "Gotowe do dołączenia",
+      "message": "Wymagana zgoda jest aktualna. Potwierdź teraz przeniesienie do rodziny; widoczność dla mentora pozostaje osobną, dwustronną umową.",
+      "join": "Dołącz do rodziny"
+    },
+    "complete": {
+      "title": "Przeniesienie do rodziny zakończone",
+      "message": "Twoje konto i historia nauki znajdują się teraz w planie rodzinnym. Widoczność dla mentora jest ograniczona do osobno zaakceptowanej umowy."
+    },
+    "terminal": {
+      "expired": {
+        "title": "To zaproszenie wygasło",
+        "message": "Poproś zapraszającą osobę dorosłą o wysłanie nowego zaproszenia do rodziny."
+      },
+      "declined": {
+        "title": "Zaproszenie odrzucone",
+        "message": "Twoje konto i historia nauki nie zostały przeniesione."
+      },
+      "withdrawn": {
+        "title": "Zaproszenie wycofane",
+        "message": "Zapraszająca osoba dorosła wycofała to zaproszenie. Nic nie zostało przeniesione."
+      }
+    },
+    "errors": {
+      "completeDecisions": "Wprowadź kod rodziny i przejrzyj wszystkie trzy opcje przed kontynuacją.",
+      "guardianNotReady": "Wymagany jest kod rodziny, potwierdzenie od dostawcy i wybór widoczności przez opiekuna."
     }
   }
 }

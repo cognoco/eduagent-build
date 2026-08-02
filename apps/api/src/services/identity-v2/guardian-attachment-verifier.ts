@@ -47,6 +47,10 @@ export interface GuardianAuthorityInitiationInput {
   verifierUrl: string;
   verifierKey: string;
   tokenSecret: string;
+  /** Server-derived destination override for an unfinished family join. */
+  destinationOrganizationId?: string;
+  /** Server-derived learner assent bound to a joint family-join ceremony. */
+  expectedLearnerAssentAt?: Date;
   now?: Date;
   fetchImpl?: typeof fetch;
 }
@@ -80,6 +84,7 @@ function commandBindingDigest(
     authorizationForm: string;
     requiredAssuranceLevel: string;
     purposeSetDigest: string;
+    learnerAssentAt: string | null;
   },
   secret: string,
 ): string {
@@ -200,6 +205,7 @@ export async function initiateGuardianAuthorityVerification(
     callerPersonId: input.callerPersonId,
     chargePersonId: input.chargePersonId,
     asOf: now,
+    destinationOrganizationId: input.destinationOrganizationId,
   });
 
   const purposesDigest = purposeSetDigest();
@@ -217,6 +223,7 @@ export async function initiateGuardianAuthorityVerification(
       authorizationForm: context.authorizationForm,
       requiredAssuranceLevel: context.requiredAssuranceLevel,
       purposeSetDigest: purposesDigest,
+      learnerAssentAt: input.expectedLearnerAssentAt?.toISOString() ?? null,
     },
     input.tokenSecret,
   );
@@ -323,6 +330,7 @@ export async function initiateGuardianAuthorityVerification(
           policyVersion: context.policyVersion,
           requiredAssuranceLevel: 'VPC_VERIFIED',
           authorizationForm: context.authorizationForm,
+          learnerAssentAt: input.expectedLearnerAssentAt?.toISOString() ?? null,
         },
       }),
     });
@@ -360,6 +368,9 @@ export async function initiateGuardianAuthorityVerification(
     verified.organizationId !== context.organizationId ||
     verified.jurisdiction !== context.jurisdiction ||
     verified.policyVersion !== context.policyVersion ||
+    (input.expectedLearnerAssentAt !== undefined &&
+      new Date(verified.learnerAssentAt ?? '').getTime() !==
+        input.expectedLearnerAssentAt.getTime()) ||
     (context.authorizationForm === 'joint_child_guardian' &&
       (!verified.learnerAssentAt ||
         new Date(verified.learnerAssentAt).getTime() > now.getTime()))
@@ -429,6 +440,8 @@ export async function attachGuardianConsentFromDurableAuthorityToken(
     chargePersonId: string;
     authorityToken: string;
     tokenSecret: string;
+    /** Server-derived destination override for an unfinished family join. */
+    destinationOrganizationId?: string;
   },
 ) {
   const authority = await verifyDurableGuardianAuthorityToken(
@@ -441,5 +454,6 @@ export async function attachGuardianConsentFromDurableAuthorityToken(
     callerPersonId: input.callerPersonId,
     chargePersonId: input.chargePersonId,
     authority,
+    destinationOrganizationId: input.destinationOrganizationId,
   });
 }

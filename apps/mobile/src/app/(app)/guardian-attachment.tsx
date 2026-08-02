@@ -21,9 +21,11 @@ export default function GuardianAttachmentScreen(): React.ReactElement {
   const params = useLocalSearchParams<{
     chargePersonId?: string | string[];
     verificationHandle?: string | string[];
+    familyCode?: string | string[];
   }>();
   const chargePersonId = firstParam(params.chargePersonId);
   const verificationHandle = firstParam(params.verificationHandle);
+  const familyCode = firstParam(params.familyCode);
   const initiation = useGuardianAuthorityInitiation();
   const attachment = useGuardianAttachment();
   const started = useRef(false);
@@ -51,8 +53,15 @@ export default function GuardianAttachmentScreen(): React.ReactElement {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    if (familyCode && verificationHandle) {
+      router.replace({
+        pathname: '/(app)/family-join',
+        params: { code: familyCode, verificationHandle },
+      } as Href);
+      return;
+    }
     void execute();
-  }, [execute]);
+  }, [execute, familyCode, router, verificationHandle]);
 
   if (error) {
     return (

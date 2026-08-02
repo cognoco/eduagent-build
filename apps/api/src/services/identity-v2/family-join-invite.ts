@@ -136,11 +136,12 @@ export async function initiateFamilyJoinInvite(
         recipientChangeCount: sql`CASE WHEN ${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} THEN ${familyJoinInvite.recipientChangeCount} + 1 ELSE ${familyJoinInvite.recipientChangeCount} END`,
         updatedAt: sql`now()`,
       },
-      // Terminal-status guard + the two caps, atomic. An accepted slot can never
-      // be revived to 'pending'. `invited_email` is NOT NULL so there is no
+      // Only an unbound pending slot may be resent or retargeted. Once the
+      // learner binds a journey, invitation identity is frozen until its
+      // terminal outcome. `invited_email` is NOT NULL so there is no
       // initial-assignment branch: same recipient → resend cap; real change →
       // change cap.
-      setWhere: sql`${familyJoinInvite.status} <> 'accepted' AND ((${familyJoinInvite.invitedEmail} IS NOT DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.resendCount} < ${MAX_FAMILY_JOIN_RESENDS}) OR (${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.recipientChangeCount} < ${MAX_FAMILY_JOIN_RECIPIENT_CHANGES}))`,
+      setWhere: sql`${familyJoinInvite.status} = 'pending' AND ((${familyJoinInvite.invitedEmail} IS NOT DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.resendCount} < ${MAX_FAMILY_JOIN_RESENDS}) OR (${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.recipientChangeCount} < ${MAX_FAMILY_JOIN_RECIPIENT_CHANGES}))`,
     })
     .returning();
 
@@ -151,8 +152,8 @@ export async function initiateFamilyJoinInvite(
       where: inviteKey(input.inviterPersonId, input.familyOrgId),
       columns: { status: true },
     });
-    if (existingRow?.status === 'accepted') {
-      throw new ConflictError('This family invite has already been accepted.');
+    if (existingRow?.status !== 'pending') {
+      throw new ConflictError('This family invite already has a journey.');
     }
     throw new RateLimitedError(
       isRecipientChange
@@ -161,12 +162,11 @@ export async function initiateFamilyJoinInvite(
     );
   }
 
-  // The invite email carries NO action link (operator ruling 2026-07-12) — the
-  // accept surface it would have to point at does not exist yet. The token is
-  // still minted and stored on the row above; only its DELIVERY is deferred to
-  // the accept-surface work. See formatFamilyJoinInviteEmail.
+  // The invite email carries no action link because no universal/app-link is
+  // configured. It delivers the opaque token as a manual code consumed by the
+  // authenticated resumable app journey.
   const emailResult = await sendEmail(
-    formatFamilyJoinInviteEmail(input.invitedEmail),
+    formatFamilyJoinInviteEmail(input.invitedEmail, token),
     input.emailOptions,
   );
 
@@ -300,19 +300,23 @@ export async function claimFamilyJoinInvite(
   db: Database,
   inviteId: string,
   presentedToken: string,
+  options?: { retainTokenForJourney?: boolean },
 ): Promise<boolean> {
   const claimed = await db
     .update(familyJoinInvite)
     .set({
       status: 'accepted',
       acceptedAt: sql`now()`,
-      token: null,
+      // The legacy one-shot accept clears the bearer. A durable journey keeps
+      // the exact token until its existing expiry so an authenticated invited
+      // learner can recover the committed result after response loss.
+      token: options?.retainTokenForJourney ? presentedToken : null,
       updatedAt: sql`now()`,
     })
     .where(
       and(
         eq(familyJoinInvite.id, inviteId),
-        eq(familyJoinInvite.status, 'pending'),
+        sql`${familyJoinInvite.status} IN ('pending','bound')`,
         eq(familyJoinInvite.token, presentedToken),
         sql`${familyJoinInvite.tokenExpiresAt} > now()`,
       ),
