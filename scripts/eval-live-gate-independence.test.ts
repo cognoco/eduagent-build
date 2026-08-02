@@ -40,6 +40,7 @@ jest.mock(
 
 import { TEACHING_SCENARIOS } from '../apps/api/eval-llm/fixtures/teaching-scenarios';
 import { CHALLENGE_SIM_SCENARIOS } from '../apps/api/eval-llm/fixtures/challenge-personas';
+import { MAX_CHALLENGE_QUESTIONS } from '../apps/api/src/services/challenge-round/caps';
 import { PROFILES } from '../apps/api/eval-llm/fixtures/profiles';
 import { ENVELOPE_FLOWS } from '../apps/api/eval-llm/envelope-flow-registry';
 import { FLOWS } from '../apps/api/eval-llm/flow-registry';
@@ -76,6 +77,16 @@ function loadJobSteps(workflowPath: string, jobId: string): WorkflowStep[] {
   return steps;
 }
 
+function deriveWorkflowMasteryBudget(step: WorkflowStep) {
+  const runs = step.run?.match(/--runs (\d+)/);
+  if (!runs) throw new Error('Mastery workflow step must configure --runs');
+  return deriveMasteryBudget({
+    scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
+    runs: Number(runs[1]),
+    questionsPerRound: MAX_CHALLENGE_QUESTIONS,
+  });
+}
+
 describe('eval-live.yml — three independent live gates (WI-2461)', () => {
   const steps = loadJobSteps('.github/workflows/eval-live.yml', 'live-evals');
   const envelopeStep = steps.find((s) =>
@@ -106,10 +117,13 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     const evidence = readFileSync(
       join(repoRoot, '.github/workflows/eval-live.yml'),
       'utf8',
-    ).match(/required=(\d+) samples; its 10% headroom configures (\d+)/);
+    ).match(
+      /baseline=(\d+) and required=(\d+) samples; its 10% headroom configures (\d+)/,
+    );
     expect(evidence).not.toBeNull();
-    expect(Number(evidence![1])).toBe(budget.requiredSamples);
-    expect(Number(evidence![2])).toBe(budget.configuredBudget);
+    expect(Number(evidence![1])).toBe(budget.baselineSamples);
+    expect(Number(evidence![2])).toBe(budget.requiredSamples);
+    expect(Number(evidence![3])).toBe(budget.configuredBudget);
   });
 
   test('hand-maintained envelope registry matches the runtime envelope subset', () => {
@@ -118,17 +132,12 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     );
   });
 
-  test('mastery cap is the derived complete 8 × 3 configured-unit grid', () => {
+  test('mastery cap is derived from the workflow run count and server question cap', () => {
     expect(masteryStep).toBeDefined();
-    const budget = deriveMasteryBudget({
-      scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
-      runs: 3,
-    });
+    const budget = deriveWorkflowMasteryBudget(masteryStep!);
     const cap = masteryStep!.run!.match(/--max-live-calls (\d+)/);
     expect(cap).not.toBeNull();
     expect(Number(cap![1])).toBe(budget.configuredUnits);
-    expect(budget.expectedProviderCalls).toBe(192);
-    expect(masteryStep!.run).toContain('216');
   });
 
   test('workflow keeps heterogeneous gate caps separate from comparable provider demand', () => {
@@ -140,10 +149,7 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       ENVELOPE_FLOWS,
       PROFILES,
     );
-    const masteryBudget = deriveMasteryBudget({
-      scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
-      runs: 3,
-    });
+    const masteryBudget = deriveWorkflowMasteryBudget(masteryStep!);
     const teachingProviderCalls = TEACHING_SCENARIOS.length * 17;
     const workflowComments = workflow.replace(/^\s*#\s?/gm, '');
     const providerEvidence = workflowComments.match(
