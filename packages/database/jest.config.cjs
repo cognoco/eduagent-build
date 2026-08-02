@@ -3,7 +3,7 @@ const { join } = require('path');
 
 // Reading the SWC compilation config for the spec files
 const swcJestConfig = JSON.parse(
-  readFileSync(`${__dirname}/.spec.swcrc`, 'utf-8')
+  readFileSync(`${__dirname}/.spec.swcrc`, 'utf-8'),
 );
 
 // Disable .swcrc look-up by SWC core because we're passing in swcJestConfig ourselves
@@ -14,7 +14,7 @@ module.exports = {
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   setupFiles: [join(__dirname, 'jest.setup.ts')],
-  testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
+  testMatch: ['**/src/**/*.(spec|test).[jt]s?(x)'],
   modulePathIgnorePatterns: ['\\.claude/worktrees'],
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
@@ -34,7 +34,6 @@ module.exports = {
       statements: 60,
     },
   },
-  passWithNoTests: true,
   testTimeout: 30000,
   maxWorkers: 1,
 };
