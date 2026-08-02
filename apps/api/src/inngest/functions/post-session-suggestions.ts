@@ -21,32 +21,17 @@ import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-owners
 
 const logger = createLogger();
 
-const filingCompletedContextShape = {
-  profileId: z.string(),
-  sessionId: z.string().optional(),
-  timestamp: z.string().optional(),
-};
-
 const filingCompletedDataSchema = z
-  .union([
-    z.object({
-      ...filingCompletedContextShape,
-      bookId: z.string(),
-      topicId: z.string(),
-    }),
-    z.object({
-      ...filingCompletedContextShape,
-      bookId: z.null(),
-      topicId: z.null(),
-    }),
-    z.object({
-      ...filingCompletedContextShape,
-      // Rolling-deploy compatibility for the legacy no-topic producer:
-      // undefined fields disappeared when Inngest serialized the event.
-      bookId: z.undefined().optional(),
-      topicId: z.undefined().optional(),
-    }),
-  ])
+  .object({
+    profileId: z.string(),
+    sessionId: z.string().optional(),
+    timestamp: z.string().optional(),
+    // Rolling-deploy compatibility: legacy producers omitted topicId and
+    // no-topic producers omitted either or both identifiers after JSON
+    // serialization. Any incomplete target is normalized to the no-topic path.
+    bookId: z.string().nullish(),
+    topicId: z.string().nullish(),
+  })
   .transform(({ bookId, topicId, ...context }) => ({
     ...context,
     bookId: bookId ?? null,

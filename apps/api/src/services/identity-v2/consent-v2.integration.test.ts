@@ -1484,14 +1484,21 @@ const COPPA = 'coppa_parental_consent';
       it('preserves the resend count when Resend permanently rejects the attempt', async () => {
         const orgId = await seedOrg();
         const childId = await seedPerson(orgId);
-        await requestConsentV2(db, {
-          chargePersonId: childId,
-          organizationId: orgId,
-          consentType: 'GDPR',
-          guardianEmail: 'real-parent@example.com',
-          childName: 'Kid',
-          appUrl: 'https://api.test',
-        });
+        const restoreSeedTransport = registerEmailTransportForTesting(
+          async () => ({ sent: true }),
+        );
+        try {
+          await requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'real-parent@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          });
+        } finally {
+          restoreSeedTransport();
+        }
         const restoreTransport = registerEmailTransportForTesting(async () => ({
           sent: false,
           retryability: 'permanent',

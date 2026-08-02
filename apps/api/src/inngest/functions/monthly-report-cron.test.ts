@@ -1841,6 +1841,44 @@ describe('monthlyReportGenerate', () => {
       expect(mockLogNotification).not.toHaveBeenCalled();
     });
 
+    it('throws when sendEmail reports no_api_key so configuration repair can be retried', async () => {
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null);
+      (
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' });
+      (
+        mockMonthlyReportDb.query.login.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
+      mockSendEmail.mockResolvedValueOnce({
+        sent: false,
+        retryability: 'none',
+        reason: 'no_api_key',
+      });
+      const runner = createInngestStepRunner({
+        runResults: {
+          'generate-monthly-report': REPORT_RESULT,
+          'send-monthly-push': { sent: true },
+        },
+      });
+      const handler = (monthlyReportGenerate as any).fn;
+
+      await expect(
+        handler({
+          event: {
+            data: makeGenerateEvent(),
+            name: 'app/monthly-report.generate',
+          },
+          step: runner.step,
+        }),
+      ).rejects.toThrow(
+        'monthly-report-generate retryable email configuration failure: no_api_key',
+      );
+
+      expect(mockLogNotification).not.toHaveBeenCalled();
+    });
+
     it('attempt 2: email sends when push step is memoized (dedup check NOT re-evaluated)', async () => {
       // Simulate Inngest retry: both generate-monthly-report AND
       // send-monthly-push are memoized (already completed).

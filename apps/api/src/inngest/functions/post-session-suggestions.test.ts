@@ -195,20 +195,22 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
     [{ bookId: null, topicId: 'topic-1' }],
     [{ bookId: 'book-1' }],
     [{ topicId: 'topic-1' }],
-  ])('[WI-2788] rejects a mixed filing target: %o', async (target) => {
-    const result = await runHandler({
-      profileId: validEventData.profileId,
-      sessionId: validEventData.sessionId,
-      ...target,
-    });
+    [{ bookId: 'book-1', topicTitle: 'Legacy topic title' }],
+  ])(
+    '[WI-2788] normalizes and skips a mixed or legacy filing target: %o',
+    async (target) => {
+      const result = await runHandler({
+        profileId: validEventData.profileId,
+        sessionId: validEventData.sessionId,
+        ...target,
+      });
 
-    expect(result).toEqual(
-      expect.objectContaining({ status: 'skipped', reason: 'invalid_payload' }),
-    );
-    expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
-    expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
-    expect(mockRouteAndCall).not.toHaveBeenCalled();
-  });
+      expect(result).toEqual({ status: 'skipped', reason: 'no_topic' });
+      expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+      expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+      expect(mockRouteAndCall).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns skipped:invalid_json when LLM emits malformed JSON (no throw, no retry)', async () => {
     mockRouteAndCall.mockResolvedValue({

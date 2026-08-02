@@ -685,6 +685,11 @@ export const monthlyReportGenerate = inngest.createFunction(
             reportResult.reportMonth,
           ),
         });
+        if (!result.sent && result.reason === 'no_api_key') {
+          throw new Error(
+            'monthly-report-generate retryable email configuration failure: no_api_key',
+          );
+        }
         if (!result.sent && result.retryability === 'transient') {
           throw new Error(
             `monthly-report-generate transient email failure: ${result.reason}`,

@@ -76,6 +76,22 @@ import { ConflictError } from '../../errors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
+const NON_DATE_FAKEABLE_APIS = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+] as const;
 
 (RUN ? describe : describe.skip)(
   'executeDeletionV2 GDPR gaps (WI-849, integration)',
@@ -343,7 +359,7 @@ const RUN = !!process.env.DATABASE_URL;
         releaseAfter: null,
       });
 
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: [...NON_DATE_FAKEABLE_APIS] });
       jest.setSystemTime(new Date('2000-01-01T00:00:00.000Z'));
       try {
         await markPendingClerkErasuresComplete(db, [clerkUserId]);
@@ -378,7 +394,7 @@ const RUN = !!process.env.DATABASE_URL;
         releaseAfter: sql`clock_timestamp() + interval '1 hour'`,
       });
 
-      jest.useFakeTimers();
+      jest.useFakeTimers({ doNotFake: [...NON_DATE_FAKEABLE_APIS] });
       jest.setSystemTime(new Date('2100-01-01T00:00:00.000Z'));
       try {
         await expect(
