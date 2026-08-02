@@ -26,7 +26,7 @@ const mockFormatConsentReminderEmail = jest.fn(
 );
 
 jest.mock(
-  '../../services/safe-non-core' /* gc1-allow: external Inngest dispatch boundary */,
+  '../../services/safe-non-core' /* gc1-allow: requires live Inngest transport unavailable in unit step-runner context */,
   () => {
     const actual = jest.requireActual(
       '../../services/safe-non-core',
@@ -46,19 +46,22 @@ jest.mock(
 // so the requestedAt-window suppression remains test-controllable.
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockGetStepDatabase(),
-    getStepClerkSecretKey: jest.fn(() => 'clerk-test-key'),
-    getStepResendApiKey: jest.fn(() => 're_test_key'),
-    getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
-    getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: request-scoped DB and secret bindings unavailable in unit step-runner context */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockGetStepDatabase(),
+      getStepClerkSecretKey: jest.fn(() => 'clerk-test-key'),
+      getStepResendApiKey: jest.fn(() => 're_test_key'),
+      getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
+      getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
+    };
+  },
+);
 
 jest.mock(
   '../../services/identity-v2/consent-v2' /* gc1-allow: write fn — refreshConsentTokenForRequestV2 performs an .update().returning() token write, not exercisable on the unit Proxy mock-db; no consent-reminders integration twin exists yet — coverage gap tracked WI-905 */,
@@ -74,19 +77,22 @@ jest.mock(
   },
 );
 
-jest.mock('../../services/notifications', () => {
-  const actual = jest.requireActual(
-    '../../services/notifications',
-  ) as typeof import('../../services/notifications');
-  return {
-    ...actual,
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    formatConsentReminderEmail: (...args: unknown[]) =>
-      mockFormatConsentReminderEmail(
-        ...(args as [string, string, number, string]),
-      ),
-  };
-});
+jest.mock(
+  '../../services/notifications' /* gc1-allow: workflow unit test isolates live Resend transport; requireActual preserves other exports */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      formatConsentReminderEmail: (...args: unknown[]) =>
+        mockFormatConsentReminderEmail(
+          ...(args as [string, string, number, string]),
+        ),
+    };
+  },
+);
 
 jest.mock(
   '../../services/identity-v2/deletion-v2' /* gc1-allow: internal-service exception — the real snapshot/atomic-erasure path requires a transaction, advisory lock, and graph queries unavailable on the unit Proxy DB. This suite pins the durable Inngest step ABI, so adapters return persisted step-result shapes; requireActual preserves untouched exports. Real DB coverage gap remains tracked by WI-905. */,

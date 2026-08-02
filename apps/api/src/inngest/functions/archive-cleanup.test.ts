@@ -5,7 +5,7 @@ const mockInngestTransport = createInngestTransportCapture();
 const mockSafeSend = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
-  '../../services/safe-non-core' /* gc1-allow: external Inngest dispatch boundary */,
+  '../../services/safe-non-core' /* gc1-allow: requires live Inngest transport unavailable in unit step-runner context */,
   () => {
     const actual = jest.requireActual(
       '../../services/safe-non-core',

@@ -11,7 +11,7 @@ const mockRouteAndCall = jest.fn();
 const mockFindOwnedCurriculumTopic = jest.fn();
 
 jest.mock(
-  '../../services/curriculum-topic-ownership' /* gc1-allow: live database ownership lookup boundary */,
+  '../../services/curriculum-topic-ownership' /* gc1-allow: multi-join ownership query is inexpressible on the unit mock DB; integration tests own real semantics */,
   () => {
     const actual = jest.requireActual(
       '../../services/curriculum-topic-ownership',
