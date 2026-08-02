@@ -30,6 +30,11 @@ export function parseTarget(databaseUrl) {
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
     refuse('DATABASE_URL must use the postgres or postgresql protocol.');
   }
+  if (parsed.searchParams.has('host') || parsed.searchParams.has('hostaddr')) {
+    refuse(
+      'DATABASE_URL query-string host overrides (host, hostaddr) are not allowed.',
+    );
+  }
   const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
   if (!parsed.hostname || !databaseName) {
     refuse('DATABASE_URL must identify both a host and database name.');
