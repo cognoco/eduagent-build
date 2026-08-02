@@ -1,0 +1,44 @@
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:api:integration /home/vetinari/nexus/_dev/eduagent-build
+> node scripts/run-api-integration.mjs --jest --testPathPatterns 'quota-provision-v2.integration|subscription-core-v2.integration|quota-reconcile.integration'
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+apps/api                                 |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+apps/mobile                              |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/database                        |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/retention                       |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/schemas                         |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+packages/test-utils                      |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.18.0","pnpm":"10.19.0"})
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS @eduagent/api:integration apps/api/src/services/billing/quota-reconcile.integration.test.ts (17.177 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/billing/billing-v2/quota-provision-v2.integration.test.ts (6.307 s)
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+PASS @eduagent/api:integration apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts
+  ● Console
+
+    console.log
+      [api-setup] Using Neon HTTP driver
+
+      at createDatabase (tests/integration/api-setup.ts:44:19)
+
+
+Test Suites: 3 passed, 3 total
+Tests:       16 passed, 16 total
+Snapshots:   0 total
+Time:        25.26 s
+Ran all test suites matching quota-provision-v2.integration|subscription-core-v2.integration|quota-reconcile.integration.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

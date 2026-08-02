@@ -1,0 +1,91 @@
+{
+  "target": {
+    "project": "lingering-violet-30592106",
+    "branch": "br-weathered-silence-agw4on4x"
+  },
+  "orphans_remaining": 0,
+  "deleted_ids_still_present": 0,
+  "quota_pools_remaining": 6,
+  "remaining_rows": [
+    {
+      "id": "019d67c6-2457-77a1-bb34-4c5a9c802500",
+      "subscription_id": "019d67c6-23a6-7a7f-97aa-ed64d883bb1c",
+      "monthly_limit": 1500,
+      "used_this_month": 0,
+      "daily_limit": null,
+      "used_today": 0
+    },
+    {
+      "id": "019d85c5-d2e5-787d-aa2a-0a654e5809d3",
+      "subscription_id": "019d85c5-d2a9-79c5-a337-b16b4988a531",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0
+    },
+    {
+      "id": "019d85c7-ba52-7769-855f-1eba93b88472",
+      "subscription_id": "019d85c7-ba29-71ba-bb1e-46cf993faa65",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0
+    },
+    {
+      "id": "019d85c7-beb8-702c-9de0-730fc4b938a6",
+      "subscription_id": "019d85c7-be83-7df1-a771-a110b13e3cc8",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0
+    },
+    {
+      "id": "019d85c7-c2ce-753f-bf4d-31b2d15f87ff",
+      "subscription_id": "019d85c7-c2a1-7205-a27c-3af7593f08b0",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0
+    },
+    {
+      "id": "019f22a7-36bd-700f-86df-adbc48f043b3",
+      "subscription_id": "019f22a7-3646-74a6-b08c-bcce50abea6b",
+      "monthly_limit": 700,
+      "used_this_month": 0,
+      "daily_limit": null,
+      "used_today": 0
+    }
+  ],
+  "total_usage_preserved": {
+    "m": 0,
+    "d": 0
+  },
+  "live_fks_still_targeting_legacy_parents": [
+    {
+      "conname": "profile_quota_usage_subscription_id_subscriptions_id_fk",
+      "child": "profile_quota_usage",
+      "parent": "subscriptions"
+    },
+    {
+      "conname": "quota_pools_subscription_id_subscriptions_id_fk",
+      "child": "quota_pools",
+      "parent": "subscriptions"
+    },
+    {
+      "conname": "subscriptions_account_id_accounts_id_fk",
+      "child": "subscriptions",
+      "parent": "accounts"
+    },
+    {
+      "conname": "top_up_credits_subscription_id_subscriptions_id_fk",
+      "child": "top_up_credits",
+      "parent": "subscriptions"
+    },
+    {
+      "conname": "usage_events_subscription_id_subscriptions_id_fk",
+      "child": "usage_events",
+      "parent": "subscriptions"
+    }
+  ],
+  "unvalidated_fks": 0
+}
