@@ -8,6 +8,14 @@ export interface Violation {
 }
 
 const SHA_REF = /^[a-f0-9]{40}$/;
+
+// Estate ruling D-80 (2026-08-02, WI-3039): claude-code-action deliberately floats
+// at @v1 — upstream fixes arrive automatically, the verdict-marker evaluator catches
+// the posts-nothing failure mode, and the review gate fails closed. Every other
+// external action stays SHA-pinned; add here only with an estate ruling.
+const FLOATING_REF_ALLOWLIST: ReadonlyMap<string, string> = new Map([
+  ['anthropics/claude-code-action', 'v1'],
+]);
 const YAML_FILE = /\.ya?ml$/;
 const SECRET_REFERENCE = /secrets\s*(\.|\[)/;
 
@@ -132,6 +140,8 @@ function validateActionRef(file: string, step: Record<string, unknown>) {
   }
 
   const ref = uses.slice(atIndex + 1);
+  const action = uses.slice(0, atIndex);
+  if (FLOATING_REF_ALLOWLIST.get(action) === ref) return null;
   if (!SHA_REF.test(ref)) {
     return {
       file,

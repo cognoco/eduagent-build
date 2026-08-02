@@ -292,7 +292,7 @@ jobs:
         id: review-1
         continue-on-error: true
         timeout-minutes: 20
-        uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1 # v1
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ env.CLAUDE_REVIEW_PROMPT }}
@@ -305,7 +305,7 @@ jobs:
         if: steps.review-1.outcome == 'failure'
         continue-on-error: true
         timeout-minutes: 20
-        uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1 # v1
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
           prompt: ${{ env.CLAUDE_REVIEW_PROMPT }}
@@ -316,7 +316,7 @@ jobs:
         if: steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'
         continue-on-error: true
         timeout-minutes: 20
-        uses: anthropics/claude-code-action@20c8abf165d5f85ab3fc970db9498436377dc9d1 # v1
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
           prompt: ${{ env.CLAUDE_REVIEW_PROMPT }}

@@ -73,7 +73,7 @@ root and in `docs/`.
 ## L2 — All decisions (ADRs)
 
 The full ADR register and the significance gate live in
-[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0019`, `MMT-ADR-0021`, `MMT-ADR-0022`
+[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0019`, `MMT-ADR-0021`, `MMT-ADR-0022`, the reconstructed `0023`–`0052` series (Proposed unless marked), and `0053` (agents-file design principles, Proposed)
 (`0003` is unused — number gap, not a live record; `0020` is reserved for the identity-foundation cutover-plan consent-request ADR and is not yet filed; `0017` records the concept-capture additive layer; `0018` promotes the legacy `ARCH-8` LLM-orchestrator entry; `0019` records the OS-agnostic cross-platform development policy; `0021` records the freeform Library-filing threshold (five-exchange gate); `0022` records the activity-ledger narration substrate). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
 draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 
@@ -85,7 +85,11 @@ draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
   — provisionally approved with the WI-2037 rewrite of MMT-ADR-0010 and
   operative for delivery; final ratification is tracked in OPQ-160.
 - **Plans** — `docs/plans/`.
-- **Runbooks** — `docs/runbooks/` (procedures; e.g. `llm-model-vetting.md`).
+- **Runbooks** — `docs/runbooks/` (procedures; e.g. `llm-model-vetting.md`,
+  `claude-reviewer-recovery.md` — reviewer-outage + self-reference recovery).
+- **Reference (L3)** — [`docs/known-exceptions.md`](known-exceptions.md) — the
+  sanctioned-deviations registry (full rationales; AGENTS.md holds the index);
+  [`docs/i18n.md`](i18n.md) — the language system + its CI guards.
 - **Registers** — `docs/registers/` — governed data masters + immutable provenance
   trails; **not canon** (canon points at them). Index: [`registers/README.md`](registers/README.md).
 

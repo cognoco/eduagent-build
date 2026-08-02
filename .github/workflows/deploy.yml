@@ -187,6 +187,8 @@ jobs:
           IS_PRODUCTION: ${{ github.event_name == 'workflow_dispatch' && inputs.api_environment == 'production' }}
           STAGING_SECRET_SET: ${{ secrets.DATABASE_URL_STAGING != '' }}
           PRODUCTION_SECRET_SET: ${{ secrets.DATABASE_URL_PRODUCTION != '' }}
+          STAGING_APP_SECRET_SET: ${{ secrets.DATABASE_URL_STAGING_APP != '' }}
+          PRODUCTION_APP_SECRET_SET: ${{ secrets.DATABASE_URL_PRODUCTION_APP != '' }}
           API_ENVIRONMENT: ${{ inputs.api_environment }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -212,8 +214,16 @@ jobs:
             echo "  Add DATABASE_URL_STAGING to GitHub Actions secrets."
             exit 1
           fi
+          if [ "$IS_STAGING" = "true" ] && [ "$STAGING_APP_SECRET_SET" != "true" ]; then
+            echo "✗ Staging deploy but secrets.DATABASE_URL_STAGING_APP is empty or unset."
+            exit 1
+          fi
           if [ "$IS_PRODUCTION" = "true" ] && [ "$PRODUCTION_SECRET_SET" != "true" ]; then
             echo "✗ Production deploy but secrets.DATABASE_URL_PRODUCTION is empty or unset."
+            exit 1
+          fi
+          if [ "$IS_PRODUCTION" = "true" ] && [ "$PRODUCTION_APP_SECRET_SET" != "true" ]; then
+            echo "✗ Production deploy but secrets.DATABASE_URL_PRODUCTION_APP is empty or unset."
             exit 1
           fi
           echo "✓ Expected secret is set for deploy target."
@@ -225,6 +235,16 @@ jobs:
           DATABASE_URL_STAGING_HOST: ${{ secrets.DATABASE_URL_STAGING_HOST }}
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
         run: node packages/database/scripts/verify-db-target.mjs
+
+      - name: Verify Worker application database role
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
+          MIGRATOR_DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
+          WORKER_DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING_APP || secrets.DATABASE_URL_PRODUCTION_APP }}
+          DATABASE_URL_STAGING_HOST: ${{ secrets.DATABASE_URL_STAGING_HOST }}
+          DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
+          WORKER_DATABASE_BYPASSRLS_EXPECTED: ${{ vars.WORKER_DATABASE_BYPASSRLS_EXPECTED }}
+        run: node packages/database/scripts/verify-worker-db-role.mjs
 
       - name: Render Cloudflare identifiers into wrangler.toml
         # [FCR-2026-05-23-L14.F7/F8] Neither the CF account_id nor KV namespace
@@ -266,6 +286,12 @@ jobs:
         working-directory: packages/database
         run: node scripts/check-reference-only-migrations.mjs
 
+      - name: Verify live migration journal before migrate
+        working-directory: packages/database
+        env:
+          DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
+        run: node scripts/verify-migration-journal.mjs
+
       - name: Run database migrations
         working-directory: packages/database
         env:
@@ -275,6 +301,16 @@ jobs:
           echo "Running migrations on ${DEPLOY_ENV} database..."
           pnpm exec drizzle-kit migrate
           echo "✓ Database migrations applied"
+
+      - name: Re-verify Worker application database role after migrations
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
+          MIGRATOR_DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
+          WORKER_DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING_APP || secrets.DATABASE_URL_PRODUCTION_APP }}
+          DATABASE_URL_STAGING_HOST: ${{ secrets.DATABASE_URL_STAGING_HOST }}
+          DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
+          WORKER_DATABASE_BYPASSRLS_EXPECTED: ${{ vars.WORKER_DATABASE_BYPASSRLS_EXPECTED }}
+        run: node packages/database/scripts/verify-worker-db-role.mjs
 
       # [BUG-803] Sync secrets to the (already-deployed) Worker BEFORE switching
       # traffic to the new code. This step previously ran AFTER `wrangler deploy`,
@@ -295,24 +331,21 @@ jobs:
       # New posture: a missing per-env token is a hard fail. Add the repo
       # secrets `DOPPLER_TOKEN_STG` and `DOPPLER_TOKEN_PRD` (config-scoped
       # Doppler service tokens — Developer plan does not have project-scoped
-      # service accounts), or explicitly opt out of sync for this run by
-      # setting the workflow secret `SKIP_DOPPLER_SYNC=true` AND running
-      # `pnpm secrets:sync stg|prd` locally before triggering the deploy.
+      # service accounts). Protected deploys never permit a sync bypass because
+      # the Worker API exposes secret names, not values, so an out-of-band sync
+      # cannot prove DATABASE_URL now contains the verified app-role URL.
       - name: Sync secrets from Doppler to Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOPPLER_TOKEN_STG: ${{ secrets.DOPPLER_TOKEN_STG }}
           DOPPLER_TOKEN_PRD: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          WORKER_DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING_APP || secrets.DATABASE_URL_PRODUCTION_APP }}
           SKIP_DOPPLER_SYNC: ${{ secrets.SKIP_DOPPLER_SYNC }}
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           if [ "${SKIP_DOPPLER_SYNC:-false}" = "true" ]; then
-            if [ "$DEPLOY_ENV" = "production" ]; then
-              echo "::error title=Production retention gate unverifiable::SKIP_DOPPLER_SYNC cannot be used for production because RETENTION_PURGE_ENABLED must be true and verified from Doppler before deployment."
-              exit 1
-            fi
-            echo "::warning title=Doppler→Worker sync explicitly skipped::SKIP_DOPPLER_SYNC=true was set as a workflow secret. Worker secrets were NOT synced — operator must have run \`pnpm secrets:sync\` locally for this deploy."
-            exit 0
+            echo "::error title=Protected Worker sync cannot be bypassed::SKIP_DOPPLER_SYNC cannot be used for protected staging or production because the live DATABASE_URL value cannot otherwise be verified."
+            exit 1
           fi
           # Map wrangler env names to Doppler config short names + pick the per-config token.
           # Doppler Developer plan uses config-scoped service tokens (not project-scoped service
@@ -324,7 +357,7 @@ jobs:
             *)          SYNC_TARGET="dev"; DOPPLER_TOKEN="" ;;
           esac
           if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            echo "::error title=Doppler→Worker sync FAILED::DOPPLER_TOKEN_$(echo $SYNC_TARGET | tr a-z A-Z) is not set as a GitHub Actions secret. Worker secrets cannot be synced from Doppler (${SYNC_TARGET}), so this deploy would ship with stale secrets. Add the per-env service token to repo secrets, or set SKIP_DOPPLER_SYNC=true workflow secret after running \`pnpm secrets:sync ${SYNC_TARGET}\` locally."
+            echo "::error title=Doppler→Worker sync FAILED::DOPPLER_TOKEN_$(echo $SYNC_TARGET | tr a-z A-Z) is not set as a GitHub Actions secret. Worker secrets cannot be synced from Doppler (${SYNC_TARGET}), so this deploy would ship with stale secrets. Add the per-env service token to repo secrets."
             exit 1
           fi
           export DOPPLER_TOKEN

@@ -16,15 +16,57 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { updateEasJson, EAS_EXTRA_VARS, EAS_JSON_DENYLIST } =
-  require('./setup-env.js') as {
-    updateEasJson: (
-      easPath: string,
-      fetchSecretsJson: (config: string) => Record<string, string> | null,
-    ) => void;
-    EAS_EXTRA_VARS: string[];
-    EAS_JSON_DENYLIST: string[];
-  };
+const {
+  updateEasJson,
+  EAS_EXTRA_VARS,
+  EAS_JSON_DENYLIST,
+  verifyDatabaseIsReadOnly,
+} = require('./setup-env.js') as {
+  updateEasJson: (
+    easPath: string,
+    fetchSecretsJson: (config: string) => Record<string, string> | null,
+  ) => void;
+  EAS_EXTRA_VARS: string[];
+  EAS_JSON_DENYLIST: string[];
+  verifyDatabaseIsReadOnly: (
+    content: string,
+    runVerifier: (
+      binary: string,
+      args: string[],
+      options: { env: NodeJS.ProcessEnv; stdio: string },
+    ) => { status: number | null; error?: Error },
+  ) => boolean;
+};
+
+describe('[WI-1628] env sync refuses write-capable staging DATABASE_URL values', () => {
+  it('passes only the parsed DATABASE_URL to the catalog verifier', () => {
+    const runVerifier = jest.fn(() => ({ status: 0 }));
+    const content =
+      'DATABASE_URL="postgresql://lane:secret@example.test/staging"\nOTHER=value\n';
+
+    expect(verifyDatabaseIsReadOnly(content, runVerifier)).toBe(true);
+    expect(runVerifier).toHaveBeenCalledTimes(1);
+    const [, , options] = runVerifier.mock.calls[0];
+    expect(options.env.DATABASE_URL).toBe(
+      'postgresql://lane:secret@example.test/staging',
+    );
+  });
+
+  it('fails closed when DATABASE_URL is absent or the verifier rejects it', () => {
+    const rejectingVerifier = jest.fn(() => ({ status: 1 }));
+
+    expect(verifyDatabaseIsReadOnly('OTHER=value\n', rejectingVerifier)).toBe(
+      false,
+    );
+    expect(rejectingVerifier).not.toHaveBeenCalled();
+    expect(
+      verifyDatabaseIsReadOnly(
+        'DATABASE_URL=postgresql://lane:secret@example.test/staging\n',
+        rejectingVerifier,
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('[WI-1311] updateEasJson preserves managed vars Doppler does not currently define', () => {
   let fixturePath: string;

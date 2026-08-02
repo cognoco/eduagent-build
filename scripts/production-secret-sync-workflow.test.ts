@@ -76,11 +76,16 @@ describe('[WI-1641] production secret-sync workflow', () => {
       DOPPLER_TOKEN_PRD: '${{ secrets.DOPPLER_TOKEN_PRD }}',
       CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
       CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CF_ACCOUNT_ID }}',
+      MIGRATOR_DATABASE_URL: '${{ secrets.DATABASE_URL_PRODUCTION }}',
+      WORKER_DATABASE_URL: '${{ secrets.DATABASE_URL_PRODUCTION_APP }}',
+      WORKER_DATABASE_BYPASSRLS_EXPECTED:
+        '${{ vars.WORKER_DATABASE_BYPASSRLS_EXPECTED }}',
     });
     expect(sync?.env).toEqual({
       DOPPLER_TOKEN: '${{ secrets.DOPPLER_TOKEN_PRD }}',
       CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
       CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CF_ACCOUNT_ID }}',
+      WORKER_DATABASE_URL: '${{ secrets.DATABASE_URL_PRODUCTION_APP }}',
       WRANGLER_SYNC_CONFIG: '${{ runner.temp }}/wrangler-secret-sync.jsonc',
     });
     expect(sync?.run).toContain('WRANGLER_SYNC_CONFIG');

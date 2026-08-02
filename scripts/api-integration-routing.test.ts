@@ -230,14 +230,17 @@ describe('API co-located integration routing', () => {
     expect(pkg.scripts?.['test:api:integration:ci']).toBe(
       'node scripts/run-api-integration.mjs --nx',
     );
+    expect(pkg.scripts?.['test:api:integration:cross-package:ci']).toBe(
+      'node scripts/run-api-integration.mjs --cross-package',
+    );
   });
 
   it('keeps the cross-package target and exposes an unambiguous API co-located target', () => {
     const project = readJson<NxProject>('apps/api/project.json');
     const targets = project.targets ?? {};
 
-    expect(targets['test:integration']?.options?.command).toContain(
-      'tests/integration/jest.config.cjs',
+    expect(targets['test:integration']?.options?.command).toBe(
+      'pnpm run test:api:integration:cross-package:ci',
     );
     expect(targets['integration-api']?.options?.command).toBe(
       'node scripts/run-api-integration.mjs --jest',
@@ -263,7 +266,7 @@ describe('API co-located integration routing', () => {
     const instructions = readFileSync(join(repoRoot, 'AGENTS.md'), 'utf8');
 
     expect(instructions).toContain(
-      'the API co-located suite is `pnpm run test:api:integration:ci`',
+      'API co-located suite: `pnpm run test:api:integration:ci`',
     );
     expect(instructions).not.toContain(
       'the API co-located suite is `pnpm exec nx run api:integration-api`',

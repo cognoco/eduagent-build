@@ -16,6 +16,8 @@ const ROOT_PACKAGE_JSON = join(REPO_ROOT, 'package.json');
 const API_PROJECT_JSON = join(REPO_ROOT, 'apps', 'api', 'project.json');
 const FAKE_PNPM_PRELOAD =
   './scripts/__fixtures__/run-api-integration/fake-pnpm-preload.cjs';
+const FAKE_DOPPLER_PRELOAD =
+  './scripts/__fixtures__/doppler-run/fake-doppler-preload.cjs';
 
 const CONTRACT_ENV_KEYS = [
   'DATABASE_URL',
@@ -123,7 +125,12 @@ describe('run-api-integration.mjs', () => {
       FAKE_PNPM_CLI: defaultPnpmCli,
       FAKE_PNPM_LAUNCH_MARKER: pnpmLaunchMarker,
       FAKE_COREPACK_MARKER: corepackMarker,
-      NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${FAKE_PNPM_PRELOAD}`]
+      DOPPLER_RUN_FAKE_EXEC_CHILD: '1',
+      NODE_OPTIONS: [
+        process.env.NODE_OPTIONS,
+        `--require=${FAKE_DOPPLER_PRELOAD}`,
+        `--require=${FAKE_PNPM_PRELOAD}`,
+      ]
         .filter(Boolean)
         .join(' '),
     };
@@ -180,11 +187,26 @@ describe('run-api-integration.mjs', () => {
 
   test('Nx target delegates to the guarded launcher instead of bare pnpm', () => {
     const project = JSON.parse(readFileSync(API_PROJECT_JSON, 'utf8')) as {
-      targets?: { 'integration-api'?: { options?: { command?: string } } };
+      targets?: {
+        'integration-api'?: { options?: { command?: string } };
+        'test:integration'?: { options?: { command?: string } };
+      };
     };
 
     expect(project.targets?.['integration-api']?.options?.command).toBe(
       'node scripts/run-api-integration.mjs --jest',
+    );
+    expect(project.targets?.['test:integration']?.options?.command).toBe(
+      'pnpm run test:api:integration:cross-package:ci',
+    );
+  });
+
+  test('cross-package integration suite uses the disposable database guard', () => {
+    const result = run(['--cross-package', '--runInBand'], dedicatedDatabase);
+
+    expect(result.status).toBe(0);
+    expect(readPnpmCommands(pnpmLaunchMarker)).toContain(
+      'exec jest --config tests/integration/jest.config.cjs --no-coverage --runInBand',
     );
   });
 
@@ -206,6 +228,12 @@ describe('run-api-integration.mjs', () => {
       pnpmCli: '/opt/pnpm/pnpm.js',
       command: process.execPath,
       prefixArgs: ['/opt/pnpm/pnpm.js'],
+    },
+    {
+      name: 'POSIX pnpm.mjs CLI',
+      pnpmCli: '/opt/pnpm/pnpm.mjs',
+      command: process.execPath,
+      prefixArgs: ['/opt/pnpm/pnpm.mjs'],
     },
   ])(
     'launches $name through npm_execpath with exact forwarded arguments',
@@ -451,6 +479,14 @@ describe('run-api-integration.mjs', () => {
       ...baseConfig.testPathIgnorePatterns,
       'apps/api/src/db/curriculum-dedup-index-repair\\.integration\\.test\\.ts$',
     ]);
+  });
+
+  test('--check-only validates the disposable DB without launching Jest', () => {
+    const result = run(['--check-only'], dedicatedDatabase);
+
+    expect(result.status).toBe(0);
+    expect(readMarker(corepackMarker)).toBe('');
+    expect(readMarker(pnpmMarker)).toBe('');
   });
 
   test('canonical package command selects mentomate/dev_integration explicitly', () => {

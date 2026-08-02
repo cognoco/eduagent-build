@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { packageManagerLaunch } from './package-manager-launch.mjs';
+
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCRIPT = fileURLToPath(import.meta.url);
 const DOPPLER_WRAPPER = join(REPO_ROOT, 'scripts', 'doppler-run.mjs');
@@ -20,6 +22,7 @@ const LOOPBACK_ONLY_REPAIR_PATH = resolve(
 );
 const LOCAL_JEST_CONFIG = 'apps/api/jest.integration.config.cjs';
 const REMOTE_JEST_CONFIG = 'apps/api/jest.integration.remote.config.cjs';
+const CROSS_PACKAGE_JEST_CONFIG = 'tests/integration/jest.config.cjs';
 
 function refuse(reason) {
   throw new Error(`API integration launch refused before Jest: ${reason}`);
@@ -46,27 +49,16 @@ function pinnedPnpmVersion() {
   return match[1];
 }
 
-function packageManagerLaunch() {
-  const pnpmCli = process.env.npm_execpath?.trim();
-  if (!pnpmCli) {
+function assertPinnedPnpm() {
+  const expected = pinnedPnpmVersion();
+  let launch;
+  try {
+    launch = packageManagerLaunch(process.env.npm_execpath, process.execPath);
+  } catch {
     refuse(
       'npm_execpath is required; run the canonical pnpm test:api:integration command.',
     );
   }
-  return /\.(?:c?js)$/i.test(pnpmCli)
-    ? {
-        binary: process.execPath,
-        args: [pnpmCli],
-      }
-    : {
-        binary: pnpmCli,
-        args: [],
-      };
-}
-
-function assertPinnedPnpm() {
-  const expected = pinnedPnpmVersion();
-  const launch = packageManagerLaunch();
   const result = spawnSync(launch.binary, [...launch.args, '--version'], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
@@ -206,6 +198,14 @@ function assertDatabaseContract() {
 function main() {
   const [mode, ...forwardedArgs] = process.argv.slice(2);
 
+  if (mode === '--check-only') {
+    if (forwardedArgs.length) {
+      refuse('--check-only does not accept arguments.');
+    }
+    assertDatabaseContract();
+    return 0;
+  }
+
   if (mode === '--jest') {
     const { isLocal } = assertDatabaseContract();
     if (
@@ -244,6 +244,20 @@ function main() {
       'nx',
       'run',
       'api:integration-api',
+    ]);
+  }
+
+  if (mode === '--cross-package') {
+    assertDatabaseContract();
+    const launch = assertPinnedPnpm();
+    return run(launch.binary, [
+      ...launch.args,
+      'exec',
+      'jest',
+      '--config',
+      CROSS_PACKAGE_JEST_CONFIG,
+      '--no-coverage',
+      ...forwardedArgs,
     ]);
   }
 

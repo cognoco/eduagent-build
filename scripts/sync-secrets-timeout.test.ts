@@ -15,10 +15,12 @@ const { syncSecrets } = require('./sync-secrets.js') as {
 
 describe('[WI-1837] bounded rollback secret restore', () => {
   const previousConfig = process.env.WRANGLER_SYNC_CONFIG;
+  const previousWorkerDatabaseUrl = process.env.WORKER_DATABASE_URL;
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.WRANGLER_SYNC_CONFIG = '/tmp/wrangler-secret-sync.jsonc';
+    process.env.WORKER_DATABASE_URL = 'postgresql://worker-app-role';
     mockExecSync.mockReturnValue('{"DATABASE_URL":"redacted"}');
     mockSpawnSync.mockImplementation((_command: string, args: string[]) => {
       if (args.includes('list')) {
@@ -38,6 +40,11 @@ describe('[WI-1837] bounded rollback secret restore', () => {
     } else {
       process.env.WRANGLER_SYNC_CONFIG = previousConfig;
     }
+    if (previousWorkerDatabaseUrl === undefined) {
+      delete process.env.WORKER_DATABASE_URL;
+    } else {
+      process.env.WORKER_DATABASE_URL = previousWorkerDatabaseUrl;
+    }
   });
 
   it('caps every transitive Doppler and Wrangler subprocess at 30 seconds', () => {
@@ -52,6 +59,15 @@ describe('[WI-1837] bounded rollback secret restore', () => {
     for (const call of mockSpawnSync.mock.calls) {
       expect(call[2]).toMatchObject({ timeout: 30_000 });
     }
+  });
+
+  it('rejects multiple protected targets before any external command', () => {
+    expect(syncSecrets(['stg', 'prd'])).toEqual({
+      ok: false,
+      results: {},
+    });
+    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
   it('turns a timed-out restore into a prompt, alertable sync failure', () => {

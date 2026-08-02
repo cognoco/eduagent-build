@@ -109,3 +109,37 @@ but **unstaged** in the same logical scope, pull that file in (or split the
 commit) so each commit is self-contained. For Expo Router files with `[`/`]`
 in the path, use a literal pathspec, e.g.
 `git add ':(literal)apps/mobile/src/app/session/[sessionId].tsx'`.
+
+## Plumbing authorization (docs-only)
+
+This repo declares a **plumbing authorization** for the working-tree-free plumbing
+commit path (the alternate path in `/zdx-core:commit`, zdx-core ≥ 1.2.0):
+
+- **Permitted change classes:** documentation artifacts ONLY — `docs/**`
+  markdown/HTML/PDF evidence and repo meta-docs. No code, config, CI, schema, or
+  test files. A change-set containing any file outside this class uses the
+  standard worktree→PR procedure, whatever else it contains.
+- **Compensating CI gate:** the PR pipeline — the change-class router routes the
+  docs class, and the armed merge gate (green checks + clean automated-review
+  verdict at head + disposed bot threads) stands in for the skipped local hooks.
+- **Landing rule:** always branch + PR; never a commit on `main`, never a branch
+  switch of the shared checkout.
+
+Provenance: operator-ruled 2026-07-29 (docs-only exception), promoted to the
+estate mechanism 2026-08-02 (WI-3042).
+
+**Recipe** (interim copy — the canonical home is `/zdx-core:commit` § "Alternate
+path: working-tree-free plumbing commit"; delete this block once zdx-core 1.2.0
+is rolled out on every surface):
+
+```bash
+git -C <path> fetch origin main
+base=$(git -C <path> rev-parse origin/main)
+export GIT_INDEX_FILE=$(mktemp)
+git -C <path> read-tree "$base"
+blob=$(git -C <path> hash-object -w <local-file>)                        # repeat per file
+git -C <path> update-index --add --cacheinfo 100644 "$blob" <repo-path>  # or --force-remove to delete
+tree=$(git -C <path> write-tree); unset GIT_INDEX_FILE
+commit=$(git -C <path> commit-tree "$tree" -p "$base" -m "docs(scope): summary")
+git -C <path> push origin "$commit":refs/heads/<branch>
+```
