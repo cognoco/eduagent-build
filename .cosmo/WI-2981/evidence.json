@@ -1,44 +1,36 @@
 {
-  "workItem": "WI-2981",
-  "name": "Preserve main CI evidence across rapid merge concurrency",
-  "files": {
-    "workflow": ".github/workflows/ci.yml",
-    "contractTest": "scripts/ci-concurrency-contract.test.ts",
-    "redGreen": ".cosmo/WI-2981/red-green.md",
-    "completionSummary": ".cosmo/WI-2981/completion-summary.md"
-  },
-  "historicalEvidence": {
-    "cancelledZeroJobRuns": ["30688886377", "30688890531", "30688912863"],
-    "rootCause": "Main pushes shared ci-refs/heads/main, allowing GitHub to replace the single pending run when a third push arrives."
-  },
-  "redGreen": {
-    "red": {
-      "command": "pnpm exec jest --config scripts/jest.config.cjs scripts/ci-concurrency-contract.test.ts --runInBand --no-coverage",
-      "result": "exit 1; 1 suite failed; 3 tests failed and 1 passed against the baseline workflow"
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The deterministic contract covers idle main pushes and SHA attribution.",
+      "pointer": "scripts/ci-concurrency-contract.test.ts"
     },
-    "revertRed": {
-      "result": "exit 1; exact baseline concurrency restored; 3 tests failed and 1 passed"
+    {
+      "acRef": "AC-2",
+      "description": "The SHA-scoped main group preserves every rapid-merge commit's attributable CI evidence while PR heads remain cancellable.",
+      "pointer": ".github/workflows/ci.yml:28"
     },
-    "green": {
-      "result": "exit 0; 1 suite passed; 4 tests passed"
+    {
+      "acRef": "AC-3",
+      "description": "Workflow and security contract tests pass without authority or gate changes.",
+      "pointer": "pnpm check:github-workflow-security"
     },
-    "restoreGreen": {
-      "result": "exit 0; exact candidate concurrency restored; 1 suite passed; 4 tests passed"
+    {
+      "acRef": "AC-4",
+      "description": "Historical cancelled zero-job runs and the post-fix deterministic concurrency proof are recorded.",
+      "pointer": ".cosmo/WI-2981/red-green.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The contract fails on the baseline and passes after the fix, with revert/restoration evidence.",
+      "pointer": ".cosmo/WI-2981/red-green.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The workflow YAML parses and the security checks remain green.",
+      "pointer": "pnpm exec jest --config scripts/jest.config.cjs scripts/check-github-workflow-security.test.ts --runInBand --no-coverage"
     }
-  },
-  "securityScope": {
-    "deploymentAuthorityChanged": false,
-    "permissionsChanged": false,
-    "triggersChanged": false,
-    "requiredChecksChanged": false,
-    "mergeGatesChanged": false
-  },
-  "validations": {
-    "focusedWorkflowAndSecurityContracts": "exit 0; 2 suites; 57 tests passed",
-    "workflowSecurityCheck": "exit 0; GitHub workflow security check passed",
-    "yamlParse": "exit 0; .github/workflows/ci.yml parsed successfully",
-    "prettierCheck": "exit 0; all evidence and changed files formatted",
-    "scriptsSuite": "exit 0; 74 passed, 1 skipped; 1239 passed, 4 skipped tests",
-    "gitDiffCheck": "exit 0; git diff --check clean"
-  }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "scripts/ci-concurrency-contract.test.ts"
 }
