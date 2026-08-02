@@ -15,29 +15,9 @@
     "route": "/usage"
   },
   {
-    "file": "apps/api/src/routes/celebrations.ts",
-    "method": "get",
-    "route": "/celebrations/pending"
-  },
-  {
-    "file": "apps/api/src/routes/coaching-card.ts",
-    "method": "get",
-    "route": "/coaching-card"
-  },
-  {
     "file": "apps/api/src/routes/consent.ts",
     "method": "get",
     "route": "/consent/:childProfileId/status"
-  },
-  {
-    "file": "apps/api/src/routes/curriculum.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/curriculum"
-  },
-  {
-    "file": "apps/api/src/routes/curriculum.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/curriculum/topics/:topicId/explain"
   },
   {
     "file": "apps/api/src/routes/dashboard.ts",
@@ -115,21 +95,6 @@
     "route": "/dashboard/children/:profileId/weekly-reports/:reportId"
   },
   {
-    "file": "apps/api/src/routes/dictation.ts",
-    "method": "get",
-    "route": "/dictation/history"
-  },
-  {
-    "file": "apps/api/src/routes/dictation.ts",
-    "method": "get",
-    "route": "/dictation/streak"
-  },
-  {
-    "file": "apps/api/src/routes/language-progress.ts",
-    "method": "get",
-    "route": "/subjects/:subjectId/cefr-progress"
-  },
-  {
     "file": "apps/api/src/routes/learner-profile.ts",
     "method": "get",
     "route": "/learner-profile/:profileId"
@@ -140,19 +105,9 @@
     "route": "/learner-profile/:profileId/export-text"
   },
   {
-    "file": "apps/api/src/routes/library-search.ts",
-    "method": "get",
-    "route": "/library/search"
-  },
-  {
     "file": "apps/api/src/routes/notifications.ts",
     "method": "get",
     "route": "/notifications/child-cap"
-  },
-  {
-    "file": "apps/api/src/routes/nudges.ts",
-    "method": "get",
-    "route": "/nudges"
   },
   {
     "file": "apps/api/src/routes/recaps.ts",

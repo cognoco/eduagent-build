@@ -21,6 +21,9 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
 }));
 
 import { Hono } from 'hono';
+import { ERROR_CODES } from '@eduagent/schemas';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { ForbiddenError } from '../errors';
 import { celebrationRoutes } from './celebrations';
 
 const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
@@ -92,5 +95,67 @@ describe('[WI-143 / DS-054] celebrations proxy-mode guard', () => {
     // The stub db will likely throw a different error (markCelebrationsSeen
     // hits an empty object) but crucially not a PROXY_MODE 403.
     expect(res.status).not.toBe(403);
+  });
+});
+
+// ---- [WI-2877] read-authority guard (G14) ----
+// Direct-mount harness WITHOUT profileScopeMiddleware: no
+// profileAuthorityVerifiedFor proof exists, so this case exercises the route
+// guard's own fail-closed fallback (verifyPersonOwnershipV2) — the
+// defense-in-depth layer for standalone/direct mounting. In the full app the
+// same spoof is rejected centrally by profileScopeMiddleware (WI-2128) before
+// any route runs (see profile-scope.test.ts).
+// getPendingCelebrations has no service mock in this file (the real service
+// would hit the stub db), so this case asserts the 403 boundary only.
+
+describe('[WI-2877] read-authority guard', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      c.set('profileId' as never, VICTIM_PROFILE_ID);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', celebrationRoutes);
+    return direct;
+  }
+
+  it('GET /celebrations/pending?viewer=parent rejects a cross-profile read with 403 — viewer=parent is client input, never authority', async () => {
+    // The caller's person holds no self/guardianship authority over the
+    // installed profile; the client-asserted viewer=parent query param must
+    // not substitute for that authority.
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+
+    const res = await makeUnprovenApp().request(
+      '/celebrations/pending?viewer=parent',
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
   });
 });
