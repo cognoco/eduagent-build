@@ -27,7 +27,6 @@ describe('disposable PostgreSQL extension bootstrap', () => {
 
   it('creates both extensions idempotently without destructive SQL', () => {
     expect(existsSync(INIT_PATH)).toBe(true);
-    if (!existsSync(INIT_PATH)) return;
 
     const sql = readFileSync(INIT_PATH, 'utf8');
     expect(sql).toMatch(/CREATE EXTENSION IF NOT EXISTS vector\s*;/i);
