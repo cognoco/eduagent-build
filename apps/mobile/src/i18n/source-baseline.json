@@ -558,7 +558,7 @@
     "familyJoinJourney.complete.message": "sha256:6f12ad89d26fc3df1915afc3281ab9375365e478f4c90905116f553712e50e95",
     "familyJoinJourney.complete.title": "sha256:b4e34cb79ee713aa5ce63fbaa5761ef3a394bcc7a4f10cb98c9df37b427b5e36",
     "familyJoinJourney.continue": "sha256:a26f0c4eaefc3ca1abf24fa7cd5d9ce9263970f784c27de0d086eb4e94e5d38f",
-    "familyJoinJourney.decline": "sha256:2ce06dafd8750891ef9a250745196de47be95ad88a330181e81eacdb47dbc6bc",
+    "familyJoinJourney.decline": "sha256:339c48b4f5c3c3347011a28ff72353beee2d386dc4ca335fcd8ebd811c03ade3",
     "familyJoinJourney.errors.completeDecisions": "sha256:57938b9db33cb90d065f2d7cfa171917eda02032d74441039cb097be39ba391a",
     "familyJoinJourney.errors.guardianNotReady": "sha256:e841ac904c09f25b785b4d7cb7659b6ce56d4e6d8726abd8c92ede9cad66cb52",
     "familyJoinJourney.guardian.authorityTitle": "sha256:abc2f16e54bfc8d3b2944d525e94e104bfb657159f061576dcb71571350d108a",
