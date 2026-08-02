@@ -356,6 +356,44 @@ describe('[WI-2543] mixed-route granular consent boundaries', () => {
     }
   });
 
+  it('[WI-2988] classifies homework OCR consent after deterministic upload validation and before provider dispatch', () => {
+    const boundary = ROUTE_OWNED_LLM_CONSENT_BOUNDARIES.find(
+      ({ id }) => id === 'homework.ocr',
+    );
+    expect(boundary).toMatchObject({
+      classification: 'route-owned',
+      preConsentBranchTokens: [
+        "const contentLengthHeader = c.req.header('content-length');",
+        'if (!(file instanceof File)) {',
+        '!OCR_CONSTRAINTS.acceptedMimeTypes.includes(',
+        'if (file.size > OCR_CONSTRAINTS.maxFileSizeBytes) {',
+      ],
+      consentGateToken: 'await assertLlmConsent(',
+      llmDispatchTokens: [
+        'provider = getOcrProvider(',
+        'const result = await provider.extractText(',
+      ],
+      llmCallSiteFile: 'apps/api/src/services/ocr.ts',
+    });
+    if (!boundary) return;
+
+    const routeSource = sliceBetweenTokens(
+      readRepoFile(boundary.routeFile),
+      boundary.routeStartToken,
+      boundary.routeEndToken,
+    );
+    const gateIndex = routeSource.indexOf(boundary.consentGateToken ?? '');
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    for (const token of boundary.preConsentBranchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThanOrEqual(0);
+      expect(routeSource.indexOf(token)).toBeLessThan(gateIndex);
+    }
+    for (const token of boundary.llmDispatchTokens ?? []) {
+      expect(routeSource.indexOf(token)).toBeGreaterThan(gateIndex);
+    }
+    expect(LLM_CALL_SITE_FILES).toContain(boundary.llmCallSiteFile);
+  });
+
   it('requires an explicit rationale for every remaining route-entry gate', () => {
     for (const boundary of ROUTE_OWNED_LLM_CONSENT_BOUNDARIES) {
       expect({

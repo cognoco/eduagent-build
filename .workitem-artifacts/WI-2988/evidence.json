@@ -1,0 +1,86 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The completion evidence covers the item definition of done.",
+      "pointer": ".workitem-artifacts/WI-2988/verification.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Consent ordering and externally visible variants are covered by the route regression matrix.",
+      "pointer": "apps/api/src/routes/homework.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Withdrawn consent preserves declared Content-Length 413 without provider construction.",
+      "pointer": "apps/api/src/routes/homework.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Withdrawn consent preserves every required multipart and file-validation 400 without provider construction.",
+      "pointer": "apps/api/src/routes/homework.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Each accepted MIME variant returns the established consent-denied 403 before provider construction.",
+      "pointer": "apps/api/src/routes/homework.test.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Active consent retains one provider dispatch and the existing response contract.",
+      "pointer": "apps/api/src/routes/homework.test.ts"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Boundary coverage is represented structurally.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts"
+    },
+    {
+      "acRef": "AC-8",
+      "description": "The manifest and guard classify homework OCR as route-owned and enforce validation before consent and consent before provider dispatch.",
+      "pointer": "apps/api/src/middleware/metering.coverage.guard.test.ts"
+    },
+    {
+      "acRef": "AC-9",
+      "description": "Regression proof is preserved in tracked evidence.",
+      "pointer": ".workitem-artifacts/WI-2988/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-10",
+      "description": "Focused regression cases cover all required withdrawn-consent validation and accepted-file paths.",
+      "pointer": "apps/api/src/routes/homework.test.ts"
+    },
+    {
+      "acRef": "AC-11",
+      "description": "The red, green, production-route-only revert red, and exact-restore green sequence is recorded.",
+      "pointer": ".workitem-artifacts/WI-2988/red-green-revert.md"
+    },
+    {
+      "acRef": "AC-12",
+      "description": "The required routed validation command and result are recorded.",
+      "pointer": ".workitem-artifacts/WI-2988/verification.md"
+    },
+    {
+      "acRef": "AC-13",
+      "description": "Scope and authority evidence is recorded.",
+      "pointer": ".workitem-artifacts/WI-2988/verification.md"
+    },
+    {
+      "acRef": "AC-14",
+      "description": "The implementation diff remains limited to the four authorized collision files.",
+      "pointer": ".workitem-artifacts/WI-2988/verification.md"
+    },
+    {
+      "acRef": "AC-15",
+      "description": "Accepted MIME types, limits, provider behavior, response schema, metering, and all unauthorized domains remain unchanged.",
+      "pointer": ".workitem-artifacts/WI-2988/verification.md"
+    },
+    {
+      "acRef": "AC-16",
+      "description": "Exact-head strict-green Adversarial review remains an external acceptance gate.",
+      "pointer": ".workitem-artifacts/WI-2988/verification.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-02",
+  "redGreenPointer": ".workitem-artifacts/WI-2988/red-green-revert.md"
+}
