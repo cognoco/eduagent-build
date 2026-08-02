@@ -1698,6 +1698,7 @@ export default function SessionSummaryScreen() {
                 voiceLocale={getVoiceLocaleForLanguage(
                   activeProfile?.conversationLanguage,
                 )}
+                scopeKey={sessionId}
                 testID="summary-reflection-mic"
                 onTranscript={(finalTranscript) =>
                   // Clamp to the summarySubmitSchema 2000-char contract:

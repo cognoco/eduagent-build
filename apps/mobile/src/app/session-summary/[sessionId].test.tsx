@@ -31,6 +31,45 @@ const mockParams = {
   escalationRung: '2',
 } as Record<string, string | string[] | undefined>;
 
+// Mocked speech hook so scope-transition behavior is drivable from tests.
+interface MockSpeech {
+  status: string;
+  transcript: string;
+  isFinalTranscript: boolean;
+  error: string | null;
+  isListening: boolean;
+  startListening: jest.Mock;
+  stopListening: jest.Mock;
+  clearTranscript: jest.Mock;
+  requestMicrophonePermission: jest.Mock;
+  getMicrophonePermissionStatus: jest.Mock;
+}
+
+let mockSpeech: MockSpeech;
+
+jest.mock(
+  '../../hooks/use-speech-recognition' /* gc1-allow: native-boundary — the hook wraps expo-speech-recognition, a native module with no jest-runnable implementation */,
+  () => ({
+    useSpeechRecognition: () => mockSpeech,
+  }),
+);
+
+function resetMockSpeech(): void {
+  mockSpeech = {
+    status: 'idle',
+    transcript: '',
+    isFinalTranscript: false,
+    error: null,
+    isListening: false,
+    startListening: jest.fn().mockResolvedValue(undefined),
+    stopListening: jest.fn().mockResolvedValue(undefined),
+    clearTranscript: jest.fn(),
+    requestMicrophonePermission: jest.fn().mockResolvedValue(true),
+    getMicrophonePermissionStatus: jest.fn().mockResolvedValue(null),
+  };
+}
+resetMockSpeech();
+
 const mockTestProfileId = '10000000-0000-4000-8000-000000000001';
 const mockTestAccountId = '10000000-0000-4000-8000-000000000002';
 const mockChildProfileId = '10000000-0000-4000-8000-000000000003';
@@ -796,6 +835,38 @@ describe('SessionSummaryScreen', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     screen.getByTestId('summary-reflection-mic');
+  });
+
+  it('a sessionId change mid-capture revokes the dictation (late final cannot cross sessions)', async () => {
+    resetMockSpeech();
+    const view = render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    fireEvent.press(screen.getByTestId('summary-reflection-mic'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockSpeech.startListening).toHaveBeenCalledTimes(1);
+
+    // Expo Router reuses the screen while the route param changes.
+    mockParams.sessionId = '770e8400-e29b-41d4-a716-446655440999';
+    view.rerender(<SessionSummaryScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockSpeech.stopListening).toHaveBeenCalled();
+
+    // A late final from the old session must not land in the new draft.
+    mockSpeech = {
+      ...mockSpeech,
+      status: 'idle',
+      isListening: false,
+      transcript: 'meant for the previous session',
+      isFinalTranscript: true,
+    };
+    view.rerender(<SessionSummaryScreen />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('summary-input').props.value).toBe('');
   });
 
   // [WI-2573] MMT-ADR-0036 §3.1 — the mentor-notice MVP is in-app only and
