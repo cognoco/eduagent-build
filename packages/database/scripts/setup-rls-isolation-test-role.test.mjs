@@ -65,6 +65,31 @@ test('remote targets are check-only and never invoke role mutation', async () =>
   assert.equal(store.applyCount, 0);
 });
 
+test('localhost URL with a host or socket override never invokes role mutation', async () => {
+  for (const hostOverride of [
+    'shared.neon.tech',
+    encodeURIComponent('/var/run/postgresql'),
+  ]) {
+    const store = fakeStore([
+      readyState({ ready: false, roleExists: false, canSetRole: false }),
+      readyState(),
+    ]);
+    await assert.rejects(
+      ensureRlsIsolationTestRole(
+        {
+          databaseUrl: `postgresql://user:password@localhost/integration?host=${hostOverride}`,
+          applyLocal: true,
+        },
+        store,
+      ),
+      (error) =>
+        error instanceof RlsRoleSetupRefusal &&
+        error.message.includes('host override'),
+    );
+    assert.equal(store.applyCount, 0);
+  }
+});
+
 test('check mode reports missing SET membership without mutating', async () => {
   const store = fakeStore([readyState({ ready: false, canSetRole: false })]);
   await assert.rejects(
