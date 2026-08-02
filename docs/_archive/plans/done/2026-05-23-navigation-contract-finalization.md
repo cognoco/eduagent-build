@@ -788,7 +788,7 @@ The test must assert that the original user action no longer flips `isExplicitPr
 
 - [ ] **Step 2: Execute the bridge spec**
 
-If the bridge spec does not have its own plan yet, create one as a sibling plan (`docs/superpowers/plans/2026-05-23-learn-this-too-bridge.md`) using the writing-plans skill, then execute. Otherwise execute the existing bridge plan.
+If the bridge spec does not have its own plan yet, create one as a sibling plan (`docs/_archive/plans/done/2026-05-23-learn-this-too-bridge-gaps.md`) using the writing-plans skill, then execute. Otherwise execute the existing bridge plan.
 
 This is bounded enough to delegate to a sub-coordinator session.
 

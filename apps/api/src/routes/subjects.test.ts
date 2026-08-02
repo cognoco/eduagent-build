@@ -102,6 +102,7 @@ jest.mock('../services/identity-v2/consent-status-v2', () => ({
 }));
 
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import {
@@ -112,6 +113,8 @@ import {
   retryCurriculumForSubject,
   SubjectLimitError,
 } from '../services/subject';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { ForbiddenError } from '../errors';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
@@ -944,5 +947,96 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
     const body = (await res.json()) as { code?: string };
     expect(body.code).toBe('PROXY_MODE');
     expect(resolveSubjectNameMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2881] read-authority guard (G26)
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so each attack below is a credentialed
+// non-owner request traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+// ---------------------------------------------------------------------------
+describe('[WI-2881] read-authority guard (G26)', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', subjectRoutes);
+    return direct;
+  }
+
+  function denyNextOwnershipCheck() {
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+  }
+
+  async function expectForbidden(res: Response) {
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+  }
+
+  it('[G26] GET /subjects rejects a cross-profile X-Profile-Id spoof with 403 before the subject-list read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request('/subjects', {
+      headers: SPOOF_HEADERS,
+    });
+
+    await expectForbidden(res);
+    expect(listSubjects).not.toHaveBeenCalled();
+  });
+
+  it('[G26] GET /subjects/:id rejects a cross-profile X-Profile-Id spoof with 403 before the subject read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(`/subjects/${SUBJECT_ID}`, {
+      headers: SPOOF_HEADERS,
+    });
+
+    await expectForbidden(res);
+    expect(getSubject).not.toHaveBeenCalled();
   });
 });

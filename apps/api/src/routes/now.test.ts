@@ -586,3 +586,85 @@ describe('now routes', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-2881] X-Profile-Id spoof-shaped denial for now.ts's self-scope branch
+// (G29 — implemented by WI-2565; verified here, not double-patched). Unlike
+// the [WI-2565] cases above (fixed profileId, caller mismatch), this harness
+// installs profileId ONLY from the request's X-Profile-Id header — the same
+// client-controlled input the real profileScopeMiddleware resolves — so the
+// attack traverses header → middleware → route exactly as the sibling
+// WI-2881 sweep-D cases do. profileAuthorityVerifiedFor is deliberately
+// never set (no central proof), keeping the case mutation-sensitive to the
+// route guard's fail-closed fallback (verifyPersonOwnershipV2).
+// ---------------------------------------------------------------------------
+describe('[WI-2881] read-authority guard spoof shape (G29 — guarded by WI-2565)', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyPersonOwnershipV2.mockReset();
+  });
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, { marker: 'db' } as unknown as Database);
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: TEST_ACCOUNT_ID });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', nowRoutes);
+    return direct;
+  }
+
+  it.each([
+    ['/now', buildNowFeed],
+    ['/now/overflow', buildNowOverflow],
+  ] as const)(
+    '[G29] GET %s (scope=self) rejects a cross-profile X-Profile-Id spoof with 403 before the feed read',
+    async (path, build) => {
+      mockVerifyPersonOwnershipV2.mockRejectedValueOnce(
+        new Error('caller cannot read selected profile'),
+      );
+
+      const res = await makeUnprovenApp().request(`${path}?scope=self`, {
+        headers: SPOOF_HEADERS,
+      });
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+      expect(mockVerifyPersonOwnershipV2).toHaveBeenCalledWith(
+        expect.anything(),
+        VICTIM_PROFILE_ID,
+        TEST_ACCOUNT_ID,
+        ATTACKER_PERSON_ID,
+      );
+      expect(build).not.toHaveBeenCalled();
+    },
+  );
+});

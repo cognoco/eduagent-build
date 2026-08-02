@@ -5,18 +5,46 @@ import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 
 import { scopesRoutes } from './scopes';
 import { resolveScopesForPerson } from '../services/scope-resolution';
+import { resolveSupporterColdStart } from '../services/supporter-coldstart';
 import { readSupporteeStructuralSubjects } from '../services/supporter-structural-mask';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
-jest.mock(
-  '../services/scope-resolution' /* gc1-allow: route unit test - service has direct unit coverage */,
-  () => ({ resolveScopesForPerson: jest.fn() }),
-);
+// Route unit tests configure these per-case; the real resolvers run raw db
+// queries the stub `db` in this file cannot satisfy — each service has direct
+// unit coverage. requireActual + targeted override (GC1 Pattern A).
+jest.mock('../services/scope-resolution', () => ({
+  ...jest.requireActual('../services/scope-resolution'),
+  resolveScopesForPerson: jest.fn(),
+}));
 
-jest.mock(
-  '../services/supporter-structural-mask' /* gc1-allow: route unit test - service has direct unit coverage */,
-  () => ({ readSupporteeStructuralSubjects: jest.fn() }),
-);
+jest.mock('../services/supporter-structural-mask', () => ({
+  ...jest.requireActual('../services/supporter-structural-mask'),
+  readSupporteeStructuralSubjects: jest.fn(),
+}));
+
+// [WI-2881] The coldstart resolver runs real db queries the stub `db` in this
+// file cannot satisfy; the denial test below asserts the read never runs on a
+// rejected spoof. requireActual + targeted override (GC1 Pattern A).
+jest.mock('../services/supporter-coldstart', () => ({
+  ...jest.requireActual('../services/supporter-coldstart'),
+  resolveSupporterColdStart: jest.fn(),
+}));
+
+// [WI-2881] assertCanReadProfile (GET /scopes, /scopes/coldstart) calls
+// verifyPersonOwnershipV2 — a raw db.select() membership query the stub `db`
+// in this file cannot satisfy. The resolving default models an authorized
+// caller (self, or a guardian of an uncredentialed charge); denial tests
+// override with mockRejectedValueOnce to prove the routes fail closed before
+// the scope reads. The cross-account read attack against a real membership
+// table is covered by the real-DB break test in
+// tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
 
 const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
@@ -28,6 +56,9 @@ function makeApp(callerPersonId: string = PROFILE_ID) {
   app.use('*', async (c, next) => {
     c.set('db' as never, { marker: 'db' } as unknown as Database);
     c.set('profileId' as never, PROFILE_ID);
+    // [WI-2881] account required by assertCanReadProfile on the self-scope
+    // GETs (ownership-v2 mocked to resolve above).
+    c.set('account' as never, { id: 'test-account-id' });
     c.set('callerPersonId' as never, callerPersonId);
     await next();
   });
@@ -133,5 +164,98 @@ describe('scopes routes', () => {
       CALLER_PERSON_ID,
       CHILD_ID,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2881] read-authority guard (G31 — self-scope handlers only; the sibling
+// GET /scopes/:personId/subjects supporter-edge handler is G32, WI-2518's
+// remit, and stays on its readSupporteeStructuralSubjects edge check.)
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so each attack below is a credentialed
+// non-owner request traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+// ---------------------------------------------------------------------------
+describe('[WI-2881] read-authority guard (G31)', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', scopesRoutes);
+    return direct;
+  }
+
+  function denyNextOwnershipCheck() {
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+  }
+
+  async function expectForbidden(res: Response) {
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+  }
+
+  it('[G31] GET /scopes rejects a cross-profile X-Profile-Id spoof with 403 before the scope-list read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request('/scopes', {
+      headers: SPOOF_HEADERS,
+    });
+
+    await expectForbidden(res);
+    expect(resolveScopesForPerson).not.toHaveBeenCalled();
+  });
+
+  it('[G31] GET /scopes/coldstart rejects a cross-profile X-Profile-Id spoof with 403 before the coldstart read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request('/scopes/coldstart', {
+      headers: SPOOF_HEADERS,
+    });
+
+    await expectForbidden(res);
+    expect(resolveSupporterColdStart).not.toHaveBeenCalled();
   });
 });

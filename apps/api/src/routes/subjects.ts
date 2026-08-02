@@ -38,6 +38,7 @@ import { classifySubject } from '../services/subject-classify';
 import { notFound, apiError, SubjectNotFoundError } from '../errors';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { withProfile } from '../route-utils/route-context';
 import { recordActivationEventSafely } from '../services/activation-events';
@@ -52,6 +53,10 @@ type SubjectRouteEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [WI-2881] Set server-side by accountMiddleware — required by
+    // assertCanReadProfile.
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -101,6 +106,10 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
   .get('/subjects', zValidator('query', subjectListQuerySchema), async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+    // [WI-2881] Central middleware (WI-2128) proves self-or-managed-charge
+    // for the installed profile; consume its target-bound proof when
+    // present, else run the fail-closed fallback (direct/unproven mounts).
+    await assertCanReadProfile(c, profileId);
     const { includeInactive: includeInactiveParam } = c.req.valid('query');
     const includeInactive = includeInactiveParam === 'true';
     const subjects = await listSubjects(db, profileId, { includeInactive });
@@ -218,6 +227,8 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2881] Read-authority guard — see GET /subjects above.
+      await assertCanReadProfile(c, profileId);
       const { id } = c.req.valid('param');
       const subject = await getSubject(db, profileId, id);
       if (!subject) return notFound(c, 'Subject not found');

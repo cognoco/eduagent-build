@@ -204,11 +204,13 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
 });
 
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { app } from '../index';
 import { settingsRoutes } from './settings';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
-import { ForbiddenError } from '@eduagent/schemas';
+import { ForbiddenError, ERROR_CODES } from '@eduagent/schemas';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 
 const AUTH_HEADERS = makeAuthHeaders();
 const PROFILE_HEADERS = { ...AUTH_HEADERS, 'X-Profile-Id': 'profile-1' };
@@ -801,5 +803,118 @@ describe('[CR LOW] child celebration routes require owner gate', () => {
     );
 
     expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2881] read-authority guard (G23)
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so each attack below is a credentialed
+// non-owner request traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+// ---------------------------------------------------------------------------
+describe('[WI-2881] read-authority guard (G23)', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // isOwner:true / explicit-header models the spoofed target being the
+      // account OWNER's profile — the exact shape that satisfies
+      // /settings/withdrawal-archive's assertOwnerProfile pre-gate (and the
+      // mocked verifyPersonIsOrgAdminV2 satisfies assertCallerIsAccountOwner),
+      // so the denial below is attributable to assertCanReadProfile alone.
+      c.set('profileMeta' as never, {
+        isOwner: true,
+        resolvedVia: 'explicit-header',
+      });
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', settingsRoutes);
+    return direct;
+  }
+
+  function denyNextOwnershipCheck() {
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+  }
+
+  async function expectForbidden(res: Response) {
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+  }
+
+  it('[G23] GET /settings/notifications rejects a cross-profile X-Profile-Id spoof with 403 before the prefs read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request('/settings/notifications', {
+      headers: SPOOF_HEADERS,
+    });
+
+    await expectForbidden(res);
+    expect(mockGetNotificationPrefs).not.toHaveBeenCalled();
+  });
+
+  it('[G23] GET /settings/withdrawal-archive rejects a cross-profile X-Profile-Id spoof with 403 before the preference read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      '/settings/withdrawal-archive',
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
+    expect(mockGetWithdrawalArchivePreference).not.toHaveBeenCalled();
+  });
+
+  it('[G23] GET /settings/family-pool-breakdown-sharing rejects a cross-profile X-Profile-Id spoof with 403 before the sharing read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      '/settings/family-pool-breakdown-sharing',
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
+    expect(mockGetOwnedFamilyPoolBreakdownSharing).not.toHaveBeenCalled();
   });
 });

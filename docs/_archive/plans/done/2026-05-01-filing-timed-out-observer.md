@@ -4,7 +4,7 @@
 
 **Goal:** Write the five missing test files that complete the spec verification coverage for the Filing Timed-Out Observer feature.
 
-**Architecture:** The Inngest functions (`filing-timed-out-observe`, `filing-completed-observe`, `filing-stranded-backfill`), DB schema columns, mobile `FilingFailedBanner` component, `use-sessions` refetch hook, and `POST /sessions/:id/retry-filing` endpoint are **all already implemented and registered**. This plan only adds tests. Spec: `docs/superpowers/specs/2026-04-29-filing-timed-out-observer-design.md`. Finding ID: `[FILING-TIMEOUT-OBS]`.
+**Architecture:** The Inngest functions (`filing-timed-out-observe`, `filing-completed-observe`, `filing-stranded-backfill`), DB schema columns, mobile `FilingFailedBanner` component, `use-sessions` refetch hook, and `POST /sessions/:id/retry-filing` endpoint are **all already implemented and registered**. This plan only adds tests. Spec: `docs/_archive/specs/Done/2026-04-29-filing-timed-out-observer-design.md`. Finding ID: `[FILING-TIMEOUT-OBS]`.
 
 **Tech Stack:** Jest, `@testing-library/react-native`, real Postgres for the integration test (loadDatabaseEnv pattern from `weekly-progress-push.integration.test.ts`).
 

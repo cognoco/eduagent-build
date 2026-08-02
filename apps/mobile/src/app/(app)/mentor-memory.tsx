@@ -509,6 +509,7 @@ export default function MentorMemoryScreen() {
             voiceLocale={getVoiceLocaleForLanguage(
               activeProfile?.conversationLanguage,
             )}
+            voiceScopeKey={activeProfile?.id}
             onChangeText={setDraft}
             onAppendTranscript={(finalTranscript) =>
               setDraft((prev) => appendTranscript(prev, finalTranscript))

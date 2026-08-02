@@ -19,6 +19,7 @@
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   guardianship,
+  login,
   membership,
   person,
   type Database,
@@ -490,6 +491,20 @@ export async function listProfilesV2(
       createdAt: person.createdAt,
       updatedAt: person.updatedAt,
       roles: membership.roles,
+      hasLogin: callerPersonId
+        ? sql<boolean>`EXISTS (
+            SELECT 1 FROM ${login}
+            WHERE ${login.personId} = ${person.id}
+          )`.as('has_login')
+        : sql<boolean>`false`.as('has_login'),
+      callerHasActiveGuardianship: callerPersonId
+        ? sql<boolean>`EXISTS (
+            SELECT 1 FROM ${guardianship}
+            WHERE ${guardianship.guardianPersonId} = ${callerPersonId}
+              AND ${guardianship.chargePersonId} = ${person.id}
+              AND ${guardianship.revokedAt} IS NULL
+          )`.as('caller_has_active_guardianship')
+        : sql<boolean>`false`.as('caller_has_active_guardianship'),
     })
     .from(person)
     .innerJoin(membership, eq(membership.personId, person.id))
@@ -501,23 +516,15 @@ export async function listProfilesV2(
     );
 
   if (callerPersonId) {
-    const authorityResults = await Promise.all(
-      rows.map(async (row) => ({
-        row,
-        authority: await resolvePersonOperationAuthorityV2(
-          db,
-          row.id,
-          organizationId,
-          callerPersonId,
-        ),
-      })),
+    // Membership, Login presence, and the caller's active Guardianship edge
+    // are resolved by the single org-scoped query above. Keep the operation-
+    // authority semantics identical to resolvePersonOperationAuthorityV2:
+    // self, or active guardian of an uncredentialed charge.
+    rows = rows.filter(
+      (row) =>
+        row.id === callerPersonId ||
+        (row.callerHasActiveGuardianship && !row.hasLogin),
     );
-    rows = authorityResults
-      .filter(
-        ({ authority }) =>
-          authority === 'self' || authority === 'managed-charge',
-      )
-      .map(({ row }) => row);
   }
 
   if (rows.length === 0) return [];

@@ -191,12 +191,12 @@ Per-file evidence is brief ("active workflow rule", "active architecture fact");
 | `docs/specs/2026-04-18-llm-response-envelope.md` | Canonical envelope contract; CLAUDE.md non-negotiable rule explicitly names this file. |
 | `docs/specs/2026-04-19-prompt-tuning-design.md` | Active spec for B.1-B.5 prompt tuning. |
 | `docs/specs/2026-04-28-profile-as-lens.md` (if present — verify) | Active spec for next major feature cycle. |
-| `docs/superpowers/specs/2026-04-18-parent-narrative-design.md` | Phases 3-5 not implemented; spec is design authority. |
-| `docs/superpowers/specs/2026-04-24-progress-screen-redesign-design.md` | Phase 2 redesign spec; needed for progress-screen Phase 2. |
-| `docs/superpowers/specs/2026-04-29-filing-timed-out-observer-design.md` | Spec dated 1 day ago; implementation underway. |
-| `docs/superpowers/plans/2026-04-19-parent-narrative-implementation.md` | Phases 3-5 not started. |
-| `docs/superpowers/plans/2026-04-20-feedback-and-early-adopter.md` | Feedback system shipped (`f2343ee8`); plan checklist not all ticked — **user: verify and may move to 2C archive**. |
-| `docs/superpowers/plans/2026-04-23-llm-never-truncate.md` | Phase 1 shipped; Phases 2-4 telemetry-gated. |
+| `docs/_archive/specs/Done/2026-04-18-parent-narrative-design.md` | Phases 3-5 not implemented; spec is design authority. |
+| `docs/_archive/specs/Done/2026-04-24-progress-screen-redesign-design.md` | Phase 2 redesign spec; needed for progress-screen Phase 2. |
+| `docs/_archive/specs/Done/2026-04-29-filing-timed-out-observer-design.md` | Spec dated 1 day ago; implementation underway. |
+| `docs/_archive/plans/done/2026-04-19-parent-narrative-implementation.md` | Phases 3-5 not started. |
+| `docs/_archive/plans/done/2026-04-20-feedback-and-early-adopter.md` | Feedback system shipped (`f2343ee8`); plan checklist not all ticked — **user: verify and may move to 2C archive**. |
+| `docs/_archive/plans/done/2026-04-23-llm-never-truncate-phase1-implemented.md` | Phase 1 shipped; Phases 2-4 telemetry-gated. |
 | `docs/plans/2026-04-29-profile-as-lens-phase-1.md` (if present) | New plan; PRs not yet started. |
 
 ---

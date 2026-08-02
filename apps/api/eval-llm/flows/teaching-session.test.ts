@@ -10,7 +10,9 @@
 
 import {
   evaluateTeachingVerdict,
+  runTeachingSession,
   type TeachingSessionInput,
+  type TeachingSessionLiveDeps,
   type TeachingVerdict,
 } from './teaching-session';
 import {
@@ -106,14 +108,68 @@ describe('evaluateTeachingVerdict — transfer dimension', () => {
     expect(issues).toHaveLength(0);
   });
 
-  it('transfer unrecognised value → one warning (no errors)', () => {
+  it('transfer unrecognised value → schema-invalid ERROR (fail closed)', () => {
     const issues = evaluateTeachingVerdict(
       DUMMY_INPUT,
       makeResponse({ ...OK_VERDICT, transfer: 'maybe' }),
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
-    expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
+    expect(issues[0]!.severity).toBe('error');
+    expect(issues[0]!.code).toContain('verdict-schema-invalid');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Structural verdict validation (fail closed, WI-2461 review round 2)
+//
+// A parseable-but-structurally-invalid verdict ({}, missing fields, wrong
+// types) must be an error: pre-fix, `{}` fell through to the unrecognised-
+// transfer WARNING and the boolean dimensions silently no-op'd, so a judge
+// that returned garbage JSON passed the gate.
+// ---------------------------------------------------------------------------
+
+describe('evaluateTeachingVerdict — structural verdict validation', () => {
+  it('empty object verdict {} → one schema-invalid ERROR', () => {
+    const issues = evaluateTeachingVerdict(DUMMY_INPUT, makeResponse({}));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('error');
+    expect(issues[0]!.code).toContain('verdict-schema-invalid');
+  });
+
+  it('missing boolean fields (transfer only) → schema-invalid ERROR naming the missing fields', () => {
+    const issues = evaluateTeachingVerdict(
+      DUMMY_INPUT,
+      makeResponse({ transfer: 'yes' }),
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('error');
+    expect(issues[0]!.code).toContain('verdict-schema-invalid');
+    expect(issues[0]!.message).toContain('scaffolding_appropriate');
+    expect(issues[0]!.message).toContain('looped_or_incoherent');
+    expect(issues[0]!.message).toContain('told_not_taught');
+  });
+
+  it('wrong-typed fields (numeric transfer, string boolean) → schema-invalid ERROR', () => {
+    const issues = evaluateTeachingVerdict(
+      DUMMY_INPUT,
+      makeResponse({
+        transfer: 1,
+        scaffolding_appropriate: 'yes',
+        looped_or_incoherent: false,
+        told_not_taught: false,
+      }),
+    );
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('error');
+    expect(issues[0]!.code).toContain('verdict-schema-invalid');
+  });
+
+  it('a fully valid verdict still evaluates normally (no schema issue)', () => {
+    const issues = evaluateTeachingVerdict(
+      DUMMY_INPUT,
+      makeResponse({ ...OK_VERDICT }),
+    );
+    expect(issues).toHaveLength(0);
   });
 });
 
@@ -190,31 +246,33 @@ describe('evaluateTeachingVerdict — soft dimensions (warnings only)', () => {
 // Missing / error verdict cases
 // ---------------------------------------------------------------------------
 
-describe('evaluateTeachingVerdict — missing or error verdict', () => {
-  it('missing verdict → one no-verdict warning, zero errors', () => {
+describe('evaluateTeachingVerdict — missing or error verdict (fail closed, WI-2461 AC-3)', () => {
+  // An unjudged transcript must FAIL the gate, not warn: a warning-only issue
+  // never increments summary.qualityFailures, so pre-fix an entirely unjudged
+  // teaching run (judge down, unparseable verdict) exited 0 and read as green.
+
+  it('missing verdict → one no-verdict ERROR', () => {
     const issues = evaluateTeachingVerdict(DUMMY_INPUT, makeResponse(null));
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.severity).toBe('error');
     expect(issues[0]!.code).toContain('no-verdict');
-    expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
   });
 
-  it('judge error → one judge-unavailable warning, zero errors', () => {
+  it('judge error → one judge-unavailable ERROR', () => {
     const issues = evaluateTeachingVerdict(
       DUMMY_INPUT,
       makeResponse({ error: 'timeout after 30s' }),
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.severity).toBe('error');
     expect(issues[0]!.code).toContain('judge-unavailable');
-    expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
   });
 
-  it('unparseable liveResponse → no-verdict warning', () => {
+  it('unparseable liveResponse → no-verdict ERROR', () => {
     // Non-JSON string: parseFirstJsonObject returns null → verdict undefined
     const issues = evaluateTeachingVerdict(DUMMY_INPUT, 'not json at all');
     expect(issues).toHaveLength(1);
-    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.severity).toBe('error');
     expect(issues[0]!.code).toContain('no-verdict');
   });
 });
@@ -268,6 +326,111 @@ describe('evaluateTeachingVerdict — combined cases', () => {
     );
     expect(issues.filter((i) => i.severity === 'error')).toHaveLength(0);
     expect(issues.filter((i) => i.severity === 'warning')).toHaveLength(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Internal provider failures propagate as structured execution failures
+// (fail closed, WI-2461 review round 2)
+//
+// Pre-fix, mentor/learner/transfer-probe exceptions were caught into
+// transcript strings, runLive returned normally (runner counted liveCallsOk),
+// and a permissive judge could pass the run. runTeachingSession is the
+// deps-injected core of runLive (no jest.mock — dependency injection, same
+// pattern as runner/gates.ts GateDeps): every provider failure must surface in
+// the result's executionFailures, and evaluateTeachingVerdict must turn each
+// into an error-class issue.
+// ---------------------------------------------------------------------------
+
+const HAPPY_DEPS: TeachingSessionLiveDeps = {
+  mentorTurn: async () => JSON.stringify({ reply: 'Let me explain phases.' }),
+  learnerTurn: async () => 'Oh, so it is about sunlight angles?',
+  transferProbe: async () => 'The lit half faces the Sun; we see part of it.',
+  judge: async () => ({ ...OK_VERDICT }),
+};
+
+interface ParsedRunResult {
+  executionFailures?: string[];
+  verdict?: Record<string, unknown>;
+}
+
+async function runWith(
+  overrides: Partial<TeachingSessionLiveDeps>,
+): Promise<{ raw: string; parsed: ParsedRunResult }> {
+  const raw = await runTeachingSession(DUMMY_INPUT, {
+    ...HAPPY_DEPS,
+    ...overrides,
+  });
+  return { raw, parsed: JSON.parse(raw) as ParsedRunResult };
+}
+
+describe('runTeachingSession — provider failures fail closed', () => {
+  it('happy path: no executionFailures, verdict passed through, zero issues', async () => {
+    const { raw, parsed } = await runWith({});
+    expect(parsed.executionFailures ?? []).toHaveLength(0);
+    expect(parsed.verdict).toMatchObject({ transfer: 'yes' });
+    expect(evaluateTeachingVerdict(DUMMY_INPUT, raw)).toHaveLength(0);
+  });
+
+  it('mentor call failure → executionFailures entry + error-class issue despite a passing verdict', async () => {
+    const { raw, parsed } = await runWith({
+      mentorTurn: async () => {
+        throw new Error('mentor provider 502');
+      },
+    });
+    expect(parsed.executionFailures!.length).toBeGreaterThan(0);
+    expect(parsed.executionFailures!.join(' ')).toContain('mentor');
+    const issues = evaluateTeachingVerdict(DUMMY_INPUT, raw);
+    const errors = issues.filter((i) => i.severity === 'error');
+    // The permissive judge said transfer:'yes' — the run must STILL fail.
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some((i) => i.code.includes('provider-call-failed'))).toBe(
+      true,
+    );
+  });
+
+  it('learner-simulator failure → executionFailures entry + error-class issue', async () => {
+    const { raw, parsed } = await runWith({
+      learnerTurn: async () => {
+        throw new Error('learner provider timeout');
+      },
+    });
+    expect(parsed.executionFailures!.join(' ')).toContain('learner');
+    const issues = evaluateTeachingVerdict(DUMMY_INPUT, raw);
+    expect(
+      issues.some(
+        (i) =>
+          i.severity === 'error' && i.code.includes('provider-call-failed'),
+      ),
+    ).toBe(true);
+  });
+
+  it('transfer-probe failure → executionFailures entry + error-class issue', async () => {
+    const { raw, parsed } = await runWith({
+      transferProbe: async () => {
+        throw new Error('probe provider 429');
+      },
+    });
+    expect(parsed.executionFailures!.join(' ')).toContain('transfer probe');
+    const issues = evaluateTeachingVerdict(DUMMY_INPUT, raw);
+    expect(
+      issues.some(
+        (i) =>
+          i.severity === 'error' && i.code.includes('provider-call-failed'),
+      ),
+    ).toBe(true);
+  });
+
+  it('judge failure → judge-unavailable error-class issue (via the {error} verdict)', async () => {
+    const { raw } = await runWith({
+      judge: async () => ({ error: 'judge provider down' }),
+    });
+    const issues = evaluateTeachingVerdict(DUMMY_INPUT, raw);
+    expect(
+      issues.some(
+        (i) => i.severity === 'error' && i.code.includes('judge-unavailable'),
+      ),
+    ).toBe(true);
   });
 });
 

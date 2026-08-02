@@ -1,0 +1,12 @@
+# Search-tool ignore file (ripgrep, fd, ag — gitignore syntax). NOT a VCS
+# ignore: archived material is tracked in git and must stay tracked.
+#
+# docs/_archive/ holds ~460 superseded docs whose filenames collide with live
+# canon (navigation-contract, architecture-*, memory-architecture-*, …).
+# Excluding them from default searches keeps archived and live hits from
+# appearing side by side with nothing distinguishing them (WI-2658).
+#
+# To search the archive deliberately:
+#   rg --no-ignore <pattern> docs/_archive/     (or rg -u.)
+#   fd --no-ignore <pattern> docs/_archive/
+docs/_archive/

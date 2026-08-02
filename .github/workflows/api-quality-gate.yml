@@ -87,12 +87,14 @@ jobs:
       # Mastery-SIMULATION baseline — a SEPARATE, deterministic, key-free guard
       # (distinct simulation-baseline.json, not the signal baseline above). It
       # structurally validates the committed sim baseline + checks the judge slug
-      # is current; makes NO live LLM call. continue-on-error UNTIL the baseline
-      # is seeded (T12): until then there is no committed simulation-baseline.json,
-      # so this step reds — that red signals "feature inert", not broken code.
-      # T12 commits the real provenance-stamped baseline AND removes
-      # continue-on-error here in the same PR (mirrors WI-556 for the main harness).
+      # is current; makes NO live LLM call.
+      #
+      # Blocking since WI-2461: the provenance-stamped simulation-baseline.json
+      # was seeded 2026-07-17 and is committed, so a red here is a real
+      # placebo-baseline or stale-judge-slug problem, never "feature inert"
+      # (mirrors WI-556 for the main harness). Re-seed with the eval:llm:sim
+      # --update-baseline command documented in eval-live.yml if the drift is
+      # intentional.
       - name: LLM eval harness — validate SIMULATION baseline (deterministic)
         if: steps.change-class.outputs.eval == 'true'
-        continue-on-error: true
         run: pnpm --filter @eduagent/api eval:llm:sim -- --validate-baseline

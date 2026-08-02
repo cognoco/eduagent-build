@@ -50,7 +50,7 @@ globalThis.MENTOMATE_ATLAS_DATA = {
     audience: 'Technical non-coders, PMs, POs, and operators',
     updated: '2026-05-03',
     sourceSpec:
-      'docs/superpowers/specs/2026-05-02-visual-onboarding-atlas-design.md',
+      'docs/_archive/specs/done/2026-05-02-visual-onboarding-atlas-design.md',
     sourceCommit: 'd1845d1f docs: add visual onboarding atlas design',
     principle:
       'Interactive HTML and structured data are canonical. PNGs and slides are generated views.',

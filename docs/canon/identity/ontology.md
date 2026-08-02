@@ -6,37 +6,52 @@ their canonical home), `MMT-ADR-0001`/`0002`/`0007`–`0012`, and the sibling id
 doc.**
 
 > **Implementation status — the jurisdiction-consent model is TARGET; its resolution is UNBUILT
-> (verified 2026-08-01 against `origin/main` @ `764748015`).** The
-> `resolveConsentRequirement(age × residence_jurisdiction)` model in this doc (§3.2, §3.4, inv 10/29)
-> is canon for what we are building — it is **not** a description of shipped behaviour. As of the
-> verification commit:
+> AS A GENERAL PATH, with ONE live, narrow exception (verified 2026-08-02 against `origin/main` @
+> `8127597`).** The `resolveConsentRequirement(age × residence_jurisdiction)` model in this doc (§3.2,
+> §3.4, inv 10/29) is canon for what we are building — it is **not** a description of general shipped
+> behaviour. As of the verification commit:
 >
 > - **Schema shipped; two policy-data paths, one seeded.** `person.residence_jurisdiction` and the
 >   `regimes` / `policy_cells` tables exist (migration `0108_identity_foundation_baseline.sql`), but
->   `policy_cells` is **unpopulated**. A newer DB-mastered path, `country_policy_registry`, **is**
->   seeded (31 EEA+UK rows; migrations `0157`/`0158`, WI-2690).
-> - **Resolvers exist but are unconsumed.** The older `evaluatePolicyCell`
->   (`apps/api/src/services/policy-engine/engine.ts:51-60`) is a fail-closed scaffold returning
->   `consentRequired: true` for **all** inputs, with no consumers outside the policy-engine barrel.
->   The newer `resolveCountryPolicy` / `resolveJurisdiction`
->   (`apps/api/src/services/identity-v2/country-policy.ts`, `country-policy-loader.ts` — WI-2690's
->   self-described canonical habitual-residence resolver) computes a real per-country
->   `AgeConsentDecision` over the seeded registry — but **neither resolver has any production
->   consumer**. Nothing in the wired consent flows reads `residence_jurisdiction` to make a consent
->   decision.
-> - **The live consent gate is jurisdiction-blind.** What the wired flows actually import is the flat
->   age threshold in `apps/api/src/services/consent.ts` — `checkConsentRequired` /
+>   `policy_cells` is still **unpopulated** — no migration under `apps/api/drizzle` contains an
+>   `INSERT INTO policy_cells`, and only `0108` and `0113_identity_stray_ddl.sql` reference the table
+>   at all (schema-only). A newer DB-mastered path, `country_policy_registry`, **is** seeded (31
+>   EEA+UK rows; migrations `0157`/`0158`, WI-2690).
+> - **`evaluatePolicyCell` remains the fail-closed unbuilt scaffold.** `apps/api/src/services/policy-engine/engine.ts:51-60`
+>   still returns `{ prohibited: false, consentRequired: true }` for **all** inputs (unknown-input
+>   branch at line 55, known-input branch at line 59 — both hard-coded), with no consumers outside the
+>   policy-engine barrel.
+> - **`resolveJurisdiction` / `resolveCountryPolicy` now have exactly one production consumer —
+>   guardian attachment.** `resolveGuardianAttachmentContext`
+>   (`apps/api/src/services/identity-v2/guardian-attachment.ts:101`) reads
+>   `charge.residenceJurisdiction` and calls `resolveJurisdiction`
+>   (`country-policy-loader.ts:104`, which wraps `resolveCountryPolicy` in `country-policy.ts:88`) at
+>   `guardian-attachment.ts:181-186` to compute a real per-country `AgeConsentDecision` and gate on
+>   `consentDecision.ageBand` / `consentStatus`. This is reached live:
+>   `apps/api/src/services/identity-v2/guardian-attachment-verifier.ts:199` calls it from
+>   `initiateGuardianAuthorityVerification` / `attachGuardianConsentFromDurableAuthorityToken`, which
+>   back the mounted `POST /consent/guardian-attachment/initiate` and `POST /consent/guardian-attachment`
+>   routes (`apps/api/src/routes/consent.ts:231,290`; landed by WI-2533/WI-2986, commit `785ba4e5`).
+>   Separate `git grep` passes for `resolveJurisdiction`, `resolveCountryPolicy`, and
+>   `residenceJurisdiction` against `origin/main -- apps/api` confirm this is the *only* production
+>   call site of either resolver — all other `resolveJurisdiction`/`resolveCountryPolicy` hits are
+>   tests, and all other `residenceJurisdiction` reads (`profile-v2.ts`, `child-profile-v2.ts`,
+>   `identity-graph.ts`, `export-v2.ts`, `profile.ts`) only store/display the value, never feed it into
+>   a consent decision.
+> - **Every other consent flow remains jurisdiction-blind.** What the rest of the wired flows import
+>   is the flat age threshold in `apps/api/src/services/consent.ts` — `checkConsentRequired` /
 >   `checkConsentRequiredFromDate` (`age <= 16` → GDPR consent required; lines 163/207 — the
 >   "GDPR-everywhere" model, where location is not a factor). Wired callers include
->   `apps/api/src/middleware/consent.ts` and the `identity-v2` services.
+>   `apps/api/src/middleware/consent.ts:10,167` and identity-v2's `child-profile-v2.ts:39,140,145`,
+>   `family-join-v2.ts:54,158`, `identity-graph.ts:50,221`.
 >
-> **Refiners and executors: treat this model as *resolution-unbuilt*.** Acceptance criteria for
-> consent-cluster items must scope **building out** the jurisdiction resolution — the owning resolver
-> and consumer-wiring work — never **consuming** it as if it were live. Do not write ACs that call a
-> jurisdiction-aware resolver until that work has landed and been verified; and do not scope a *new*
-> resolver without reconciling against the WI-2690 resolver that already exists unconsumed. This
-> banner labels current reality; it does not amend the target model, which stands exactly as written
-> below.
+> **Refiners and executors: treat this model as *resolution-unbuilt*, EXCEPT the guardian-attachment
+> path above, which is live and should be treated as such.** Do not write ACs that assume a
+> jurisdiction-aware resolver is wired into any *other* consent flow (the flat age gate still governs
+> there) until that work has landed and been verified; and do not scope a *new* resolver without
+> reconciling against the WI-2690 resolver that guardian-attachment already consumes. This banner
+> labels current reality — it neither prescribes nor expands build work — and it does not amend the
+> target model, which stands exactly as written below.
 
 **What this is.** The single *structural* terminus for the identity foundation: the entities, their
 one-line definitions, the relationships between them, and the invariants that bind them — in one
@@ -231,7 +246,7 @@ The drift engine was turning *attributes* into entities/tables. These stay as co
   as-is; it is the one identity-adjacent term that is *not* drifting.
 
 ### §3.4 — Residence jurisdiction
-*(Column shipped; nothing yet reads it for consent — see the implementation-status banner at the top.)*
+*(Column shipped; read for consent only by the guardian-attachment verification path — every other wired consent flow remains jurisdiction-blind. See the implementation-status banner at the top.)*
 - A Person carries a **`residence_jurisdiction`**: a **first-class, time-versioned attribute** (history
   retained for audit — *"what policy was in force when we processed"*), keyed off **residence**, not
   current location (a holiday or VPN must not re-gate). It is the input to the consent computation

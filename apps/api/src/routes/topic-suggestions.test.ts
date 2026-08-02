@@ -103,6 +103,22 @@ jest.mock('../services/suggestions', () => ({
   ]),
 }));
 
+// [WI-2881] assertCanReadProfile (GET topic-suggestions) calls
+// verifyPersonOwnershipV2 — a raw db.select() membership query the mock DB in
+// this file cannot satisfy. The resolving default models an authorized caller
+// (the full-app tests above never reach it anyway: profileScopeMiddleware
+// stamps the target-bound authority proof, so the guard's fast path applies);
+// the [WI-2881] denial test below overrides with mockRejectedValueOnce to
+// prove the route fails closed before the suggestions read. The cross-account
+// read attack against a real membership table is covered by the real-DB break
+// test in tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock LLM services — registerProvider for llm middleware
 // ---------------------------------------------------------------------------
@@ -145,7 +161,14 @@ jest.mock(
 // Import app AFTER all mocks are in place
 // ---------------------------------------------------------------------------
 
+import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { ERROR_CODES } from '@eduagent/schemas';
 import { app } from '../index';
+import { topicSuggestionRoutes } from './topic-suggestions';
+import { getUnusedTopicSuggestions } from '../services/suggestions';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { ForbiddenError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -220,5 +243,80 @@ describe('topic-suggestions routes', () => {
       );
       expect(res.status).toBe(400);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2881] read-authority guard (G27)
+// Unlike the full-app tests above (where profileScopeMiddleware stamps the
+// target-bound authority proof), this harness mounts the route module
+// directly and installs profileId ONLY from the request's X-Profile-Id
+// header — the same client-controlled input the real middleware resolves —
+// so the attack below is a credentialed non-owner request traversing
+// header → middleware → route. profileAuthorityVerifiedFor is deliberately
+// never set (no central proof), which keeps the case mutation-sensitive to
+// the route guard's own fail-closed fallback (verifyPersonOwnershipV2).
+// ---------------------------------------------------------------------------
+describe('[WI-2881] read-authority guard (G27)', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+  const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000201';
+  const BOOK_ID = 'a0000000-0000-4000-a000-000000000401';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', topicSuggestionRoutes);
+    return direct;
+  }
+
+  it('[G27] GET /subjects/:subjectId/books/:bookId/topic-suggestions rejects a cross-profile X-Profile-Id spoof with 403 before the suggestions read', async () => {
+    jest.mocked(getUnusedTopicSuggestions).mockClear();
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+
+    const res = await makeUnprovenApp().request(
+      `/subjects/${SUBJECT_ID}/books/${BOOK_ID}/topic-suggestions`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+    expect(getUnusedTopicSuggestions).not.toHaveBeenCalled();
   });
 });
