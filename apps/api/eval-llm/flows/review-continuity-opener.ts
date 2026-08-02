@@ -15,6 +15,7 @@ import { reviewContinuityContexts } from '../fixtures/review-continuity';
 import type {
   DeterministicCheckContext,
   FlowDefinition,
+  ProviderCallContext,
   PromptMessages,
   QualityIssue,
   Scenario,
@@ -108,6 +109,23 @@ export const reviewContinuityOpenerFlow: FlowDefinition<ReviewContinuityOpenerIn
       'apps/api/src/services/review-continuity/opener.ts:buildReviewContinuityOpener',
     emitsEnvelope: true,
     expectedResponseSchema: llmResponseEnvelopeSchema,
+
+    // The judge call in evaluateQuality below (judgeOpenerFaithfulness) only
+    // fires when the mentor is pinned via --openrouter-model — see the
+    // "mentor-not-pinned" warning branch, which skips the judge entirely
+    // otherwise. `context.openrouterModel` is threaded explicitly by the
+    // caller (index.ts's preflight, and runHarness's own budget enforcement)
+    // rather than read from the getOpenRouterModelOverride() global, so both
+    // sides agree on the count even before that global would be set. Weekly
+    // unpinned gate: 1 call/item. An operator-run faithfulness check with the
+    // mentor pinned: 2 calls/item (opener + judge) — 10 required samples, so
+    // pinned demand is +10 over unpinned for this flow.
+    providerCallCount(
+      _input: ReviewContinuityOpenerInput,
+      context: ProviderCallContext,
+    ): number {
+      return context.openrouterModel ? 2 : 1;
+    },
 
     buildPromptInput(): ReviewContinuityOpenerInput | null {
       // Not used — enumerateScenarios fans out the fixtures instead.

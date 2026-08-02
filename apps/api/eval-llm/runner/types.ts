@@ -53,6 +53,24 @@ export interface DeterministicCheckContext<Input = unknown> {
 }
 
 /**
+ * Execution/accounting context passed to `providerCallCount` — CLI options
+ * that affect HOW MANY provider calls one item costs but aren't part of the
+ * per-item `Input` itself (e.g. whether the mentor is pinned via
+ * `--openrouter-model`, which makes review-continuity-opener dispatch an
+ * extra judge call). Threaded explicitly through the call chain (index.ts →
+ * budget.ts / runner.ts → this) rather than read from a mutable global at
+ * call time: `deriveEnvelopeProviderDemandFromMatrix` runs during preflight,
+ * BEFORE `bootstrapLlmProviders()` / `setOpenRouterModelOverride()` would
+ * have set any global override, so a global read there would always see the
+ * unpinned answer regardless of the CLI flags actually supplied.
+ * [WI-3029 provider-accounting correction]
+ */
+export interface ProviderCallContext {
+  /** The `--openrouter-model` value, or undefined when unpinned (production routing). */
+  openrouterModel?: string;
+}
+
+/**
  * A scenario groups a scenarioId with the Input it generates. Used by flows
  * that exercise the same prompt builder across multiple branches — e.g. the
  * main tutoring loop fanned out across escalation rungs / session types.
@@ -103,6 +121,17 @@ export interface FlowDefinition<Input = unknown> {
    * will show "not supported for this flow" instead of a response.
    */
   runLive?(input: Input, messages: PromptMessages): Promise<string>;
+
+  /**
+   * Total provider calls for one live item, including internal judge calls.
+   * `context` carries the execution/accounting options (e.g. a pinned
+   * `--openrouter-model`) that can change the count — see
+   * `ProviderCallContext`. Both the preflight demand estimate
+   * (`runner/budget.ts`) and the live runner's own budget enforcement
+   * (`runHarness`) call this with the SAME context, so a declared count is
+   * both accounted for AND capped, not just reported.
+   */
+  providerCallCount?(input: Input, context: ProviderCallContext): number;
 
   /**
    * Optional: expected response shape for live runs. When set, Tier 2 runs

@@ -9,7 +9,7 @@
 //   pnpm eval:llm -- --profile 12yo-dinosaurs   # one profile
 //   pnpm eval:llm -- --flow exchanges --scenarios core   # 3 highest-signal scenarios
 //   pnpm eval:llm -- --flow exchanges --scenarios S1,S3  # specific scenarios
-//   pnpm eval:llm -- --max-live-calls 5         # cap live LLM calls (default 20)
+//   pnpm eval:llm -- --max-live-calls 5         # optional live-call cap (default 20)
 //   doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls)
 //
 //   doppler run -- pnpm eval:llm -- --flow safety-probes --live \
@@ -33,75 +33,37 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { capitalsFlow } from './flows/quiz-capitals';
-import { vocabularyFlow } from './flows/quiz-vocabulary';
-import { guessWhoFlow } from './flows/quiz-guess-who';
-import { dictationGenerateFlow } from './flows/dictation-generate';
-import { dictationGenerateSanitizationFlow } from './flows/dictation-generate-sanitization';
-import { prepareHomeworkFlow } from './flows/dictation-prepare-homework';
-import { dictationReviewFlow } from './flows/dictation-review';
-import { sessionAnalysisFlow } from './flows/session-analysis';
-import { sessionRecapFlow } from './flows/session-recap';
-import { sessionSummaryFlow } from './flows/session-summary';
-import { filingPreSessionFlow } from './flows/filing-pre-session';
-import { exchangesFlow } from './flows/exchanges';
-import { homeworkNoticeFlow } from './flows/homework-notice';
-import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
-import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
-import { subjectClassifyFlow } from './flows/subject-classify';
+import { FLOWS } from './flow-registry';
 // [WI-1755] Launch-guard eval coverage for the language-learning-intent
 // detector used at subject creation. See flow file for context.
-import { languageDetectFlow } from './flows/language-detect';
-import { probesFlow } from './flows/probes';
+// Flow registry is shared with deterministic workflow-contract tests.
 // [H3 — 2026-06-05 safety audit] Adversarial safety regression suite:
 // jailbreaks, prompt extraction, crisis disclosures, harmful-content asks.
-import { safetyProbesFlow } from './flows/safety-probes';
 // [Memo §6.2] Conversation-language quality for cs/nb/pl — LLM judge on
 // production routing scores candidate-model prose. See flow file.
-import { languageQualityFlow } from './flows/language-quality';
-import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
-import { progressSummaryFlow } from './flows/progress-summary';
-import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
-import { recallGraderFlow } from './flows/recall-grader';
-import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 // [BUG-125] Snapshot coverage for the two prompt builders the pre-commit
 // hook was previously blind to. See flow files for context.
-import { languagePromptsFlow } from './flows/language-prompts';
 // [WI-1547] Snapshot coverage for the graded-input generation prompt.
-import { gradedInputPromptsFlow } from './flows/graded-input-prompts';
-import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
-import { nowParkReturnFlow } from './flows/now-park-return';
-import { parkAndReturnRankingFlow } from './flows/park-and-return-ranking';
-import { parkAndReturnReweaveFlow } from './flows/park-and-return-reweave';
-import { appHelpV2Flow } from './flows/app-help-v2';
 // Pedagogy-coverage flows: the harness proved epistemic safety (source
 // grounding, no-cheating, no-stereotyping) but only *observed* whether
 // teaching produces understanding. These two close that gap — see flow files.
-import { challengeRoundMasteryFlow } from './flows/challenge-round-mastery';
-import { misconceptionRepairFlow } from './flows/misconception-repair';
 // [T1–T4 — 2026-06-27 plan] Teaching-session multi-turn flow: stuck-unless-taught
 // learner, 8-turn loop, unaided transfer probe, temp-0 judge (PRE-TEEN/TEEN-BAND).
-import { teachingSessionFlow } from './flows/teaching-session';
 // [T10 — 2026-06-26 plan] Model-selection gate for the dedicated grader that
 // emits challenge_round_evaluation when the tutor (gpt-oss) drops it. Two-axis
 // fixture battery: format (non-empty schema-valid verdict) + judgment (solid /
 // misconception / missing / false-mastery guard). See flow file for bake-off
 // commands (--flow challenge-grader --live --openrouter-model <slug>).
-import { challengeGraderFlow } from './flows/challenge-grader';
 // [plan 2026-06-27] Review-continuity opener faithfulness — deterministic
 // builder snapshots + two-independent-model judge (model A pinned mentor,
 // model B independent OpenRouter judge). See flow file.
-import { reviewContinuityOpenerFlow } from './flows/review-continuity-opener';
 // [WI-1877 rework] Suitability-judge injection resistance — behavioral,
 // single-model live run proving a fenced learner-message directive cannot
 // flip an unsuitable reply's verdict to a clean "ok". See flow file.
-import { judgeSuitabilityFlow } from './flows/judge-suitability';
-import { learningTextSafetyJudgeFlow } from './flows/learning-text-safety-judge';
 // [WI-2625] Mentor-notice re-check judge — behavioral live run proving the
 // independent server-side judge lands on the correct verdict per accepted
 // pair, resolves an off-topic message to "continue", and resists an
 // injected directive trying to force locked_in. See flow file.
-import { recheckJudgeFlow } from './flows/recheck-judge';
 import {
   listFlows,
   parseCliArgs,
@@ -109,14 +71,20 @@ import {
   type RunSummary,
   type RunOptions,
 } from './runner/runner';
-import type { FlowDefinition } from './runner/types';
 import {
   buildBaseline,
   parseBaseline,
   validateBaselineStructure,
   type Baseline,
 } from './runner/metrics';
+import { PROFILES } from './fixtures/profiles';
+import {
+  deriveEnvelopeBudgetFromMatrix,
+  deriveEnvelopeProviderDemandFromMatrix,
+  resolveEnvelopeLiveCallCap,
+} from './runner/budget';
 import { evaluateGates } from './runner/gates';
+import { isCoverageIncomplete } from './runner/coverage';
 import {
   bootstrapLlmProviders,
   setOpenRouterProviderPin,
@@ -186,49 +154,6 @@ function updateZeroDriftReceipt(options: RunOptions): void {
   }
 }
 
-const FLOWS: FlowDefinition[] = [
-  capitalsFlow as FlowDefinition,
-  vocabularyFlow as FlowDefinition,
-  guessWhoFlow as FlowDefinition,
-  dictationGenerateFlow as FlowDefinition,
-  dictationGenerateSanitizationFlow as FlowDefinition,
-  prepareHomeworkFlow as FlowDefinition,
-  dictationReviewFlow as FlowDefinition,
-  sessionAnalysisFlow as FlowDefinition,
-  sessionRecapFlow as FlowDefinition,
-  sessionSummaryFlow as FlowDefinition,
-  filingPreSessionFlow as FlowDefinition,
-  exchangesFlow as FlowDefinition,
-  homeworkNoticeFlow as FlowDefinition,
-  topicProbeSignalsFlow as FlowDefinition,
-  topicIntentMatcherFlow as FlowDefinition,
-  subjectClassifyFlow as FlowDefinition,
-  languageDetectFlow as FlowDefinition,
-  probesFlow as FlowDefinition,
-  safetyProbesFlow as FlowDefinition,
-  languageQualityFlow as FlowDefinition,
-  bookSuggestionRegenerationFlow as FlowDefinition,
-  progressSummaryFlow as FlowDefinition,
-  assessmentEvaluationFlow as FlowDefinition,
-  anthropicResponseFormatFlow as FlowDefinition,
-  languagePromptsFlow as FlowDefinition,
-  gradedInputPromptsFlow as FlowDefinition,
-  adaptiveTeachingFlow as FlowDefinition,
-  nowParkReturnFlow as FlowDefinition,
-  parkAndReturnRankingFlow as FlowDefinition,
-  parkAndReturnReweaveFlow as FlowDefinition,
-  appHelpV2Flow as FlowDefinition,
-  challengeRoundMasteryFlow as FlowDefinition,
-  misconceptionRepairFlow as FlowDefinition,
-  teachingSessionFlow as FlowDefinition,
-  challengeGraderFlow as FlowDefinition,
-  reviewContinuityOpenerFlow as FlowDefinition,
-  recallGraderFlow as FlowDefinition,
-  judgeSuitabilityFlow as FlowDefinition,
-  recheckJudgeFlow as FlowDefinition,
-  learningTextSafetyJudgeFlow as FlowDefinition,
-];
-
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const { options, listOnly } = parseCliArgs(argv);
@@ -236,6 +161,54 @@ async function main(): Promise<void> {
   if (listOnly) {
     clearZeroDriftReceipt();
     listFlows(FLOWS);
+    const baseline = await readBaseline();
+    // [WI-3029 SHOULD-2] --list is the operator-facing sizing surface for
+    // scoped seed/reseed invocations (see the seed-guard's remedy text
+    // below) — it must apply --flow / --profile / --scenarios exactly like
+    // the preflight and post-run report blocks do, or a scoped `--list`
+    // still reports the FULL unscoped matrix (329/366), which is the wrong
+    // number to size --max-live-calls from.
+    const scopedFlows = FLOWS.filter(
+      (flow) => !options.flowFilter || options.flowFilter.has(flow.id),
+    );
+    const scopedProfiles = PROFILES.filter(
+      (profile) =>
+        !options.profileFilter || options.profileFilter.has(profile.id),
+    );
+    const budget = deriveEnvelopeBudgetFromMatrix(
+      scopedFlows,
+      scopedProfiles,
+      baseline?.flows,
+      { scenarioFilter: options.scenarioFilter },
+    );
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      scopedFlows,
+      scopedProfiles,
+      {
+        scenarioFilter: options.scenarioFilter,
+        providerCallContext: { openrouterModel: options.openrouterModel },
+      },
+    );
+    console.log(
+      `Envelope matrix demand: required=${budget.requiredSamples} ` +
+        `baseline=${budget.baselineSamples} configured=${budget.configuredBudget} ` +
+        `headroom=${budget.headroomSamples} (${budget.headroomRate * 100}%)`,
+    );
+    console.log(
+      `Envelope provider demand: outer=${providerDemand.outerRunLiveCalls} ` +
+        `internal=${providerDemand.internalProviderCalls} ` +
+        `total=${providerDemand.providerCalls}` +
+        `${
+          options.openrouterModel
+            ? ` (context: mentor pinned via --openrouter-model=${options.openrouterModel})`
+            : ' (context: unpinned/production routing)'
+        }`,
+    );
+    for (const [flowId, demand] of Object.entries(budget.flows)) {
+      console.log(
+        `  [${flowId}] required=${demand.requiredSamples} baseline=${demand.baselineSamples}`,
+      );
+    }
     return;
   }
 
@@ -313,6 +286,68 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  if (options.live && options.onlyEnvelopeFlows) {
+    const baseline = await readBaseline();
+    const preflightFlows = FLOWS.filter(
+      (flow) => !options.flowFilter || options.flowFilter.has(flow.id),
+    );
+    const preflightProfiles = PROFILES.filter(
+      (profile) =>
+        !options.profileFilter || options.profileFilter.has(profile.id),
+    );
+    const budget = deriveEnvelopeBudgetFromMatrix(
+      preflightFlows,
+      preflightProfiles,
+      baseline?.flows,
+      { scenarioFilter: options.scenarioFilter },
+    );
+    // [WI-3029 provider-accounting correction] `budget.configuredBudget` is a
+    // SAMPLE-count floor (attempted items, +10% headroom) — it does NOT
+    // account for a flow costing more than one provider call per item
+    // (internal judges, or review-continuity-opener's pinned-mentor judge).
+    // `providerDemand.providerCalls` is the actual, context-aware provider-
+    // call total for THIS invocation's --openrouter-model state. The
+    // effective floor — for both auto-fit and the explicit-cap rejection
+    // below — is never below either number, or a pinned-mentor run with an
+    // omitted/undersized --max-live-calls would silently truncate mid-run.
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      preflightFlows,
+      preflightProfiles,
+      {
+        scenarioFilter: options.scenarioFilter,
+        providerCallContext: { openrouterModel: options.openrouterModel },
+      },
+    );
+    const effectiveFloor = Math.max(
+      budget.configuredBudget,
+      providerDemand.providerCalls,
+    );
+    options.maxLiveCalls = resolveEnvelopeLiveCallCap(
+      options,
+      budget,
+      providerDemand,
+    );
+    if (
+      options.maxLiveCalls !== undefined &&
+      options.maxLiveCalls < effectiveFloor
+    ) {
+      clearZeroDriftReceipt();
+      console.error(
+        `Envelope matrix requires ${budget.requiredSamples} samples plus ` +
+          `${budget.headroomSamples} headroom calls (sample floor=${budget.configuredBudget}; ` +
+          `baseline=${budget.baselineSamples}); context-aware provider-call demand ` +
+          `is ${providerDemand.providerCalls} calls` +
+          `${
+            options.openrouterModel
+              ? ` (mentor pinned via --openrouter-model=${options.openrouterModel})`
+              : ' (unpinned/production routing)'
+          }; supplied --max-live-calls=${options.maxLiveCalls} is below the ` +
+          `effective floor of ${effectiveFloor}.`,
+      );
+      process.exit(2);
+    }
+  }
+
   // Bootstrap LLM providers early so any missing-key errors surface before
   // the run matrix starts. Tier-1 runs skip this — no LLM calls are made.
   if (options.live) {
@@ -349,6 +384,41 @@ async function main(): Promise<void> {
   );
 
   const summary: RunSummary = await runHarness(FLOWS, options);
+
+  if (options.live) {
+    const baselineForReport = await readBaseline();
+    const matrixFlows = FLOWS.filter(
+      (flow) =>
+        (!options.flowFilter || options.flowFilter.has(flow.id)) &&
+        (!options.onlyEnvelopeFlows || flow.emitsEnvelope === true),
+    );
+    const matrixProfiles = PROFILES.filter(
+      (profile) =>
+        !options.profileFilter || options.profileFilter.has(profile.id),
+    );
+    const envelopeBudget = deriveEnvelopeBudgetFromMatrix(
+      matrixFlows,
+      matrixProfiles,
+      baselineForReport?.flows,
+      { scenarioFilter: options.scenarioFilter },
+    );
+    console.log(
+      `Envelope budget: configured=${envelopeBudget.configuredBudget} ` +
+        `required=${envelopeBudget.requiredSamples} ` +
+        `baseline=${envelopeBudget.baselineSamples} ` +
+        `headroom=${envelopeBudget.headroomSamples} ` +
+        `(${envelopeBudget.headroomRate * 100}%); no truncation contract`,
+    );
+    for (const [flowId, demand] of Object.entries(envelopeBudget.flows)) {
+      const coverage = summary.envelopeCoverage[flowId];
+      console.log(
+        `  [${flowId}] required=${demand.requiredSamples} ` +
+          `attempted=${coverage?.attempted ?? 0} ` +
+          `completed=${coverage?.completed ?? 0} ` +
+          `budget-skipped=${coverage?.budgetSkipped ?? 0}`,
+      );
+    }
+  }
 
   console.log('');
   console.log('─────────────────────────────────────────');
@@ -404,6 +474,36 @@ async function main(): Promise<void> {
           `  doppler run -- pnpm eval:llm -- --live ${requiredFlows
             .map((id) => `--flow ${id}`)
             .join(' ')} --max-live-calls 250 --update-baseline`,
+      );
+      process.exit(1);
+    }
+    // [WI-3029 S5] Coverage seed-guard: validateBaselineStructure above only
+    // catches an EMPTY flow (n=0, the placebo state) — it does not catch a
+    // flow with SOME samples but fewer than its required-sample demand (e.g. an
+    // operator-run `--update-baseline` reseed scoped to a subset of flows via
+    // `--flow`, under a --max-live-calls too low for that subset — see
+    // docs/pre-launch-checklist.md). Refuse to write a baseline seeded from
+    // incomplete coverage; evaluateGates below would only report this AFTER the
+    // write, which is one gate too late for a seed operation.
+    const incompleteSeedFlows = requiredFlows.filter((flowId) =>
+      isCoverageIncomplete(summary.envelopeCoverage[flowId]),
+    );
+    if (incompleteSeedFlows.length > 0) {
+      console.error(
+        `Refusing to write baseline — coverage is incomplete for flow(s) required by an envelope-emitting seed:`,
+      );
+      for (const flowId of incompleteSeedFlows) {
+        // Non-null: incompleteSeedFlows was filtered by isCoverageIncomplete,
+        // which is false (and thus excludes) for an undefined entry.
+        const c = summary.envelopeCoverage[flowId]!;
+        console.error(
+          `  [${flowId}] attempted=${c.attempted} completed=${c.completed} ` +
+            `budget-skipped=${c.budgetSkipped} required=${c.required}`,
+        );
+      }
+      console.error('');
+      console.error(
+        'Raise --max-live-calls (or drop --flow scoping) so every required sample is attempted before seeding.',
       );
       process.exit(1);
     }

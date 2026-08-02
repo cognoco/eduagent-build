@@ -21,6 +21,7 @@ import {
   formatDriftReport,
   type Baseline,
 } from './metrics';
+import { isCoverageIncomplete } from './coverage';
 
 /** A line for the caller to print: stdout (`log`) or stderr (`error`). */
 export interface GateMessage {
@@ -86,11 +87,28 @@ export async function evaluateGates(
   // baseline we just wrote. Quality and execution failures still fail the run
   // so an operator inspects them before committing the seed.
   if (options.updateBaseline) {
-    if (qualityFailed || executionFailed) {
+    // [WI-3029 S5] A starved seed run must never look clean: seeding from a
+    // truncated run is strictly worse than checking against one, so an
+    // incomplete envelopeCoverage flow fails this path exactly like a
+    // quality/execution failure does, even when neither of those fired.
+    const incompleteFlows = Object.entries(summary.envelopeCoverage).filter(
+      ([, coverage]) => isCoverageIncomplete(coverage),
+    );
+    if (qualityFailed || executionFailed || incompleteFlows.length > 0) {
       messages.push({
         level: 'error',
         text: 'NOTE: baseline.json WAS written (signal distributions include the failed samples). Triage the quality/live-call execution failures above before committing it.',
       });
+      for (const [flowId, coverage] of incompleteFlows) {
+        messages.push({
+          level: 'error',
+          text:
+            `Coverage gate: ${flowId} is incomplete (attempted=${coverage.attempted}, ` +
+            `completed=${coverage.completed}, budget-skipped=${coverage.budgetSkipped}, ` +
+            `required=${coverage.required}); the written baseline for this flow is truncated — ` +
+            'do not commit it as-is.',
+        });
+      }
       return { exitCode: 1, driftEvaluated: false, messages };
     }
     return { exitCode: 0, driftEvaluated: false, messages };
@@ -98,6 +116,7 @@ export async function evaluateGates(
 
   let driftEvaluated = false;
   let driftExceeded = false;
+  let coverageIncomplete = false;
 
   // The drift comparison runs whenever --check-baseline is set — independently
   // of `qualityFailed`. This ordering IS the fix.
@@ -111,10 +130,29 @@ export async function evaluateGates(
       return { exitCode: 2, driftEvaluated: false, messages };
     }
     driftEvaluated = true;
+    for (const [flowId, coverage] of Object.entries(summary.envelopeCoverage)) {
+      // No `baseline.flows[flowId]` guard: a flow not yet seeded into the
+      // baseline (a brand-new envelope flow) is EXACTLY the case
+      // compareAgainstBaseline below excludes from drift (budget starvation
+      // isn't a signal collapse) — so the coverage gate must catch it
+      // regardless of baseline membership, or it is invisible everywhere.
+      // [WI-3029 S3]
+      if (isCoverageIncomplete(coverage)) {
+        coverageIncomplete = true;
+        messages.push({
+          level: 'error',
+          text:
+            `Coverage gate: ${flowId} is incomplete (attempted=${coverage.attempted}, ` +
+            `completed=${coverage.completed}, budget-skipped=${coverage.budgetSkipped}); ` +
+            'baseline drift is not evaluated for this flow.',
+        });
+      }
+    }
     const drifts = compareAgainstBaseline(
       summary.envelopeMetrics,
       baseline,
       deps.tolerancePp,
+      summary.envelopeCoverage,
     );
     if (drifts.length === 0) {
       messages.push({
@@ -134,11 +172,12 @@ export async function evaluateGates(
     }
   }
 
-  if (qualityFailed || executionFailed || driftExceeded) {
+  if (qualityFailed || executionFailed || driftExceeded || coverageIncomplete) {
     const reasons = [
       qualityFailed ? 'scenario-quality failures' : null,
       executionFailed ? 'live-call execution failures' : null,
       driftExceeded ? 'baseline signal drift' : null,
+      coverageIncomplete ? 'incomplete baseline coverage' : null,
     ].filter((r): r is string => r !== null);
     messages.push({
       level: 'error',

@@ -1,4 +1,9 @@
-import type { FlowDefinition, QualityIssue, Scenario } from './types';
+import type {
+  FlowDefinition,
+  ProviderCallContext,
+  QualityIssue,
+  Scenario,
+} from './types';
 import { PROFILES, type EvalProfile } from '../fixtures/profiles';
 import { writeSnapshot } from './snapshot';
 import {
@@ -7,6 +12,8 @@ import {
   type FlowAggregate,
   type SampleMetrics,
 } from './metrics';
+import { aggregateCoverage, type FlowCoverage } from './coverage';
+import { countEnvelopeFlowSamples } from './budget';
 
 // ---------------------------------------------------------------------------
 // Runner — orchestrates the flow × profile matrix.
@@ -107,6 +114,7 @@ export interface RunSummary {
    * flows with `emitsEnvelope: true`. Drives the baseline regression guard.
    */
   envelopeMetrics: Record<string, FlowAggregate>;
+  envelopeCoverage: Record<string, FlowCoverage>;
 }
 
 export function parseCliArgs(argv: string[]): {
@@ -242,6 +250,7 @@ export async function runHarness(
     qualityFailures: 0,
     skipped: [],
     envelopeMetrics: {},
+    envelopeCoverage: {},
   };
 
   // Per-flow bags of SampleMetrics — folded into aggregates at the end so we
@@ -259,6 +268,41 @@ export async function runHarness(
 
   const maxLiveCalls = options.maxLiveCalls ?? DEFAULT_MAX_LIVE_CALLS;
   let liveCallsMade = 0;
+  // Threaded to every providerCallCount call below so accounting and
+  // enforcement agree with the preflight demand estimate in budget.ts, which
+  // uses the same options.openrouterModel value. [WI-3029 provider-accounting
+  // correction]
+  const providerCallContext: ProviderCallContext = {
+    openrouterModel: options.openrouterModel,
+  };
+  const coverageByFlow = new Map<
+    string,
+    {
+      attempted: number;
+      completed: number;
+      budgetSkipped: number;
+      required: number;
+    }
+  >();
+  // Eagerly seed every active envelope-emitting flow's coverage entry — including
+  // one that never reaches a single live-call attempt (e.g. every item throws in
+  // buildPrompt before the attempt counter below is reached) — so `required` is
+  // always compared against a real 0, not a missing map entry the gate can't see.
+  // [WI-3029 S4]
+  if (options.live) {
+    for (const flow of activeFlows) {
+      if (flow.emitsEnvelope) {
+        coverageByFlow.set(flow.id, {
+          attempted: 0,
+          completed: 0,
+          budgetSkipped: 0,
+          required: countEnvelopeFlowSamples(flow, activeProfiles, {
+            scenarioFilter: options.scenarioFilter,
+          }),
+        });
+      }
+    }
+  }
 
   for (const flow of activeFlows) {
     summary.flowsRun++;
@@ -344,18 +388,41 @@ export async function runHarness(
           }
 
           if (options.live && flow.runLive) {
-            if (liveCallsMade >= maxLiveCalls) {
-              liveError = `live budget exceeded (${maxLiveCalls} calls); re-run with --max-live-calls to raise`;
+            if (flow.emitsEnvelope) {
+              // Guaranteed to exist: every active emitsEnvelope flow is seeded
+              // above (before this loop) whenever options.live is true.
+              coverageByFlow.get(flow.id)!.attempted++;
+            }
+            // [WI-3029 provider-accounting correction] Reserve the flow's
+            // DECLARED total provider-call cost for this item (opener + any
+            // internal judge, e.g. review-continuity-opener's pinned-mentor
+            // judge) BEFORE making any call — not just 1 per outer runLive().
+            // Reject up front when the remaining budget can't cover it, so an
+            // insufficient cap skips the item without an outer call or judge
+            // call ever firing.
+            const predictedProviderCalls =
+              flow.providerCallCount?.(item.input, providerCallContext) ?? 1;
+            if (liveCallsMade + predictedProviderCalls > maxLiveCalls) {
+              liveError =
+                `live budget exceeded (${maxLiveCalls} calls; this item needs ` +
+                `${predictedProviderCalls} more, ${liveCallsMade} already spent); ` +
+                're-run with --max-live-calls to raise';
               summary.skipped.push({
                 flowId: flow.id,
                 profileId: profile.id,
                 reason: liveError,
               });
+              if (flow.emitsEnvelope) {
+                coverageByFlow.get(flow.id)!.budgetSkipped++;
+              }
             } else {
-              liveCallsMade++;
+              liveCallsMade += predictedProviderCalls;
               try {
                 liveResponse = await flow.runLive(item.input, messages);
                 summary.liveCallsOk++;
+                if (flow.emitsEnvelope) {
+                  coverageByFlow.get(flow.id)!.completed++;
+                }
 
                 // Collect signal metrics for envelope-emitting flows so the
                 // baseline regression guard can detect drift (Layer 1).
@@ -478,6 +545,9 @@ export async function runHarness(
   // baseline guard, tests) see a single Record<flowId, FlowAggregate>.
   for (const [flowId, samples] of samplesByFlow.entries()) {
     summary.envelopeMetrics[flowId] = aggregateFlowSamples(samples);
+  }
+  for (const [flowId, coverage] of coverageByFlow.entries()) {
+    summary.envelopeCoverage[flowId] = aggregateCoverage(coverage);
   }
 
   return summary;

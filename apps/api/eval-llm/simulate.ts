@@ -28,7 +28,7 @@
 //
 //   doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
 //     --learner-model meta-llama/llama-3.3-70b-instruct --runs 3 \
-//     --max-live-calls 189 --check-baseline
+//     --max-live-calls 216 --check-baseline
 //     Live grid: gpt-oss tutor + production judge grade a distinct learner;
 //     enforce the over-credit ceiling + drift vs the committed baseline. The
 //     learner must be a non-gpt family (the stg minor judge is gpt-4o-mini —
@@ -67,6 +67,11 @@ import type { EvalProfile } from './fixtures/profiles';
 import { setOpenRouterModelOverride } from './runner/llm-client';
 import { evaluateMainGridCompleteness } from './runner/sim-grid-gate';
 import {
+  assertSufficientMasteryBudget,
+  deriveMasteryBudget,
+  deriveMasteryReproduceCapacity,
+} from './runner/sim-budget';
+import {
   bootstrapLlmProviders,
   setOpenRouterProviderPin,
 } from './runner/llm-bootstrap';
@@ -87,14 +92,6 @@ import {
   writeCorpus,
   type SimulationBaseline,
 } from './runner/simulation-metrics';
-
-/**
- * Upper bound on LLM calls per round: learner + grader + tutor, once per
- * question. The grader is a real LLM call per turn under the grader-ON pipeline,
- * so this is 3× (not 2×) MAX_CHALLENGE_QUESTIONS — undercounting it would let
- * `maxRounds = floor(maxLiveCalls / CALLS_PER_ROUND)` silently overspend the cap.
- */
-const CALLS_PER_ROUND = 3 * MAX_CHALLENGE_QUESTIONS;
 
 const BASELINE_PATH = path.resolve(__dirname, 'simulation-baseline.json');
 /**
@@ -215,16 +212,27 @@ function selectScenarios(
   return CHALLENGE_SIM_SCENARIOS.filter((s) => wanted.has(s.id.toLowerCase()));
 }
 
-function printGrid(): void {
+function printGrid(runs = 1, topics: string[] | 'all' = 'all'): void {
+  const scenarios = selectScenarios(topics);
   console.log('Challenge-Round simulated-learner scenarios:\n');
-  for (const s of CHALLENGE_SIM_SCENARIOS) {
+  for (const s of scenarios) {
     const profile = resolveScenarioProfile(s);
     console.log(
       `  ${s.id.padEnd(34)} profile=${(profile?.id ?? '??').padEnd(22)} expected=${s.expectedOutcome}`,
     );
   }
+  const scope = topics === 'all' ? '' : ' (filtered by --topics)';
   console.log(
-    `\n${CHALLENGE_SIM_SCENARIOS.length} scenarios. Use --topics <id,id|all> to select; --runs N to repeat.`,
+    `\n${scenarios.length} scenario(s)${scope}. Use --topics <id,id|all> to select; --runs N to repeat.`,
+  );
+  const budget = deriveMasteryBudget({
+    scenarioCount: scenarios.length,
+    runs,
+    questionsPerRound: MAX_CHALLENGE_QUESTIONS,
+  });
+  console.log(
+    `Budget for runs=${runs}: configured=${budget.configuredUnits} units; ` +
+      `expected-provider-calls=${budget.expectedProviderCalls}; no truncation`,
   );
 }
 
@@ -321,7 +329,7 @@ async function main(): Promise<void> {
 
   // --list must work with NO bootstrap (no Doppler / provider keys needed).
   if (args.list) {
-    printGrid();
+    printGrid(args.runs, args.topics);
     return;
   }
 
@@ -397,28 +405,27 @@ async function main(): Promise<void> {
   }
 
   // Build the grid ROUND-ROBIN (runs outer, scenarios inner): [s1..sN, s1..sN].
-  // A budget truncation then drops repeats of later runs, not whole topics, so
-  // the measured distribution stays representative across the scenario set.
-  const fullGrid = Array.from({ length: args.runs }, () => scenarios).flat();
+  // No budget truncation: an insufficient --max-live-calls fails the configured-
+  // floor preflight below instead of silently dropping repeats or topics, so the
+  // measured distribution always covers the full requested scenario set.
+  const grid = Array.from({ length: args.runs }, () => scenarios).flat();
 
-  // Budget: auto-fit to the grid when --max-live-calls is omitted (the default
-  // never silently truncates). An explicit budget is a HARD cap — never force a
-  // round that would overrun it.
-  const effectiveMaxCalls =
-    args.maxLiveCalls ?? fullGrid.length * CALLS_PER_ROUND;
-  const maxRounds = Math.floor(effectiveMaxCalls / CALLS_PER_ROUND);
-  if (maxRounds < 1) {
-    throw new Error(
-      `--max-live-calls=${effectiveMaxCalls} is below the ~${CALLS_PER_ROUND} calls a single round needs; raise it to run at least one round.`,
-    );
+  const budget = deriveMasteryBudget({
+    scenarioCount: scenarios.length,
+    runs: args.runs,
+    questionsPerRound: MAX_CHALLENGE_QUESTIONS,
+  });
+  // The configured-unit demand is the governed preflight contract. It is
+  // intentionally higher than the separately reported provider-call estimate
+  // because the configured unit reserves the final follow-up slot.
+  const effectiveMaxCalls = args.maxLiveCalls ?? budget.configuredUnits;
+  if (args.maxLiveCalls !== null) {
+    assertSufficientMasteryBudget(budget, effectiveMaxCalls);
   }
-  const grid = fullGrid.slice(0, maxRounds);
-  if (grid.length < fullGrid.length) {
-    console.warn(
-      `[budget] requested ${fullGrid.length} rounds but --max-live-calls=${args.maxLiveCalls} ` +
-        `(~${CALLS_PER_ROUND} calls/round) caps at ${grid.length}. ${fullGrid.length - grid.length} round(s) dropped — raise --max-live-calls to run them.`,
-    );
-  }
+  console.log(
+    `[budget] mastery grid: ${budget.rounds} rounds; configured=${budget.configuredUnits} ` +
+      `units; expected-provider-calls=${budget.expectedProviderCalls}; cap=${effectiveMaxCalls}; no truncation`,
+  );
 
   // Provider pin + grader-candidate override BEFORE bootstrap. The override
   // pins the GRADER candidate (defaultGraderTurn → runHarnessLlm honors it);
@@ -558,15 +565,21 @@ async function main(): Promise<void> {
     }
     if (gate.overCreditCount > 0) {
       const ids = gate.overCreditScenarioIds;
-      // Budget the re-test against the HARD --max-live-calls cap. If we cannot
-      // requalify EVERY offender REPRODUCE_N× within the remaining budget, fail
-      // CLOSED — a detected breach is never silently dropped for lack of budget.
+      // Budget the re-test against the configured --max-live-calls ceiling. If
+      // we cannot requalify EVERY offender REPRODUCE_N× within the remaining
+      // budget, fail CLOSED — a detected breach is never silently dropped for
+      // lack of budget.
       const neededRounds = ids.length * REPRODUCE_N;
-      const remainingRounds = Math.max(0, maxRounds - grid.length);
-      if (remainingRounds < neededRounds) {
+      const reproduceCapacity = deriveMasteryReproduceCapacity(
+        budget,
+        effectiveMaxCalls,
+        REPRODUCE_N,
+        ids.length,
+      );
+      if (!reproduceCapacity.reachable) {
         console.error(
           `[eval:llm:sim] OVER-CREDIT CEILING BREACH on ${ids.join(', ')} — ` +
-            `insufficient budget to requalify (${remainingRounds} round(s) left, need ${neededRounds}). ` +
+            `insufficient budget to requalify (${reproduceCapacity.availableRounds} round(s) left, need ${neededRounds}). ` +
             `Failing closed; re-run with a higher --max-live-calls to re-test a suspected one-off slip.`,
         );
         process.exit(1);

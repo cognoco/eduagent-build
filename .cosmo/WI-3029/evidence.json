@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Dry-run derives the current envelope matrix demand, checked-in baseline sum, and 10% headroom without truncation.",
+      "pointer": "pnpm eval:llm -- --list"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Runner tests prove per-flow attempted, completed, budget-skipped, and required-sample accounting, including a flow that reports incomplete because a pre-call skip drops attempted below required with zero budget-skips.",
+      "pointer": "apps/api/eval-llm/runner/runner.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Gate tests prove zero/partial exhaustion fails closed while incomplete coverage is excluded from BaselineDrift, an incomplete flow absent from baseline.json still fails the coverage gate, and --update-baseline refuses to accept (gate) or write (index.ts seed-guard) incomplete coverage.",
+      "pointer": "apps/api/eval-llm/runner/gates.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Index summary code prints configured versus required demand and per-flow coverage.",
+      "pointer": "apps/api/eval-llm/index.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Pure mastery budget tests cover the complete grid, changed counts, 215 rejection, 216 acceptance, and derive that 216 configured versus 192 expected leaves exactly three 8-call reproduce rounds for one offender.",
+      "pointer": "apps/api/eval-llm/runner/sim-budget.test.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Workflow comments record matrix-derived envelope provider demand including internal judge calls, sequential estimated provider demand, and gate-specific caps with explicit timeout uncertainty.",
+      "pointer": ".github/workflows/eval-live.yml"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Deterministic workflow-contract tests pin derived provider-demand relationships, omitted-cap preflight ordering, runtime order, and changed counts without a fixed envelope-only assertion.",
+      "pointer": "scripts/eval-live-gate-independence.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-02-local-deterministic",
+  "redGreenPointer": ".cosmo/WI-3029/red-green.md"
+}

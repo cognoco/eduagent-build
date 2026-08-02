@@ -42,20 +42,25 @@ jobs:
       github.event_name != 'pull_request' ||
       github.event.label.name == 'run-live-evals'
     runs-on: ubuntu-latest
-    # Sized for the real run, not the old fail-fast one: Tier-2 envelope matrix
-    # (~242 live calls) + teaching-session (5 runLive × ~17 internal calls ≈ 85)
-    # + mastery-sim (189 calls) + setup ≈ 516 calls total.
-    # The previous 30 only ever held because the budget-starved drift check
-    # failed within the first ~20 calls; with a real budget (WI-560) the job
-    # runs to completion. 150 is an interim cap with headroom for OpenRouter
-    # queue spikes (~30-60s/call) since no full three-gate run has been
-    # measured yet — re-tune from the observed P90 of the first
-    # workflow_dispatch run (raised from 120 when the teaching gate was added,
-    # WI-2461).
-    # NOTE: the 300 --max-live-calls budget below assumes the current envelope
-    # scenario counts (Σ baseline n = 242); a large scenario-matrix growth
-    # needs both numbers revisited.
-    timeout-minutes: 150
+    # Sequential-demand contract (WI-3029): envelope matrix reports
+    # baseline=305 and required=329 samples; its 10% headroom configures 362.
+    # Envelope provider demand: 329 outer runLive invocations + 37 internal judge
+    # calls (31 legitimate_sensitive safety probes + 6 language-quality samples)
+    # = 366 provider calls. Teaching remains 5 runLive invocations (≈85
+    # internal calls). Mastery is an 8-scenario × 3-run grid: 216 governed
+    # configured units and 192 expected provider calls. The comparable estimated
+    # provider demand is 366 + 85 + 192 = 643; configured caps remain
+    # gate-specific because these units are heterogeneous and must not be added
+    # across gates. No paid
+    # full-run P90 is retained yet, so 180 minutes is an explicit conservative
+    # timeout with queue/latency uncertainty; reverify it from the first
+    # operator-authorized run evidence before tightening. The last observed
+    # per-call estimate (pre-retune, not re-verified against this raised 643
+    # demand) was ~30-60s/call for OpenRouter queue spikes — at that rate 643
+    # calls is ~5.4-10.7h, which would exceed 180 minutes. Reverify the
+    # per-call rate alongside the timeout from the first operator-authorized
+    # run at this demand before trusting either number.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -112,7 +117,7 @@ jobs:
         id: envelope-gate
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
-        run: doppler run -- pnpm eval:llm -- --live --check-baseline --only-envelope-flows --max-live-calls 300
+        run: doppler run -- pnpm eval:llm -- --live --check-baseline --only-envelope-flows --max-live-calls 366
 
       # Teaching-session live gate (WI-2461). --only-envelope-flows above
       # filters to emitsEnvelope:true flows, and teaching-session deliberately
@@ -148,8 +153,14 @@ jobs:
       # learner. The learner is meta-llama/llama-3.3-70b-instruct: a different
       # family from BOTH the gpt-4o-mini grader (gpt-4o, the documented learner,
       # COLLIDES → two-model guard hard-fails) and gpt-oss tutor, so the guard
-      # holds. Budget: 7 challenge-sim scenarios × 3 runs × 9 calls/round
-      # (3 calls/question × MAX_CHALLENGE_QUESTIONS=3) = 189, so every round runs.
+      # holds. Budget: 8 challenge-sim scenarios × 3 runs × 9 governed
+      # configured units/round (3 calls/question × MAX_CHALLENGE_QUESTIONS=3)
+      # = 216. The separately reported expected provider demand is 8
+      # calls/round, 192 total, leaving 24 calls: exactly three reproduce rounds
+      # at 8 calls each for a single over-credit offender. That makes the
+      # existing single-offender 3-round requalification path reachable.
+      # Changing any of these numbers changes gate strictness, not just cost;
+      # preflight still requires the governed 216 cap.
       # A reproduced over-credit breach exits 1 (the hard ceiling); soft drift
       # only warns. Distinct baseline from the signal one above — this reads
       # simulation-baseline.json. Seeded under DOPPLER_TOKEN_STG (same judge slug).
@@ -164,7 +175,7 @@ jobs:
         run: >-
           doppler run -- pnpm --filter @eduagent/api eval:llm:sim --
           --learner-model meta-llama/llama-3.3-70b-instruct --runs 3
-          --max-live-calls 189 --check-baseline
+          --max-live-calls 216 --check-baseline
 
       # Alert on drift/break: scheduled runs have no PR surface to go red on,
       # so a silent failure would defeat the point (same rationale as the
@@ -215,7 +226,7 @@ jobs:
                 ``,
                 `Triage: re-run to rule out provider flakiness; if drift is real and`,
                 `intentional, re-baseline with`,
-                `\`doppler run -- pnpm eval:llm -- --live --update-baseline\` and commit.`,
+                `\`doppler run -- pnpm eval:llm -- --live --only-envelope-flows --update-baseline\` and commit.`,
                 ``,
                 `If the failing step was the **Teaching-session live gate**, read the`,
                 `quality-issue codes in the run output first — the gate fails closed,`,
@@ -233,7 +244,7 @@ jobs:
                 `If the failing step was the **Mastery-simulation gate** (over-credit`,
                 `ceiling / simulation-baseline.json drift), it is a DIFFERENT baseline —`,
                 `re-seed with`,
-                `\`doppler run -- pnpm --filter @eduagent/api eval:llm:sim -- --learner-model meta-llama/llama-3.3-70b-instruct --runs 3 --max-live-calls 189 --update-baseline\``,
+                `\`doppler run -- pnpm --filter @eduagent/api eval:llm:sim -- --learner-model meta-llama/llama-3.3-70b-instruct --runs 3 --max-live-calls 216 --update-baseline\``,
                 `and commit. A reproduced over-credit breach is a real grader-leniency`,
                 `regression — fix the grader/prompt; do NOT raise the ceiling.`,
                 ``,

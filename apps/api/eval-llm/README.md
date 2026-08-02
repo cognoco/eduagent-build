@@ -205,24 +205,29 @@ pnpm --filter @eduagent/api eval:llm:sim -- --list
 # COLLIDES (guard hard-fails); use a non-gpt learner like llama-3.3-70b.
 # Omit --max-live-calls to auto-fit the budget to the full grid (no silent truncation).
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model meta-llama/llama-3.3-70b-instruct --runs 2 --max-live-calls 30
+  --learner-model meta-llama/llama-3.3-70b-instruct --runs 2
 
 # Pin an explicit grader candidate instead of production routing (any valid
 # OpenRouter slug; must differ from the learner family):
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
   --learner-model meta-llama/llama-3.3-70b-instruct --grader-model deepseek/deepseek-chat \
-  --runs 2 --max-live-calls 30
+  --runs 2
 ```
 
 Flags: `--learner-model <slug>` (required for a run), `--grader-model <slug>`
 (optional candidate; default = production judge routing), `--provider <slug>`,
-`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (optional **hard
-cap**; when omitted the budget auto-fits to `grid × 9 calls/round`
+`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (optional
+**configured-floor preflight**; when omitted the budget auto-fits to `grid × 9 calls/round`
 (**9 calls/round** = 3 calls/question × `MAX_CHALLENGE_QUESTIONS=3`) so a run
 never silently truncates the grid), `--list`, `--allow-same-family`, and the
 three **baseline verbs** below (`--validate-baseline`, `--check-baseline`,
 `--update-baseline`). Output lands in `eval-llm/corpus/<timestamp>/` (gitignored)
 as one transcript JSON per round plus `metrics.json`.
+
+To run a cheaper subset, narrow with `--topics <id,id>` and/or a lower `--runs`;
+`--max-live-calls` can no longer reduce cost on its own — a value below the
+configured floor is rejected, not honoured (`--list --topics <id,id>` reports
+the resulting configured/expected-call cost before you spend anything).
 
 ### Over-credit gate + baseline (three verbs)
 

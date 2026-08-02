@@ -53,6 +53,7 @@ function summaryWith(opts: {
     qualityFailures: opts.qualityFailures ?? 0,
     skipped: [],
     envelopeMetrics: { exchanges: { n: 100, rates: opts.rates ?? RATES } },
+    envelopeCoverage: {},
   };
 }
 
@@ -157,6 +158,71 @@ describe('evaluateGates [WI-1148]', () => {
     ).toBe(true);
   });
 
+  it('[WI-3029 S5] --update-baseline with incomplete coverage (no quality/execution failures) still fails loud, not silently green', async () => {
+    // Before the fix: a starved --update-baseline run with zero quality/
+    // execution failures fell through to `return { exitCode: 0, ... }` — the
+    // truncated baseline was written and the run reported clean. The seed
+    // path must never accept incomplete coverage silently: seeding from a
+    // truncated run is strictly worse than checking against one.
+    const result = await evaluateGates(
+      {
+        ...summaryWith({
+          qualityFailures: 0,
+          liveCallsFailed: 0,
+          rates: RATES,
+        }),
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 60,
+            completed: 60,
+            budgetSkipped: 0,
+            required: 221,
+            complete: false,
+          },
+        },
+      },
+      { live: true, updateBaseline: true },
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.driftEvaluated).toBe(false);
+    expect(
+      result.messages.some((m) => m.text.includes('baseline.json WAS written')),
+    ).toBe(true);
+    expect(
+      result.messages.some(
+        (m) => m.text.includes('Coverage gate') && m.text.includes('exchanges'),
+      ),
+    ).toBe(true);
+  });
+
+  it('--update-baseline with complete coverage and no failures still exits 0 (no false-positive)', async () => {
+    const result = await evaluateGates(
+      {
+        ...summaryWith({
+          qualityFailures: 0,
+          liveCallsFailed: 0,
+          rates: RATES,
+        }),
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 100,
+            completed: 100,
+            budgetSkipped: 0,
+            required: 100,
+            complete: true,
+          },
+        },
+      },
+      { live: true, updateBaseline: true },
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.driftEvaluated).toBe(false);
+  });
+
   it('--check-baseline with no baseline file → exit 2 (misconfig)', async () => {
     const result = await evaluateGates(
       summaryWith({ qualityFailures: 0, rates: RATES }),
@@ -168,6 +234,122 @@ describe('evaluateGates [WI-1148]', () => {
     expect(result.driftEvaluated).toBe(false);
     expect(
       result.messages.some((m) => m.text.includes('No baseline found')),
+    ).toBe(true);
+  });
+
+  it('zero-sample budget exhaustion fails closed without manufacturing drift', async () => {
+    const result = await evaluateGates(
+      {
+        ...summaryWith({ rates: RATES }),
+        envelopeMetrics: {},
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 3,
+            completed: 0,
+            budgetSkipped: 3,
+            required: 3,
+            complete: false,
+          },
+        },
+      },
+      CHECK_OPTS,
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.some((m) => m.text.includes('Coverage gate'))).toBe(
+      true,
+    );
+    expect(
+      result.messages.some((m) => m.text.includes('Signal drift detected')),
+    ).toBe(false);
+  });
+
+  it('partial budget exhaustion remains coverage-incomplete while real drift is preserved elsewhere', async () => {
+    const result = await evaluateGates(
+      {
+        ...summaryWith({ rates: RATES }),
+        envelopeMetrics: {
+          exchanges: { n: 2, rates: { ...RATES, partialProgress: 0.9 } },
+          other: { n: 100, rates: { ...RATES, partialProgress: 0.9 } },
+        },
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 4,
+            completed: 2,
+            budgetSkipped: 2,
+            required: 4,
+            complete: false,
+          },
+          other: {
+            attempted: 100,
+            completed: 100,
+            budgetSkipped: 0,
+            required: 100,
+            complete: true,
+          },
+        },
+      },
+      CHECK_OPTS,
+      {
+        ...deps(baselineWith(RATES)),
+        readBaseline: async () => ({
+          ...baselineWith(RATES),
+          flows: {
+            exchanges: baselineWith(RATES).flows.exchanges!,
+            other: baselineWith(RATES).flows.exchanges!,
+          },
+        }),
+      },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.some((m) => m.text.includes('Coverage gate'))).toBe(
+      true,
+    );
+    expect(
+      result.messages.some((m) => m.text.includes('Signal drift detected')),
+    ).toBe(true);
+  });
+
+  it('[WI-3029 S3] incomplete coverage on a flow ABSENT from baseline.flows still fails the run', async () => {
+    // A new envelope flow not yet seeded into baseline.json (baselineWith only
+    // has "exchanges") that is budget-starved must not slip through just
+    // because there is no baseline entry to gate against — compareAgainstBaseline
+    // already excludes it from drift (budget starvation isn't a signal
+    // collapse), so the coverage gate is the ONLY thing that can catch it.
+    const result = await evaluateGates(
+      {
+        ...summaryWith({ rates: RATES }),
+        envelopeMetrics: {
+          exchanges: { n: 100, rates: RATES },
+        },
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 100,
+            completed: 100,
+            budgetSkipped: 0,
+            required: 100,
+            complete: true,
+          },
+          'new-flow': {
+            attempted: 2,
+            completed: 2,
+            budgetSkipped: 0,
+            required: 10,
+            complete: false,
+          },
+        },
+      },
+      CHECK_OPTS,
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(
+      result.messages.some(
+        (m) => m.text.includes('Coverage gate') && m.text.includes('new-flow'),
+      ),
     ).toBe(true);
   });
 });

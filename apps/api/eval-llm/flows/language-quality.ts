@@ -293,6 +293,10 @@ export const languageQualityFlow: FlowDefinition<LanguageQualityScenarioInput> =
     emitsEnvelope: true,
     expectedResponseSchema: llmResponseEnvelopeSchema,
 
+    providerCallCount(): number {
+      return 2;
+    },
+
     buildPromptInput(): LanguageQualityScenarioInput | null {
       // Not used — enumerateScenarios fans out instead.
       return null;
