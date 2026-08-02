@@ -17,6 +17,8 @@ import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { useAllNotes } from '../../../hooks/use-notes';
 import { useProfileSessionsArchive } from '../../../hooks/use-progress';
 import { useProfile } from '../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
+import { VoiceInputControl } from '../../../components/common';
 import { OWN_LEARNING_RETURN_TO } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
@@ -506,6 +508,16 @@ export default function MyNotesListScreen(): React.ReactElement {
                 })}
                 className="flex-1 text-body text-text-primary"
                 testID="my-notes-search"
+              />
+              {/* WI-2552 (WI-1763 row 27): shared transcription-only mic; the
+                  final transcript REPLACES the query like typing does. */}
+              <VoiceInputControl
+                value={query}
+                voiceLocale={getVoiceLocaleForLanguage(
+                  activeProfile?.conversationLanguage,
+                )}
+                testID="my-notes-search-mic"
+                onTranscript={setQuery}
               />
             </View>
 

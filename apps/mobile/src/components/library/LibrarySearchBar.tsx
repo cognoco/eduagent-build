@@ -2,6 +2,7 @@ import { Keyboard, Pressable, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
+import { VoiceInputControl } from '../common/VoiceInputControl';
 
 interface LibrarySearchBarProps {
   value: string;
@@ -9,6 +10,8 @@ interface LibrarySearchBarProps {
   placeholder: string;
   /** Accessible name for the search field; falls back to the placeholder. */
   accessibilityLabel?: string;
+  /** Voice locale for the search mic (WI-2552), resolved by the screen. */
+  voiceLocale?: string;
 }
 
 export function LibrarySearchBar({
@@ -16,6 +19,7 @@ export function LibrarySearchBar({
   onChangeText,
   placeholder,
   accessibilityLabel,
+  voiceLocale,
 }: LibrarySearchBarProps): React.ReactElement {
   const { t } = useTranslation();
   const themeColors = useThemeColors();
@@ -35,6 +39,14 @@ export function LibrarySearchBar({
         autoCorrect={false}
         returnKeyType="search"
         onSubmitEditing={() => Keyboard.dismiss()}
+      />
+      {/* WI-2552: shared transcription-only mic; the final transcript
+          REPLACES the query through the same onChangeText path as typing. */}
+      <VoiceInputControl
+        value={value}
+        voiceLocale={voiceLocale}
+        testID="library-search-mic"
+        onTranscript={onChangeText}
       />
       {value.length > 0 && (
         <Pressable

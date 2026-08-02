@@ -53,6 +53,8 @@ describe('FeedbackSheet', () => {
 
     expect(screen.queryByText('Thank you!')).toBeNull();
     expect(screen.getByTestId('feedback-message-input')).toBeTruthy();
+    // WI-2552: shared transcription-only mic renders with the message field.
+    expect(screen.getByTestId('feedback-message-mic')).toBeTruthy();
   });
 
   it('clears submit error when the message changes', async () => {
