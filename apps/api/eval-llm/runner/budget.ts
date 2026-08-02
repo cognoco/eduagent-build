@@ -128,21 +128,29 @@ export function deriveEnvelopeProviderDemandFromMatrix(
     let outerRunLiveCalls = 0;
     let providerCalls = 0;
     for (const profile of profiles) {
-      const scenarios = flow.enumerateScenarios
-        ? (flow.enumerateScenarios(profile) ?? [])
-        : (() => {
-            const input = flow.buildPromptInput(profile);
-            return input === null ? [] : [{ scenarioId: flow.id, input }];
-          })();
-      for (const scenario of scenarios) {
-        if (
-          options.scenarioFilter &&
-          !options.scenarioFilter.has(scenario.scenarioId)
-        ) {
-          continue;
+      if (flow.enumerateScenarios) {
+        const scenarios = flow.enumerateScenarios(profile) ?? [];
+        for (const scenario of scenarios) {
+          if (
+            options.scenarioFilter &&
+            !options.scenarioFilter.has(scenario.scenarioId)
+          ) {
+            continue;
+          }
+          outerRunLiveCalls++;
+          providerCalls += flow.providerCallCount?.(scenario.input) ?? 1;
         }
+      } else {
+        // Non-enumerated flows have no real scenarioId to filter on — the
+        // runner (runner.ts) and countEnvelopeFlowSamples never apply
+        // scenarioFilter to them either, so this must not synthesize one
+        // from flow.id and expose it to the filter (that would zero out the
+        // flow's demand whenever an unrelated --scenarios filter doesn't
+        // happen to include its id).
+        const input = flow.buildPromptInput(profile);
+        if (input === null) continue;
         outerRunLiveCalls++;
-        providerCalls += flow.providerCallCount?.(scenario.input) ?? 1;
+        providerCalls += flow.providerCallCount?.(input) ?? 1;
       }
     }
     byFlow[flow.id] = {

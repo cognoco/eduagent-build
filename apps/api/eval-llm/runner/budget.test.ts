@@ -81,6 +81,39 @@ describe('deriveEnvelopeProviderDemandFromMatrix', () => {
     });
     expect(buildCount).toBe(1);
   });
+
+  it("[CodeRabbit] a scenarioFilter that excludes a non-enumerated flow's own id still counts that flow, matching countEnvelopeFlowSamples and the runner", () => {
+    // Non-enumerated flows have no real scenarioId — the runner (runner.ts)
+    // and countEnvelopeFlowSamples never scenario-filter them. The synthetic
+    // `scenarioId: flow.id` used internally here must not be exposed to
+    // options.scenarioFilter, or an unrelated --scenarios filter would zero
+    // out this flow's provider demand even though the runner would still
+    // execute it in full.
+    const flows: EnvelopeMatrixFlow[] = [
+      {
+        id: 'single-input',
+        emitsEnvelope: true,
+        buildPromptInput: () => ({ some: 'input' }),
+      },
+    ];
+
+    expect(
+      deriveEnvelopeProviderDemandFromMatrix(flows, [{}], {
+        scenarioFilter: new Set(['some-other-scenario']),
+      }),
+    ).toEqual({
+      outerRunLiveCalls: 1,
+      internalProviderCalls: 0,
+      providerCalls: 1,
+      flows: {
+        'single-input': {
+          outerRunLiveCalls: 1,
+          internalProviderCalls: 0,
+          providerCalls: 1,
+        },
+      },
+    });
+  });
 });
 
 describe('resolveEnvelopeLiveCallCap', () => {

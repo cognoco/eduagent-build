@@ -41,7 +41,8 @@ Red review tests first failed because the provider-demand and omitted-cap
 helpers were not exported. Green review verification then passed:
 
 ```text
-apps/api/eval-llm/runner/budget.test.ts: 5 passed
+apps/api/eval-llm/runner/budget.test.ts: 5 passed (now 6 passed — see the
+  CodeRabbit follow-up round below)
 scripts/eval-live-gate-independence.test.ts: 14 passed
 ```
 
@@ -81,7 +82,8 @@ Behavioral fixes verified RED then GREEN, no live/paid provider call:
   "complete coverage exits 0" case guards against a false-positive.
 
 Final suite counts after the correction round (`pnpm exec jest --config
-apps/api/jest.config.cjs --runInBand --no-coverage`):
+apps/api/jest.config.cjs --runInBand --no-coverage`) — superseded by the
+CodeRabbit follow-up round's counts immediately below:
 
 ```text
 apps/api/eval-llm/runner/{budget,coverage,sim-budget}.test.ts: 15 passed, 15 total
@@ -95,3 +97,50 @@ skipped), 1221 passed (4 skipped), 1225 total — unchanged from the prior
 round (`scripts/api-integration-routing.test.ts` still passes 10/10 locally;
 its CI red is the pre-existing external `main`-side AGENTS.md pin break,
 untouched by this PR, per the independent review's §0).
+
+## CodeRabbit follow-up round (two verified quick fixes)
+
+Behavioral fix verified RED then GREEN, no live/paid provider call:
+
+- **`deriveEnvelopeProviderDemandFromMatrix` scenario-filter leak**
+  (`runner/budget.ts`): the non-enumerated-flow branch synthesized
+  `scenarioId: flow.id` and exposed it to `options.scenarioFilter`, so a
+  `--scenarios` filter that didn't happen to include a flow's own id as a
+  literal string zeroed out that flow's provider demand — diverging from
+  both the runner (`runner.ts`, which never scenario-filters non-enumerated
+  flows) and `countEnvelopeFlowSamples` (same). RED:
+  `budget.test.ts`'s new "scenarioFilter that excludes a non-enumerated
+  flow's own id still counts that flow" case failed
+  (`outerRunLiveCalls: 0, providerCalls: 0` instead of `1, 1`). GREEN after
+  restructuring the loop to only scenario-filter inside the
+  `flow.enumerateScenarios` branch.
+
+Test-correctness fix (the test's own detection gap, verified by injecting a
+duplicate registry entry, not a production-code RED/GREEN):
+
+- **`scripts/eval-live-gate-independence.test.ts`'s "full flow registry
+  preserves the pre-budget runtime order"** only checked that 39 named flows'
+  string positions in the source text were monotonically increasing — it
+  never compared the total membership, so an extra/duplicate/unlisted entry
+  anywhere in `FLOWS` passed silently. Demonstrated by temporarily appending
+  a duplicate `learningTextSafetyJudgeFlow` to `flow-registry.ts`'s array:
+  the OLD test still passed (proving the blind spot); the fix — parsing
+  every `^  (\w+),$` match from the array body and asserting exact array
+  equality against the expected list — failed against the same injected
+  duplicate (`toEqual` diff showed the extra entry). The injected duplicate
+  was then reverted (`git diff --stat` confirmed a clean revert) and the
+  fixed test passes 14/14 against the real, unmodified registry.
+
+Final suite counts after this round:
+
+```text
+apps/api/eval-llm/runner/budget.test.ts: 6 passed, 6 total
+apps/api/eval-llm/ (all): 27 suites, 312 passed, 9 skipped, 321 total
+scripts/eval-live-gate-independence.test.ts: 14 passed, 14 total
+```
+
+`nx run api:typecheck` exit 0. `pnpm run test:scripts`: 73 suites passed (1
+skipped), 1221 passed (4 skipped), 1225 total — unchanged. The separate
+timeout and pinned-mentor provider-accounting threads (S6 and C1 from the
+prior round) were intentionally left untouched per this round's scope — the
+shepherd is handling those as scope/reroute decisions.

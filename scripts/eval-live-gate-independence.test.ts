@@ -225,12 +225,21 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
   });
 
   test('full flow registry preserves the pre-budget runtime order', () => {
+    // [CodeRabbit] Parse the ACTUAL registry membership + order from the
+    // array body and assert exact equality against the expected list — the
+    // prior `indexOf` + sorted-positions check only proved the named flows
+    // appear in relative order; it never compared the total set, so an
+    // extra/duplicate/unlisted entry anywhere in FLOWS passed silently.
     const source = readFileSync(
       join(repoRoot, 'apps/api/eval-llm/flow-registry.ts'),
       'utf8',
     );
     const start = source.indexOf('export const FLOWS');
     const body = source.slice(start, source.indexOf('];', start));
+    const actualOrder = Array.from(
+      body.matchAll(/^\s{2}(\w+),$/gm),
+      (match) => match[1],
+    );
     const originalOrder = [
       'capitalsFlow',
       'vocabularyFlow',
@@ -273,9 +282,7 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       'recheckJudgeFlow',
       'learningTextSafetyJudgeFlow',
     ];
-    const positions = originalOrder.map((name) => body.indexOf(`  ${name},`));
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(actualOrder).toEqual(originalOrder);
   });
 
   test('a dedicated teaching-session live gate exists, separate from the envelope-only step', () => {
