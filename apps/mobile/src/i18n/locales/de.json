@@ -565,7 +565,9 @@
       "addChildAccessLabel": "Kinderprofil hinzufügen",
       "breakdownSharingTitle": "Familiennutzung teilen",
       "breakdownSharingDescription": "Nutzung pro Profil anzeigen.",
-      "breakdownSharingError": "Einstellung konnte nicht aktualisiert werden. Versuche es erneut."
+      "breakdownSharingError": "Einstellung konnte nicht aktualisiert werden. Versuche es erneut.",
+      "joinFamily": "Einer Familie beitreten",
+      "joinFamilyDescription": "Gib den Einmal-Code aus einer Familieneinladung ein."
     },
     "celebrations": {
       "allTitle": "Alle Feiern",
@@ -4675,6 +4677,78 @@
       "title": "Familieneinrichtung nicht wiederhergestellt",
       "message": "Deine Auswahl ist weiterhin geschützt. Vor dem Fortfahren erneut versuchen.",
       "retry": "Erneut versuchen"
+    }
+  },
+  "familyJoinJourney": {
+    "title": "Einer Familie beitreten",
+    "intro": "Gib den Einmal-Code aus deiner Einladung ein. Nichts ändert sich, bis du jede Auswahl überprüft und den Vorgang abgeschlossen hast.",
+    "restored": "Wir haben deine unvollständige Familieneinladung auf diesem Gerät wiederhergestellt. Überprüfe die Auswahl erneut, bevor du fortfährst.",
+    "code": {
+      "label": "Familien-Code",
+      "placeholder": "Gib deinen Einmal-Code ein"
+    },
+    "membership": {
+      "title": "Mein Konto in diesen Familienplan verschieben",
+      "description": "Dein Login und dein Lernverlauf bleiben dir erhalten. Die Abrechnung wird auf den Familienplan der Zielfamilie umgestellt."
+    },
+    "processing": {
+      "title": "Lernverarbeitung in der Zielfamilie zulassen",
+      "description": "Dies dokumentiert die Zustimmung, dass MentoMate deinen Lerndienst nach dem Wechsel weiter bereitstellen darf."
+    },
+    "visibility": {
+      "title": "Sichtbarkeit des Lernens",
+      "description": "Wähle separat aus, ob der einladende Erwachsene dein Unterstützer werden und die vereinbarten Lernzusammenfassungen sehen darf.",
+      "guardianDescription": "Wähle, ob du die Seite des Lernenden in dieser Unterstützungsbeziehung autorisierst. Der einladende Unterstützer muss noch separat zustimmen.",
+      "accept": "Sichtbarkeit für Unterstützer erlauben",
+      "acceptDescription": "Eine separate Sichtbarkeitsvereinbarung starten. Es sind keine Lerndaten sichtbar, bis beide Seiten zugestimmt haben.",
+      "decline": "Lernen privat halten",
+      "declineDescription": "Dem Familienplan beitreten, ohne Sichtbarkeit für Unterstützer zu erstellen."
+    },
+    "continue": "Einladung prüfen",
+    "decline": "Mein Konto getrennt halten",
+    "safeExit": "Sicher beenden",
+    "awaitingGuardian": {
+      "title": "Verifizierter Vormund muss fortfahren",
+      "message": "Der Familienwechsel ist pausiert. Ein Vormund kann diesen Code nach der Anmeldung auf diesem oder einem anderen Gerät verwenden. Der Code allein gewährt keine Befugnis."
+    },
+    "guardian": {
+      "title": "Schritt für Vormund",
+      "intro": "Melde dich als der Erwachsene an, dessen elterliche Verantwortung unabhängig überprüft wird. Der Einladende und der Vormund können verschiedene Personen sein.",
+      "authorityTitle": "Unabhängige Vormund-Verifizierung",
+      "providerRequired": "Schließe die Prüfung beim genehmigten Identitätsanbieter ab und kehre zu diesem Bildschirm zurück. MentoMate speichert keine Nachweise des Anbieters auf diesem Gerät.",
+      "providerReturned": "Der Anbieter hat eine einmalige Verifizierungs-Kennung zurückgegeben. Überprüfe die Sichtbarkeitsauswahl, bevor du sie einlöst.",
+      "complete": "Entscheidung des Vormunds bestätigen"
+    },
+    "guardianFinished": {
+      "title": "Schritt für Vormund abgeschlossen",
+      "message": "Der Lernende muss sich wieder anmelden und den Familienwechsel abschließen. Der einladende Unterstützer muss die Sichtbarkeit noch separat akzeptieren."
+    },
+    "ready": {
+      "title": "Bereit beizutreten",
+      "message": "Die erforderliche Zustimmung ist aktuell. Bestätige jetzt den Familienwechsel; die Sichtbarkeit für Unterstützer bleibt eine separate, zweiseitige Vereinbarung.",
+      "join": "Familie beitreten"
+    },
+    "complete": {
+      "title": "Familienwechsel abgeschlossen",
+      "message": "Dein Konto und dein Lernverlauf sind jetzt im Familienplan. Jegliche Sichtbarkeit für Unterstützer bleibt auf den separat akzeptierten Vertrag beschränkt."
+    },
+    "terminal": {
+      "expired": {
+        "title": "Diese Einladung ist abgelaufen",
+        "message": "Bitte den einladenden Erwachsenen, eine neue Familieneinladung zu senden."
+      },
+      "declined": {
+        "title": "Einladung abgelehnt",
+        "message": "Dein Konto und dein Lernverlauf wurden nicht verschoben."
+      },
+      "withdrawn": {
+        "title": "Einladung zurückgezogen",
+        "message": "Der einladende Erwachsene hat diese Einladung zurückgezogen. Nichts wurde verschoben."
+      }
+    },
+    "errors": {
+      "completeDecisions": "Gib den Familien-Code ein und prüfe alle drei Optionen, bevor du fortfährst.",
+      "guardianNotReady": "Familien-Code, Rückmeldung des Anbieters und Sichtbarkeitsauswahl des Vormunds sind erforderlich."
     }
   }
 }

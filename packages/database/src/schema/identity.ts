@@ -1136,7 +1136,7 @@ export const familyJoinInvite = pgTable(
       .where(sql`${table.token} IS NOT NULL`),
     check(
       'family_join_invite_status_check',
-      sql`${table.status} IN ('pending','accepted')`,
+      sql`${table.status} IN ('pending','bound','accepted','declined','withdrawn')`,
     ),
     check(
       'family_join_invite_resend_count_check',

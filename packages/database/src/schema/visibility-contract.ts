@@ -114,7 +114,7 @@ export const supportVisibilityAuditEvents = pgTable(
       .where(sql`${table.contractId} IS NOT NULL`),
     check(
       'support_visibility_audit_events_type_check',
-      sql`${table.eventType} IN ('contract_initiated','contract_accepted','appeal_requested','supportership_revoked','graduation_restamped')`,
+      sql`${table.eventType} IN ('contract_initiated','contract_accepted','appeal_requested','supportership_revoked','graduation_restamped','authority_invalidated')`,
     ),
   ],
 );

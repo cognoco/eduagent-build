@@ -584,6 +584,8 @@
     },
     "family": {
       "sectionHeader": "Family",
+      "joinFamily": "Join a family",
+      "joinFamilyDescription": "Enter the one-time code from a family invitation.",
       "addChild": "Add a child",
       "addChildDescription": "Create a profile so your child can learn with their own mentor",
       "addChildAccessLabel": "Add a child profile",
@@ -4209,6 +4211,78 @@
       "title": "We couldn't restore family setup",
       "message": "Your choice is still protected. Try again before continuing.",
       "retry": "Try again"
+    }
+  },
+  "familyJoinJourney": {
+    "title": "Join a family",
+    "intro": "Enter the one-time code from your invitation. Nothing changes until you review each choice and finish the journey.",
+    "restored": "We restored your unfinished family invitation on this device. Review the choices again before continuing.",
+    "code": {
+      "label": "Family code",
+      "placeholder": "Enter your one-time code"
+    },
+    "membership": {
+      "title": "Move my account to this family plan",
+      "description": "Your login and learning history stay yours. Billing moves to the destination family plan."
+    },
+    "processing": {
+      "title": "Allow learning processing in the destination family",
+      "description": "This records consent for MentoMate to keep providing your learning service after the move."
+    },
+    "visibility": {
+      "title": "Learning visibility",
+      "description": "Choose separately whether the inviting adult may become your supporter and see the agreed learning summaries.",
+      "guardianDescription": "Choose whether to authorize the learner's side of this support relationship. The inviting supporter must still accept separately.",
+      "accept": "Allow supporter visibility",
+      "acceptDescription": "Start a separate visibility agreement. No learning data is visible until both sides accept.",
+      "decline": "Keep learning private",
+      "declineDescription": "Join the family plan without creating supporter visibility."
+    },
+    "continue": "Review invitation",
+    "decline": "Keep my account separate",
+    "safeExit": "Exit safely",
+    "awaitingGuardian": {
+      "title": "A verified guardian must continue",
+      "message": "The family move is paused. A guardian can use this code after signing in on this or another device. The code alone grants no authority."
+    },
+    "guardian": {
+      "title": "Guardian step",
+      "intro": "Sign in as the adult whose parental responsibility will be independently verified. The inviter and guardian may be different people.",
+      "authorityTitle": "Independent guardian verification",
+      "providerRequired": "Complete the approved identity-provider check and return to this screen. MentoMate does not store provider evidence on this device.",
+      "providerReturned": "The provider returned a one-time verification handle. Review the visibility choice before redeeming it.",
+      "complete": "Confirm guardian decision"
+    },
+    "guardianFinished": {
+      "title": "Guardian step complete",
+      "message": "The learner must sign back in and finish the family move. The inviting supporter still has a separate visibility acceptance."
+    },
+    "ready": {
+      "title": "Ready to join",
+      "message": "The required consent is current. Confirm the family move now; supporter visibility remains a separate two-sided agreement.",
+      "join": "Join family"
+    },
+    "complete": {
+      "title": "Family move complete",
+      "message": "Your account and learning history are now on the family plan. Any supporter visibility remains limited to its separately accepted contract."
+    },
+    "terminal": {
+      "expired": {
+        "title": "This invitation expired",
+        "message": "Ask the inviting adult to send a new family invitation."
+      },
+      "declined": {
+        "title": "Invitation declined",
+        "message": "Your account and learning history were not moved."
+      },
+      "withdrawn": {
+        "title": "Invitation withdrawn",
+        "message": "The inviting adult withdrew this invitation. Nothing was moved."
+      }
+    },
+    "errors": {
+      "completeDecisions": "Enter the family code and review all three choices before continuing.",
+      "guardianNotReady": "The family code, provider return, and guardian visibility choice are required."
     }
   },
   "clerkGate": {

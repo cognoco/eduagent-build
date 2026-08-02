@@ -11,8 +11,9 @@
 // AC mapping (plan _dev .cosmo-watch/batch4/WI-1753-PLAN.md §3):
 //   AC-2  membership REPOINT with roles reset to ['learner'] (never admin of the
 //         family org); parent stays admin/payer (already true — org-anchored sub).
-//   AC-3  NEVER writes a guardianship row (inv 14/19). A supportership row is
-//         appended ONLY on explicit teen opt-in.
+//   AC-3  This membership mutation never creates guardianship. The resumable
+//         journey may already have established separately verified guardian
+//         authority; supportership still requires its own explicit decision.
 //   AC-4  person_id is stable — no new Person is created, so every person-scoped
 //         row (sessions / retention / notes / supportership) rides along untouched.
 //   AC-5  repoint + org-of-one teardown run in ONE Postgres transaction (see the
@@ -21,8 +22,8 @@
 //   AC-6  the teen keeps their store subscription (billing option B, no server
 //         refund). We capture the store ref BEFORE the DB subscription teardown
 //         and dispatch a durable self-cancel nudge AFTER commit (WI-885 pattern).
-//   AC-7  the accept path never creates guardianship; a minor-initiated
-//         guardianship request is rejected upstream (Phase-2 route), not here.
+//   AC-7  the legacy direct accept path never creates guardianship; the journey
+//         wrapper establishes it through the verified-adult boundary upstream.
 //
 // SINGLE-TRANSACTION (orchestrator ruling 2026-07-12): single-tx supersedes the
 // ADR-0010 migration-pending interim for the existing-teen (no-external-step)
@@ -41,6 +42,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   consentGrant,
+  consentReceipt,
   membership,
   organization,
   person,
@@ -106,6 +108,13 @@ export interface AcceptFamilyJoinInput {
    * billing/quota seat only, with zero visibility granted to the parent (AC-3).
    */
   optInSupportership: boolean;
+  /** Internal durable-journey composition; ordinary v1 callers omit it. */
+  journeyContext?: {
+    expectedGuardianPersonId: string | null;
+    visibilityContract: VisibilityContract | null;
+    archiveSourceConsentGrants: true;
+    deferStoreCancelNudge: true;
+  };
 }
 
 export interface AcceptFamilyJoinResult {
@@ -132,17 +141,24 @@ export interface AcceptFamilyJoinResult {
 async function assertSelfDirectedFamilyJoiner(
   db: Database,
   teenPersonId: string,
+  journeyGuardianPersonId?: string | null,
 ): Promise<void> {
-  const [charges, guardians] = await Promise.all([
-    getChargePersonIds(db, teenPersonId),
-    getGuardianPersonIds(db, teenPersonId),
-  ]);
+  // This assertion runs inside the family-join transaction. node-postgres
+  // transaction clients support one statement at a time (pg 9 enforces it).
+  const charges = await getChargePersonIds(db, teenPersonId);
+  const guardians = await getGuardianPersonIds(db, teenPersonId);
   if (charges.length > 0) {
     throw new ForbiddenError(
       'Accepting account is a guardian and cannot join as a learner.',
     );
   }
-  if (guardians.length > 0) {
+  if (
+    journeyGuardianPersonId === undefined
+      ? guardians.length > 0
+      : journeyGuardianPersonId === null
+        ? guardians.length > 0
+        : guardians.length !== 1 || guardians[0] !== journeyGuardianPersonId
+  ) {
     throw new ForbiddenError(
       'Accepting account is a managed child and cannot self-join.',
     );
@@ -160,7 +176,11 @@ async function assertSelfDirectedFamilyJoiner(
     birthMonth ?? undefined,
     birthDay ?? undefined,
   );
-  if (ACCEPT_REQUIRES_SELF_CONSENT_CAPABLE && consentCheck.required) {
+  if (
+    journeyGuardianPersonId === undefined &&
+    ACCEPT_REQUIRES_SELF_CONSENT_CAPABLE &&
+    consentCheck.required
+  ) {
     throw new ForbiddenError(
       'Accepting teen is not self-consent-capable by age.',
     );
@@ -191,10 +211,19 @@ export async function acceptFamilyJoin(
     familyOrgId,
     parentPersonId,
     optInSupportership,
+    journeyContext,
   } = input;
 
   if (teenPersonId === parentPersonId) {
     throw new BadRequestError('A teen cannot join their own account.');
+  }
+  if (
+    journeyContext &&
+    Boolean(journeyContext.visibilityContract) !== optInSupportership
+  ) {
+    throw new BadRequestError(
+      'Journey supportership decision and visibility contract disagree.',
+    );
   }
 
   return db
@@ -234,7 +263,11 @@ export async function acceptFamilyJoin(
       // Claiming INSIDE the tx (rather than consuming after it, as v1 did) also
       // means any later precondition failure rolls the claim back — a failed
       // accept releases the token instead of burning it.
-      if (!(await claimFamilyJoinInvite(tx, inviteId, inviteToken))) {
+      if (
+        !(await claimFamilyJoinInvite(tx, inviteId, inviteToken, {
+          retainTokenForJourney: journeyContext !== undefined,
+        }))
+      ) {
         throw new ConflictError(
           'This family invite is no longer valid — it may have been used, resent, or expired.',
         );
@@ -252,21 +285,27 @@ export async function acceptFamilyJoin(
       // Idempotent double-accept: already in the family org → nothing to do.
       if (teenMembership.organizationId === familyOrgId) {
         if (optInSupportership) {
-          await assertSelfDirectedFamilyJoiner(tx, teenPersonId);
+          await assertSelfDirectedFamilyJoiner(
+            tx,
+            teenPersonId,
+            journeyContext?.expectedGuardianPersonId,
+          );
         }
-        const visibilityContract = optInSupportership
-          ? await initiateLinkInTransaction(tx, {
-              supporterPersonId: parentPersonId,
-              supporteePersonId: teenPersonId,
-              relation: 'parent',
-              managedTier: false,
-              managedTierActive: false,
-              initiatedByPersonId: teenPersonId,
-            })
-          : await findActiveLinkContract(tx, {
-              supporterPersonId: parentPersonId,
-              supporteePersonId: teenPersonId,
-            });
+        const visibilityContract = journeyContext
+          ? journeyContext.visibilityContract
+          : optInSupportership
+            ? await initiateLinkInTransaction(tx, {
+                supporterPersonId: parentPersonId,
+                supporteePersonId: teenPersonId,
+                relation: 'parent',
+                managedTier: false,
+                managedTierActive: false,
+                initiatedByPersonId: teenPersonId,
+              })
+            : await findActiveLinkContract(tx, {
+                supporterPersonId: parentPersonId,
+                supporteePersonId: teenPersonId,
+              });
         return {
           familyOrgId,
           teenPersonId,
@@ -292,7 +331,11 @@ export async function acceptFamilyJoin(
       // (3) Precondition: the teen is on NO guardianship edge in either direction.
       // A guardian (has charges) or a managed child (has a guardian) is not a solo
       // owner and must not be silently restructured.
-      await assertSelfDirectedFamilyJoiner(tx, teenPersonId);
+      await assertSelfDirectedFamilyJoiner(
+        tx,
+        teenPersonId,
+        journeyContext?.expectedGuardianPersonId,
+      );
 
       // (5) Precondition: the family plan must have a SEAT for the teen.
       // A subscription row existing is not that precondition — it proves nothing
@@ -382,15 +425,19 @@ export async function acceptFamilyJoin(
       // person's grants to the retain-tier consent_receipt) — the teen/adult
       // here SURVIVES, so their grants stay live in consent_grant, just under
       // the new organization_id.
-      await tx
-        .update(consentGrant)
-        .set({ organizationId: familyOrgId })
-        .where(
-          and(
-            eq(consentGrant.organizationId, orgOfOneId),
-            eq(consentGrant.chargePersonId, teenPersonId),
-          ),
-        );
+      if (journeyContext?.archiveSourceConsentGrants) {
+        await archiveSourceConsentGrants(tx, teenPersonId, orgOfOneId);
+      } else {
+        await tx
+          .update(consentGrant)
+          .set({ organizationId: familyOrgId })
+          .where(
+            and(
+              eq(consentGrant.organizationId, orgOfOneId),
+              eq(consentGrant.chargePersonId, teenPersonId),
+            ),
+          );
+      }
       // DELETE the org-of-one subscription (satisfies its payer + org RESTRICT;
       // subscription_payers + profile_quota_usage + quota_pools cascade off it).
       await tx
@@ -400,19 +447,22 @@ export async function acceptFamilyJoin(
       // consent grants → no inbound RESTRICT rows remain).
       await tx.delete(organization).where(eq(organization.id, orgOfOneId));
 
-      // (11) AC-3: NEVER a guardianship row. Explicit opt-in creates (or
-      // repairs) the canonical supportership + bilateral visibility contract
-      // inside this same transaction. Opt-out creates neither.
-      const visibilityContract = optInSupportership
-        ? await initiateLinkInTransaction(tx, {
-            supporterPersonId: parentPersonId,
-            supporteePersonId: teenPersonId,
-            relation: 'parent',
-            managedTier: false,
-            managedTierActive: false,
-            initiatedByPersonId: teenPersonId,
-          })
-        : null;
+      // (11) AC-3: this mutation never creates guardianship. The journey path
+      // supplies any separately verified authority through journeyContext.
+      // Legacy explicit opt-in creates (or repairs) the canonical supportership
+      // + bilateral visibility contract; opt-out creates neither.
+      const visibilityContract = journeyContext
+        ? journeyContext.visibilityContract
+        : optInSupportership
+          ? await initiateLinkInTransaction(tx, {
+              supporterPersonId: parentPersonId,
+              supporteePersonId: teenPersonId,
+              relation: 'parent',
+              managedTier: false,
+              managedTierActive: false,
+              initiatedByPersonId: teenPersonId,
+            })
+          : null;
 
       // (12) No marker to clear — see step (6). The join is fully committed atomically.
       return {
@@ -432,7 +482,7 @@ export async function acceptFamilyJoin(
       // closure (TS drops narrowing on a mutable property accessed inside a nested
       // arrow).
       const nudge = result.storeCancelNudge;
-      if (nudge) {
+      if (nudge && !input.journeyContext?.deferStoreCancelNudge) {
         await safeSend(
           () =>
             inngest.send({
@@ -449,4 +499,40 @@ export async function acceptFamilyJoin(
       }
       return result;
     });
+}
+
+async function archiveSourceConsentGrants(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<void> {
+  const grants = await db.query.consentGrant.findMany({
+    where: and(
+      eq(consentGrant.chargePersonId, personId),
+      eq(consentGrant.organizationId, organizationId),
+    ),
+  });
+  if (grants.length === 0) return;
+  await db.insert(consentReceipt).values(
+    grants.map((grant) => ({
+      personId: grant.chargePersonId,
+      organizationId: grant.organizationId,
+      purpose: grant.purpose,
+      lawfulBasis: grant.lawfulBasis,
+      granted: grant.granted,
+      grantedAt: grant.grantedAt,
+      withdrawnAt: grant.withdrawnAt,
+      priorValue: grant.priorValue,
+      auditFact: grant.auditFact,
+      retentionPeriod: null,
+    })),
+  );
+  await db
+    .delete(consentGrant)
+    .where(
+      and(
+        eq(consentGrant.chargePersonId, personId),
+        eq(consentGrant.organizationId, organizationId),
+      ),
+    );
 }

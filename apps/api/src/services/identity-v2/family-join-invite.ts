@@ -37,6 +37,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   familyJoinInvite,
+  familyJoinJourney,
   membership,
   person,
   type Database,
@@ -97,8 +98,9 @@ export async function initiateFamilyJoinInvite(
   db: Database,
   input: InitiateFamilyJoinInviteInput,
 ): Promise<InitiateFamilyJoinInviteResult> {
+  const now = new Date();
   const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + INVITE_TOKEN_TTL_MS);
+  const expiresAt = new Date(now.getTime() + INVITE_TOKEN_TTL_MS);
 
   // Pre-read for error classification + email-failure rollback ONLY. This does
   // not weaken anti-enum: it reads the parent's OWN invite row (keyed to the
@@ -106,53 +108,76 @@ export async function initiateFamilyJoinInvite(
   // account. The caps themselves are enforced atomically below.
   const existing = await db.query.familyJoinInvite.findFirst({
     where: inviteKey(input.inviterPersonId, input.familyOrgId),
-    columns: { invitedEmail: true },
+    columns: {
+      id: true,
+      invitedEmail: true,
+      status: true,
+      tokenExpiresAt: true,
+    },
   });
   const isRecipientChange =
     existing != null && existing.invitedEmail !== input.invitedEmail;
 
-  const [row] = await db
-    .insert(familyJoinInvite)
-    .values({
-      inviterPersonId: input.inviterPersonId,
-      familyOrgId: input.familyOrgId,
-      invitedEmail: input.invitedEmail,
-      status: 'pending',
-      token,
-      tokenExpiresAt: expiresAt,
-      resendCount: 0,
-      recipientChangeCount: 0,
-    })
-    .onConflictDoUpdate({
-      target: [familyJoinInvite.inviterPersonId, familyJoinInvite.familyOrgId],
-      set: {
-        status: 'pending',
+  const reissued = isReissuableInvite(existing, now)
+    ? await reissueTerminalInvite(db, {
+        inviterPersonId: input.inviterPersonId,
+        familyOrgId: input.familyOrgId,
         invitedEmail: input.invitedEmail,
         token,
-        tokenExpiresAt: expiresAt,
-        // Same recipient → resend++; recipient change → reset to 0.
-        resendCount: sql`CASE WHEN ${familyJoinInvite.invitedEmail} IS NOT DISTINCT FROM ${input.invitedEmail} THEN ${familyJoinInvite.resendCount} + 1 ELSE 0 END`,
-        // A change between two real recipients consumes a change slot.
-        recipientChangeCount: sql`CASE WHEN ${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} THEN ${familyJoinInvite.recipientChangeCount} + 1 ELSE ${familyJoinInvite.recipientChangeCount} END`,
-        updatedAt: sql`now()`,
-      },
-      // Terminal-status guard + the two caps, atomic. An accepted slot can never
-      // be revived to 'pending'. `invited_email` is NOT NULL so there is no
-      // initial-assignment branch: same recipient → resend cap; real change →
-      // change cap.
-      setWhere: sql`${familyJoinInvite.status} <> 'accepted' AND ((${familyJoinInvite.invitedEmail} IS NOT DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.resendCount} < ${MAX_FAMILY_JOIN_RESENDS}) OR (${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.recipientChangeCount} < ${MAX_FAMILY_JOIN_RECIPIENT_CHANGES}))`,
-    })
-    .returning();
+        expiresAt,
+        now,
+      })
+    : null;
+
+  const [upserted] = reissued
+    ? [reissued]
+    : await db
+        .insert(familyJoinInvite)
+        .values({
+          inviterPersonId: input.inviterPersonId,
+          familyOrgId: input.familyOrgId,
+          invitedEmail: input.invitedEmail,
+          status: 'pending',
+          token,
+          tokenExpiresAt: expiresAt,
+          resendCount: 0,
+          recipientChangeCount: 0,
+        })
+        .onConflictDoUpdate({
+          target: [
+            familyJoinInvite.inviterPersonId,
+            familyJoinInvite.familyOrgId,
+          ],
+          set: {
+            status: 'pending',
+            invitedEmail: input.invitedEmail,
+            token,
+            tokenExpiresAt: expiresAt,
+            // Same recipient → resend++; recipient change → reset to 0.
+            resendCount: sql`CASE WHEN ${familyJoinInvite.invitedEmail} IS NOT DISTINCT FROM ${input.invitedEmail} THEN ${familyJoinInvite.resendCount} + 1 ELSE 0 END`,
+            // A change between two real recipients consumes a change slot.
+            recipientChangeCount: sql`CASE WHEN ${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} THEN ${familyJoinInvite.recipientChangeCount} + 1 ELSE ${familyJoinInvite.recipientChangeCount} END`,
+            updatedAt: sql`now()`,
+          },
+          // Only an unbound pending slot may be resent or retargeted. Once the
+          // learner binds a journey, invitation identity is frozen until its
+          // terminal outcome. Terminal and expired slots are reopened above
+          // under a row lock after their stale journey residue is removed.
+          setWhere: sql`${familyJoinInvite.status} = 'pending' AND ((${familyJoinInvite.invitedEmail} IS NOT DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.resendCount} < ${MAX_FAMILY_JOIN_RESENDS}) OR (${familyJoinInvite.invitedEmail} IS DISTINCT FROM ${input.invitedEmail} AND ${familyJoinInvite.recipientChangeCount} < ${MAX_FAMILY_JOIN_RECIPIENT_CHANGES}))`,
+        })
+        .returning();
+  const row = upserted;
 
   if (!row) {
-    // Conflict existed but setWhere blocked the update — terminal (accepted) or
-    // a cap. Re-read status to classify (all reads are of the parent's OWN slot).
+    // Conflict existed but neither the locked terminal/expiry path nor the
+    // pending-slot setWhere admitted the update. Re-read status to distinguish
+    // a live/accepted journey from an abuse-cap hit.
     const existingRow = await db.query.familyJoinInvite.findFirst({
       where: inviteKey(input.inviterPersonId, input.familyOrgId),
       columns: { status: true },
     });
-    if (existingRow?.status === 'accepted') {
-      throw new ConflictError('This family invite has already been accepted.');
+    if (existingRow?.status !== 'pending') {
+      throw new ConflictError('This family invite already has a journey.');
     }
     throw new RateLimitedError(
       isRecipientChange
@@ -161,12 +186,11 @@ export async function initiateFamilyJoinInvite(
     );
   }
 
-  // The invite email carries NO action link (operator ruling 2026-07-12) — the
-  // accept surface it would have to point at does not exist yet. The token is
-  // still minted and stored on the row above; only its DELIVERY is deferred to
-  // the accept-surface work. See formatFamilyJoinInviteEmail.
+  // The invite email carries no action link because no universal/app-link is
+  // configured. It delivers the opaque token as a manual code consumed by the
+  // authenticated resumable app journey.
   const emailResult = await sendEmail(
-    formatFamilyJoinInviteEmail(input.invitedEmail),
+    formatFamilyJoinInviteEmail(input.invitedEmail, token),
     input.emailOptions,
   );
 
@@ -183,6 +207,75 @@ export async function initiateFamilyJoinInvite(
   }
 
   return { emailDelivered: true };
+}
+
+type ReissuableInvite =
+  | Pick<typeof familyJoinInvite.$inferSelect, 'status' | 'tokenExpiresAt'>
+  | null
+  | undefined;
+
+function isReissuableInvite(invite: ReissuableInvite, now: Date): boolean {
+  return (
+    invite?.status === 'declined' ||
+    invite?.status === 'withdrawn' ||
+    ((invite?.status === 'pending' || invite?.status === 'bound') &&
+      (!invite.tokenExpiresAt ||
+        invite.tokenExpiresAt.getTime() <= now.getTime()))
+  );
+}
+
+async function reissueTerminalInvite(
+  db: Database,
+  input: {
+    inviterPersonId: string;
+    familyOrgId: string;
+    invitedEmail: string;
+    token: string;
+    expiresAt: Date;
+    now: Date;
+  },
+) {
+  return db.transaction(async (txRaw) => {
+    const tx = txRaw as unknown as Database;
+    const [locked] = await tx
+      .select()
+      .from(familyJoinInvite)
+      .where(inviteKey(input.inviterPersonId, input.familyOrgId))
+      .for('update');
+    if (!locked || !isReissuableInvite(locked, input.now)) return null;
+
+    const staleJourney = await tx.query.familyJoinJourney.findFirst({
+      where: eq(familyJoinJourney.inviteId, locked.id),
+    });
+    if (
+      staleJourney?.state === 'declined' ||
+      staleJourney?.state === 'withdrawn'
+    ) {
+      await tx
+        .delete(familyJoinJourney)
+        .where(eq(familyJoinJourney.id, staleJourney.id));
+    } else if (staleJourney) {
+      // Active rows may still own consent and visibility artifacts. Their
+      // expiry transition must retire those records in the journey service
+      // before this invite slot can be reopened. Joined rows never reopen.
+      return null;
+    }
+    const [reopened] = await tx
+      .update(familyJoinInvite)
+      .set({
+        status: 'pending',
+        invitedEmail: input.invitedEmail,
+        token: input.token,
+        tokenExpiresAt: input.expiresAt,
+        acceptedAt: null,
+        resendCount: 0,
+        recipientChangeCount: 0,
+        updatedAt: input.now,
+      })
+      .where(eq(familyJoinInvite.id, locked.id))
+      .returning();
+    return reopened ?? null;
+  });
 }
 
 export interface FamilyJoinInviterContext {
@@ -300,19 +393,23 @@ export async function claimFamilyJoinInvite(
   db: Database,
   inviteId: string,
   presentedToken: string,
+  options?: { retainTokenForJourney?: boolean },
 ): Promise<boolean> {
   const claimed = await db
     .update(familyJoinInvite)
     .set({
       status: 'accepted',
       acceptedAt: sql`now()`,
-      token: null,
+      // The legacy one-shot accept clears the bearer. A durable journey keeps
+      // the exact token until its existing expiry so an authenticated invited
+      // learner can recover the committed result after response loss.
+      token: options?.retainTokenForJourney ? presentedToken : null,
       updatedAt: sql`now()`,
     })
     .where(
       and(
         eq(familyJoinInvite.id, inviteId),
-        eq(familyJoinInvite.status, 'pending'),
+        sql`${familyJoinInvite.status} IN ('pending','bound')`,
         eq(familyJoinInvite.token, presentedToken),
         sql`${familyJoinInvite.tokenExpiresAt} > now()`,
       ),

@@ -31,6 +31,7 @@ import {
   consentGrant,
   createDatabase,
   familyJoinInvite,
+  familyJoinJourney,
   login,
   membership,
   organization,
@@ -64,7 +65,6 @@ const MINOR_BIRTH_YEAR = NOW_YEAR - 15;
 // No email config in the test env → sendEmail returns `no_api_key`, which the
 // service treats as a config (not delivery) outcome: the invite row is KEPT and
 // no counter is rolled back. So invite rows and counters are assertable here.
-const APP_URL = 'https://example.test';
 
 (RUN ? describe : describe.skip)(
   'initiateFamilyJoinInvite (integration)',
@@ -169,13 +169,11 @@ const APP_URL = 'https://example.test';
           inviterPersonId: a.personId,
           familyOrgId: a.orgId,
           invitedEmail: teenEmail, // matches a real account
-          appUrl: APP_URL,
         });
         const noMatchResult = await initiateFamilyJoinInvite(db, {
           inviterPersonId: b.personId,
           familyOrgId: b.orgId,
           invitedEmail: `nobody_${randomUUID()}@example.test`, // no match
-          appUrl: APP_URL,
         });
 
         // Byte-identical service result regardless of account existence.
@@ -216,7 +214,6 @@ const APP_URL = 'https://example.test';
             inviterPersonId: personId,
             familyOrgId: orgId,
             invitedEmail: email,
-            appUrl: APP_URL,
           });
 
         // initial + 3 resends (resend_count 0 → 3) all allowed.
@@ -252,7 +249,6 @@ const APP_URL = 'https://example.test';
             familyOrgId: orgId,
             // a DIFFERENT recipient every call — a change, never a resend.
             invitedEmail: `retarget_${randomUUID()}@example.test`,
-            appUrl: APP_URL,
           });
 
         // initial invite + 3 recipient changes (change_count 0 → 3) all allowed.
@@ -283,7 +279,6 @@ const APP_URL = 'https://example.test';
           inviterPersonId: personId,
           familyOrgId: orgId,
           invitedEmail: `accepted_${randomUUID()}@example.test`,
-          appUrl: APP_URL,
         });
         // Simulate the accept route flipping the slot to terminal.
         await db
@@ -296,9 +291,83 @@ const APP_URL = 'https://example.test';
             inviterPersonId: personId,
             familyOrgId: orgId,
             invitedEmail: `again_${randomUUID()}@example.test`,
-            appUrl: APP_URL,
           }),
         ).rejects.toBeInstanceOf(ConflictError);
+      },
+      30_000,
+    );
+
+    itGraph.each([
+      { inviteStatus: 'declined', journeyState: 'declined' },
+      { inviteStatus: 'withdrawn', journeyState: 'withdrawn' },
+      { inviteStatus: 'bound', journeyState: null },
+    ] as const)(
+      'reissues a $inviteStatus slot after terminal or expiry cleanup',
+      async ({ inviteStatus, journeyState }) => {
+        const { personId, orgId } = await seedInviter();
+        const invitedEmail = `recover_${randomUUID()}@example.test`;
+        await initiateFamilyJoinInvite(db, {
+          inviterPersonId: personId,
+          familyOrgId: orgId,
+          invitedEmail,
+        });
+        const original = await db.query.familyJoinInvite.findFirst({
+          where: eq(familyJoinInvite.familyOrgId, orgId),
+        });
+        expect(original).toBeDefined();
+        if (!original) return;
+
+        const terminalAt = new Date();
+        if (journeyState) {
+          await db.insert(familyJoinJourney).values({
+            inviteId: original.id,
+            chargePersonId: personId,
+            familyOrgId: orgId,
+            state: journeyState,
+            jurisdiction: 'NO',
+            policyVersion: 'test-policy-v1',
+            authorizationForm: 'self',
+            learnerAssentedAt: null,
+            learnerSupportershipPreference: null,
+            supportershipAuthority: 'learner',
+            supportershipDecision: null,
+            declinedAt: journeyState === 'declined' ? terminalAt : null,
+            withdrawnAt: journeyState === 'withdrawn' ? terminalAt : null,
+          });
+        }
+        await db
+          .update(familyJoinInvite)
+          .set({
+            status: inviteStatus,
+            tokenExpiresAt:
+              inviteStatus === 'bound'
+                ? new Date(terminalAt.getTime() - 1_000)
+                : original.tokenExpiresAt,
+          })
+          .where(eq(familyJoinInvite.id, original.id));
+
+        await initiateFamilyJoinInvite(db, {
+          inviterPersonId: personId,
+          familyOrgId: orgId,
+          invitedEmail,
+        });
+
+        const reopened = await db.query.familyJoinInvite.findFirst({
+          where: eq(familyJoinInvite.id, original.id),
+        });
+        expect(reopened).toMatchObject({
+          id: original.id,
+          status: 'pending',
+          invitedEmail,
+          resendCount: 0,
+          recipientChangeCount: 0,
+        });
+        expect(reopened?.token).not.toBe(original.token);
+        await expect(
+          db.query.familyJoinJourney.findFirst({
+            where: eq(familyJoinJourney.inviteId, original.id),
+          }),
+        ).resolves.toBeUndefined();
       },
       30_000,
     );

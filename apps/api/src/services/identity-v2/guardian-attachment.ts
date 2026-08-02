@@ -4,6 +4,7 @@ import {
   consentRequest,
   guardianship,
   membership,
+  organization,
   person,
   type Database,
 } from '@eduagent/database';
@@ -27,6 +28,8 @@ export interface GuardianAttachmentInput {
   chargePersonId: string;
   /** Verified, signed VPC assertion; never caller-authored facts. */
   authority: GuardianAuthorityAssertion;
+  /** Server-derived destination override for an unfinished family join. */
+  destinationOrganizationId?: string;
   asOf?: Date;
   /** Transaction-failure seam used by integration tests only. */
   afterGuardianWrite?: () => void | Promise<void>;
@@ -104,44 +107,52 @@ export async function resolveGuardianAttachmentContext(
     callerPersonId: string;
     chargePersonId: string;
     asOf: Date;
+    /** Omitted on the generic path; never populated from a client request. */
+    destinationOrganizationId?: string;
   },
 ) {
-  const [guardian, charge, chargeMemberships, activeEdges] = await Promise.all([
-    db.query.person.findFirst({
-      where: eq(person.id, input.callerPersonId),
-      columns: {
-        id: true,
-        birthDate: true,
-        loginId: true,
-        ageKnowing: true,
-      },
-    }),
-    db.query.person.findFirst({
-      where: eq(person.id, input.chargePersonId),
-      columns: {
-        id: true,
-        birthDate: true,
-        residenceJurisdiction: true,
-        residenceKnowing: true,
-        loginId: true,
-      },
-    }),
-    db.query.membership.findMany({
-      where: eq(membership.personId, input.chargePersonId),
-      columns: { organizationId: true },
-    }),
-    db.query.guardianship.findMany({
-      where: and(
-        eq(guardianship.chargePersonId, input.chargePersonId),
-        isNull(guardianship.revokedAt),
-      ),
-      columns: {
-        id: true,
-        guardianPersonId: true,
-        qualification: true,
-      },
-    }),
-  ]);
+  // Redemption calls this with a node-postgres transaction client. Keep all
+  // statements sequential so the same helper remains valid under pg 9.
+  const guardian = await db.query.person.findFirst({
+    where: eq(person.id, input.callerPersonId),
+    columns: {
+      id: true,
+      birthDate: true,
+      loginId: true,
+      ageKnowing: true,
+    },
+  });
+  const charge = await db.query.person.findFirst({
+    where: eq(person.id, input.chargePersonId),
+    columns: {
+      id: true,
+      birthDate: true,
+      residenceJurisdiction: true,
+      residenceKnowing: true,
+      loginId: true,
+    },
+  });
+  const chargeMemberships = await db.query.membership.findMany({
+    where: eq(membership.personId, input.chargePersonId),
+    columns: { organizationId: true },
+  });
+  const activeEdges = await db.query.guardianship.findMany({
+    where: and(
+      eq(guardianship.chargePersonId, input.chargePersonId),
+      isNull(guardianship.revokedAt),
+    ),
+    columns: {
+      id: true,
+      guardianPersonId: true,
+      qualification: true,
+    },
+  });
+  const destination = input.destinationOrganizationId
+    ? await db.query.organization.findFirst({
+        where: eq(organization.id, input.destinationOrganizationId),
+        columns: { id: true },
+      })
+    : undefined;
 
   const guardianBirth = guardian ? birthDateParts(guardian.birthDate) : null;
   const chargeBirth = charge ? birthDateParts(charge.birthDate) : null;
@@ -172,6 +183,7 @@ export async function resolveGuardianAttachmentContext(
     !charge.loginId ||
     chargeMemberships.length !== 1 ||
     !chargeMembership ||
+    (input.destinationOrganizationId !== undefined && !destination) ||
     activeEdges.length > 1 ||
     (activeEdges[0] && activeEdges[0].guardianPersonId !== input.callerPersonId)
   ) {
@@ -196,7 +208,8 @@ export async function resolveGuardianAttachmentContext(
   }
 
   return {
-    organizationId: chargeMembership.organizationId,
+    organizationId:
+      input.destinationOrganizationId ?? chargeMembership.organizationId,
     jurisdiction: policy.habitualResidence,
     policyVersion: policy.policyVersion,
     authorizationForm: policy.authorizationForm,
@@ -254,6 +267,7 @@ export async function attachGuardianConsentForCredentialedLearner(
         callerPersonId: input.callerPersonId,
         chargePersonId: input.chargePersonId,
         asOf,
+        destinationOrganizationId: input.destinationOrganizationId,
       },
     );
     if (
@@ -271,23 +285,21 @@ export async function attachGuardianConsentForCredentialedLearner(
       context.policy.regimeKey === 'US_COPPA'
         ? 'coppa_parental_consent'
         : 'gdpr_parental_consent';
-    const [requests, existingGrants] = await Promise.all([
-      tx.query.consentRequest.findMany({
-        where: and(
-          eq(consentRequest.chargePersonId, input.chargePersonId),
-          eq(consentRequest.organizationId, context.organizationId),
-          eq(consentRequest.requestedBasis, lawfulBasis),
-        ),
-      }),
-      tx.query.consentGrant.findMany({
-        where: and(
-          eq(consentGrant.chargePersonId, input.chargePersonId),
-          eq(consentGrant.organizationId, context.organizationId),
-          eq(consentGrant.lawfulBasis, lawfulBasis),
-        ),
-        orderBy: (grant, { desc }) => [desc(grant.grantedAt), desc(grant.id)],
-      }),
-    ]);
+    const requests = await tx.query.consentRequest.findMany({
+      where: and(
+        eq(consentRequest.chargePersonId, input.chargePersonId),
+        eq(consentRequest.organizationId, context.organizationId),
+        eq(consentRequest.requestedBasis, lawfulBasis),
+      ),
+    });
+    const existingGrants = await tx.query.consentGrant.findMany({
+      where: and(
+        eq(consentGrant.chargePersonId, input.chargePersonId),
+        eq(consentGrant.organizationId, context.organizationId),
+        eq(consentGrant.lawfulBasis, lawfulBasis),
+      ),
+      orderBy: (grant, { desc }) => [desc(grant.grantedAt), desc(grant.id)],
+    });
     if (!hasCompletePurposeSet(requests)) {
       throw new GuardianAttachmentRejectedError();
     }

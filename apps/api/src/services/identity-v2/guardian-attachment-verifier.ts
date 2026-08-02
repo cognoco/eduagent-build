@@ -47,6 +47,10 @@ export interface GuardianAuthorityInitiationInput {
   verifierUrl: string;
   verifierKey: string;
   tokenSecret: string;
+  /** Server-derived destination override for an unfinished family join. */
+  destinationOrganizationId?: string;
+  /** Server-derived learner assent bound to a joint family-join ceremony. */
+  expectedLearnerAssentAt?: Date;
   now?: Date;
   fetchImpl?: typeof fetch;
 }
@@ -70,21 +74,31 @@ function purposeSetDigest(): string {
     .digest('hex');
 }
 
-function commandBindingDigest(
-  input: {
-    guardianPersonId: string;
-    chargePersonId: string;
-    organizationId: string;
-    jurisdiction: string;
-    policyVersion: string;
-    authorizationForm: string;
-    requiredAssuranceLevel: string;
-    purposeSetDigest: string;
-  },
-  secret: string,
-): string {
+type CommandBinding = {
+  guardianPersonId: string;
+  chargePersonId: string;
+  organizationId: string;
+  jurisdiction: string;
+  policyVersion: string;
+  authorizationForm: string;
+  requiredAssuranceLevel: string;
+  purposeSetDigest: string;
+  learnerAssentAt: string | null;
+};
+
+function commandBindingDigest(input: CommandBinding, secret: string): string {
   return createHmac('sha256', secret)
     .update(JSON.stringify(input), 'utf8')
+    .digest('hex');
+}
+
+function legacyCommandBindingDigest(
+  input: CommandBinding,
+  secret: string,
+): string {
+  const { learnerAssentAt: _learnerAssentAt, ...legacyBinding } = input;
+  return createHmac('sha256', secret)
+    .update(JSON.stringify(legacyBinding), 'utf8')
     .digest('hex');
 }
 
@@ -200,6 +214,7 @@ export async function initiateGuardianAuthorityVerification(
     callerPersonId: input.callerPersonId,
     chargePersonId: input.chargePersonId,
     asOf: now,
+    destinationOrganizationId: input.destinationOrganizationId,
   });
 
   const purposesDigest = purposeSetDigest();
@@ -207,19 +222,27 @@ export async function initiateGuardianAuthorityVerification(
     input.verificationHandle,
     input.tokenSecret,
   );
-  const bindingDigest = commandBindingDigest(
-    {
-      guardianPersonId: input.callerPersonId,
-      chargePersonId: input.chargePersonId,
-      organizationId: context.organizationId,
-      jurisdiction: context.jurisdiction,
-      policyVersion: context.policyVersion,
-      authorizationForm: context.authorizationForm,
-      requiredAssuranceLevel: context.requiredAssuranceLevel,
-      purposeSetDigest: purposesDigest,
-    },
-    input.tokenSecret,
-  );
+  const binding: CommandBinding = {
+    guardianPersonId: input.callerPersonId,
+    chargePersonId: input.chargePersonId,
+    organizationId: context.organizationId,
+    jurisdiction: context.jurisdiction,
+    policyVersion: context.policyVersion,
+    authorizationForm: context.authorizationForm,
+    requiredAssuranceLevel: context.requiredAssuranceLevel,
+    purposeSetDigest: purposesDigest,
+    learnerAssentAt: input.expectedLearnerAssentAt?.toISOString() ?? null,
+  };
+  const bindingDigest = commandBindingDigest(binding, input.tokenSecret);
+  // Rows issued before learner assent became part of the generic attachment
+  // command remain safely retryable. Family-join commands always supply an
+  // expected assent timestamp and therefore never accept this legacy digest.
+  const retryableBindingDigests = [bindingDigest];
+  if (input.expectedLearnerAssentAt === undefined) {
+    retryableBindingDigests.push(
+      legacyCommandBindingDigest(binding, input.tokenSecret),
+    );
+  }
 
   const [reservation] = await db
     .insert(guardianAuthorityRedemptions)
@@ -251,7 +274,9 @@ export async function initiateGuardianAuthorityVerification(
       .limit(1);
     if (
       !existing ||
-      !sameDigest(existing.commandBindingDigest, bindingDigest) ||
+      !retryableBindingDigests.some((digest) =>
+        sameDigest(existing.commandBindingDigest, digest),
+      ) ||
       existing.guardianPersonId !== input.callerPersonId ||
       existing.chargePersonId !== input.chargePersonId ||
       existing.organizationId !== context.organizationId ||
@@ -323,6 +348,7 @@ export async function initiateGuardianAuthorityVerification(
           policyVersion: context.policyVersion,
           requiredAssuranceLevel: 'VPC_VERIFIED',
           authorizationForm: context.authorizationForm,
+          learnerAssentAt: input.expectedLearnerAssentAt?.toISOString() ?? null,
         },
       }),
     });
@@ -360,6 +386,10 @@ export async function initiateGuardianAuthorityVerification(
     verified.organizationId !== context.organizationId ||
     verified.jurisdiction !== context.jurisdiction ||
     verified.policyVersion !== context.policyVersion ||
+    (input.expectedLearnerAssentAt !== undefined &&
+      (!verified.learnerAssentAt ||
+        new Date(verified.learnerAssentAt).getTime() !==
+          input.expectedLearnerAssentAt.getTime())) ||
     (context.authorizationForm === 'joint_child_guardian' &&
       (!verified.learnerAssentAt ||
         new Date(verified.learnerAssentAt).getTime() > now.getTime()))
@@ -429,6 +459,8 @@ export async function attachGuardianConsentFromDurableAuthorityToken(
     chargePersonId: string;
     authorityToken: string;
     tokenSecret: string;
+    /** Server-derived destination override for an unfinished family join. */
+    destinationOrganizationId?: string;
   },
 ) {
   const authority = await verifyDurableGuardianAuthorityToken(
@@ -441,5 +473,6 @@ export async function attachGuardianConsentFromDurableAuthorityToken(
     callerPersonId: input.callerPersonId,
     chargePersonId: input.chargePersonId,
     authority,
+    destinationOrganizationId: input.destinationOrganizationId,
   });
 }
