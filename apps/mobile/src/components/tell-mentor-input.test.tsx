@@ -160,5 +160,45 @@ describe('TellMentorInput', () => {
       await flushEffects();
       expect(mockSpeech.startListening).not.toHaveBeenCalled();
     });
+
+    it('forwards voiceScopeKey — a scope change revokes the in-flight capture', async () => {
+      const onChangeText = jest.fn();
+      const screenApi = render(
+        <TellMentorInput
+          {...BASE_PROPS}
+          onChangeText={onChangeText}
+          voiceScopeKey="child-001"
+        />,
+      );
+      fireEvent.press(screenApi.getByTestId('tell-mentor-mic'));
+      await flushEffects();
+
+      screenApi.rerender(
+        <TellMentorInput
+          {...BASE_PROPS}
+          onChangeText={onChangeText}
+          voiceScopeKey="child-002"
+        />,
+      );
+      await flushEffects();
+      expect(mockSpeech.stopListening).toHaveBeenCalled();
+
+      mockSpeech = {
+        ...mockSpeech,
+        status: 'idle',
+        isListening: false,
+        transcript: 'meant for the previous child',
+        isFinalTranscript: true,
+      };
+      screenApi.rerender(
+        <TellMentorInput
+          {...BASE_PROPS}
+          onChangeText={onChangeText}
+          voiceScopeKey="child-002"
+        />,
+      );
+      await flushEffects();
+      expect(onChangeText).not.toHaveBeenCalled();
+    });
   });
 });

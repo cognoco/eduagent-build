@@ -696,6 +696,38 @@ describe('useSpeechRecognition', () => {
       expect(revoked.result.current.transcript).toBe('');
     });
 
+    it('a stop during a pending start cancels it — the mic never opens late', async () => {
+      let resolvePermission: ((v: { granted: boolean }) => void) | undefined;
+      mockRequestPermissionsAsync.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvePermission = resolve;
+          }),
+      );
+      mockLoadSpeechModule.mockResolvedValue(nativeModule());
+      const { result } = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      await flushEffects();
+
+      let startPromise: Promise<void> = Promise.resolve();
+      act(() => {
+        startPromise = result.current.startListening();
+      });
+      // The caller moves on (scope change / discard) while the OS permission
+      // prompt is still open.
+      await act(async () => {
+        await result.current.stopListening();
+      });
+      await act(async () => {
+        resolvePermission?.({ granted: true });
+        await startPromise;
+      });
+
+      expect(mockStart).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('idle');
+    });
+
     it("a non-owner stopListening never stops the owner's native capture", async () => {
       mockLoadSpeechModule.mockResolvedValue(nativeModule());
       const owner = renderHook(() =>
