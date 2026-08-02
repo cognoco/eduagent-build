@@ -33,15 +33,18 @@ jest.mock(
 // directly, outside the Inngest HTTP boundary that installs request-scoped
 // environment bindings. Keep the real helper module and override only the
 // environment so the real sendEmail path may target the captured test address.
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepEnvironment: () => 'production',
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: request-scoped environment binding */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepEnvironment: () => 'production',
+    };
+  },
+);
 
 import { accountSecurityNotification } from './account-security-notification';
 

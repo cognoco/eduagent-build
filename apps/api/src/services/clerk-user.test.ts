@@ -1,11 +1,14 @@
 const mockCaptureException = jest.fn();
-jest.mock('./sentry', () => {
-  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  './sentry' /* gc1-allow: external Sentry transport boundary */,
+  () => {
+    const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 import {
   clearVerifiedClerkEmailCacheForTest,

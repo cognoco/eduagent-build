@@ -14,30 +14,36 @@ const mockDb = {
 // decision from request-scoped helpers, Neon, and notification transports.
 // The overrides below are limited to those effects; real service behavior is
 // covered by their dedicated tests.
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockDb,
-    getStepEnvironment: () => 'test',
-    getStepResendApiKey: () => 're_test_key',
-    getStepEmailFrom: () => 'noreply@mentomate.com',
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: request-scoped DB and environment bindings */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockDb,
+      getStepEnvironment: () => 'test',
+      getStepResendApiKey: () => 're_test_key',
+      getStepEmailFrom: () => 'noreply@mentomate.com',
+    };
+  },
+);
 
-jest.mock('../../services/notifications', () => {
-  const actual = jest.requireActual(
-    '../../services/notifications',
-  ) as typeof import('../../services/notifications');
-  return {
-    ...actual,
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-  };
-});
+jest.mock(
+  '../../services/notifications' /* gc1-allow: external Expo and Resend delivery boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { familyJoinStoreCancelNudge } from './family-join-store-cancel-nudge';

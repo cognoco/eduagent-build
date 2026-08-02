@@ -164,15 +164,18 @@ jest.mock(
   },
 );
 
-jest.mock('../../services/clerk-user', () => {
-  const actual = jest.requireActual(
-    '../../services/clerk-user',
-  ) as typeof import('../../services/clerk-user');
-  return {
-    ...actual,
-    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
-  };
-});
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
+);
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock('../../services/notifications', () => {

@@ -25,15 +25,18 @@ const mockFormatConsentReminderEmail = jest.fn(
   }),
 );
 
-jest.mock('../../services/safe-non-core', () => {
-  const actual = jest.requireActual(
-    '../../services/safe-non-core',
-  ) as typeof import('../../services/safe-non-core');
-  return {
-    ...actual,
-    safeSend: (...args: unknown[]) => mockSafeSend(...args),
-  };
-});
+jest.mock(
+  '../../services/safe-non-core' /* gc1-allow: external Inngest dispatch boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/safe-non-core',
+    ) as typeof import('../../services/safe-non-core');
+    return {
+      ...actual,
+      safeSend: (...args: unknown[]) => mockSafeSend(...args),
+    };
+  },
+);
 
 // Shared seeded DB — getStepDatabase returns this; seedConsentState patches its
 // db.query so the REAL resolveOrgIdForPerson (membership.findFirst) +
@@ -137,15 +140,18 @@ jest.mock(
 
 // Clerk deletion is a live external API boundary; only that outbound call is
 // replaced in this workflow test.
-jest.mock('../../services/clerk-user', () => {
-  const actual = jest.requireActual(
-    '../../services/clerk-user',
-  ) as typeof import('../../services/clerk-user');
-  return {
-    ...actual,
-    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
-  };
-});
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
+);
 
 import { NonRetriableError } from 'inngest';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';

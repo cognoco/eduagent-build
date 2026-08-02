@@ -5,39 +5,48 @@ const mockMarkPendingClerkErasuresComplete = jest
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
 const mockDb = { kind: 'test-db' };
 
-jest.mock('../../services/identity-v2/deletion-v2', () => {
-  const actual = jest.requireActual(
-    '../../services/identity-v2/deletion-v2',
-  ) as typeof import('../../services/identity-v2/deletion-v2');
-  return {
-    ...actual,
-    ensurePendingClerkErasures: (...args: unknown[]) =>
-      mockEnsurePendingClerkErasures(...args),
-    markPendingClerkErasuresComplete: (...args: unknown[]) =>
-      mockMarkPendingClerkErasuresComplete(...args),
-  };
-});
+jest.mock(
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: real DB transaction and advisory-lock boundary; integration twin covers it */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/deletion-v2',
+    ) as typeof import('../../services/identity-v2/deletion-v2');
+    return {
+      ...actual,
+      ensurePendingClerkErasures: (...args: unknown[]) =>
+        mockEnsurePendingClerkErasures(...args),
+      markPendingClerkErasuresComplete: (...args: unknown[]) =>
+        mockMarkPendingClerkErasuresComplete(...args),
+    };
+  },
+);
 
-jest.mock('../../services/clerk-user', () => {
-  const actual = jest.requireActual(
-    '../../services/clerk-user',
-  ) as typeof import('../../services/clerk-user');
-  return {
-    ...actual,
-    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
-  };
-});
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
+);
 
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual(
-    '../helpers',
-  ) as typeof import('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: () => mockDb,
-    getStepClerkSecretKey: () => 'clerk-test-key',
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: request-scoped DB and secret bindings */,
+  () => {
+    const actual = jest.requireActual(
+      '../helpers',
+    ) as typeof import('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: () => mockDb,
+      getStepClerkSecretKey: () => 'clerk-test-key',
+    };
+  },
+);
 
 import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';

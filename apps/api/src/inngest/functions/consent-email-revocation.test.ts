@@ -120,15 +120,18 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
 
 // Clerk deletion is a live external API boundary; only that outbound call is
 // replaced in this workflow test.
-jest.mock('../../services/clerk-user', () => {
-  const actual = jest.requireActual(
-    '../../services/clerk-user',
-  ) as typeof import('../../services/clerk-user');
-  return {
-    ...actual,
-    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
-  };
-});
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
+);
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock('../../services/notifications', () => {

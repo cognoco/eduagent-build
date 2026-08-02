@@ -1,12 +1,17 @@
 const mockCaptureException = jest.fn();
 
-jest.mock('../sentry', () => {
-  const actual = jest.requireActual('../sentry') as typeof import('../sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  '../sentry' /* gc1-allow: external Sentry transport boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../sentry',
+    ) as typeof import('../sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 import { sendEmail, type EmailPayload } from './email';
 
@@ -163,7 +168,9 @@ describe('[WI-2788] Resend delivery policy and retry classification', () => {
   });
 
   it('classifies a network failure as transient', async () => {
-    (globalThis.fetch as jest.Mock).mockRejectedValue(new Error('network down'));
+    (globalThis.fetch as jest.Mock).mockRejectedValue(
+      new Error('network down'),
+    );
 
     const result = await sendEmail(payload, {
       resendApiKey: 're_test',

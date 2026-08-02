@@ -4,15 +4,18 @@ const { createInngestTransportCapture } =
 const mockInngestTransport = createInngestTransportCapture();
 const mockSafeSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/safe-non-core', () => {
-  const actual = jest.requireActual(
-    '../../services/safe-non-core',
-  ) as typeof import('../../services/safe-non-core');
-  return {
-    ...actual,
-    safeSend: (...args: unknown[]) => mockSafeSend(...args),
-  };
-});
+jest.mock(
+  '../../services/safe-non-core' /* gc1-allow: external Inngest dispatch boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/safe-non-core',
+    ) as typeof import('../../services/safe-non-core');
+    return {
+      ...actual,
+      safeSend: (...args: unknown[]) => mockSafeSend(...args),
+    };
+  },
+);
 
 jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
@@ -112,15 +115,18 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
 
 // Clerk deletion is a live external API boundary; keep the real module shape
 // while replacing only the outbound delete call.
-jest.mock('../../services/clerk-user', () => {
-  const actual = jest.requireActual(
-    '../../services/clerk-user',
-  ) as typeof import('../../services/clerk-user');
-  return {
-    ...actual,
-    deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
-  };
-});
+jest.mock(
+  '../../services/clerk-user' /* gc1-allow: external Clerk HTTP boundary */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/clerk-user',
+    ) as typeof import('../../services/clerk-user');
+    return {
+      ...actual,
+      deleteClerkUser: (...args: unknown[]) => mockDeleteClerkUser(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import * as sentry from '../../services/sentry';
