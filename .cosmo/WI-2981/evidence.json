@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The deterministic contract pins the exact PR/main group and covers idle main pushes and SHA attribution.",
+      "pointer": "scripts/ci-concurrency-contract.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The SHA-scoped main group preserves every rapid-merge commit's attributable CI evidence while PR heads remain cancellable, and OTA publication is serialized.",
+      "pointer": ".github/workflows/ci.yml:28"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Workflow and security contract tests pass without authority or gate changes.",
+      "pointer": "pnpm check:github-workflow-security"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Historical cancelled zero-job runs, OTA ordering/live-tip protection, and the post-fix deterministic concurrency proof are recorded.",
+      "pointer": ".cosmo/WI-2981/red-green.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The contract fails on the baseline and passes after the fix, with revert/restoration evidence.",
+      "pointer": ".cosmo/WI-2981/red-green.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The workflow YAML parses and the security checks remain green.",
+      "pointer": "pnpm exec jest --config scripts/jest.config.cjs scripts/check-github-workflow-security.test.ts --runInBand --no-coverage"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "scripts/ci-concurrency-contract.test.ts"
+}
