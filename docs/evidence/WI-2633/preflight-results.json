@@ -1,0 +1,50 @@
+{
+  "target": {
+    "project": "lingering-violet-30592106",
+    "branch": "br-weathered-silence-agw4on4x",
+    "db": "neondb"
+  },
+  "quota_pools_total": 9,
+  "orphan_count": 3,
+  "orphans": [
+    {
+      "id": "019d782a-ce22-7660-9a0d-73941f2830a0",
+      "subscription_id": "019d782a-cddc-7e58-b06a-15f2a39815e5",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0,
+      "cycle_reset_at": "2026-07-10T16:12:44.450Z",
+      "created_at": "2026-04-10T16:12:44.501Z",
+      "updated_at": "2026-06-11T09:44:45.187Z",
+      "legacy_rows": 1,
+      "legacy_status": "expired"
+    },
+    {
+      "id": "019dea4e-e828-7590-92ee-a794972fade3",
+      "subscription_id": "019dea4e-e794-7a9d-86b9-9a55df7e9629",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0,
+      "cycle_reset_at": "2026-07-02T20:08:53.032Z",
+      "created_at": "2026-05-02T20:08:53.153Z",
+      "updated_at": "2026-06-09T19:40:08.362Z",
+      "legacy_rows": 1,
+      "legacy_status": "expired"
+    },
+    {
+      "id": "019df86f-0ddf-7440-9b66-a294d806de28",
+      "subscription_id": "019df86f-0d84-71e8-b46d-d5cdf265f507",
+      "monthly_limit": 100,
+      "used_this_month": 0,
+      "daily_limit": 10,
+      "used_today": 0,
+      "cycle_reset_at": "2026-07-05T13:58:40.863Z",
+      "created_at": "2026-05-05T13:58:40.914Z",
+      "updated_at": "2026-06-09T19:40:08.362Z",
+      "legacy_rows": 1,
+      "legacy_status": "expired"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+-- WI-2633 postchecks (AC-4): prove zero unintended quota loss, zero non-legacy child FKs still
+-- referencing legacy parents, every repointed FK validates, and WI-2487's profiles-only result unchanged.
+-- 1. Orphan count must be zero.
+-- 2. Remaining quota_pools rows must be exactly the 6 non-orphans, unchanged.
+-- 3. No live child FK (excluding drop-list children) still targets profiles/subscriptions/accounts.
+-- 4. WI-2487's result: no quota/child rows orphaned against `person`.
