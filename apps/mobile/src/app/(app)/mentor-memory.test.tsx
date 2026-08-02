@@ -164,11 +164,13 @@ jest.mock('../../components/tell-mentor-input', () => ({
   TellMentorInput: ({
     onSubmit,
     onChangeText,
+    voiceScopeKey,
   }: {
     onSubmit: () => void;
     onChangeText: (text: string) => void;
+    voiceScopeKey?: string | number;
   }) => {
-    const { Pressable, TextInput } = require('react-native');
+    const { Pressable, Text, TextInput } = require('react-native');
     return (
       <>
         <TextInput
@@ -176,6 +178,9 @@ jest.mock('../../components/tell-mentor-input', () => ({
           onChangeText={onChangeText}
         />
         <Pressable testID="tell-mentor-submit" onPress={onSubmit} />
+        {/* Probe: the screen must supply its writing-profile identity so the
+            real TellMentorInput can revoke captures across profile switches. */}
+        <Text testID="tell-mentor-voice-scope">{String(voiceScopeKey)}</Text>
       </>
     );
   },
@@ -872,5 +877,17 @@ describe('MentorMemoryScreen — proxy mode write guard (WI-274)', () => {
     expect(
       fetchCallsMatching(mockFetch, 'onboarding/interests/context'),
     ).toHaveLength(0);
+  });
+});
+describe('voice scope threading', () => {
+  it("supplies the active profile's id as the Tell Mentor voice scope", async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('tell-mentor-voice-scope').props.children).toBe(
+      'test-profile-id',
+    );
   });
 });

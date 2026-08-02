@@ -229,6 +229,8 @@ interface FirstSessionWrapUpCardProps {
   celebrationEventId: string;
   seenCelebrationEventIds: ReadonlySet<string>;
   voiceLocale?: string;
+  /** Data-scope identity for the voice capture (the wrapped-up session id). */
+  voiceScopeKey?: string | number;
   onChangeText: (value: string) => void;
   /** Applies the final transcript with a functional update at the state owner. */
   onAppendTranscript: (finalTranscript: string) => void;
@@ -244,6 +246,7 @@ function FirstSessionWrapUpCard({
   celebrationEventId,
   seenCelebrationEventIds,
   voiceLocale,
+  voiceScopeKey,
   onChangeText,
   onAppendTranscript,
   onSubmit,
@@ -278,6 +281,7 @@ function FirstSessionWrapUpCard({
           value={value}
           disabled={isSubmitting || hasSubmitted}
           voiceLocale={voiceLocale}
+          scopeKey={voiceScopeKey}
           testID="first-session-reflection-mic"
           onTranscript={onAppendTranscript}
         />
@@ -1990,6 +1994,7 @@ function SessionScreenInner() {
       celebrationEventId={`first-session-wrap-up:${firstSessionWrapUp.sessionId}`}
       seenCelebrationEventIds={seenFirstSessionCelebrationIds}
       voiceLocale={languageVoiceLocale}
+      voiceScopeKey={firstSessionWrapUp.sessionId}
       onChangeText={setFirstSessionReflectionText}
       onAppendTranscript={(finalTranscript) =>
         setFirstSessionReflectionText((prev) =>
