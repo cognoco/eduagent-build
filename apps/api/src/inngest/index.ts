@@ -96,6 +96,7 @@ import { retrievalEventsRetentionCron } from './functions/retrieval-events-reten
 import { clerkErasureFenceCleanup } from './functions/clerk-erasure-fence-cleanup';
 import { preparedNoticeCleanup } from './functions/prepared-notice-cleanup';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
+import { persistedLearningTextRemediation } from './functions/persisted-learning-text-remediation';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
 import { suitabilityJudge } from './functions/judge-suitability';
@@ -209,6 +210,7 @@ export {
   activationEventsRetentionCron,
   activationEventsRetentionOnFailure,
   memoryFactsBackfill,
+  persistedLearningTextRemediation,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
   suitabilityJudge,
@@ -314,6 +316,7 @@ export const functions = [
   activationEventsRetentionCron,
   activationEventsRetentionOnFailure,
   memoryFactsBackfill,
+  persistedLearningTextRemediation,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
   suitabilityJudge,
