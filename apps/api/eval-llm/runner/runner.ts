@@ -7,6 +7,7 @@ import {
   type FlowAggregate,
   type SampleMetrics,
 } from './metrics';
+import { aggregateCoverage, type FlowCoverage } from './coverage';
 
 // ---------------------------------------------------------------------------
 // Runner — orchestrates the flow × profile matrix.
@@ -107,6 +108,7 @@ export interface RunSummary {
    * flows with `emitsEnvelope: true`. Drives the baseline regression guard.
    */
   envelopeMetrics: Record<string, FlowAggregate>;
+  envelopeCoverage: Record<string, FlowCoverage>;
 }
 
 export function parseCliArgs(argv: string[]): {
@@ -242,6 +244,7 @@ export async function runHarness(
     qualityFailures: 0,
     skipped: [],
     envelopeMetrics: {},
+    envelopeCoverage: {},
   };
 
   // Per-flow bags of SampleMetrics — folded into aggregates at the end so we
@@ -259,6 +262,10 @@ export async function runHarness(
 
   const maxLiveCalls = options.maxLiveCalls ?? DEFAULT_MAX_LIVE_CALLS;
   let liveCallsMade = 0;
+  const coverageByFlow = new Map<
+    string,
+    { attempted: number; completed: number; budgetSkipped: number }
+  >();
 
   for (const flow of activeFlows) {
     summary.flowsRun++;
@@ -344,6 +351,15 @@ export async function runHarness(
           }
 
           if (options.live && flow.runLive) {
+            if (flow.emitsEnvelope) {
+              const coverage = coverageByFlow.get(flow.id) ?? {
+                attempted: 0,
+                completed: 0,
+                budgetSkipped: 0,
+              };
+              coverage.attempted++;
+              coverageByFlow.set(flow.id, coverage);
+            }
             if (liveCallsMade >= maxLiveCalls) {
               liveError = `live budget exceeded (${maxLiveCalls} calls); re-run with --max-live-calls to raise`;
               summary.skipped.push({
@@ -351,11 +367,17 @@ export async function runHarness(
                 profileId: profile.id,
                 reason: liveError,
               });
+              if (flow.emitsEnvelope) {
+                coverageByFlow.get(flow.id)!.budgetSkipped++;
+              }
             } else {
               liveCallsMade++;
               try {
                 liveResponse = await flow.runLive(item.input, messages);
                 summary.liveCallsOk++;
+                if (flow.emitsEnvelope) {
+                  coverageByFlow.get(flow.id)!.completed++;
+                }
 
                 // Collect signal metrics for envelope-emitting flows so the
                 // baseline regression guard can detect drift (Layer 1).
@@ -478,6 +500,9 @@ export async function runHarness(
   // baseline guard, tests) see a single Record<flowId, FlowAggregate>.
   for (const [flowId, samples] of samplesByFlow.entries()) {
     summary.envelopeMetrics[flowId] = aggregateFlowSamples(samples);
+  }
+  for (const [flowId, coverage] of coverageByFlow.entries()) {
+    summary.envelopeCoverage[flowId] = aggregateCoverage(coverage);
   }
 
   return summary;

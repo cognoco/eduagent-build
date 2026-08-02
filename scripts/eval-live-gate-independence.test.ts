@@ -29,6 +29,12 @@ import { join } from 'node:path';
 import { parse } from 'yaml';
 
 import { TEACHING_SCENARIOS } from '../apps/api/eval-llm/fixtures/teaching-scenarios';
+import { CHALLENGE_SIM_SCENARIOS } from '../apps/api/eval-llm/fixtures/challenge-personas';
+import { PROFILES } from '../apps/api/eval-llm/fixtures/profiles';
+import { ENVELOPE_FLOWS } from '../apps/api/eval-llm/envelope-flow-registry';
+import { deriveEnvelopeBudgetFromMatrix } from '../apps/api/eval-llm/runner/budget';
+import { parseBaseline } from '../apps/api/eval-llm/runner/metrics';
+import { deriveMasteryBudget } from '../apps/api/eval-llm/runner/sim-budget';
 
 interface WorkflowStep {
   name?: string;
@@ -68,6 +74,124 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     expect(envelopeStep).toBeDefined();
     expect(envelopeStep!.run).toContain('--live');
     expect(envelopeStep!.run).toContain('--check-baseline');
+    const cap = envelopeStep!.run!.match(/--max-live-calls (\d+)/);
+    expect(cap).not.toBeNull();
+    const baseline = parseBaseline(
+      readFileSync(join(repoRoot, 'apps/api/eval-llm/baseline.json'), 'utf8'),
+    );
+    expect(baseline).not.toBeNull();
+    const budget = deriveEnvelopeBudgetFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+      baseline!.flows,
+    );
+    expect(Number(cap![1])).toBe(budget.configuredBudget);
+
+    const evidence = readFileSync(
+      join(repoRoot, '.github/workflows/eval-live.yml'),
+      'utf8',
+    ).match(
+      /baseline=(\d+) and required=(\d+) samples; its 10% headroom configures (\d+)/,
+    );
+    expect(evidence).not.toBeNull();
+    expect(Number(evidence![1])).toBe(budget.baselineSamples);
+    expect(Number(evidence![2])).toBe(budget.requiredSamples);
+    expect(Number(evidence![3])).toBe(budget.configuredBudget);
+  });
+
+  test('mastery cap is the derived complete 8 × 3 configured-unit grid', () => {
+    expect(masteryStep).toBeDefined();
+    const budget = deriveMasteryBudget({
+      scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
+      runs: 3,
+    });
+    const cap = masteryStep!.run!.match(/--max-live-calls (\d+)/);
+    expect(cap).not.toBeNull();
+    expect(Number(cap![1])).toBe(budget.configuredUnits);
+    expect(budget.expectedProviderCalls).toBe(192);
+    expect(masteryStep!.run).toContain('216');
+  });
+
+  test('workflow keeps heterogeneous gate caps separate from comparable provider demand', () => {
+    const workflow = readFileSync(
+      join(repoRoot, '.github/workflows/eval-live.yml'),
+      'utf8',
+    );
+    expect(workflow).toContain('329 + 85 + 192 = 606');
+    expect(workflow).toContain('configured caps remain gate-specific');
+    const baseline = parseBaseline(
+      readFileSync(join(repoRoot, 'apps/api/eval-llm/baseline.json'), 'utf8'),
+    );
+    const envelopeBudget = deriveEnvelopeBudgetFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+      baseline!.flows,
+    );
+    const masteryBudget = deriveMasteryBudget({
+      scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
+      runs: 3,
+    });
+    const mixedTotal =
+      envelopeBudget.configuredBudget +
+      TEACHING_SCENARIOS.length * 17 +
+      masteryBudget.configuredUnits;
+    expect(workflow).not.toContain(
+      `${mixedTotal} configured units across the three gates`,
+    );
+  });
+
+  test('full flow registry preserves the pre-budget runtime order', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/api/eval-llm/flow-registry.ts'),
+      'utf8',
+    );
+    const start = source.indexOf('export const FLOWS');
+    const body = source.slice(start, source.indexOf('];', start));
+    const originalOrder = [
+      'capitalsFlow',
+      'vocabularyFlow',
+      'guessWhoFlow',
+      'dictationGenerateFlow',
+      'dictationGenerateSanitizationFlow',
+      'prepareHomeworkFlow',
+      'dictationReviewFlow',
+      'sessionAnalysisFlow',
+      'sessionRecapFlow',
+      'sessionSummaryFlow',
+      'filingPreSessionFlow',
+      'exchangesFlow',
+      'homeworkNoticeFlow',
+      'topicProbeSignalsFlow',
+      'topicIntentMatcherFlow',
+      'subjectClassifyFlow',
+      'languageDetectFlow',
+      'probesFlow',
+      'safetyProbesFlow',
+      'languageQualityFlow',
+      'bookSuggestionRegenerationFlow',
+      'progressSummaryFlow',
+      'assessmentEvaluationFlow',
+      'anthropicResponseFormatFlow',
+      'languagePromptsFlow',
+      'gradedInputPromptsFlow',
+      'adaptiveTeachingFlow',
+      'nowParkReturnFlow',
+      'parkAndReturnRankingFlow',
+      'parkAndReturnReweaveFlow',
+      'appHelpV2Flow',
+      'challengeRoundMasteryFlow',
+      'misconceptionRepairFlow',
+      'teachingSessionFlow',
+      'challengeGraderFlow',
+      'reviewContinuityOpenerFlow',
+      'recallGraderFlow',
+      'judgeSuitabilityFlow',
+      'recheckJudgeFlow',
+      'learningTextSafetyJudgeFlow',
+    ];
+    const positions = originalOrder.map((name) => body.indexOf(`  ${name},`));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
   test('a dedicated teaching-session live gate exists, separate from the envelope-only step', () => {

@@ -53,6 +53,7 @@ function summaryWith(opts: {
     qualityFailures: opts.qualityFailures ?? 0,
     skipped: [],
     envelopeMetrics: { exchanges: { n: 100, rates: opts.rates ?? RATES } },
+    envelopeCoverage: {},
   };
 }
 
@@ -168,6 +169,78 @@ describe('evaluateGates [WI-1148]', () => {
     expect(result.driftEvaluated).toBe(false);
     expect(
       result.messages.some((m) => m.text.includes('No baseline found')),
+    ).toBe(true);
+  });
+
+  it('zero-sample budget exhaustion fails closed without manufacturing drift', async () => {
+    const result = await evaluateGates(
+      {
+        ...summaryWith({ rates: RATES }),
+        envelopeMetrics: {},
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 3,
+            completed: 0,
+            budgetSkipped: 3,
+            complete: false,
+          },
+        },
+      },
+      CHECK_OPTS,
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.some((m) => m.text.includes('Coverage gate'))).toBe(
+      true,
+    );
+    expect(
+      result.messages.some((m) => m.text.includes('Signal drift detected')),
+    ).toBe(false);
+  });
+
+  it('partial budget exhaustion remains coverage-incomplete while real drift is preserved elsewhere', async () => {
+    const result = await evaluateGates(
+      {
+        ...summaryWith({ rates: RATES }),
+        envelopeMetrics: {
+          exchanges: { n: 2, rates: { ...RATES, partialProgress: 0.9 } },
+          other: { n: 100, rates: { ...RATES, partialProgress: 0.9 } },
+        },
+        envelopeCoverage: {
+          exchanges: {
+            attempted: 4,
+            completed: 2,
+            budgetSkipped: 2,
+            complete: false,
+          },
+          other: {
+            attempted: 100,
+            completed: 100,
+            budgetSkipped: 0,
+            complete: true,
+          },
+        },
+      },
+      CHECK_OPTS,
+      {
+        ...deps(baselineWith(RATES)),
+        readBaseline: async () => ({
+          ...baselineWith(RATES),
+          flows: {
+            exchanges: baselineWith(RATES).flows.exchanges!,
+            other: baselineWith(RATES).flows.exchanges!,
+          },
+        }),
+      },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.some((m) => m.text.includes('Coverage gate'))).toBe(
+      true,
+    );
+    expect(
+      result.messages.some((m) => m.text.includes('Signal drift detected')),
     ).toBe(true);
   });
 });

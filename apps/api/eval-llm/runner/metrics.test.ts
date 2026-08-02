@@ -9,6 +9,7 @@ import {
   type Baseline,
   type FlowAggregate,
 } from './metrics';
+import type { FlowCoverage } from './coverage';
 
 describe('extractSampleMetrics', () => {
   it('extracts signals and ui_hints from a well-formed envelope', () => {
@@ -229,6 +230,19 @@ describe('compareAgainstBaseline', () => {
     expect(drifts.length).toBeGreaterThan(0);
     expect(drifts.every((d) => d.flowId === 'exchanges')).toBe(true);
     expect(drifts.every((d) => d.currentRate === 0)).toBe(true);
+  });
+
+  it('does not turn budget-starved partial coverage into a full-drop drift', () => {
+    const base = makeBaseline({ exchanges: makeAggregate() });
+    const coverage: Record<string, FlowCoverage> = {
+      exchanges: {
+        attempted: 4,
+        completed: 2,
+        budgetSkipped: 2,
+        complete: false,
+      },
+    };
+    expect(compareAgainstBaseline({}, base, 0.05, coverage)).toEqual([]);
   });
 
   it('treats a new flow as all-or-nothing delta from zero', () => {

@@ -21,6 +21,7 @@ import {
   formatDriftReport,
   type Baseline,
 } from './metrics';
+import { isCoverageIncomplete } from './coverage';
 
 /** A line for the caller to print: stdout (`log`) or stderr (`error`). */
 export interface GateMessage {
@@ -98,6 +99,7 @@ export async function evaluateGates(
 
   let driftEvaluated = false;
   let driftExceeded = false;
+  let coverageIncomplete = false;
 
   // The drift comparison runs whenever --check-baseline is set — independently
   // of `qualityFailed`. This ordering IS the fix.
@@ -111,10 +113,23 @@ export async function evaluateGates(
       return { exitCode: 2, driftEvaluated: false, messages };
     }
     driftEvaluated = true;
+    for (const [flowId, coverage] of Object.entries(summary.envelopeCoverage)) {
+      if (baseline.flows[flowId] && isCoverageIncomplete(coverage)) {
+        coverageIncomplete = true;
+        messages.push({
+          level: 'error',
+          text:
+            `Coverage gate: ${flowId} is incomplete (attempted=${coverage.attempted}, ` +
+            `completed=${coverage.completed}, budget-skipped=${coverage.budgetSkipped}); ` +
+            'baseline drift is not evaluated for this flow.',
+        });
+      }
+    }
     const drifts = compareAgainstBaseline(
       summary.envelopeMetrics,
       baseline,
       deps.tolerancePp,
+      summary.envelopeCoverage,
     );
     if (drifts.length === 0) {
       messages.push({
@@ -134,11 +149,12 @@ export async function evaluateGates(
     }
   }
 
-  if (qualityFailed || executionFailed || driftExceeded) {
+  if (qualityFailed || executionFailed || driftExceeded || coverageIncomplete) {
     const reasons = [
       qualityFailed ? 'scenario-quality failures' : null,
       executionFailed ? 'live-call execution failures' : null,
       driftExceeded ? 'baseline signal drift' : null,
+      coverageIncomplete ? 'incomplete baseline coverage' : null,
     ].filter((r): r is string => r !== null);
     messages.push({
       level: 'error',

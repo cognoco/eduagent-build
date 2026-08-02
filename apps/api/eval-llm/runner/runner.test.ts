@@ -282,3 +282,45 @@ describe('runHarness --only-envelope-flows', () => {
     expect(summary.flowsRun).toBe(2);
   });
 });
+
+describe('runHarness envelope coverage accounting', () => {
+  afterEach(async () => {
+    const dir = path.resolve(
+      __dirname,
+      '..',
+      'snapshots',
+      'test-envelope-coverage',
+    );
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('records attempted, completed, and budget-skipped samples per flow', async () => {
+    const flow: FlowDefinition<{ scenarioId: string }> = {
+      id: 'test-envelope-coverage',
+      name: 'Test Envelope Coverage',
+      sourceFile: 'test',
+      emitsEnvelope: true,
+      buildPromptInput: () => null,
+      enumerateScenarios: () => [
+        { scenarioId: 'C1', input: { scenarioId: 'C1' } },
+        { scenarioId: 'C2', input: { scenarioId: 'C2' } },
+        { scenarioId: 'C3', input: { scenarioId: 'C3' } },
+      ],
+      buildPrompt: () => ({ system: 'coverage' }),
+      runLive: async () => '{"reply":"ok"}',
+    };
+
+    const summary = await runHarness([flow], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+      maxLiveCalls: 1,
+    });
+
+    expect(summary.envelopeCoverage['test-envelope-coverage']).toEqual({
+      attempted: 3,
+      completed: 1,
+      budgetSkipped: 2,
+      complete: false,
+    });
+  });
+});

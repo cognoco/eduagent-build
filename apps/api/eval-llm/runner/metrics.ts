@@ -26,6 +26,7 @@
 // ---------------------------------------------------------------------------
 
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
+import type { FlowCoverage } from './coverage';
 
 /** Per-sample outcome extracted from one live LLM response. */
 export interface SampleMetrics {
@@ -253,6 +254,7 @@ export function compareAgainstBaseline(
   current: Record<string, FlowAggregate>,
   baseline: Baseline,
   tolerancePp: number,
+  coverage: Record<string, FlowCoverage> = {},
 ): BaselineDrift[] {
   const drifts: BaselineDrift[] = [];
   const flowIds = new Set<string>([
@@ -261,6 +263,12 @@ export function compareAgainstBaseline(
   ]);
 
   for (const flowId of flowIds) {
+    if (coverage[flowId] && !coverage[flowId].complete) {
+      // Budget starvation is a coverage gate, not a signal collapse. Leaving
+      // this flow out of the drift comparison preserves genuine drift for
+      // completely observed flows without manufacturing a full drop to zero.
+      continue;
+    }
     const cur = current[flowId];
     const base = baseline.flows[flowId];
 

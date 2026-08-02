@@ -33,75 +33,37 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { capitalsFlow } from './flows/quiz-capitals';
-import { vocabularyFlow } from './flows/quiz-vocabulary';
-import { guessWhoFlow } from './flows/quiz-guess-who';
-import { dictationGenerateFlow } from './flows/dictation-generate';
-import { dictationGenerateSanitizationFlow } from './flows/dictation-generate-sanitization';
-import { prepareHomeworkFlow } from './flows/dictation-prepare-homework';
-import { dictationReviewFlow } from './flows/dictation-review';
-import { sessionAnalysisFlow } from './flows/session-analysis';
-import { sessionRecapFlow } from './flows/session-recap';
-import { sessionSummaryFlow } from './flows/session-summary';
-import { filingPreSessionFlow } from './flows/filing-pre-session';
-import { exchangesFlow } from './flows/exchanges';
-import { homeworkNoticeFlow } from './flows/homework-notice';
-import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
-import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
-import { subjectClassifyFlow } from './flows/subject-classify';
+import { FLOWS } from './flow-registry';
 // [WI-1755] Launch-guard eval coverage for the language-learning-intent
 // detector used at subject creation. See flow file for context.
-import { languageDetectFlow } from './flows/language-detect';
-import { probesFlow } from './flows/probes';
+// Flow registry is shared with deterministic workflow-contract tests.
 // [H3 — 2026-06-05 safety audit] Adversarial safety regression suite:
 // jailbreaks, prompt extraction, crisis disclosures, harmful-content asks.
-import { safetyProbesFlow } from './flows/safety-probes';
 // [Memo §6.2] Conversation-language quality for cs/nb/pl — LLM judge on
 // production routing scores candidate-model prose. See flow file.
-import { languageQualityFlow } from './flows/language-quality';
-import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
-import { progressSummaryFlow } from './flows/progress-summary';
-import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
-import { recallGraderFlow } from './flows/recall-grader';
-import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 // [BUG-125] Snapshot coverage for the two prompt builders the pre-commit
 // hook was previously blind to. See flow files for context.
-import { languagePromptsFlow } from './flows/language-prompts';
 // [WI-1547] Snapshot coverage for the graded-input generation prompt.
-import { gradedInputPromptsFlow } from './flows/graded-input-prompts';
-import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
-import { nowParkReturnFlow } from './flows/now-park-return';
-import { parkAndReturnRankingFlow } from './flows/park-and-return-ranking';
-import { parkAndReturnReweaveFlow } from './flows/park-and-return-reweave';
-import { appHelpV2Flow } from './flows/app-help-v2';
 // Pedagogy-coverage flows: the harness proved epistemic safety (source
 // grounding, no-cheating, no-stereotyping) but only *observed* whether
 // teaching produces understanding. These two close that gap — see flow files.
-import { challengeRoundMasteryFlow } from './flows/challenge-round-mastery';
-import { misconceptionRepairFlow } from './flows/misconception-repair';
 // [T1–T4 — 2026-06-27 plan] Teaching-session multi-turn flow: stuck-unless-taught
 // learner, 8-turn loop, unaided transfer probe, temp-0 judge (PRE-TEEN/TEEN-BAND).
-import { teachingSessionFlow } from './flows/teaching-session';
 // [T10 — 2026-06-26 plan] Model-selection gate for the dedicated grader that
 // emits challenge_round_evaluation when the tutor (gpt-oss) drops it. Two-axis
 // fixture battery: format (non-empty schema-valid verdict) + judgment (solid /
 // misconception / missing / false-mastery guard). See flow file for bake-off
 // commands (--flow challenge-grader --live --openrouter-model <slug>).
-import { challengeGraderFlow } from './flows/challenge-grader';
 // [plan 2026-06-27] Review-continuity opener faithfulness — deterministic
 // builder snapshots + two-independent-model judge (model A pinned mentor,
 // model B independent OpenRouter judge). See flow file.
-import { reviewContinuityOpenerFlow } from './flows/review-continuity-opener';
 // [WI-1877 rework] Suitability-judge injection resistance — behavioral,
 // single-model live run proving a fenced learner-message directive cannot
 // flip an unsuitable reply's verdict to a clean "ok". See flow file.
-import { judgeSuitabilityFlow } from './flows/judge-suitability';
-import { learningTextSafetyJudgeFlow } from './flows/learning-text-safety-judge';
 // [WI-2625] Mentor-notice re-check judge — behavioral live run proving the
 // independent server-side judge lands on the correct verdict per accepted
 // pair, resolves an off-topic message to "continue", and resists an
 // injected directive trying to force locked_in. See flow file.
-import { recheckJudgeFlow } from './flows/recheck-judge';
 import {
   listFlows,
   parseCliArgs,
@@ -109,13 +71,14 @@ import {
   type RunSummary,
   type RunOptions,
 } from './runner/runner';
-import type { FlowDefinition } from './runner/types';
 import {
   buildBaseline,
   parseBaseline,
   validateBaselineStructure,
   type Baseline,
 } from './runner/metrics';
+import { PROFILES } from './fixtures/profiles';
+import { deriveEnvelopeBudgetFromMatrix } from './runner/budget';
 import { evaluateGates } from './runner/gates';
 import {
   bootstrapLlmProviders,
@@ -186,49 +149,6 @@ function updateZeroDriftReceipt(options: RunOptions): void {
   }
 }
 
-const FLOWS: FlowDefinition[] = [
-  capitalsFlow as FlowDefinition,
-  vocabularyFlow as FlowDefinition,
-  guessWhoFlow as FlowDefinition,
-  dictationGenerateFlow as FlowDefinition,
-  dictationGenerateSanitizationFlow as FlowDefinition,
-  prepareHomeworkFlow as FlowDefinition,
-  dictationReviewFlow as FlowDefinition,
-  sessionAnalysisFlow as FlowDefinition,
-  sessionRecapFlow as FlowDefinition,
-  sessionSummaryFlow as FlowDefinition,
-  filingPreSessionFlow as FlowDefinition,
-  exchangesFlow as FlowDefinition,
-  homeworkNoticeFlow as FlowDefinition,
-  topicProbeSignalsFlow as FlowDefinition,
-  topicIntentMatcherFlow as FlowDefinition,
-  subjectClassifyFlow as FlowDefinition,
-  languageDetectFlow as FlowDefinition,
-  probesFlow as FlowDefinition,
-  safetyProbesFlow as FlowDefinition,
-  languageQualityFlow as FlowDefinition,
-  bookSuggestionRegenerationFlow as FlowDefinition,
-  progressSummaryFlow as FlowDefinition,
-  assessmentEvaluationFlow as FlowDefinition,
-  anthropicResponseFormatFlow as FlowDefinition,
-  languagePromptsFlow as FlowDefinition,
-  gradedInputPromptsFlow as FlowDefinition,
-  adaptiveTeachingFlow as FlowDefinition,
-  nowParkReturnFlow as FlowDefinition,
-  parkAndReturnRankingFlow as FlowDefinition,
-  parkAndReturnReweaveFlow as FlowDefinition,
-  appHelpV2Flow as FlowDefinition,
-  challengeRoundMasteryFlow as FlowDefinition,
-  misconceptionRepairFlow as FlowDefinition,
-  teachingSessionFlow as FlowDefinition,
-  challengeGraderFlow as FlowDefinition,
-  reviewContinuityOpenerFlow as FlowDefinition,
-  recallGraderFlow as FlowDefinition,
-  judgeSuitabilityFlow as FlowDefinition,
-  recheckJudgeFlow as FlowDefinition,
-  learningTextSafetyJudgeFlow as FlowDefinition,
-];
-
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const { options, listOnly } = parseCliArgs(argv);
@@ -236,6 +156,22 @@ async function main(): Promise<void> {
   if (listOnly) {
     clearZeroDriftReceipt();
     listFlows(FLOWS);
+    const baseline = await readBaseline();
+    const budget = deriveEnvelopeBudgetFromMatrix(
+      FLOWS,
+      PROFILES,
+      baseline?.flows,
+    );
+    console.log(
+      `Envelope matrix demand: required=${budget.requiredSamples} ` +
+        `baseline=${budget.baselineSamples} configured=${budget.configuredBudget} ` +
+        `headroom=${budget.headroomSamples} (${budget.headroomRate * 100}%)`,
+    );
+    for (const [flowId, demand] of Object.entries(budget.flows)) {
+      console.log(
+        `  [${flowId}] required=${demand.requiredSamples} baseline=${demand.baselineSamples}`,
+      );
+    }
     return;
   }
 
@@ -313,6 +249,34 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  if (options.live && options.onlyEnvelopeFlows) {
+    const baseline = await readBaseline();
+    const budget = deriveEnvelopeBudgetFromMatrix(
+      FLOWS.filter(
+        (flow) => !options.flowFilter || options.flowFilter.has(flow.id),
+      ),
+      PROFILES.filter(
+        (profile) =>
+          !options.profileFilter || options.profileFilter.has(profile.id),
+      ),
+      baseline?.flows,
+      { scenarioFilter: options.scenarioFilter },
+    );
+    if (
+      options.maxLiveCalls !== undefined &&
+      options.maxLiveCalls < budget.configuredBudget
+    ) {
+      clearZeroDriftReceipt();
+      console.error(
+        `Envelope matrix requires ${budget.configuredBudget} configured calls ` +
+          `for ${budget.requiredSamples} samples (baseline=${budget.baselineSamples}, ` +
+          `headroom=${budget.headroomSamples}); --max-live-calls=${options.maxLiveCalls} ` +
+          'would truncate the matrix.',
+      );
+      process.exit(2);
+    }
+  }
+
   // Bootstrap LLM providers early so any missing-key errors surface before
   // the run matrix starts. Tier-1 runs skip this — no LLM calls are made.
   if (options.live) {
@@ -349,6 +313,41 @@ async function main(): Promise<void> {
   );
 
   const summary: RunSummary = await runHarness(FLOWS, options);
+
+  if (options.live) {
+    const baselineForReport = await readBaseline();
+    const matrixFlows = FLOWS.filter(
+      (flow) =>
+        (!options.flowFilter || options.flowFilter.has(flow.id)) &&
+        (!options.onlyEnvelopeFlows || flow.emitsEnvelope === true),
+    );
+    const matrixProfiles = PROFILES.filter(
+      (profile) =>
+        !options.profileFilter || options.profileFilter.has(profile.id),
+    );
+    const envelopeBudget = deriveEnvelopeBudgetFromMatrix(
+      matrixFlows,
+      matrixProfiles,
+      baselineForReport?.flows,
+      { scenarioFilter: options.scenarioFilter },
+    );
+    console.log(
+      `Envelope budget: configured=${envelopeBudget.configuredBudget} ` +
+        `required=${envelopeBudget.requiredSamples} ` +
+        `baseline=${envelopeBudget.baselineSamples} ` +
+        `headroom=${envelopeBudget.headroomSamples} ` +
+        `(${envelopeBudget.headroomRate * 100}%); no truncation contract`,
+    );
+    for (const [flowId, demand] of Object.entries(envelopeBudget.flows)) {
+      const coverage = summary.envelopeCoverage[flowId];
+      console.log(
+        `  [${flowId}] required=${demand.requiredSamples} ` +
+          `attempted=${coverage?.attempted ?? 0} ` +
+          `completed=${coverage?.completed ?? 0} ` +
+          `budget-skipped=${coverage?.budgetSkipped ?? 0}`,
+      );
+    }
+  }
 
   console.log('');
   console.log('─────────────────────────────────────────');
