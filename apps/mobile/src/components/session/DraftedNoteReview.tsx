@@ -21,8 +21,12 @@ export function DraftedNoteReview({
   const { t } = useTranslation();
   const [content, setContent] = useState(initialContent ?? '');
   const [editing, setEditing] = useState(initialContent === null);
+  // PR #2861 review: the mic (and save) must be inert during the async
+  // onSave window — dictation after Save dispatched would mutate a draft
+  // that was already submitted with the original text.
+  const [saving, setSaving] = useState(false);
   const trimmedContent = content.trim();
-  const canSave = trimmedContent.length > 0;
+  const canSave = trimmedContent.length > 0 && !saving;
   return (
     <View
       className="rounded-2xl bg-surface-elevated p-4 border border-accent-soft"
@@ -52,6 +56,7 @@ export function DraftedNoteReview({
           <View className="mt-2">
             <VoiceInputControl
               value={content}
+              disabled={saving}
               voiceLocale={voiceLocale}
               testID="drafted-note-mic"
               onTranscript={(finalTranscript) =>
@@ -68,7 +73,15 @@ export function DraftedNoteReview({
       <View className="flex-row gap-2 mt-3 flex-wrap">
         <Pressable
           onPress={() => {
-            if (canSave) void onSave(trimmedContent);
+            if (!canSave) return;
+            setSaving(true);
+            void (async () => {
+              try {
+                await onSave(trimmedContent);
+              } finally {
+                setSaving(false);
+              }
+            })();
           }}
           disabled={!canSave}
           className={`rounded-xl px-4 py-2 ${

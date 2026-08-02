@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 jest.mock(
-  'react-i18next',
+  'react-i18next' /* gc1-allow: i18n boundary — external package, canonical mock-i18n util returning en.json strings (repo convention, cf. FeedbackSheet.test) */,
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
