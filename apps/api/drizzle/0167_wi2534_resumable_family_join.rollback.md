@@ -50,6 +50,11 @@ WHERE dependency.refobjid = 'family_join_journey'::regclass
 ```sql
 BEGIN;
 
+LOCK TABLE "family_join_journey",
+           "family_join_invite",
+           "support_visibility_audit_events"
+  IN ACCESS EXCLUSIVE MODE;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM "family_join_journey") THEN
@@ -91,31 +96,62 @@ ALTER TABLE "support_visibility_audit_events"
     'graduation_restamped'
   ));
 
+DO $$
+DECLARE
+  invite_status_definition text;
+  visibility_event_definition text;
+BEGIN
+  IF to_regclass('public.family_join_journey') IS NOT NULL THEN
+    RAISE EXCEPTION
+      '0167 rollback assertion failed: family_join_journey still exists';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM "family_join_invite"
+    WHERE "status" NOT IN ('pending', 'accepted')
+  ) THEN
+    RAISE EXCEPTION
+      '0167 rollback assertion failed: non-legacy invite status remains';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM "support_visibility_audit_events"
+    WHERE "event_type" = 'authority_invalidated'
+  ) THEN
+    RAISE EXCEPTION
+      '0167 rollback assertion failed: authority_invalidated event remains';
+  END IF;
+
+  SELECT pg_get_constraintdef(oid)
+  INTO invite_status_definition
+  FROM pg_constraint
+  WHERE conrelid = 'family_join_invite'::regclass
+    AND conname = 'family_join_invite_status_check';
+  IF invite_status_definition IS DISTINCT FROM
+    'CHECK ((status = ANY (ARRAY[''pending''::text, ''accepted''::text])))'
+  THEN
+    RAISE EXCEPTION
+      '0167 rollback assertion failed: invite status constraint is %',
+      invite_status_definition;
+  END IF;
+
+  SELECT pg_get_constraintdef(oid)
+  INTO visibility_event_definition
+  FROM pg_constraint
+  WHERE conrelid = 'support_visibility_audit_events'::regclass
+    AND conname = 'support_visibility_audit_events_type_check';
+  IF visibility_event_definition IS DISTINCT FROM
+    'CHECK ((event_type = ANY (ARRAY[''contract_initiated''::text, ''contract_accepted''::text, ''appeal_requested''::text, ''supportership_revoked''::text, ''graduation_restamped''::text])))'
+  THEN
+    RAISE EXCEPTION
+      '0167 rollback assertion failed: visibility event constraint is %',
+      visibility_event_definition;
+  END IF;
+END
+$$;
+
 COMMIT;
 ```
 
-**Post-rollback assertions:** all queries must return the shown legacy-safe result before the pre-0167 application is deployed.
-
-```sql
-SELECT to_regclass('public.family_join_journey') IS NULL
-  AS journey_table_removed; -- true
-
-SELECT count(*) = 0 AS invalid_invite_statuses
-FROM "family_join_invite"
-WHERE "status" NOT IN ('pending', 'accepted'); -- true
-
-SELECT count(*) = 0 AS invalid_visibility_events
-FROM "support_visibility_audit_events"
-WHERE "event_type" = 'authority_invalidated'; -- true
-
-SELECT pg_get_constraintdef(oid)
-FROM pg_constraint
-WHERE conname IN (
-  'family_join_invite_status_check',
-  'support_visibility_audit_events_type_check'
-)
-ORDER BY conname; -- definitions contain only the pre-0167 values
-```
+**Post-rollback assertions:** The final `DO` block runs before `COMMIT` and raises on any missing or non-legacy result. A failed assertion rolls the entire procedure back; deploy the pre-0167 application only after the transaction commits successfully.
 
 **Recovery:** Deploy the pre-0167 application revision with this rollback. If the resumable journey is reintroduced later, reapply the migration and restore only reviewed records from the pre-rollback backup; do not blindly replay terminal invites or authority-invalidated events.
 

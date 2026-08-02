@@ -65,7 +65,6 @@ const MINOR_BIRTH_YEAR = NOW_YEAR - 15;
 // No email config in the test env → sendEmail returns `no_api_key`, which the
 // service treats as a config (not delivery) outcome: the invite row is KEPT and
 // no counter is rolled back. So invite rows and counters are assertable here.
-const APP_URL = 'https://example.test';
 
 (RUN ? describe : describe.skip)(
   'initiateFamilyJoinInvite (integration)',
@@ -170,13 +169,11 @@ const APP_URL = 'https://example.test';
           inviterPersonId: a.personId,
           familyOrgId: a.orgId,
           invitedEmail: teenEmail, // matches a real account
-          appUrl: APP_URL,
         });
         const noMatchResult = await initiateFamilyJoinInvite(db, {
           inviterPersonId: b.personId,
           familyOrgId: b.orgId,
           invitedEmail: `nobody_${randomUUID()}@example.test`, // no match
-          appUrl: APP_URL,
         });
 
         // Byte-identical service result regardless of account existence.
@@ -217,7 +214,6 @@ const APP_URL = 'https://example.test';
             inviterPersonId: personId,
             familyOrgId: orgId,
             invitedEmail: email,
-            appUrl: APP_URL,
           });
 
         // initial + 3 resends (resend_count 0 → 3) all allowed.
@@ -253,7 +249,6 @@ const APP_URL = 'https://example.test';
             familyOrgId: orgId,
             // a DIFFERENT recipient every call — a change, never a resend.
             invitedEmail: `retarget_${randomUUID()}@example.test`,
-            appUrl: APP_URL,
           });
 
         // initial invite + 3 recipient changes (change_count 0 → 3) all allowed.
@@ -284,7 +279,6 @@ const APP_URL = 'https://example.test';
           inviterPersonId: personId,
           familyOrgId: orgId,
           invitedEmail: `accepted_${randomUUID()}@example.test`,
-          appUrl: APP_URL,
         });
         // Simulate the accept route flipping the slot to terminal.
         await db
@@ -297,7 +291,6 @@ const APP_URL = 'https://example.test';
             inviterPersonId: personId,
             familyOrgId: orgId,
             invitedEmail: `again_${randomUUID()}@example.test`,
-            appUrl: APP_URL,
           }),
         ).rejects.toBeInstanceOf(ConflictError);
       },
@@ -317,7 +310,6 @@ const APP_URL = 'https://example.test';
           inviterPersonId: personId,
           familyOrgId: orgId,
           invitedEmail,
-          appUrl: APP_URL,
         });
         const original = await db.query.familyJoinInvite.findFirst({
           where: eq(familyJoinInvite.familyOrgId, orgId),
@@ -358,7 +350,6 @@ const APP_URL = 'https://example.test';
           inviterPersonId: personId,
           familyOrgId: orgId,
           invitedEmail,
-          appUrl: APP_URL,
         });
 
         const reopened = await db.query.familyJoinInvite.findFirst({

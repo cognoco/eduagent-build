@@ -25,7 +25,7 @@ Status: review hardening verified. The implementation is reconciled with `origin
 | Full mobile unit project | `pnpm test:mobile:unit` | passed, exit 0 in 952.1 seconds |
 | Full database unit project | `pnpm exec nx run @eduagent/database:test` against the isolated database | 35 suites / 329 tests passed |
 | Migration integrity | migration immutability and enum-idempotency guards | passed |
-| Migration rollback | applied the revised guarded SQL in `0167_wi2534_resumable_family_join.rollback.md` to disposable clone `wi2534_rollback_verification_20260802`, then ran its post-rollback assertions | empty-journey precondition enforced; journey table removed; invalid invite/audit counts zero; both legacy constraints restored |
+| Migration rollback | applied the revised guarded SQL in `0167_wi2534_resumable_family_join.rollback.md` to disposable clones, including the post-review clone `wi2534_rollback_review_20260802_1715` | affected tables locked before the destructive guard; empty-journey precondition enforced; journey table removed; invalid invite/audit rows absent; exact legacy constraints verified before commit |
 | Internationalization | orphan-key, staleness, hardcoded-JSX, and clinical-copy ratchets | passed after positive-framing correction |
 | Static checks | full TypeScript build, prompt-marker guard, no-Gemini ratchet, and test-only-export ratchet | passed with pre-existing warnings only |
 | Uncommitted-delta change-class gate | `scripts/check-change-class.sh --run --fast` via Git-for-Windows Bash | 5 checks passed, 0 failed, 1 intentionally slow check skipped |
