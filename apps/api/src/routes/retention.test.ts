@@ -127,6 +127,7 @@ jest.mock('../services/retention-data', () => {
     setTeachingPreference: jest.fn(),
     deleteTeachingPreference: jest.fn(),
     getStableTopics: jest.fn(),
+    getAssessmentEligibleTopics: jest.fn(),
   };
 });
 
@@ -235,6 +236,7 @@ jest.mock(
 );
 
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 // [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
 // calls verifyPersonOwnershipV2 — a raw db.select() membership query the
 // fully-mocked DB module cannot satisfy. Every scenario in this file that
@@ -275,8 +277,10 @@ import {
   setTeachingPreference,
   deleteTeachingPreference,
   getStableTopics,
+  getAssessmentEligibleTopics,
 } from '../services/retention-data';
-import { NotFoundError } from '../errors';
+import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
+import { NotFoundError, ForbiddenError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { ConsentWithdrawnError } from '../services/session';
@@ -1188,5 +1192,182 @@ describe('[WI-165 / DS-076] retention proxy-mode guard', () => {
       { method: 'DELETE' },
     );
     expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2879] read-authority guard (G22a-G22h)
+// The harness middleware installs profileId ONLY from the request's
+// X-Profile-Id header — the same client-controlled input the real
+// profileScopeMiddleware resolves — so each attack below is a credentialed
+// non-owner request traversing header → middleware → route.
+// profileAuthorityVerifiedFor is deliberately never set (no central proof),
+// which keeps the cases mutation-sensitive to the route guard's own
+// fail-closed fallback (verifyPersonOwnershipV2); mounting the real
+// profileScopeMiddleware would reject centrally (WI-2128) before the route
+// and lose that sensitivity (middleware behavior: profile-scope.test.ts).
+// ---------------------------------------------------------------------------
+describe('[WI-2879] read-authority guard', () => {
+  const VICTIM_PROFILE_ID = 'victim-profile-id';
+  const ATTACKER_PERSON_ID = 'attacker-person-id';
+
+  function makeUnprovenApp() {
+    const direct = new Hono();
+    direct.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // profileId derives strictly from the spoofed header; a request that
+      // forgets to send it fails loudly (500) instead of silently passing.
+      const spoofedProfileId = c.req.header('X-Profile-Id');
+      if (!spoofedProfileId) {
+        throw new Error('harness requires an X-Profile-Id header');
+      }
+      c.set('profileId' as never, spoofedProfileId);
+      c.set('user' as never, { id: 'test-user' });
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, ATTACKER_PERSON_ID);
+      // profileAuthorityVerifiedFor deliberately NOT set — no central proof.
+      await next();
+    });
+    direct.onError((err, c) => {
+      if (err instanceof ForbiddenError) {
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: err.message },
+          403,
+        );
+      }
+      // [G22b] assertNotProxyMode throws HTTPException with a prebuilt 403
+      // response — surface it as the real app would.
+      if (err instanceof HTTPException) {
+        return err.getResponse();
+      }
+      return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+    });
+    direct.route('/', retentionRoutes);
+    return direct;
+  }
+
+  function denyNextOwnershipCheck() {
+    jest
+      .mocked(verifyPersonOwnershipV2)
+      .mockRejectedValueOnce(new Error('caller cannot read selected profile'));
+  }
+
+  async function expectForbidden(res: Response) {
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(jest.mocked(verifyPersonOwnershipV2)).toHaveBeenCalledWith(
+      expect.anything(),
+      VICTIM_PROFILE_ID,
+      'test-account-id',
+      ATTACKER_PERSON_ID,
+    );
+  }
+
+  const SPOOF_HEADERS = { 'X-Profile-Id': VICTIM_PROFILE_ID };
+
+  it('[G22a] GET /library/retention rejects a cross-profile X-Profile-Id spoof with 403 before the aggregate read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request('/library/retention', {
+      headers: SPOOF_HEADERS,
+    });
+
+    await expectForbidden(res);
+    expect(getAllSubjectsRetention).not.toHaveBeenCalled();
+  });
+
+  // [G22b] GET /retention/assessment-eligible carries assertNotProxyMode
+  // BEFORE the read guard: a cross-profile request (callerPersonId !==
+  // profileId) is rejected by that orthogonal write-shape gate first, so this
+  // case cannot flip on removal of assertCanReadProfile alone — the read
+  // guard's regression protection for this handler is carried by the
+  // profile-read-authority ratchet (baseline entry removed in this WI). The
+  // case still proves the spoof never reaches the service read.
+  it('[G22b] GET /retention/assessment-eligible rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    const res = await makeUnprovenApp().request(
+      '/retention/assessment-eligible',
+      { headers: SPOOF_HEADERS },
+    );
+
+    expect(res.status).toBe(403);
+    expect(getAssessmentEligibleTopics).not.toHaveBeenCalled();
+  });
+
+  it('[G22c] GET /subjects/:subjectId/retention rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      `/subjects/${SUBJECT_ID}/retention`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
+    expect(getSubjectRetention).not.toHaveBeenCalled();
+  });
+
+  it('[G22d] GET /topics/:topicId/retention rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      `/topics/${TOPIC_ID}/retention`,
+      {
+        headers: SPOOF_HEADERS,
+      },
+    );
+
+    await expectForbidden(res);
+    expect(getTopicRetention).not.toHaveBeenCalled();
+  });
+
+  it('[G22e] GET /subjects/:subjectId/needs-deepening rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      `/subjects/${SUBJECT_ID}/needs-deepening`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
+    expect(getSubjectNeedsDeepening).not.toHaveBeenCalled();
+  });
+
+  it('[G22f] GET /subjects/:subjectId/teaching-preference rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      `/subjects/${SUBJECT_ID}/teaching-preference`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
+    expect(getTeachingPreference).not.toHaveBeenCalled();
+  });
+
+  it('[G22g] GET /retention/stability rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      `/retention/stability?subjectId=${SUBJECT_ID}`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
+    expect(getStableTopics).not.toHaveBeenCalled();
+  });
+
+  // [G22h] checkEvaluateEligibility (services/evaluate-data) is deliberately
+  // NOT module-mocked in this file — the 403 must land before the service
+  // read, so the guard rejecting is itself the proof the real service is
+  // never invoked (an unguarded handler would hit the empty mock DB and 500).
+  it('[G22h] GET /topics/:topicId/evaluate-eligibility rejects a cross-profile X-Profile-Id spoof with 403 before the service read', async () => {
+    denyNextOwnershipCheck();
+
+    const res = await makeUnprovenApp().request(
+      `/topics/${TOPIC_ID}/evaluate-eligibility`,
+      { headers: SPOOF_HEADERS },
+    );
+
+    await expectForbidden(res);
   });
 });
