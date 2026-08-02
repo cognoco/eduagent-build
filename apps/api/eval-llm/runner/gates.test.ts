@@ -40,6 +40,7 @@ function baselineWith(rates: FlowAggregate['rates']): Baseline {
 
 function summaryWith(opts: {
   qualityFailures?: number;
+  liveCallsFailed?: number;
   rates?: FlowAggregate['rates'];
 }): RunSummary {
   return {
@@ -47,7 +48,7 @@ function summaryWith(opts: {
     profilesRun: 1,
     snapshotsWritten: 1,
     liveCallsOk: 100,
-    liveCallsFailed: 0,
+    liveCallsFailed: opts.liveCallsFailed ?? 0,
     qualityWarnings: 0,
     qualityFailures: opts.qualityFailures ?? 0,
     skipped: [],
@@ -168,5 +169,102 @@ describe('evaluateGates [WI-1148]', () => {
     expect(
       result.messages.some((m) => m.text.includes('No baseline found')),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2461 AC-3] Execution-failure gate: a run where live LLM calls FAILED to
+// execute must never exit 0. Pre-fix, runner.ts incremented
+// summary.liveCallsFailed when runLive threw, but evaluateGates never read it —
+// so a provider/runtime failure (a genuinely unjudged run) passed as green.
+// ---------------------------------------------------------------------------
+
+describe('evaluateGates — execution-failure gate [WI-2461]', () => {
+  it('live calls failed, plain --live run (no baseline flags) → exit 1 naming execution failures', async () => {
+    // Mirrors the teaching-session gate invocation in eval-live.yml:
+    // `--live --flow teaching-session` with NO --check-baseline.
+    const result = await evaluateGates(
+      summaryWith({ liveCallsFailed: 2 }),
+      { live: true },
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    const failLine = result.messages.find((m) =>
+      m.text.startsWith('Eval gate failed:'),
+    );
+    expect(failLine?.text).toContain('live-call execution failures');
+    expect(failLine?.text).not.toContain('scenario-quality failures');
+  });
+
+  it('live calls failed AND --check-baseline → drift still evaluated, run still fails', async () => {
+    const result = await evaluateGates(
+      summaryWith({ liveCallsFailed: 1, rates: RATES }),
+      CHECK_OPTS,
+      deps(baselineWith(RATES)),
+    );
+
+    // Execution failure must not short-circuit the drift comparison (the
+    // WI-1148 no-masking property extends to this gate too).
+    expect(result.driftEvaluated).toBe(true);
+    expect(
+      result.messages.some((m) => m.text.includes('Baseline check passed')),
+    ).toBe(true);
+    expect(result.exitCode).toBe(1);
+    const failLine = result.messages.find((m) =>
+      m.text.startsWith('Eval gate failed:'),
+    );
+    expect(failLine?.text).toContain('live-call execution failures');
+    expect(failLine?.text).not.toContain('baseline signal drift');
+  });
+
+  it('execution + quality + drift failures → all three reasons named', async () => {
+    const drifted: FlowAggregate['rates'] = { ...RATES, partialProgress: 0.9 };
+    const result = await evaluateGates(
+      summaryWith({ liveCallsFailed: 3, qualityFailures: 2, rates: drifted }),
+      CHECK_OPTS,
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    const failLine = result.messages.find((m) =>
+      m.text.startsWith('Eval gate failed:'),
+    );
+    expect(failLine?.text).toContain('scenario-quality failures');
+    expect(failLine?.text).toContain('live-call execution failures');
+    expect(failLine?.text).toContain('baseline signal drift');
+  });
+
+  it('--update-baseline + live calls failed → exit 1 with the WAS-written NOTE (seed semantics preserved)', async () => {
+    // The baseline was already written by the caller (WI-556 by design). The
+    // seed run must still fail so the operator triages the execution failures
+    // before committing the file — same contract as quality failures.
+    const result = await evaluateGates(
+      summaryWith({ liveCallsFailed: 4, rates: RATES }),
+      { live: true, updateBaseline: true },
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.driftEvaluated).toBe(false);
+    expect(
+      result.messages.some((m) => m.text.includes('baseline.json WAS written')),
+    ).toBe(true);
+    expect(
+      result.messages.some((m) =>
+        m.text.includes('live-call execution failures'),
+      ),
+    ).toBe(true);
+  });
+
+  it('zero liveCallsFailed keeps a clean run at exit 0 (no ratchet false-positive)', async () => {
+    const result = await evaluateGates(
+      summaryWith({ liveCallsFailed: 0, rates: RATES }),
+      CHECK_OPTS,
+      deps(baselineWith(RATES)),
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.driftEvaluated).toBe(true);
   });
 });

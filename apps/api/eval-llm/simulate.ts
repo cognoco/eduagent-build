@@ -65,6 +65,7 @@ import {
 } from './fixtures/challenge-personas';
 import type { EvalProfile } from './fixtures/profiles';
 import { setOpenRouterModelOverride } from './runner/llm-client';
+import { evaluateMainGridCompleteness } from './runner/sim-grid-gate';
 import {
   bootstrapLlmProviders,
   setOpenRouterProviderPin,
@@ -493,6 +494,26 @@ async function main(): Promise<void> {
     );
   }
   console.log(`\nCorpus written to: ${corpusDir}`);
+
+  // Main-grid completeness gate [WI-2461 review round 2]: any skipped round in
+  // the requested main grid fails the run — ordinary, --check-baseline, and
+  // --update-baseline alike (update must never seed from partial results, and
+  // a partial corpus must never gate). Placed AFTER the metrics/corpus
+  // diagnostics so the operator still sees what DID complete. The
+  // reproduce-over-credit re-test below has its own fail-closed handling.
+  const gridGate = evaluateMainGridCompleteness({
+    attemptedRounds: grid.length,
+    completedRounds: metrics.totalRounds,
+    mode: args.updateBaseline
+      ? 'update-baseline'
+      : args.checkBaseline
+        ? 'check-baseline'
+        : 'run',
+  });
+  if (!gridGate.ok) {
+    console.error(gridGate.message);
+    process.exit(1);
+  }
 
   // --update-baseline: persist this run's metrics as the committed baseline,
   // stamping the resolved judge slug + the provenance marker.
