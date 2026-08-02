@@ -696,6 +696,33 @@ describe('useSpeechRecognition', () => {
       expect(revoked.result.current.transcript).toBe('');
     });
 
+    it("a non-owner stopListening never stops the owner's native capture", async () => {
+      mockLoadSpeechModule.mockResolvedValue(nativeModule());
+      const owner = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      const nonOwner = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      await flushEffects();
+
+      await act(async () => {
+        await owner.result.current.startListening();
+      });
+      await act(async () => {
+        await nonOwner.result.current.stopListening();
+      });
+
+      expect(mockStop).not.toHaveBeenCalled();
+      // The non-owner settles to idle (it is owed no final result).
+      expect(nonOwner.result.current.status).toBe('idle');
+
+      await act(async () => {
+        await owner.result.current.stopListening();
+      });
+      expect(mockStop).toHaveBeenCalledTimes(1);
+    });
+
     it('a foreign error does not reach a non-owner', async () => {
       mockLoadSpeechModule.mockResolvedValue(nativeModule());
       const other = renderHook(() =>

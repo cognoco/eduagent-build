@@ -78,6 +78,10 @@ export function DraftedNoteReview({
             void (async () => {
               try {
                 await onSave(trimmedContent);
+              } catch {
+                // The caller owns user-facing error copy (as with the
+                // pre-existing fire-and-forget call); the draft is kept so
+                // the learner can retry.
               } finally {
                 setSaving(false);
               }

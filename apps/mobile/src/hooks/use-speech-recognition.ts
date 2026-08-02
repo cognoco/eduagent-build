@@ -271,7 +271,12 @@ export function useSpeechRecognition(
     try {
       const speechModule = await loadModule();
 
-      if (speechModule) {
+      // Only the capture owner may stop the native engine — a non-owner
+      // calling stop (e.g. a control unmounting after its capture was
+      // superseded) must not cut off the current owner's live capture. The
+      // non-owner still settles its own local status below.
+      const ownsCapture = activeCaptureOwner === instanceTokenRef.current;
+      if (speechModule && ownsCapture) {
         speechModule.stop();
       }
 
@@ -281,9 +286,11 @@ export function useSpeechRecognition(
         // the result or end event lands is what keeps a consumer from
         // committing the last interim guess. (Any state but error, which is
         // terminal and must not be masked.) With no module there is no engine
-        // to owe us anything and no end event will ever arrive, so waiting
-        // would strand the caller in processing forever — settle immediately.
-        const settled = speechModule ? 'processing' : 'idle';
+        // to owe us anything, and a NON-OWNER is owed nothing either (its
+        // capture was superseded and its events are dropped) — in both cases
+        // waiting would strand the caller in processing forever, so settle
+        // to idle immediately.
+        const settled = speechModule && ownsCapture ? 'processing' : 'idle';
         setStatus((current) => (current === 'error' ? current : settled));
       }
     } catch (err) {

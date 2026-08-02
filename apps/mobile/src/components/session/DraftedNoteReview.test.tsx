@@ -85,4 +85,34 @@ describe('DraftedNoteReview', () => {
     fireEvent.press(screen.getByTestId('drafted-note-skip'));
     expect(defaultProps.onSkip).toHaveBeenCalledTimes(1);
   });
+
+  it('a rejected save resets saving so the learner can retry (no unhandled rejection)', async () => {
+    const onSave = jest.fn().mockRejectedValue(new Error('network down'));
+    render(
+      <DraftedNoteReview
+        initialContent={null}
+        fallbackPrompt="Write it"
+        onSave={onSave}
+        onSkip={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('drafted-note-input'),
+      'my drafted note',
+    );
+    fireEvent.press(screen.getByTestId('drafted-note-save'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledWith('my drafted note');
+    // Draft retained and controls live again for retry.
+    screen.getByDisplayValue('my drafted note');
+    fireEvent.press(screen.getByTestId('drafted-note-save'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledTimes(2);
+  });
 });
