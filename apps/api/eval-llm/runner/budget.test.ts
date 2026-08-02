@@ -42,7 +42,9 @@ describe('deriveEnvelopeProviderDemandFromMatrix', () => {
           },
         ],
         providerCallCount: (input) =>
-          input.category === 'legitimate_sensitive' ? 2 : 1,
+          (input as { category?: string }).category === 'legitimate_sensitive'
+            ? 2
+            : 1,
       },
     ];
 
