@@ -34,6 +34,11 @@ describe('exact self-scoped Now request predicate', () => {
         request('GET', 'https://api-stg.mentomate.com/v1/now?scope=person'),
       ),
     ).toBe(false);
+    expect(
+      isExactSelfNowRequest(
+        request('GET', 'https://api-stg.mentomate.com/v1/other?scope=self'),
+      ),
+    ).toBe(false);
   });
 
   it('keeps all post-Back observers wired to the shared predicate', () => {
