@@ -322,6 +322,69 @@ describe('VoiceInputControl', () => {
     expect(mockSpeech.stopListening).toHaveBeenCalled();
   });
 
+  it('a scope change revokes the in-flight capture (late final cannot cross scopes)', async () => {
+    const screen = renderControl({ scopeKey: 'child-001' });
+    fireEvent.press(screen.getByTestId('probe-mic'));
+    await flushEffects();
+    speechListening();
+    screen.rerender(
+      <VoiceInputControl
+        value=""
+        onTranscript={onTranscript}
+        testID="probe-mic"
+        scopeKey="child-001"
+      />,
+    );
+    // The route's child parameter changes while the engine still owes a final.
+    screen.rerender(
+      <VoiceInputControl
+        value=""
+        onTranscript={onTranscript}
+        testID="probe-mic"
+        scopeKey="child-002"
+      />,
+    );
+    await flushEffects();
+    expect(mockSpeech.stopListening).toHaveBeenCalled();
+    speechFinal('meant for the previous child');
+    screen.rerender(
+      <VoiceInputControl
+        value=""
+        onTranscript={onTranscript}
+        testID="probe-mic"
+        scopeKey="child-002"
+      />,
+    );
+    await flushEffects();
+    expect(onTranscript).not.toHaveBeenCalled();
+  });
+
+  it('a terminal engine error revokes acceptance (spurious late final cannot commit)', async () => {
+    const screen = renderControl();
+    fireEvent.press(screen.getByTestId('probe-mic'));
+    await flushEffects();
+    speechError('start failed');
+    screen.rerender(
+      <VoiceInputControl
+        value=""
+        onTranscript={onTranscript}
+        testID="probe-mic"
+      />,
+    );
+    await flushEffects();
+    // A stray final result delivered after the error must be rejected.
+    speechFinal('spurious after error');
+    screen.rerender(
+      <VoiceInputControl
+        value=""
+        onTranscript={onTranscript}
+        testID="probe-mic"
+      />,
+    );
+    await flushEffects();
+    expect(onTranscript).not.toHaveBeenCalled();
+  });
+
   it('blocks the mic while disabled', async () => {
     const screen = renderControl({ disabled: true });
     fireEvent.press(screen.getByTestId('probe-mic'));

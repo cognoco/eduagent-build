@@ -67,6 +67,13 @@ export interface VoiceInputControlProps {
   /** BCP-47 voice locale resolved from the profile's conversation language. */
   voiceLocale?: string;
   /**
+   * Identity of the data scope this control writes into (e.g. the child
+   * profile id on a child-scoped screen). When it changes while a capture is
+   * in flight, the capture is revoked — a late final from the old scope must
+   * never append into the new scope's draft.
+   */
+  scopeKey?: string | number;
+  /**
    * Full LITERAL testID for the mic button, written out at the call site
    * (e.g. `testID="tell-mentor-mic"`) so Maestro flows referencing it stay
    * statically discoverable by the e2e-testid-integrity check — a
@@ -81,6 +88,7 @@ export function VoiceInputControl({
   onTranscript,
   disabled = false,
   voiceLocale,
+  scopeKey,
   testID = 'voice-input-mic',
 }: VoiceInputControlProps): React.ReactElement {
   const { t } = useTranslation();
@@ -151,6 +159,36 @@ export function VoiceInputControl({
     }
     void stopListening();
   }, [disabled, stopListening, clearTranscript]);
+
+  // A scope change is a revocation: the capture was spoken into the OLD
+  // scope's field, and its late final must not land in the new scope's
+  // draft. Transition-sensitive like the empty-draft discard below.
+  const prevScopeKeyRef = useRef(scopeKey);
+  useEffect(() => {
+    const prev = prevScopeKeyRef.current;
+    prevScopeKeyRef.current = scopeKey;
+    if (prev === scopeKey) return;
+    if (captureRef.current.accepting) {
+      captureRef.current.accepting = false;
+      clearTranscript();
+    }
+    if (activeCaptureOwner === ownerTokenRef.current) {
+      activeCaptureOwner = null;
+    }
+    void stopListening();
+  }, [scopeKey, clearTranscript, stopListening]);
+
+  // A terminal engine error is also a revocation: beginCapture marks the
+  // capture accepting before the start settles, so a start failure or native
+  // error would otherwise leave the capture authorized and a spurious late
+  // final could still commit.
+  useEffect(() => {
+    if (speechStatus !== 'error') return;
+    captureRef.current.accepting = false;
+    if (activeCaptureOwner === ownerTokenRef.current) {
+      activeCaptureOwner = null;
+    }
+  }, [speechStatus]);
 
   // Emptying the field is a discard: a transcript still in flight must not
   // repopulate what the learner just cleared. The test is a transition to
