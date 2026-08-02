@@ -8,21 +8,22 @@
 
 ## Rollback
 
-**Possible:** Partial and destructive. The schema can return to its pre-0167 shape only after every in-progress journey is completed, cancelled, or repaired forward. The old schema cannot represent an in-progress journey, a declined/withdrawn invite, or an `authority_invalidated` audit event. Stop family-join writes, take a database backup, and complete the preflight below before running this procedure.
+**Possible:** Partial and destructive. The schema can return to its pre-0167 shape only when `family_join_journey` contains no rows. The guard blocks on every journey row, including terminal `joined`, `declined`, and `withdrawn` rows; completing or cancelling a journey does not make rollback possible. Stop family-join writes, take a database backup, export and audit any journey history that must be retained, then remove every journey row through a separately authorized purge before running this procedure. Prefer a forward repair when that purge is not acceptable. The old schema cannot represent an in-progress journey, a declined/withdrawn invite, or an `authority_invalidated` audit event.
 
 **Data loss:**
 
+- all `family_join_journey` history removed by the required pre-rollback purge, including completed `joined`, `declined`, and `withdrawn` journeys;
 - terminal invite rows whose status is `declined` or `withdrawn`;
 - `authority_invalidated` visibility-audit rows;
 
-The procedure deliberately refuses to delete journey state or reopen a `bound` invite. Those cases require an audited forward repair; changing `bound` to `pending` could reissue a code for a partially completed consent ceremony.
+The procedure deliberately refuses to delete journey state or reopen a `bound` invite. Journey rows must already be absent, and any `bound` invite requires an audited forward repair; changing `bound` to `pending` could reissue a code for a partially completed consent ceremony.
 
 The rollback does **not** reverse already completed membership moves, consent grants or receipts, guardian attachments, or visibility-contract decisions. Those are business records produced by application transactions, not data introduced mechanically by this migration. Restore from backup or perform an audited forward repair if one of those transactions must be reversed.
 
 **Preflight:**
 
 1. Stop every writer that can create or advance a family-join journey.
-2. Confirm the first query returns zero rows. Any result requires completion, cancellation, or an audited forward repair before rollback.
+2. Confirm the first query returns zero rows. Any result blocks rollback regardless of state; export and audit the history, then perform a separately authorized purge of every row, or repair forward instead.
 3. Review the foreign-key and view dependencies returned by the next two queries. `DROP ... RESTRICT` below is the final mechanical dependency gate, but it cannot find application code or dynamically constructed SQL; search deployed consumers separately.
 
 ```sql
@@ -118,4 +119,4 @@ ORDER BY conname; -- definitions contain only the pre-0167 values
 
 **Recovery:** Deploy the pre-0167 application revision with this rollback. If the resumable journey is reintroduced later, reapply the migration and restore only reviewed records from the pre-rollback backup; do not blindly replay terminal invites or authority-invalidated events.
 
-**Recommendation:** Prefer a forward repair. Use this rollback only before live use, or after all in-flight journeys have been formally resolved and the loss of terminal invite/audit history has been explicitly accepted.
+**Recommendation:** Prefer a forward repair. Use this rollback only before live use while the journey table is empty, or after every journey row has been exported as required and an authorized purge plus the loss of journey, terminal-invite, and audit history has been explicitly accepted.
