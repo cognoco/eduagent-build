@@ -1,6 +1,6 @@
 # BID-48 session handoff
 
-Last reconciled: 2026-08-02 20:12 CEST
+Last reconciled: 2026-08-02 21:52 CEST
 
 - Batch page: `3a88bce9-1f7c-8170-a3df-d40eac8c95e0`
 - Shepherd: `shepherd:codex:integration-migration`
@@ -8,23 +8,48 @@ Last reconciled: 2026-08-02 20:12 CEST
   attachment; the operator explicitly directed one bounded read/action of handoff
   103751 on `mentomate-pgm` for WI-2939.
 - Status: `Running`.
-- Authoritative members (42): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
+- Authoritative members (43): WI-2484, WI-2636, WI-2639, WI-2640, WI-2643, WI-2644,
   WI-2649, WI-2667, WI-2755, WI-2790, WI-2791, WI-2792, WI-2794, WI-2795,
   WI-2797, WI-2798, WI-2799, WI-2800, WI-2801, WI-2802, WI-2804, WI-2805,
   WI-2809, WI-2810, WI-2811, WI-2812, WI-2813, WI-2815, WI-2818, WI-2819,
   WI-2822, WI-2826, WI-2833, WI-2921, WI-2922, WI-2923, WI-2924, WI-2925,
-  WI-2931, WI-2936, WI-2939, WI-2958.
-- Brief/relation parity: reconciled at 42. PgM's live 2026-08-01 reconciliation
+  WI-2931, WI-2936, WI-2939, WI-2958, WI-3041.
+- Brief/relation parity: reconciled at 43. PgM's live 2026-08-02 reconciliation
   formally admits WI-2958 as member 42. WI-2941 remains Backlog/Active in Nexus /
   Cosmo Lifecycle Tooling with no Sprint or Delivery Batch; WI-2946 remains
   Backlog/Active in Nexus / Clacks with no Sprint or Delivery Batch. WI-2942 remains
   Closed / Duplicate of WI-2941. WI-2926 remains Closed / Duplicate of WI-2925.
-- Live authoritative slice at checkpoint: 35 Closed, 3 Executing, and 4 Ready
-  (42 members).
+- Live authoritative slice at checkpoint: 35 Closed, 3 Executing, and 5 Ready
+  (43 members).
 
 ## Current frontier — supersedes stale per-item positions below
 
-### Latest authoritative boundary — 2026-08-02 20:12 CEST
+### Latest authoritative boundary — 2026-08-02 21:52 CEST
+
+- WI-3041 was formally admitted as member 43, triaged/refined to adversarial DoR,
+  claimed as `codex:wi3041-executor:WI-3041`, and dispatched in an isolated worktree.
+  The operator-authorized worktree exception is recorded on the item: skip
+  `env:sync`, load no database credentials, and keep implementation/tests hermetic.
+  Shared integration, staging, and production remain prohibited. The executor is
+  implementing fail-fast schema compatibility plus exact bootstrap-argument
+  forwarding without automatic mutation or any authority-model change.
+- WI-2643 PR #2880 landed normally as `e8d2d38f`. Independent review returned it to
+  Ready because the exact shared disposable integration target lacks
+  `public.pending_clerk_erasure`, so all nine focused assertions fail before the RLS
+  behavior under review. FO-2098 / `OCC-6D422E4F7F43` records the occurrence and is
+  routed to WI-3041; no review-time database mutation occurred.
+- WI-2923 created the isolated development-only Clerk application, bound the dev
+  Worker, deployed exact revision `c39f0dc7`, and passed its single authorized live
+  scenario with clean teardown. PR #2878 is in final rework at head `82688845`: one
+  valid CodeRabbit test-isolation finding requires two tests to clear inherited
+  `CLERK_AUDIENCE`; the verified test-only repair is being committed before fresh
+  exact-head CI and the sanctioned merge gate. No second live scenario is needed.
+- WI-2826 remains Executing at PR #2811 head `787e254b`, awaiting the named disposable
+  hosted target. WI-2795 remains monitoring the externally owned WI-2788 rework.
+- Direct live relation query returns 35 Closed, 3 Executing, and 5 Ready across all
+  43 authoritative members. Brief/relation parity is intact; BID-48 remains Running.
+
+### Previous authoritative boundary — 2026-08-02 20:12 CEST
 
 - PgM confirmed its GitHub identity is also PR #2880's author identity, so it cannot
   supply WI-2643's required non-author approval. The operator holds the verified

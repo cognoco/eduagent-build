@@ -56,9 +56,30 @@ Delivery Batch as `Done`.
   is a semantic collision fence for WI-2649 and must rebase/regenerate its migration
   after the guard lands; it is not a batch member.
 
-## Live reconciliation — 2026-08-02 20:12 CEST
+## Live reconciliation — 2026-08-02 21:52 CEST
 
 ### Latest authoritative boundary
+
+- WI-3041 is formally admitted as member 43, refined to DoR, actively claimed, and
+  executing hermetically. The operator-authorized one-worktree exception skips
+  `env:sync` and loads no database credentials; shared integration, staging, and
+  production access remain prohibited. The selected design preserves named operator
+  attribution and refuses stale/unmarked/incompatible remote schemas before Jest/Nx
+  rather than auto-mutating them.
+- WI-2643 landed at `e8d2d38f`, then independent review returned it to Ready because
+  the current disposable integration schema lacks `public.pending_clerk_erasure`.
+  FO-2098 / `OCC-6D422E4F7F43` is routed to WI-3041. No schema or role mutation was
+  performed by the reviewer.
+- WI-2923's isolated dev-only Clerk app, dev Worker binding/deployment, and single
+  bounded live proof are complete. PR #2878 head `82688845` has one valid final
+  test-isolation repair in progress before fresh exact-head CI and sanctioned merge;
+  no second live scenario is required.
+- WI-2826 remains held for an operator-named disposable hosted target at `787e254b`;
+  WI-2795 remains monitoring external WI-2788's next completion/review event.
+- Live slice is 35 Closed, 3 Executing, and 5 Ready across 43 authoritative members.
+  Brief/relation parity is intact and the batch remains Running.
+
+### Previous authoritative boundary — 2026-08-02 20:12 CEST
 
 - WI-2643 PR #2880 is clean and fully green at exact head `861bc62d`. PgM cannot
   provide the required non-author approval because its GitHub identity resolves to
