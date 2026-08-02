@@ -77,6 +77,7 @@ import {
   getChildrenGdprConsentStatusesV2,
 } from './family-v2';
 import { inngest } from '../../inngest/client';
+import { registerEmailTransportForTesting } from '../notifications/email';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -1446,6 +1447,81 @@ const COPPA = 'coppa_parental_consent';
     // sendEmail degrades to {sent:false, reason:'no_api_key'} and the request
     // row persists — the cap logic is driven purely by DB state.
     // -------------------------------------------------------------------------
+    describe('[WI-2788] consent request persistence across terminal email failures', () => {
+      it('preserves a new request set when Resend permanently rejects the email', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        const restoreTransport = registerEmailTransportForTesting(async () => ({
+          sent: false,
+          retryability: 'permanent',
+          reason: 'resend_api_error',
+          statusCode: 422,
+          providerCode: 'validation_error',
+        }));
+
+        try {
+          await expect(
+            requestConsentV2(db, {
+              chargePersonId: childId,
+              organizationId: orgId,
+              consentType: 'GDPR',
+              guardianEmail: 'real-parent@example.com',
+              childName: 'Kid',
+              appUrl: 'https://api.test',
+            }),
+          ).resolves.toEqual({ emailDelivered: false });
+        } finally {
+          restoreTransport();
+        }
+
+        const rows = await db.query.consentRequest.findMany({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(rows).toHaveLength(CONSENT_PURPOSES.length);
+        expect(rows.every((row) => row.status === 'requested')).toBe(true);
+      });
+
+      it('preserves the resend count when Resend permanently rejects the attempt', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'real-parent@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+        const restoreTransport = registerEmailTransportForTesting(async () => ({
+          sent: false,
+          retryability: 'permanent',
+          reason: 'resend_api_error',
+          statusCode: 422,
+          providerCode: 'validation_error',
+        }));
+
+        try {
+          await expect(
+            resendConsentV2(db, {
+              chargePersonId: childId,
+              organizationId: orgId,
+              consentType: 'GDPR',
+              childName: 'Kid',
+              appUrl: 'https://api.test',
+            }),
+          ).resolves.toEqual({ emailDelivered: false });
+        } finally {
+          restoreTransport();
+        }
+
+        const rows = await db.query.consentRequest.findMany({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(rows).toHaveLength(CONSENT_PURPOSES.length);
+        expect(rows.every((row) => row.resendCount === 1)).toBe(true);
+      });
+    });
+
     describe('[WI-374] request-keyed resend + capped recipient change (v2)', () => {
       it('resend is capped per request and reuses the stored email (never changes the recipient)', async () => {
         const orgId = await seedOrg();

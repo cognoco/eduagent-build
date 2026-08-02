@@ -32,6 +32,7 @@ import { runWithInngestRequestContext } from '../helpers';
 // cap check, notification logging) while mocking only the external Expo API.
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 const RESEND_API_URL = 'https://api.resend.com/emails';
+const TEST_RESEND_API_KEY = 'resend-test-key';
 const pushApiCalls: Array<{
   to: string;
   title: string;
@@ -52,6 +53,7 @@ let expoPushTicketId = 'ticket-integration';
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 let db: Database;
+let integrationDatabaseUrl: string;
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
@@ -456,8 +458,8 @@ async function executeGenerateHandler(parentId: string): Promise<unknown> {
   return runWithInngestRequestContext(
     {
       environment: 'production',
-      databaseUrl: process.env['DATABASE_URL'],
-      resendApiKey: process.env['RESEND_API_KEY'],
+      databaseUrl: integrationDatabaseUrl,
+      resendApiKey: TEST_RESEND_API_KEY,
       emailFrom: 'test@mentomate.test',
     },
     () =>
@@ -479,9 +481,10 @@ beforeAll(async () => {
     );
   }
 
+  integrationDatabaseUrl = databaseUrl;
   db = createDatabase(databaseUrl);
   await ensureWeeklyReportsTable();
-  process.env['RESEND_API_KEY'] = 'resend-test-key';
+  process.env['RESEND_API_KEY'] = TEST_RESEND_API_KEY;
 
   // Intercept external notification APIs at the fetch level.
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {

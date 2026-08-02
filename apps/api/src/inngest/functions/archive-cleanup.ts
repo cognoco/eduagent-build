@@ -78,6 +78,14 @@ export const archiveCleanup = inngest.createFunction(
         ),
     });
     if (deletionResult.status === 'admin_transfer_required') {
+      captureMessage('archive-cleanup: erasure blocked on admin transfer', {
+        level: 'error',
+        extra: {
+          surface: 'archive-cleanup.admin_transfer_required',
+          reason: 'admin_transfer_required',
+          profileId,
+        },
+      });
       return {
         status: 'reroute_required',
         reason: 'admin_transfer_required',

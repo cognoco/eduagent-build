@@ -61,16 +61,28 @@ export async function completePersonErasureExternalWork(args: {
       );
     }
 
-    await args.step.run(`${args.stepPrefix}-clerk-users`, () =>
-      Promise.all(
+    await args.step.run(`${args.stepPrefix}-clerk-users`, async () => {
+      // The reserve receipt can outlive its finite fence. Re-check for a
+      // rebound login at the destructive boundary and refresh the DB-clock
+      // deadline; 24 hours comfortably bounds the Clerk request callback.
+      const stillReserved = await ensurePendingClerkErasures(
+        getStepDatabase(),
+        args.result.clerkUserIds,
+      );
+      if (!stillReserved) {
+        throw new NonRetriableError(
+          `${args.stepPrefix}: clerk_erasure_target_rebound; reroute for operator reconciliation`,
+        );
+      }
+      return Promise.all(
         args.result.clerkUserIds.map((userId) =>
           deleteClerkUser({
             userId,
             clerkSecretKey: getStepClerkSecretKey(),
           }),
         ),
-      ),
-    );
+      );
+    });
     await args.step.run(`${args.stepPrefix}-clerk-users-release`, () =>
       markPendingClerkErasuresComplete(
         getStepDatabase(),

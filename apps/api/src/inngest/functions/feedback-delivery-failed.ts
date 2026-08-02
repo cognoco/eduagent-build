@@ -178,15 +178,27 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       );
 
       if (!result.sent) {
+        if (result.reason === 'no_api_key') {
+          logger.warn('[feedback-delivery-failed] email config unavailable', {
+            profileId,
+            reason: result.reason,
+          });
+          // A missing key is recoverable configuration drift. Throw so the
+          // function's existing retry budget executes; after exhaustion the
+          // registered inngest/function.failed fleet observer emits the
+          // sanitized terminal signal. Do not capture every attempt here.
+          throw new Error(
+            'feedback-delivery-failed retryable configuration failure: no_api_key',
+          );
+        }
         if (result.retryability !== 'transient') {
           logger.warn('[feedback-delivery-failed] email not sent', {
             profileId,
             reason: result.reason,
           });
-          // The provider rejected this payload permanently (or delivery is
-          // disabled), so the free-text row has no remaining consumer. Erase
-          // it now instead of retaining purposeless user content until the
-          // seven-day sweeper.
+          // Non-production recipient blocking is the intentional environment
+          // safety boundary. Suppression and permanent provider rejection are
+          // terminal too, so none of these outcomes has a future consumer.
           await deleteFeedbackRetry(db, profileId, retryId);
           return {
             status: 'not_sent' as const,

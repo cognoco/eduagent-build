@@ -29,6 +29,10 @@ jest.mock(
   },
 );
 
+// Internal-helper exception: this orchestration test invokes the function
+// directly, outside the Inngest HTTP boundary that installs request-scoped
+// environment bindings. Keep the real helper module and override only the
+// environment so the real sendEmail path may target the captured test address.
 jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',

@@ -84,6 +84,11 @@ jest.mock('../../services/identity-v2/consent-v2', () => {
   };
 });
 
+// Internal-service exception: this suite pins the durable Inngest step ABI and
+// external-cleanup recovery. The real erasure functions require transactional
+// graph reads and advisory locks, which this unit harness cannot provide and
+// which deletion-v2 integration tests cover. requireActual preserves every
+// untouched export; only the step effects/results are controlled here.
 jest.mock('../../services/identity-v2/deletion-v2', () => {
   const actual = jest.requireActual(
     '../../services/identity-v2/deletion-v2',
@@ -105,6 +110,8 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
   };
 });
 
+// Clerk deletion is a live external API boundary; keep the real module shape
+// while replacing only the outbound delete call.
 jest.mock('../../services/clerk-user', () => {
   const actual = jest.requireActual(
     '../../services/clerk-user',
@@ -325,6 +332,40 @@ describe('archiveCleanup', () => {
           name: 'app/billing.subscription_store_teardown_requested',
         }),
       }),
+    );
+  });
+
+  it('emits a structured operator signal when erasure requires admin transfer', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    mockAttemptArchivedPersonErasureV2.mockResolvedValue({
+      status: 'admin_transfer_required',
+      clerkUserIds: [],
+      organizationId: 'org-001',
+      organizationDeleted: false,
+      subscriptionStoreTeardownTargets: [],
+    });
+
+    await expect(executeArchiveCleanup('profile-admin')).resolves.toMatchObject(
+      {
+        result: {
+          status: 'reroute_required',
+          reason: 'admin_transfer_required',
+          profileId: 'profile-admin',
+        },
+      },
+    );
+    expect(captureSpy).toHaveBeenCalledWith(
+      'archive-cleanup: erasure blocked on admin transfer',
+      {
+        level: 'error',
+        extra: {
+          surface: 'archive-cleanup.admin_transfer_required',
+          reason: 'admin_transfer_required',
+          profileId: 'profile-admin',
+        },
+      },
     );
   });
 

@@ -204,6 +204,43 @@ describe('scheduledDeletion', () => {
     );
   });
 
+  it('[WI-2788] uses the explicit owner email consistently across a snapshot retry', async () => {
+    mockGetOrganizationErasureSnapshotV2
+      .mockResolvedValueOnce({
+        organizationExists: true,
+        organizationId: 'acc-1',
+        personIds: ['person-owner', 'person-member'],
+        clerkUserIds: ['clerk-member', 'clerk-owner'],
+        loginEmails: ['member@example.com', 'owner@example.com'],
+        subscriptionStoreTeardownTargets: [],
+      })
+      .mockResolvedValueOnce({
+        organizationExists: true,
+        organizationId: 'acc-1',
+        personIds: ['person-owner', 'person-member'],
+        clerkUserIds: ['clerk-member', 'clerk-owner'],
+        loginEmails: ['another-member@example.com', 'owner@example.com'],
+        subscriptionStoreTeardownTargets: [],
+      });
+    mockExecuteDeletionV2
+      .mockResolvedValueOnce('snapshot_changed')
+      .mockResolvedValueOnce('deleted');
+
+    const { step } = createInngestStepRunner();
+    await (scheduledDeletion as any).fn({
+      event: { data: { accountId: 'acc-1' } },
+      step,
+    });
+
+    expect(mockExecuteDeletionV2).toHaveBeenCalledTimes(2);
+    expect(mockExecuteDeletionV2.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ ownerEmail: 'owner@example.com' }),
+    );
+    expect(mockExecuteDeletionV2.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({ ownerEmail: 'owner@example.com' }),
+    );
+  });
+
   it('calls getStepDatabase inside each step.run closure', async () => {
     const { step } = createInngestStepRunner();
     // [WI-867] v2 mocks set in beforeEach.
@@ -215,9 +252,10 @@ describe('scheduledDeletion', () => {
     });
 
     // Existing durable scalar steps remain DB-backed for rollback/resume ABI
-    // compatibility. The complete snapshot, delete, reserve, and release add
-    // four more DB steps to the five historical reads.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(9);
+    // compatibility. The complete snapshot, reserve, destructive-boundary
+    // revalidation, and release add four more DB reads to the six historical
+    // reads. Clerk deletion also uses the secret binding.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(10);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
@@ -521,15 +559,23 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
     expect(mockMarkPendingClerkErasuresComplete).not.toHaveBeenCalled();
   });
 
-  it('[WI-2788] fails closed when a captured Clerk identity has rebound', async () => {
+  it('[WI-2788] revalidates a memoized reservation before deleting a rebound Clerk identity', async () => {
     mockEnsurePendingClerkErasures.mockResolvedValueOnce(false);
 
-    const { step } = createInngestStepRunner();
+    const { step } = createInngestStepRunner({
+      // Models a sleeping run whose original reservation step completed before
+      // its finite fence expired and the Clerk identity rebound.
+      runResults: { 'reserve-clerk-users': true },
+    });
     const handler = (scheduledDeletion as any).fn;
 
     await expect(
       handler({ event: { data: { accountId: 'acc-1' } }, step }),
     ).rejects.toBeInstanceOf(NonRetriableError);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledTimes(1);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledWith(mockDb, [
+      'clerk_user_abc',
+    ]);
     expect(mockDeleteClerkUser).not.toHaveBeenCalled();
     expect(mockMarkPendingClerkErasuresComplete).not.toHaveBeenCalled();
   });
@@ -1132,12 +1178,12 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     });
   });
 
-  it('calls getStepDatabase once per v2 DB step (6 total)', async () => {
+  it('calls getStepDatabase once per v2 DB access (10 total)', async () => {
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
     await handler({ event: { data: { accountId: 'org-1' } }, step });
 
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(9);
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(10);
   });
 
   it('[BREAK CODEX-P1] pinned v2 survives a mid-grace-period flip to legacy — erases via executeDeletionV2', async () => {

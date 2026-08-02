@@ -217,20 +217,38 @@ beforeEach(async () => {
 
 afterEach(async () => {
   const db = createIntegrationDb();
-  const identities = ownedDestructiveIdentities.splice(0);
+  const identities = [...ownedDestructiveIdentities];
+  const failures: unknown[] = [];
   for (const identity of identities) {
-    await cleanupAccounts({
-      emails: [identity.email],
-      clerkUserIds: [identity.clerkUserId],
-    });
-    await db
-      .delete(pendingClerkErasure)
-      .where(
-        eq(
-          pendingClerkErasure.clerkUserIdDigest,
-          clerkErasureDigest(identity.clerkUserId),
+    const results = await Promise.allSettled([
+      cleanupAccounts({
+        emails: [identity.email],
+        clerkUserIds: [identity.clerkUserId],
+      }),
+      db
+        .delete(pendingClerkErasure)
+        .where(
+          eq(
+            pendingClerkErasure.clerkUserIdDigest,
+            clerkErasureDigest(identity.clerkUserId),
+          ),
         ),
-      );
+    ]);
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    if (rejected.length === 0) {
+      const index = ownedDestructiveIdentities.indexOf(identity);
+      if (index >= 0) ownedDestructiveIdentities.splice(index, 1);
+    } else {
+      failures.push(...rejected.map((result) => result.reason));
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      'Failed to clean one or more destructive account-deletion fixtures',
+    );
   }
 });
 

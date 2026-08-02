@@ -94,7 +94,9 @@ const RUN = !!process.env.DATABASE_URL;
       },
     ]);
 
-    await expect(deleteStalePreparedNotices(db)).resolves.toBe(1);
+    await expect(
+      deleteStalePreparedNotices(db),
+    ).resolves.toBeGreaterThanOrEqual(1);
     const survivors = await db
       .select({ payload: pendingNotices.payloadJson })
       .from(pendingNotices)

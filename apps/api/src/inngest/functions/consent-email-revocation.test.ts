@@ -58,11 +58,12 @@ jest.mock(
   },
 );
 
-// [GC6] deletePersonIfConsentWithdrawnV2 requires a real DB with transaction
-// support (advisory lock + multi-step ORM operations). The createMockDb() proxy
-// cannot provide the necessary transaction / query behavior without a full DB
-// fixture. This gc1-allow mock follows the same pattern as the other DB-backed
-// identity-v2 function mocks above.
+// [GC6] Internal-service exception: the real snapshot/atomic-erasure path
+// requires a transaction, advisory lock, and graph queries that createMockDb()
+// cannot provide. This suite pins the durable Inngest step ABI, so its adapters
+// deliberately return persisted step-result shapes; deletion-v2 integration
+// tests own the real result semantics. requireActual preserves untouched
+// exports and limits the exception to these DB-backed effects.
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn().mockResolvedValue(true);
 const mockGetPersonClerkUserIdsV2 = jest.fn().mockResolvedValue([]);
 const mockDeleteClerkUser = jest.fn().mockResolvedValue({ deleted: true });
@@ -117,6 +118,8 @@ jest.mock('../../services/identity-v2/deletion-v2', () => {
   };
 });
 
+// Clerk deletion is a live external API boundary; only that outbound call is
+// replaced in this workflow test.
 jest.mock('../../services/clerk-user', () => {
   const actual = jest.requireActual(
     '../../services/clerk-user',

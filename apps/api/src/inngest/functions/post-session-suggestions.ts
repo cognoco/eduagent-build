@@ -21,13 +21,37 @@ import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-owners
 
 const logger = createLogger();
 
-const filingCompletedDataSchema = z.object({
-  bookId: z.string(),
-  topicId: z.string(),
+const filingCompletedContextShape = {
   profileId: z.string(),
   sessionId: z.string().optional(),
   timestamp: z.string().optional(),
-});
+};
+
+const filingCompletedDataSchema = z
+  .union([
+    z.object({
+      ...filingCompletedContextShape,
+      bookId: z.string(),
+      topicId: z.string(),
+    }),
+    z.object({
+      ...filingCompletedContextShape,
+      bookId: z.null(),
+      topicId: z.null(),
+    }),
+    z.object({
+      ...filingCompletedContextShape,
+      // Rolling-deploy compatibility for the legacy no-topic producer:
+      // undefined fields disappeared when Inngest serialized the event.
+      bookId: z.undefined().optional(),
+      topicId: z.undefined().optional(),
+    }),
+  ])
+  .transform(({ bookId, topicId, ...context }) => ({
+    ...context,
+    bookId: bookId ?? null,
+    topicId: topicId ?? null,
+  }));
 
 const suggestionsResponseSchema = z.object({
   suggestions: z.array(z.string().min(1).max(200)).max(2),
@@ -87,6 +111,12 @@ export const postSessionSuggestions = inngest.createFunction(
       };
     }
     const { bookId, topicId, profileId } = validated.data;
+    // A filed legacy/edge-case session may have no resolved topic. The
+    // completion event is still valid because other consumers use it to
+    // settle session state, but there is nothing to generate suggestions for.
+    if (bookId === null || topicId === null) {
+      return { status: 'skipped' as const, reason: 'no_topic' as const };
+    }
 
     const result = await step.run('generate-suggestions', async () => {
       const db = getStepDatabase();

@@ -191,7 +191,7 @@ export const scheduledDeletion = inngest.createFunction(
         subscriptionStoreTeardownTargets: legacyStoreTeardownTargets,
       };
     }
-    let ownerEmail = erasureSnapshot.loginEmails[0] ?? legacyOwnerEmail;
+    const ownerEmail = legacyOwnerEmail;
     let subscriptionStoreTeardownTargets =
       erasureSnapshot.subscriptionStoreTeardownTargets;
 
@@ -224,7 +224,6 @@ export const scheduledDeletion = inngest.createFunction(
           return getOrganizationErasureSnapshotV2(db, accountId);
         },
       );
-      ownerEmail = erasureSnapshot.loginEmails[0] ?? null;
       subscriptionStoreTeardownTargets =
         erasureSnapshot.subscriptionStoreTeardownTargets;
       deletionResult = await step.run('delete-account-data-2', async () => {
@@ -291,6 +290,20 @@ export const scheduledDeletion = inngest.createFunction(
       }
 
       const clerkResults = await step.run('delete-clerk-users-v2', async () => {
+        // The earlier reserve step may be a stale memoized receipt after this
+        // run slept or retried. Re-check the live login rows immediately before
+        // the destructive boundary and refresh the database-clock fence. The
+        // 24-hour pending window is deliberately far longer than the bounded
+        // Clerk request, so bootstrap remains blocked for the whole callback.
+        const stillReserved = await ensurePendingClerkErasures(
+          getStepDatabase(),
+          erasureSnapshot.clerkUserIds,
+        );
+        if (!stillReserved) {
+          throw new NonRetriableError(
+            'scheduled-account-deletion: clerk_erasure_target_rebound; operator reconciliation required',
+          );
+        }
         const clerkSecretKey = getStepClerkSecretKey();
         const results = [];
         for (const userId of erasureSnapshot.clerkUserIds) {

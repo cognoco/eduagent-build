@@ -93,13 +93,13 @@ async function runFreeformFiling({
     // The session row already carries topicId when filedAt is set.
     // Step result is JSON-serialized by Inngest so undefined fields become
     // optional in the inferred type. We assert FilingInfo to restore the
-    // explicit structure — bookId is always present as a key (possibly
-    // undefined in value) on every code path.
+    // explicit structure — bookId is always present as a JSON-stable key,
+    // with null representing the valid no-topic case.
     type FilingInfo = {
-      bookId: string | undefined;
+      bookId: string | null;
     };
     const noFilingInfo: FilingInfo = {
-      bookId: undefined,
+      bookId: null,
     };
     const filedTopicId = sessionSnapshot.topicId;
     const existingFilingInfo: FilingInfo = filedTopicId

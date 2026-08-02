@@ -685,6 +685,11 @@ export const monthlyReportGenerate = inngest.createFunction(
             reportResult.reportMonth,
           ),
         });
+        if (!result.sent && result.retryability === 'transient') {
+          throw new Error(
+            `monthly-report-generate transient email failure: ${result.reason}`,
+          );
+        }
         if (result.sent) {
           await logNotification(
             db,

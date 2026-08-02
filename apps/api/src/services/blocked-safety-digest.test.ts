@@ -231,13 +231,11 @@ describe('[WI-1691] deliverBlockedSafetyDigestBucket', () => {
 
   it('throws without marking when email delivery fails transiently', async () => {
     const harness = makeDeliveryDb();
-    const send = jest
-      .fn()
-      .mockResolvedValue({
-        sent: false,
-        retryability: 'transient',
-        reason: 'network_error',
-      });
+    const send = jest.fn().mockResolvedValue({
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    });
 
     await expect(
       deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
@@ -260,7 +258,30 @@ describe('[WI-1691] deliverBlockedSafetyDigestBucket', () => {
 
     await expect(
       deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
-    ).resolves.toEqual({ delivered: false, reason: 'email_not_sent' });
+    ).resolves.toEqual({
+      delivered: false,
+      reason: 'resend_api_error',
+      retryability: 'permanent',
+    });
+
+    expect(harness.update).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a recoverable email configuration failure without marking delivered', async () => {
+    const harness = makeDeliveryDb();
+    const send = jest.fn().mockResolvedValue({
+      sent: false,
+      retryability: 'none',
+      reason: 'no_api_key',
+    });
+
+    await expect(
+      deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
+    ).resolves.toEqual({
+      delivered: false,
+      reason: 'no_api_key',
+      retryability: 'none',
+    });
 
     expect(harness.update).not.toHaveBeenCalled();
   });

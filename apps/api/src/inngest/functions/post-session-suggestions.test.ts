@@ -162,6 +162,51 @@ describe('post-session-suggestions [BUG-157] function-level guards', () => {
 });
 
 describe('post-session-suggestions [BUG-639 / J-3]', () => {
+  it('[WI-2788] accepts and skips an explicit no-topic completion without DB or LLM work', async () => {
+    const result = await runHandler({
+      ...validEventData,
+      bookId: null,
+      topicId: null,
+    });
+
+    expect(result).toEqual({ status: 'skipped', reason: 'no_topic' });
+    expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+    expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it('[WI-2788] normalizes the legacy no-topic completion with both IDs omitted', async () => {
+    const result = await runHandler({
+      profileId: validEventData.profileId,
+      sessionId: validEventData.sessionId,
+    });
+
+    expect(result).toEqual({ status: 'skipped', reason: 'no_topic' });
+    expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+    expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ bookId: 'book-1', topicId: null }],
+    [{ bookId: null, topicId: 'topic-1' }],
+    [{ bookId: 'book-1' }],
+    [{ topicId: 'topic-1' }],
+  ])('[WI-2788] rejects a mixed filing target: %o', async (target) => {
+    const result = await runHandler({
+      profileId: validEventData.profileId,
+      sessionId: validEventData.sessionId,
+      ...target,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: 'skipped', reason: 'invalid_payload' }),
+    );
+    expect(mockDb.query.curriculumBooks.findFirst).not.toHaveBeenCalled();
+    expect(mockFindOwnedCurriculumTopic).not.toHaveBeenCalled();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
   it('returns skipped:invalid_json when LLM emits malformed JSON (no throw, no retry)', async () => {
     mockRouteAndCall.mockResolvedValue({
       response: 'this is not JSON at all {oops',

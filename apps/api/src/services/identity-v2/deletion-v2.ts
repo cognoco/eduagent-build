@@ -107,6 +107,11 @@ import { captureException } from '../sentry';
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 const CLERK_ERASURE_RELEASE_GRACE_MS = 15 * 60 * 1000;
+// Bounds recovery when a run dies between reserving a fence and marking the
+// external Clerk erasure complete. Successful runs replace this with the
+// shorter JWT-grace deadline below.
+const CLERK_ERASURE_PENDING_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+export const CLERK_ERASURE_FENCE_CLEANUP_BATCH_SIZE = 500;
 
 /**
  * Per-person serializing advisory-lock key (WI-583 pattern). A restore
@@ -593,24 +598,8 @@ export async function executeDeletionV2(
       .from(subscription)
       .where(eq(subscription.organizationId, organizationId))
       .for('update');
-    const currentStoreTargets = lockedSubscriptions
-      .map((row) => ({
-        subscriptionId: row.id,
-        planTier: row.planTier,
-        status: row.status,
-        stripe: {
-          customerId: row.stripeCustomerId,
-          subscriptionId: row.stripeSubscriptionId,
-        },
-        revenueCat: {
-          originalAppUserId: row.revenuecatOriginalAppUserId,
-          storeProductId: row.storeProductId,
-          storePlatform: row.storePlatform,
-        },
-      }))
-      .sort((left, right) =>
-        left.subscriptionId.localeCompare(right.subscriptionId),
-      );
+    const currentStoreTargets =
+      toSubscriptionStoreTeardownTargets(lockedSubscriptions);
 
     if (
       expectedSnapshot &&
@@ -1193,7 +1182,6 @@ async function reservePendingClerkErasuresTx(
   if (canonicalIds.length === 0) return;
 
   await acquireClerkErasureLocksTx(tx as unknown as Database, canonicalIds);
-  const now = new Date();
   const erasureSetDigest = clerkErasureSetDigest(canonicalIds);
   await tx
     .insert(pendingClerkErasure)
@@ -1201,13 +1189,17 @@ async function reservePendingClerkErasuresTx(
       canonicalIds.map((clerkUserId) => ({
         clerkUserIdDigest: clerkErasureDigest(clerkUserId),
         erasureSetDigest,
-        releaseAfter: null,
-        updatedAt: now,
+        releaseAfter: sql`clock_timestamp() + ${CLERK_ERASURE_PENDING_TIMEOUT_MS} * interval '1 millisecond'`,
+        updatedAt: sql`clock_timestamp()`,
       })),
     )
     .onConflictDoUpdate({
       target: pendingClerkErasure.clerkUserIdDigest,
-      set: { erasureSetDigest, releaseAfter: null, updatedAt: now },
+      set: {
+        erasureSetDigest,
+        releaseAfter: sql`clock_timestamp() + ${CLERK_ERASURE_PENDING_TIMEOUT_MS} * interval '1 millisecond'`,
+        updatedAt: sql`clock_timestamp()`,
+      },
     });
 }
 
@@ -1217,13 +1209,15 @@ export async function assertClerkIdentityBootstrapAllowedTx(
 ): Promise<void> {
   await acquireClerkErasureLocksTx(tx, [clerkUserId]);
   const digest = clerkErasureDigest(clerkUserId);
-  const fence = await tx.query.pendingClerkErasure.findFirst({
-    where: eq(pendingClerkErasure.clerkUserIdDigest, digest),
-  });
+  const [fence] = await tx
+    .select({
+      released: sql<boolean>`${pendingClerkErasure.releaseAfter} is not null and ${pendingClerkErasure.releaseAfter} <= clock_timestamp()`,
+    })
+    .from(pendingClerkErasure)
+    .where(eq(pendingClerkErasure.clerkUserIdDigest, digest));
   if (!fence) return;
 
-  const now = new Date();
-  if (!fence.releaseAfter || fence.releaseAfter > now) {
+  if (!fence.released) {
     throw new ConflictError('Identity deletion is still in progress.');
   }
 
@@ -1248,7 +1242,6 @@ export async function ensurePendingClerkErasures(
       .for('update');
     if (rebound.length > 0) return false;
 
-    const now = new Date();
     const erasureSetDigest = clerkErasureSetDigest(canonicalIds);
     await tx
       .insert(pendingClerkErasure)
@@ -1256,13 +1249,17 @@ export async function ensurePendingClerkErasures(
         canonicalIds.map((clerkUserId) => ({
           clerkUserIdDigest: clerkErasureDigest(clerkUserId),
           erasureSetDigest,
-          releaseAfter: null,
-          updatedAt: now,
+          releaseAfter: sql`clock_timestamp() + ${CLERK_ERASURE_PENDING_TIMEOUT_MS} * interval '1 millisecond'`,
+          updatedAt: sql`clock_timestamp()`,
         })),
       )
       .onConflictDoUpdate({
         target: pendingClerkErasure.clerkUserIdDigest,
-        set: { erasureSetDigest, releaseAfter: null, updatedAt: now },
+        set: {
+          erasureSetDigest,
+          releaseAfter: sql`clock_timestamp() + ${CLERK_ERASURE_PENDING_TIMEOUT_MS} * interval '1 millisecond'`,
+          updatedAt: sql`clock_timestamp()`,
+        },
       });
     return true;
   });
@@ -1277,12 +1274,11 @@ export async function markPendingClerkErasuresComplete(
 
   await db.transaction(async (tx) => {
     await acquireClerkErasureLocksTx(tx as unknown as Database, canonicalIds);
-    const now = new Date();
     await tx
       .update(pendingClerkErasure)
       .set({
-        releaseAfter: new Date(now.getTime() + CLERK_ERASURE_RELEASE_GRACE_MS),
-        updatedAt: now,
+        releaseAfter: sql`clock_timestamp() + ${CLERK_ERASURE_RELEASE_GRACE_MS} * interval '1 millisecond'`,
+        updatedAt: sql`clock_timestamp()`,
       })
       .where(
         inArray(
@@ -1294,23 +1290,50 @@ export async function markPendingClerkErasuresComplete(
 }
 
 /**
- * Remove only fences whose post-deletion JWT grace period has elapsed. The
- * database clock is authoritative so worker clock skew cannot release a fence
- * early. Pending (`release_after IS NULL`) and active-grace rows survive.
+ * Remove fences whose database-authored deadline has elapsed: either the
+ * post-deletion JWT grace period or the abandoned-pending recovery timeout.
+ * The database clock is authoritative so worker clock skew cannot release a
+ * fence early. Each transaction removes at most one bounded batch; the durable
+ * cron repeats batches until fewer than the batch size remain.
  */
 export async function deleteExpiredClerkErasureFences(
   db: Database,
+  batchSize = CLERK_ERASURE_FENCE_CLEANUP_BATCH_SIZE,
 ): Promise<number> {
-  const rows = await db
-    .delete(pendingClerkErasure)
-    .where(
-      and(
-        isNotNull(pendingClerkErasure.releaseAfter),
-        lte(pendingClerkErasure.releaseAfter, sql`now()`),
-      ),
-    )
-    .returning({ digest: pendingClerkErasure.clerkUserIdDigest });
-  return rows.length;
+  if (!Number.isSafeInteger(batchSize) || batchSize <= 0) {
+    throw new RangeError(
+      'Clerk erasure fence cleanup batch size must be positive',
+    );
+  }
+  return db.transaction(async (tx) => {
+    const expired = await tx
+      .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+      .from(pendingClerkErasure)
+      .where(
+        and(
+          isNotNull(pendingClerkErasure.releaseAfter),
+          lte(pendingClerkErasure.releaseAfter, sql`clock_timestamp()`),
+        ),
+      )
+      .orderBy(
+        pendingClerkErasure.releaseAfter,
+        pendingClerkErasure.clerkUserIdDigest,
+      )
+      .limit(batchSize)
+      .for('update', { skipLocked: true });
+    if (expired.length === 0) return 0;
+
+    const rows = await tx
+      .delete(pendingClerkErasure)
+      .where(
+        inArray(
+          pendingClerkErasure.clerkUserIdDigest,
+          expired.map((row) => row.digest),
+        ),
+      )
+      .returning({ digest: pendingClerkErasure.clerkUserIdDigest });
+    return rows.length;
+  });
 }
 
 async function currentGdprGrantSetTx(
@@ -1593,24 +1616,8 @@ async function preparePersonErasureTx(
           storePlatform: true,
         },
       });
-  const subscriptionStoreTeardownTargets = lockedSubscriptions
-    .map((row) => ({
-      subscriptionId: row.id,
-      planTier: row.planTier,
-      status: row.status,
-      stripe: {
-        customerId: row.stripeCustomerId,
-        subscriptionId: row.stripeSubscriptionId,
-      },
-      revenueCat: {
-        originalAppUserId: row.revenuecatOriginalAppUserId,
-        storeProductId: row.storeProductId,
-        storePlatform: row.storePlatform,
-      },
-    }))
-    .sort((left, right) =>
-      left.subscriptionId.localeCompare(right.subscriptionId),
-    );
+  const subscriptionStoreTeardownTargets =
+    toSubscriptionStoreTeardownTargets(lockedSubscriptions);
 
   if (
     expectedSnapshot &&
@@ -1793,6 +1800,23 @@ async function readSubscriptionStoreTeardownTargetsTx(
     },
   });
 
+  return toSubscriptionStoreTeardownTargets(rows);
+}
+
+type SubscriptionStoreTeardownSource = {
+  id: string;
+  planTier: SubscriptionStoreTeardownTarget['planTier'];
+  status: SubscriptionStoreTeardownTarget['status'];
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  revenuecatOriginalAppUserId: string | null;
+  storeProductId: string | null;
+  storePlatform: string | null;
+};
+
+export function toSubscriptionStoreTeardownTargets(
+  rows: readonly SubscriptionStoreTeardownSource[],
+): SubscriptionStoreTeardownTarget[] {
   return rows
     .map((row) => ({
       subscriptionId: row.id,

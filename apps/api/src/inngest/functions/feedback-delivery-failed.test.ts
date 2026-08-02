@@ -61,6 +61,10 @@ jest.mock('../../services/logger', () => {
   };
 });
 
+// Internal-helper exception: this workflow unit test runs without an Inngest
+// request context or Neon database. Keep all real helper exports except the
+// request-owned DB/config bindings needed to drive the retry orchestration;
+// delivery itself remains isolated at the notification boundary above.
 jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
@@ -565,6 +569,47 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       ).rejects.toThrow();
 
       expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('throws on no_api_key so the configured Inngest retries can recover after key repair', async () => {
+      const { db } = stubFeedbackDb(feedbackRow());
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'none',
+        reason: 'no_api_key',
+      });
+
+      await expect(
+        executeHandler(feedbackRetryEvent(), 'evt-config-no-api-key'),
+      ).rejects.toThrow(
+        'feedback-delivery-failed retryable configuration failure: no_api_key',
+      );
+
+      expect(db.delete).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('deletes queued feedback when non-production recipient suppression is intentional', async () => {
+      const { db } = stubFeedbackDb(feedbackRow());
+      mockSendEmail.mockResolvedValue({
+        sent: false,
+        retryability: 'none',
+        reason: 'non_production_recipient',
+      });
+
+      await expect(
+        executeHandler(
+          feedbackRetryEvent(),
+          'evt-config-non-production-recipient',
+        ),
+      ).resolves.toMatchObject({
+        result: {
+          status: 'not_sent',
+          reason: 'non_production_recipient',
+        },
+      });
+
+      expect(db.delete).toHaveBeenCalledTimes(1);
     });
 
     it('does not retry a permanent provider rejection', async () => {

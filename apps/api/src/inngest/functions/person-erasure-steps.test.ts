@@ -59,9 +59,13 @@ beforeEach(() => {
 });
 
 describe('completePersonErasureExternalWork Clerk fence', () => {
-  it('[WI-2788] refuses a legacy replay whose Clerk identity is rebound', async () => {
+  it('[WI-2788] revalidates a memoized reservation before deleting a rebound Clerk identity', async () => {
     mockEnsurePendingClerkErasures.mockResolvedValue(false);
-    const runner = createInngestStepRunner();
+    const runner = createInngestStepRunner({
+      // Models a sleeping run whose original reservation receipt is memoized
+      // after its finite fence expired and the Clerk identity rebound.
+      runResults: { 'person-erasure-clerk-users-reserve': true },
+    });
 
     await expect(
       completePersonErasureExternalWork({
@@ -70,6 +74,11 @@ describe('completePersonErasureExternalWork Clerk fence', () => {
         result: RESULT,
       }),
     ).rejects.toBeInstanceOf(NonRetriableError);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledTimes(1);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledWith(mockDb, [
+      'clerk-a',
+      'clerk-b',
+    ]);
     expect(mockDeleteClerkUser).not.toHaveBeenCalled();
   });
 
@@ -102,6 +111,7 @@ describe('completePersonErasureExternalWork Clerk fence', () => {
       'clerk-a',
       'clerk-b',
     ]);
+    expect(mockEnsurePendingClerkErasures).toHaveBeenCalledTimes(2);
     expect(mockDeleteClerkUser).toHaveBeenCalledTimes(2);
     expect(mockMarkPendingClerkErasuresComplete).toHaveBeenCalledWith(mockDb, [
       'clerk-a',

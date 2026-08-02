@@ -669,7 +669,7 @@ describe('freeformFilingRetry', () => {
       expect(payload.data).not.toHaveProperty('topicTitle');
     });
 
-    it('falls back to undefined bookId and null topicId when topicId is null [CR-FIL-CONSISTENCY-02]', async () => {
+    it('emits explicit null bookId and topicId when topicId is null [CR-FIL-CONSISTENCY-02]', async () => {
       // Session filed but topicId not yet written (edge case)
       mockDb.query.learningSessions.findFirst.mockResolvedValue({
         filedAt: new Date('2026-01-01T10:00:00Z'),
@@ -684,10 +684,11 @@ describe('freeformFilingRetry', () => {
       const payload = completedCall!.payload as {
         data: Record<string, unknown>;
       };
-      // Keys must exist even when values are undefined (structure matches success path)
+      // No-topic completion has an explicit JSON-stable shape; undefined
+      // would disappear when Inngest serializes the event.
       expect(Object.keys(payload.data)).toContain('bookId');
       expect(Object.keys(payload.data)).toContain('topicId');
-      expect(payload.data.bookId).toBeUndefined();
+      expect(payload.data.bookId).toBeNull();
       expect(payload.data.topicId).toBeNull();
       expect(payload.data).not.toHaveProperty('topicTitle');
     });

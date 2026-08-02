@@ -32,7 +32,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import {
@@ -53,6 +53,7 @@ import {
 } from '@eduagent/database';
 import {
   cancelDeletionV2,
+  assertClerkIdentityBootstrapAllowedTx,
   attemptPersonIfNoConsentErasureV2,
   clerkErasureDigest,
   deleteArchivedPersonIfStillEligibleV2,
@@ -61,8 +62,10 @@ import {
   deletePersonIfNoConsentV2,
   deletePersonV2,
   executeDeletionV2,
+  ensurePendingClerkErasures,
   getOrganizationErasureSnapshotV2,
   getPersonErasureSnapshotV2,
+  markPendingClerkErasuresComplete,
   scheduleDeletionV2,
 } from './deletion-v2';
 import * as deletionV2Module from './deletion-v2';
@@ -267,9 +270,11 @@ const RUN = !!process.env.DATABASE_URL;
       );
     });
 
-    it('[WI-2788] purges only expired Clerk fences and retains pending or active-grace fences', async () => {
+    it('[WI-2788] purges expired Clerk fences in bounded batches and retains pending or active-grace fences', async () => {
       const rawIds = [
-        `clerk-cleanup-expired-${Date.now()}`,
+        `clerk-cleanup-expired-a-${Date.now()}`,
+        `clerk-cleanup-expired-b-${Date.now()}`,
+        `clerk-cleanup-expired-c-${Date.now()}`,
         `clerk-cleanup-grace-${Date.now()}`,
         `clerk-cleanup-pending-${Date.now()}`,
       ];
@@ -280,21 +285,40 @@ const RUN = !!process.env.DATABASE_URL;
         {
           clerkUserIdDigest: clerkErasureDigest(rawIds[0]!),
           erasureSetDigest: setDigest,
-          releaseAfter: new Date(now - 60 * 60 * 1000),
+          releaseAfter: new Date(0),
         },
         {
           clerkUserIdDigest: clerkErasureDigest(rawIds[1]!),
           erasureSetDigest: setDigest,
-          releaseAfter: new Date(now + 60 * 60 * 1000),
+          releaseAfter: new Date(0),
         },
         {
           clerkUserIdDigest: clerkErasureDigest(rawIds[2]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(0),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[3]!),
+          erasureSetDigest: setDigest,
+          releaseAfter: new Date(now + 60 * 60 * 1000),
+        },
+        {
+          clerkUserIdDigest: clerkErasureDigest(rawIds[4]!),
           erasureSetDigest: setDigest,
           releaseAfter: null,
         },
       ]);
 
-      await expect(deleteExpiredClerkErasureFences(db)).resolves.toBe(1);
+      const firstBatch = await deleteExpiredClerkErasureFences(db, 2);
+      expect(firstBatch).toBeGreaterThanOrEqual(1);
+      expect(firstBatch).toBeLessThanOrEqual(2);
+      let deleted = firstBatch;
+      for (let batch = 0; batch < 20; batch += 1) {
+        const count = await deleteExpiredClerkErasureFences(db, 2);
+        deleted += count;
+        if (count < 2) break;
+      }
+      expect(deleted).toBeGreaterThanOrEqual(3);
       const survivors = await db
         .select({ digest: pendingClerkErasure.clerkUserIdDigest })
         .from(pendingClerkErasure)
@@ -305,8 +329,103 @@ const RUN = !!process.env.DATABASE_URL;
           ),
         );
       expect(survivors.map((row) => row.digest).sort()).toEqual(
-        rawIds.slice(1).map(clerkErasureDigest).sort(),
+        rawIds.slice(3).map(clerkErasureDigest).sort(),
       );
+    });
+
+    it('[WI-2788] computes completion grace from the database clock', async () => {
+      const clerkUserId = `clerk-complete-clock-${Date.now()}`;
+      clerkUserIds.push(clerkUserId);
+      const digest = clerkErasureDigest(clerkUserId);
+      await db.insert(pendingClerkErasure).values({
+        clerkUserIdDigest: digest,
+        erasureSetDigest: digest,
+        releaseAfter: null,
+      });
+
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2000-01-01T00:00:00.000Z'));
+      try {
+        await markPendingClerkErasuresComplete(db, [clerkUserId]);
+      } finally {
+        jest.useRealTimers();
+      }
+
+      const [row] = await db
+        .select({
+          releaseAfter: pendingClerkErasure.releaseAfter,
+          databaseNow: sql<Date>`clock_timestamp()`,
+        })
+        .from(pendingClerkErasure)
+        .where(eq(pendingClerkErasure.clerkUserIdDigest, digest));
+      expect(row?.releaseAfter).toBeInstanceOf(Date);
+      const databaseNow = new Date(
+        row!.databaseNow as unknown as string,
+      ).getTime();
+      expect(row!.releaseAfter!.getTime()).toBeGreaterThan(databaseNow);
+      expect(row!.releaseAfter!.getTime()).toBeLessThanOrEqual(
+        databaseNow + 16 * 60 * 1000,
+      );
+    });
+
+    it('[WI-2788] evaluates active-grace bootstrap fences against the database clock', async () => {
+      const clerkUserId = `clerk-bootstrap-clock-${Date.now()}`;
+      clerkUserIds.push(clerkUserId);
+      const digest = clerkErasureDigest(clerkUserId);
+      await db.insert(pendingClerkErasure).values({
+        clerkUserIdDigest: digest,
+        erasureSetDigest: digest,
+        releaseAfter: sql`clock_timestamp() + interval '1 hour'`,
+      });
+
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2100-01-01T00:00:00.000Z'));
+      try {
+        await expect(
+          db.transaction((tx) =>
+            assertClerkIdentityBootstrapAllowedTx(
+              tx as unknown as Database,
+              clerkUserId,
+            ),
+          ),
+        ).rejects.toBeInstanceOf(ConflictError);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('[WI-2788] rejects a stale erasure reservation after its expired identity rebinds', async () => {
+      const clerkUserId = `clerk-stale-reservation-${Date.now()}`;
+      clerkUserIds.push(clerkUserId);
+      const digest = clerkErasureDigest(clerkUserId);
+      await db.insert(pendingClerkErasure).values({
+        clerkUserIdDigest: digest,
+        erasureSetDigest: digest,
+        releaseAfter: new Date(0),
+      });
+
+      await expect(
+        deleteExpiredClerkErasureFences(db),
+      ).resolves.toBeGreaterThanOrEqual(1);
+      const rebound = await createIdentityGraph(db, {
+        clerkUserId,
+        verifiedEmail: `stale-reservation-${Date.now()}@example.com`,
+        displayName: 'Rebound Owner',
+        birthYear: 1990,
+        location: 'EU',
+      });
+      personIds.push(rebound.personId);
+      orgIds.push(rebound.organizationId);
+
+      await expect(ensurePendingClerkErasures(db, [clerkUserId])).resolves.toBe(
+        false,
+      );
+      await expect(
+        db.query.login.findFirst({
+          where: eq(login.clerkUserId, clerkUserId),
+          columns: { id: true },
+        }),
+      ).resolves.toBeDefined();
     });
 
     it('[WI-2788] aborts whole-organization deletion when the external snapshot changes', async () => {
@@ -405,7 +524,10 @@ const RUN = !!process.env.DATABASE_URL;
       ).resolves.toBe('deleted');
 
       const guards = await db
-        .select({ digest: pendingClerkErasure.clerkUserIdDigest })
+        .select({
+          digest: pendingClerkErasure.clerkUserIdDigest,
+          releaseAfter: pendingClerkErasure.releaseAfter,
+        })
         .from(pendingClerkErasure)
         .where(
           inArray(
@@ -415,6 +537,9 @@ const RUN = !!process.env.DATABASE_URL;
         );
       expect(guards.map((row) => row.digest).sort()).toEqual(
         ids.map(clerkErasureDigest).sort(),
+      );
+      expect(guards.every((row) => row.releaseAfter instanceof Date)).toBe(
+        true,
       );
     });
 

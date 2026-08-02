@@ -186,7 +186,7 @@ export const paymentFailedObserve = inngest.createFunction(
       const manageBillingUrl =
         'mentomate://billing/manage?payerPersonId=' +
         encodeURIComponent(target.payerPersonId);
-      return sendEmail(
+      const result = await sendEmail(
         formatPaymentFailedEmail(target.email, manageBillingUrl),
         {
           db,
@@ -196,6 +196,12 @@ export const paymentFailedObserve = inngest.createFunction(
           idempotencyKey: sourceEventId,
         },
       );
+      if (!result.sent && result.retryability === 'transient') {
+        throw new Error(
+          `payment-failed-observe transient email failure: ${result.reason}`,
+        );
+      }
+      return result;
     });
     const emailFailureReason = !email.sent
       ? email.reason === 'resend_api_error'

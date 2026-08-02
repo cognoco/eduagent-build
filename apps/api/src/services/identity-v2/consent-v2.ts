@@ -928,8 +928,9 @@ export async function requestConsentV2(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.retryability === 'none') {
-      // Config issue, not delivery failure — keep the request row.
+    if (emailResult.retryability !== 'transient') {
+      // Configuration and terminal provider outcomes must preserve the
+      // request set so the consent state remains auditable and resumable.
       return { emailDelivered: false };
     }
     await rollbackCounter(db, write.requestIds, write.isRecipientChange);
@@ -1027,7 +1028,7 @@ export async function resendConsentV2(
   );
 
   if (!emailResult.sent) {
-    if (emailResult.retryability === 'none') {
+    if (emailResult.retryability !== 'transient') {
       return { emailDelivered: false };
     }
     await rollbackCounter(db, write.requestIds, false);

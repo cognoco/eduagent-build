@@ -272,6 +272,23 @@ describe('paymentFailedObserve', () => {
     ]);
   });
 
+  it('throws a transient email result inside the durable send step so Inngest retries', async () => {
+    mockSendEmail.mockResolvedValue({
+      sent: false,
+      retryability: 'transient',
+      reason: 'network_error',
+    });
+
+    await expect(runHandler()).rejects.toThrow(
+      'payment-failed-observe transient email failure: network_error',
+    );
+
+    expect(mockRecordBillingAlertDeliveryOutcome).not.toHaveBeenCalledWith(
+      mockDb,
+      expect.objectContaining({ channel: 'email' }),
+    );
+  });
+
   it('does not fan out when another run already inserted the source event', async () => {
     mockRecordPaymentFailedAlert.mockResolvedValue({
       alertId: ALERT_ID,

@@ -94,7 +94,16 @@ export async function deliverBlockedSafetyDigestBucket(
   now: Date = new Date(),
 ): Promise<
   | { delivered: true }
-  | { delivered: false; reason: 'empty' | 'email_not_sent' }
+  | { delivered: false; reason: 'empty' }
+  | {
+      delivered: false;
+      reason:
+        | 'no_api_key'
+        | 'suppressed'
+        | 'non_production_recipient'
+        | 'resend_api_error';
+      retryability: 'none' | 'permanent';
+    }
 > {
   return db.transaction(async (tx) => {
     // Serialize every delivery attempt for this UTC bucket. The lock is held
@@ -146,7 +155,11 @@ export async function deliverBlockedSafetyDigestBucket(
 
     if (!result.sent) {
       if (result.retryability !== 'transient') {
-        return { delivered: false, reason: 'email_not_sent' as const };
+        return {
+          delivered: false,
+          reason: result.reason,
+          retryability: result.retryability,
+        };
       }
       throw new Error(
         `blocked-safety digest transient email failure: ${result.reason}`,

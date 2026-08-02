@@ -10,6 +10,10 @@ const mockDb = {
   },
 };
 
+// Internal-boundary exception: this workflow unit test isolates the retry
+// decision from request-scoped helpers, Neon, and notification transports.
+// The overrides below are limited to those effects; real service behavior is
+// covered by their dedicated tests.
 jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',

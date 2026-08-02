@@ -86,7 +86,7 @@ jest.mock('../../services/notifications', () => {
 });
 
 jest.mock(
-  '../../services/identity-v2/deletion-v2' /* gc1-allow: write fn — deletePersonIfNoConsentV2 performs an atomic .delete() guarded by a no-consent subquery, not exercisable on the unit Proxy mock-db; no consent-reminders integration twin exists yet — coverage gap tracked WI-905 */,
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: internal-service exception — the real snapshot/atomic-erasure path requires a transaction, advisory lock, and graph queries unavailable on the unit Proxy DB. This suite pins the durable Inngest step ABI, so adapters return persisted step-result shapes; requireActual preserves untouched exports. Real DB coverage gap remains tracked by WI-905. */,
   () => {
     const actual = jest.requireActual(
       '../../services/identity-v2/deletion-v2',
@@ -135,6 +135,8 @@ jest.mock(
   },
 );
 
+// Clerk deletion is a live external API boundary; only that outbound call is
+// replaced in this workflow test.
 jest.mock('../../services/clerk-user', () => {
   const actual = jest.requireActual(
     '../../services/clerk-user',
