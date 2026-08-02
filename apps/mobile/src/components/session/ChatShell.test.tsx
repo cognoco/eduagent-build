@@ -74,17 +74,20 @@ let mockSttState = {
   isListening: false,
 };
 
-jest.mock('../../hooks/use-speech-recognition', () => ({
-  ...jest.requireActual('../../hooks/use-speech-recognition'),
-  useSpeechRecognition: () => ({
-    ...mockSttState,
-    startListening: mockStartListening,
-    stopListening: mockStopListening,
-    clearTranscript: mockClearTranscript,
-    requestMicrophonePermission: mockRequestMicrophonePermission,
-    getMicrophonePermissionStatus: mockGetMicrophonePermissionStatus,
+jest.mock(
+  '../../hooks/use-speech-recognition' /* gc1-allow: native-boundary — wraps expo-speech-recognition, no jest-runnable implementation; requireActual keeps other exports real */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-speech-recognition'),
+    useSpeechRecognition: () => ({
+      ...mockSttState,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      clearTranscript: mockClearTranscript,
+      requestMicrophonePermission: mockRequestMicrophonePermission,
+      getMicrophonePermissionStatus: mockGetMicrophonePermissionStatus,
+    }),
   }),
-}));
+);
 
 // TTS mock
 const mockSpeak = jest.fn();
@@ -92,30 +95,36 @@ const mockStopSpeaking = jest.fn();
 const mockReplay = jest.fn();
 const mockSetRate = jest.fn();
 
-jest.mock('../../hooks/use-text-to-speech', () => ({
-  ...jest.requireActual('../../hooks/use-text-to-speech'),
-  useTextToSpeech: () => ({
-    isSpeaking: false,
-    rate: 1.0,
-    speak: mockSpeak,
-    stop: mockStopSpeaking,
-    replay: mockReplay,
-    setRate: mockSetRate,
+jest.mock(
+  '../../hooks/use-text-to-speech' /* gc1-allow: native-boundary — wraps expo-speech TTS, no jest-runnable implementation; requireActual keeps other exports real */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-text-to-speech'),
+    useTextToSpeech: () => ({
+      isSpeaking: false,
+      rate: 1.0,
+      speak: mockSpeak,
+      stop: mockStopSpeaking,
+      replay: mockReplay,
+      setRate: mockSetRate,
+    }),
   }),
-}));
+);
 
 // Stub shared components that add native renderer/timer dependencies the shell
 // suite does not exercise directly.
-jest.mock('../common', () => ({
-  ...jest.requireActual('../common'),
-  DeskLampAnimation: () => null,
-  MagicPenAnimation: () => null,
-  ThemedMarkdown: ({ children }: { children: unknown }) => {
-    const React = require('react');
-    const { Text } = require('react-native');
-    return React.createElement(Text, null, children);
-  },
-}));
+jest.mock(
+  '../common' /* gc1-allow: native-boundary — reanimated-backed animation components unavailable in Jest; requireActual keeps every other export (incl. VoiceInputControl) real */,
+  () => ({
+    ...jest.requireActual('../common'),
+    DeskLampAnimation: () => null,
+    MagicPenAnimation: () => null,
+    ThemedMarkdown: ({ children }: { children: unknown }) => {
+      const React = require('react');
+      const { Text } = require('react-native');
+      return React.createElement(Text, null, children);
+    },
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Helpers

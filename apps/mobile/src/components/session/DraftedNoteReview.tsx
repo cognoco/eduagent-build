@@ -21,9 +21,9 @@ export function DraftedNoteReview({
   const { t } = useTranslation();
   const [content, setContent] = useState(initialContent ?? '');
   const [editing, setEditing] = useState(initialContent === null);
-  // PR #2861 review: the mic (and save) must be inert during the async
-  // onSave window — dictation after Save dispatched would mutate a draft
-  // that was already submitted with the original text.
+  // The mic and save must be inert during the async onSave window — a
+  // transcript appended after Save was dispatched would mutate a draft that
+  // was already submitted with the original text.
   const [saving, setSaving] = useState(false);
   const trimmedContent = content.trim();
   const canSave = trimmedContent.length > 0 && !saving;
