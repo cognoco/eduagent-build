@@ -28,6 +28,7 @@ type ScopesRouteEnv = {
     // [WI-2881] Set server-side by accountMiddleware — required by
     // assertCanReadProfile on the self-scope handlers.
     account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 

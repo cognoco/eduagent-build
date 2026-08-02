@@ -10,15 +10,18 @@ import { readSupporteeStructuralSubjects } from '../services/supporter-structura
 import { verifyPersonOwnershipV2 } from '../services/identity-v2/ownership-v2';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
-jest.mock(
-  '../services/scope-resolution' /* gc1-allow: route unit test - service has direct unit coverage */,
-  () => ({ resolveScopesForPerson: jest.fn() }),
-);
+// Route unit tests configure these per-case; the real resolvers run raw db
+// queries the stub `db` in this file cannot satisfy — each service has direct
+// unit coverage. requireActual + targeted override (GC1 Pattern A).
+jest.mock('../services/scope-resolution', () => ({
+  ...jest.requireActual('../services/scope-resolution'),
+  resolveScopesForPerson: jest.fn(),
+}));
 
-jest.mock(
-  '../services/supporter-structural-mask' /* gc1-allow: route unit test - service has direct unit coverage */,
-  () => ({ readSupporteeStructuralSubjects: jest.fn() }),
-);
+jest.mock('../services/supporter-structural-mask', () => ({
+  ...jest.requireActual('../services/supporter-structural-mask'),
+  readSupporteeStructuralSubjects: jest.fn(),
+}));
 
 // [WI-2881] The coldstart resolver runs real db queries the stub `db` in this
 // file cannot satisfy; the denial test below asserts the read never runs on a
