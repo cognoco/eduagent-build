@@ -368,6 +368,47 @@ describe('payload validation', () => {
     expect(res.status).toBe(400);
   });
 
+  // [WI-3055] BREAK TEST: RevenueCat sends explicit `null` for fields that do
+  // not apply to a consumable top-up. Zod's `.optional()` rejects `null`, so
+  // this exact payload returned 400 in production and the purchased credits
+  // were never granted while the store had already charged the customer.
+  // Reproduced from the real delivery FA8ACBEC-… (2026-08-02); the Clerk
+  // app_user_id is replaced with a placeholder (SEC-11 data minimisation).
+  it('[WI-3055] accepts a NON_RENEWING_PURCHASE carrying explicit nulls and reaches its handler', async () => {
+    const res = await makeRequest({
+      api_version: '1.0',
+      event: {
+        id: 'FA8ACBEC-0CF2-4391-AA90-29EA798787D4',
+        type: 'NON_RENEWING_PURCHASE',
+        app_user_id: 'user_placeholderClerkUserId000',
+        product_id: 'com.eduagent.topup.500.android',
+        entitlement_id: null,
+        entitlement_ids: null,
+        expiration_at_ms: null,
+        renewal_number: null,
+        metadata: null,
+        period_type: 'NORMAL',
+        purchased_at_ms: 1_754_164_982_000,
+        environment: 'SANDBOX',
+        store: 'PLAY_STORE',
+        presented_offering_id: 'top_up',
+        event_timestamp_ms: 1_754_164_983_000,
+      },
+    });
+
+    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
+    expect(mockRevenuecatHandlers.handleNonRenewingPurchase).toHaveBeenCalled();
+
+    // The nulls must arrive at the handler as `undefined`, not `null` — the
+    // handler passes these straight into `T | undefined` parameters.
+    const [, , handledEvent] =
+      mockRevenuecatHandlers.handleNonRenewingPurchase.mock.calls[0];
+    expect(handledEvent.entitlement_ids).toBeUndefined();
+    expect(handledEvent.expiration_at_ms).toBeUndefined();
+    expect(handledEvent.product_id).toBe('com.eduagent.topup.500.android');
+  });
+
   // [BUG-835] BREAK TEST: malformed JSON body must return 400, not 500.
   it('[BUG-835] returns 400 for malformed JSON body (no retry storm)', async () => {
     const res = await app.request(

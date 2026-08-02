@@ -1,0 +1,18 @@
+{
+  "pageId": "3b08bce9-1f7c-81e0-9734-f7630c9c62e0",
+  "id": "WI-3055",
+  "name": "RevenueCat webhook schema rejects explicit nulls — every top-up purchase 400s and credits are never granted",
+  "description": "revenuecatWebhookEventSchema declares optional fields with Zod .optional(), which accepts undefined but rejects explicit null. RevenueCat sends explicit null for fields that do not apply to an event, so every NON_RENEWING_PURCHASE (consumable top-up) fails validation and the route returns 400 before any processing. The user is charged by Google Play and never receives the credits.",
+  "acceptanceCriteria": "1. A verbatim production NON_RENEWING_PURCHASE payload (entitlement_ids: null, expiration_at_ms: null) parses successfully against revenuecatWebhookSchema. 2. Optional fields accept absent | null | value on the wire. 3. The parsed output type is unchanged (T | undefined) so existing consumers keep working — in particular revenuecat-webhook.ts's `event.event_timestamp_ms === undefined` check and the ~20 field reads in revenuecat-webhook-handler-v2.ts must retain their current semantics; null must never leak into consumer code. 4. Required fields (id, type, app_user_id) still reject null and absence. 5. Regression test uses the captured production payload verbatim as a fixture, red-green verified (write the test, watch it pass, revert the fix, watch it fail, restore). 6. apps/api typecheck, lint, and the billing/webhook test suites pass. 7. After deploy to prod: replay RevenueCat event FA8ACBEC-0CF2-4391-AA90-29EA798787D4 via Retry and confirm a top_up_credits row is written.",
+  "riskImpact": "Revenue-critical and silent: money is taken by the store and nothing is granted in-app. Affects 100% of consumable top-up purchases for all users on all platforms, not just the sandbox test — a NON_RENEWING_PURCHASE always carries null entitlement_ids and null expiration_at_ms. Subscription events likely escape because INITIAL_PURCHASE populates both fields, which is why this survived to production. No error surfaces to the user; the purchase sheet reports success. RevenueCat retries expire after 6 attempts, after which the delivery is lost permanently. Launch-blocking: this is the outstanding evidence for OPQ-61.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P0",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": ""
+}
