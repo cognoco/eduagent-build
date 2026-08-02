@@ -285,16 +285,13 @@ describe('runHarness --only-envelope-flows', () => {
 
 describe('runHarness envelope coverage accounting', () => {
   afterEach(async () => {
-    const dir = path.resolve(
-      __dirname,
-      '..',
-      'snapshots',
-      'test-envelope-coverage',
-    );
-    await fs.rm(dir, { recursive: true, force: true });
+    for (const id of ['test-envelope-coverage', 'test-envelope-precall-skip']) {
+      const dir = path.resolve(__dirname, '..', 'snapshots', id);
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 
-  it('records attempted, completed, and budget-skipped samples per flow', async () => {
+  it('records attempted, completed, budget-skipped, and required samples per flow', async () => {
     const flow: FlowDefinition<{ scenarioId: string }> = {
       id: 'test-envelope-coverage',
       name: 'Test Envelope Coverage',
@@ -320,6 +317,49 @@ describe('runHarness envelope coverage accounting', () => {
       attempted: 3,
       completed: 1,
       budgetSkipped: 2,
+      required: 3,
+      complete: false,
+    });
+  });
+
+  it('marks coverage incomplete when an item is dropped BEFORE the live-call attempt, even with zero budget-skips [WI-3029 S4]', async () => {
+    // buildPrompt throws for C2 — the outer catch in runHarness records it as
+    // `skipped`, but (pre-fix) never touched `coverage.attempted`, so a flow
+    // that silently lost a sample to an early crash still reported
+    // `complete: true` because attempted(2) === completed(2) with
+    // budgetSkipped === 0. required (derived independently of the crash, from
+    // the same enumerateScenarios population) must catch this: attempted(2)
+    // < required(3) keeps it incomplete.
+    const flow: FlowDefinition<{ scenarioId: string }> = {
+      id: 'test-envelope-precall-skip',
+      name: 'Test Envelope Pre-call Skip',
+      sourceFile: 'test',
+      emitsEnvelope: true,
+      buildPromptInput: () => null,
+      enumerateScenarios: () => [
+        { scenarioId: 'C1', input: { scenarioId: 'C1' } },
+        { scenarioId: 'C2', input: { scenarioId: 'C2' } },
+        { scenarioId: 'C3', input: { scenarioId: 'C3' } },
+      ],
+      buildPrompt: (input) => {
+        if (input.scenarioId === 'C2') {
+          throw new Error('simulated builder crash');
+        }
+        return { system: 'coverage' };
+      },
+      runLive: async () => '{"reply":"ok"}',
+    };
+
+    const summary = await runHarness([flow], {
+      live: true,
+      profileFilter: new Set(['12yo-dinosaurs']),
+    });
+
+    expect(summary.envelopeCoverage['test-envelope-precall-skip']).toEqual({
+      attempted: 2,
+      completed: 2,
+      budgetSkipped: 0,
+      required: 3,
       complete: false,
     });
   });

@@ -246,9 +246,14 @@ function effectiveTolerance(tolerancePp: number, n: number): number {
  * Compare the current run's flow aggregates to a baseline. Emits a drift entry
  * for every (flow, metric) pair whose absolute percentage-point delta exceeds
  * `tolerancePp` (expressed as a fraction — 0.05 = 5pp; widened for
- * small-sample flows, see `effectiveTolerance`). Flows that are in one
- * map but not the other are reported as full-magnitude shifts against zero,
- * so new/removed flows can't silently bypass the guard.
+ * small-sample flows, see `effectiveTolerance`). A flow with incomplete
+ * `coverage` (see `coverage.ts`) is EXCLUDED here regardless of baseline
+ * membership — budget starvation is a coverage-gate concern
+ * (`gates.ts`'s `evaluateGates`), not a signal collapse, and `gates.ts`
+ * reports it independently of baseline membership too (WI-3029 S3). For every
+ * fully-covered flow, one present in only one of `current` / `baseline.flows`
+ * is still reported as a full-magnitude shift against zero, so a removed (or
+ * newly added, fully-covered) flow can't silently bypass the guard.
  */
 export function compareAgainstBaseline(
   current: Record<string, FlowAggregate>,

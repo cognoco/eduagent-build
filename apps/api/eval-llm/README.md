@@ -224,6 +224,11 @@ three **baseline verbs** below (`--validate-baseline`, `--check-baseline`,
 `--update-baseline`). Output lands in `eval-llm/corpus/<timestamp>/` (gitignored)
 as one transcript JSON per round plus `metrics.json`.
 
+To run a cheaper subset, narrow with `--topics <id,id>` and/or a lower `--runs`;
+`--max-live-calls` can no longer reduce cost on its own — a value below the
+configured floor is rejected, not honoured (`--list --topics <id,id>` reports
+the resulting configured/expected-call cost before you spend anything).
+
 ### Over-credit gate + baseline (three verbs)
 
 The simulator is a **tracked gate**, not just an observation tool. The committed

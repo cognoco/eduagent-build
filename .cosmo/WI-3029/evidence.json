@@ -7,12 +7,12 @@
     },
     {
       "acRef": "AC-2",
-      "description": "Runner tests prove per-flow attempted, completed, and budget-skipped accounting.",
+      "description": "Runner tests prove per-flow attempted, completed, budget-skipped, and required-sample accounting, including a flow that reports incomplete because a pre-call skip drops attempted below required with zero budget-skips.",
       "pointer": "apps/api/eval-llm/runner/runner.test.ts"
     },
     {
       "acRef": "AC-3",
-      "description": "Gate tests prove zero/partial exhaustion fails closed while incomplete coverage is excluded from BaselineDrift.",
+      "description": "Gate tests prove zero/partial exhaustion fails closed while incomplete coverage is excluded from BaselineDrift, an incomplete flow absent from baseline.json still fails the coverage gate, and --update-baseline refuses to accept (gate) or write (index.ts seed-guard) incomplete coverage.",
       "pointer": "apps/api/eval-llm/runner/gates.test.ts"
     },
     {

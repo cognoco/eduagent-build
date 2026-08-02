@@ -8,6 +8,7 @@ import {
   type SampleMetrics,
 } from './metrics';
 import { aggregateCoverage, type FlowCoverage } from './coverage';
+import { countEnvelopeFlowSamples } from './budget';
 
 // ---------------------------------------------------------------------------
 // Runner — orchestrates the flow × profile matrix.
@@ -264,8 +265,32 @@ export async function runHarness(
   let liveCallsMade = 0;
   const coverageByFlow = new Map<
     string,
-    { attempted: number; completed: number; budgetSkipped: number }
+    {
+      attempted: number;
+      completed: number;
+      budgetSkipped: number;
+      required: number;
+    }
   >();
+  // Eagerly seed every active envelope-emitting flow's coverage entry — including
+  // one that never reaches a single live-call attempt (e.g. every item throws in
+  // buildPrompt before the attempt counter below is reached) — so `required` is
+  // always compared against a real 0, not a missing map entry the gate can't see.
+  // [WI-3029 S4]
+  if (options.live) {
+    for (const flow of activeFlows) {
+      if (flow.emitsEnvelope) {
+        coverageByFlow.set(flow.id, {
+          attempted: 0,
+          completed: 0,
+          budgetSkipped: 0,
+          required: countEnvelopeFlowSamples(flow, activeProfiles, {
+            scenarioFilter: options.scenarioFilter,
+          }),
+        });
+      }
+    }
+  }
 
   for (const flow of activeFlows) {
     summary.flowsRun++;
@@ -352,13 +377,9 @@ export async function runHarness(
 
           if (options.live && flow.runLive) {
             if (flow.emitsEnvelope) {
-              const coverage = coverageByFlow.get(flow.id) ?? {
-                attempted: 0,
-                completed: 0,
-                budgetSkipped: 0,
-              };
-              coverage.attempted++;
-              coverageByFlow.set(flow.id, coverage);
+              // Guaranteed to exist: every active emitsEnvelope flow is seeded
+              // above (before this loop) whenever options.live is true.
+              coverageByFlow.get(flow.id)!.attempted++;
             }
             if (liveCallsMade >= maxLiveCalls) {
               liveError = `live budget exceeded (${maxLiveCalls} calls); re-run with --max-live-calls to raise`;

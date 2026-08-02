@@ -84,6 +84,7 @@ import {
   resolveEnvelopeLiveCallCap,
 } from './runner/budget';
 import { evaluateGates } from './runner/gates';
+import { isCoverageIncomplete } from './runner/coverage';
 import {
   bootstrapLlmProviders,
   setOpenRouterProviderPin,
@@ -417,6 +418,36 @@ async function main(): Promise<void> {
           `  doppler run -- pnpm eval:llm -- --live ${requiredFlows
             .map((id) => `--flow ${id}`)
             .join(' ')} --max-live-calls 250 --update-baseline`,
+      );
+      process.exit(1);
+    }
+    // [WI-3029 S5] Coverage seed-guard: validateBaselineStructure above only
+    // catches an EMPTY flow (n=0, the placebo state) — it does not catch a
+    // flow with SOME samples but fewer than its required-sample demand (e.g. an
+    // operator-run `--update-baseline` reseed scoped to a subset of flows via
+    // `--flow`, under a --max-live-calls too low for that subset — see
+    // docs/pre-launch-checklist.md). Refuse to write a baseline seeded from
+    // incomplete coverage; evaluateGates below would only report this AFTER the
+    // write, which is one gate too late for a seed operation.
+    const incompleteSeedFlows = requiredFlows.filter((flowId) =>
+      isCoverageIncomplete(summary.envelopeCoverage[flowId]),
+    );
+    if (incompleteSeedFlows.length > 0) {
+      console.error(
+        `Refusing to write baseline — coverage is incomplete for flow(s) required by an envelope-emitting seed:`,
+      );
+      for (const flowId of incompleteSeedFlows) {
+        // Non-null: incompleteSeedFlows was filtered by isCoverageIncomplete,
+        // which is false (and thus excludes) for an undefined entry.
+        const c = summary.envelopeCoverage[flowId]!;
+        console.error(
+          `  [${flowId}] attempted=${c.attempted} completed=${c.completed} ` +
+            `budget-skipped=${c.budgetSkipped} required=${c.required}`,
+        );
+      }
+      console.error('');
+      console.error(
+        'Raise --max-live-calls (or drop --flow scoping) so every required sample is attempted before seeding.',
       );
       process.exit(1);
     }

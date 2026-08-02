@@ -54,7 +54,12 @@ jobs:
     # across gates. No paid
     # full-run P90 is retained yet, so 180 minutes is an explicit conservative
     # timeout with queue/latency uncertainty; reverify it from the first
-    # operator-authorized run evidence before tightening.
+    # operator-authorized run evidence before tightening. The last observed
+    # per-call estimate (pre-retune, not re-verified against this raised 643
+    # demand) was ~30-60s/call for OpenRouter queue spikes — at that rate 643
+    # calls is ~5.4-10.7h, which would exceed 180 minutes. Reverify the
+    # per-call rate alongside the timeout from the first operator-authorized
+    # run at this demand before trusting either number.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

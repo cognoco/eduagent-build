@@ -239,6 +239,7 @@ describe('compareAgainstBaseline', () => {
         attempted: 4,
         completed: 2,
         budgetSkipped: 2,
+        required: 4,
         complete: false,
       },
     };

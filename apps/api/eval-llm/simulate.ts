@@ -93,12 +93,6 @@ import {
   type SimulationBaseline,
 } from './runner/simulation-metrics';
 
-/**
- * Upper bound on LLM calls per round: learner + grader + tutor, once per
- * question. The grader is a real LLM call per turn under the grader-ON pipeline,
- * so this is 3× (not 2×) MAX_CHALLENGE_QUESTIONS — undercounting it would let
- * `maxRounds = floor(maxLiveCalls / CALLS_PER_ROUND)` silently overspend the cap.
- */
 const BASELINE_PATH = path.resolve(__dirname, 'simulation-baseline.json');
 /**
  * Soft-drift tolerance (percentage points). Deliberately wide: at the weekly
@@ -218,19 +212,21 @@ function selectScenarios(
   return CHALLENGE_SIM_SCENARIOS.filter((s) => wanted.has(s.id.toLowerCase()));
 }
 
-function printGrid(runs = 1): void {
+function printGrid(runs = 1, topics: string[] | 'all' = 'all'): void {
+  const scenarios = selectScenarios(topics);
   console.log('Challenge-Round simulated-learner scenarios:\n');
-  for (const s of CHALLENGE_SIM_SCENARIOS) {
+  for (const s of scenarios) {
     const profile = resolveScenarioProfile(s);
     console.log(
       `  ${s.id.padEnd(34)} profile=${(profile?.id ?? '??').padEnd(22)} expected=${s.expectedOutcome}`,
     );
   }
+  const scope = topics === 'all' ? '' : ' (filtered by --topics)';
   console.log(
-    `\n${CHALLENGE_SIM_SCENARIOS.length} scenarios. Use --topics <id,id|all> to select; --runs N to repeat.`,
+    `\n${scenarios.length} scenario(s)${scope}. Use --topics <id,id|all> to select; --runs N to repeat.`,
   );
   const budget = deriveMasteryBudget({
-    scenarioCount: CHALLENGE_SIM_SCENARIOS.length,
+    scenarioCount: scenarios.length,
     runs,
     questionsPerRound: MAX_CHALLENGE_QUESTIONS,
   });
@@ -333,7 +329,7 @@ async function main(): Promise<void> {
 
   // --list must work with NO bootstrap (no Doppler / provider keys needed).
   if (args.list) {
-    printGrid(args.runs);
+    printGrid(args.runs, args.topics);
     return;
   }
 
@@ -409,9 +405,10 @@ async function main(): Promise<void> {
   }
 
   // Build the grid ROUND-ROBIN (runs outer, scenarios inner): [s1..sN, s1..sN].
-  // A budget truncation then drops repeats of later runs, not whole topics, so
-  // the measured distribution stays representative across the scenario set.
-  const fullGrid = Array.from({ length: args.runs }, () => scenarios).flat();
+  // No budget truncation: an insufficient --max-live-calls fails the configured-
+  // floor preflight below instead of silently dropping repeats or topics, so the
+  // measured distribution always covers the full requested scenario set.
+  const grid = Array.from({ length: args.runs }, () => scenarios).flat();
 
   const budget = deriveMasteryBudget({
     scenarioCount: scenarios.length,
@@ -425,7 +422,6 @@ async function main(): Promise<void> {
   if (args.maxLiveCalls !== null) {
     assertSufficientMasteryBudget(budget, effectiveMaxCalls);
   }
-  const grid = fullGrid;
   console.log(
     `[budget] mastery grid: ${budget.rounds} rounds; configured=${budget.configuredUnits} ` +
       `units; expected-provider-calls=${budget.expectedProviderCalls}; cap=${effectiveMaxCalls}; no truncation`,
@@ -569,9 +565,10 @@ async function main(): Promise<void> {
     }
     if (gate.overCreditCount > 0) {
       const ids = gate.overCreditScenarioIds;
-      // Budget the re-test against the HARD --max-live-calls cap. If we cannot
-      // requalify EVERY offender REPRODUCE_N× within the remaining budget, fail
-      // CLOSED — a detected breach is never silently dropped for lack of budget.
+      // Budget the re-test against the configured --max-live-calls ceiling. If
+      // we cannot requalify EVERY offender REPRODUCE_N× within the remaining
+      // budget, fail CLOSED — a detected breach is never silently dropped for
+      // lack of budget.
       const neededRounds = ids.length * REPRODUCE_N;
       const reproduceCapacity = deriveMasteryReproduceCapacity(
         budget,

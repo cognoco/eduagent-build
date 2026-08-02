@@ -87,11 +87,28 @@ export async function evaluateGates(
   // baseline we just wrote. Quality and execution failures still fail the run
   // so an operator inspects them before committing the seed.
   if (options.updateBaseline) {
-    if (qualityFailed || executionFailed) {
+    // [WI-3029 S5] A starved seed run must never look clean: seeding from a
+    // truncated run is strictly worse than checking against one, so an
+    // incomplete envelopeCoverage flow fails this path exactly like a
+    // quality/execution failure does, even when neither of those fired.
+    const incompleteFlows = Object.entries(summary.envelopeCoverage).filter(
+      ([, coverage]) => isCoverageIncomplete(coverage),
+    );
+    if (qualityFailed || executionFailed || incompleteFlows.length > 0) {
       messages.push({
         level: 'error',
         text: 'NOTE: baseline.json WAS written (signal distributions include the failed samples). Triage the quality/live-call execution failures above before committing it.',
       });
+      for (const [flowId, coverage] of incompleteFlows) {
+        messages.push({
+          level: 'error',
+          text:
+            `Coverage gate: ${flowId} is incomplete (attempted=${coverage.attempted}, ` +
+            `completed=${coverage.completed}, budget-skipped=${coverage.budgetSkipped}, ` +
+            `required=${coverage.required}); the written baseline for this flow is truncated — ` +
+            'do not commit it as-is.',
+        });
+      }
       return { exitCode: 1, driftEvaluated: false, messages };
     }
     return { exitCode: 0, driftEvaluated: false, messages };
@@ -114,7 +131,13 @@ export async function evaluateGates(
     }
     driftEvaluated = true;
     for (const [flowId, coverage] of Object.entries(summary.envelopeCoverage)) {
-      if (baseline.flows[flowId] && isCoverageIncomplete(coverage)) {
+      // No `baseline.flows[flowId]` guard: a flow not yet seeded into the
+      // baseline (a brand-new envelope flow) is EXACTLY the case
+      // compareAgainstBaseline below excludes from drift (budget starvation
+      // isn't a signal collapse) — so the coverage gate must catch it
+      // regardless of baseline membership, or it is invisible everywhere.
+      // [WI-3029 S3]
+      if (isCoverageIncomplete(coverage)) {
         coverageIncomplete = true;
         messages.push({
           level: 'error',

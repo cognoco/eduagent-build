@@ -108,6 +108,17 @@ export const reviewContinuityOpenerFlow: FlowDefinition<ReviewContinuityOpenerIn
       'apps/api/src/services/review-continuity/opener.ts:buildReviewContinuityOpener',
     emitsEnvelope: true,
     expectedResponseSchema: llmResponseEnvelopeSchema,
+    // No providerCallCount: the judge call in evaluateQuality below only fires
+    // when getOpenRouterModelOverride() is set (i.e. the mentor is pinned via
+    // --openrouter-model — see the "mentor-not-pinned" warning branch), which
+    // providerCallCount's (input) => number signature cannot observe (the CLI
+    // option isn't threaded into the per-item input, and isn't set yet at
+    // preflight-derivation time either — see index.ts's ordering of
+    // deriveEnvelopeProviderDemandFromMatrix before setOpenRouterModelOverride).
+    // The derived provider demand therefore correctly counts 1 call/sample for
+    // the weekly gate (which never passes --openrouter-model), but UNDERCOUNTS
+    // by this flow's required-sample count (10) for an operator-run faithfulness
+    // check with the mentor pinned — budget that manually with --max-live-calls.
 
     buildPromptInput(): ReviewContinuityOpenerInput | null {
       // Not used — enumerateScenarios fans out the fixtures instead.
