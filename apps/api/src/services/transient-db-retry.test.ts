@@ -9,7 +9,12 @@ import {
 // forwarding runs and is exercised by these tests.
 jest.mock('@sentry/cloudflare', () => ({
   withScope: (fn: (scope: unknown) => void) =>
-    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+    fn({
+      setUser: jest.fn(),
+      setTag: jest.fn(),
+      setExtra: jest.fn(),
+      setLevel: jest.fn(),
+    }),
   captureException: jest.fn(),
   captureMessage: jest.fn(),
   addBreadcrumb: jest.fn(),

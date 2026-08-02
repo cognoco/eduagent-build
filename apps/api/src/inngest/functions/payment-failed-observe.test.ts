@@ -242,6 +242,36 @@ describe('paymentFailedObserve', () => {
     expect(JSON.stringify(events)).not.toContain('payer@example.test');
   });
 
+  it('normalizes Resend failures to the controlled status-bearing reason', async () => {
+    mockSendEmail.mockResolvedValue({
+      sent: false,
+      retryability: 'permanent',
+      reason: 'resend_api_error',
+      statusCode: 422,
+      providerCode: 'validation_error',
+    });
+
+    const { sendEventCalls } = await runHandler();
+
+    expect(mockRecordBillingAlertDeliveryOutcome).toHaveBeenCalledWith(mockDb, {
+      alertId: ALERT_ID,
+      channel: 'email',
+      sent: false,
+      reason: 'resend_api_error_422',
+    });
+    expect(sendEventCalls).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          name: 'app/billing.alert_delivery_failed',
+          data: expect.objectContaining({
+            channel: 'email',
+            reason: 'resend_api_error_422',
+          }),
+        }),
+      }),
+    ]);
+  });
+
   it('does not fan out when another run already inserted the source event', async () => {
     mockRecordPaymentFailedAlert.mockResolvedValue({
       alertId: ALERT_ID,

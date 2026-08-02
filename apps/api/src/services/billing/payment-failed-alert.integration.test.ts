@@ -18,6 +18,7 @@ import {
 import { buildNowFeed } from '../now-feed';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { paymentFailedObserve } from '../../inngest/functions/payment-failed-observe';
+import { runWithInngestRequestContext } from '../../inngest/helpers';
 import {
   getBillingAlertDeliveryTarget,
   recordBillingAlertDeliveryOutcome,
@@ -295,20 +296,29 @@ const PERIOD_END_AT_ISO = PERIOD_END_AT.toISOString();
     const invoke = async () => {
       const runner = createInngestStepRunner();
       const handler = (paymentFailedObserve as any).fn;
-      const result = await handler({
-        event: {
-          id: 'stripe-payment-failed:evt-handler-integration',
-          name: 'app/payment.failed',
-          data: {
-            subscriptionId,
-            stripeSubscriptionId: 'sub_handler_integration',
-            accountId: organizationId,
-            attempt: 1,
-            timestamp: '2026-07-11T13:00:00.000Z',
-          },
+      const result = await runWithInngestRequestContext(
+        {
+          environment: 'production',
+          databaseUrl: process.env['DATABASE_URL'],
+          resendApiKey: process.env['RESEND_API_KEY'],
+          emailFrom: 'test@mentomate.test',
         },
-        step: runner.step,
-      });
+        () =>
+          handler({
+            event: {
+              id: 'stripe-payment-failed:evt-handler-integration',
+              name: 'app/payment.failed',
+              data: {
+                subscriptionId,
+                stripeSubscriptionId: 'sub_handler_integration',
+                accountId: organizationId,
+                attempt: 1,
+                timestamp: '2026-07-11T13:00:00.000Z',
+              },
+            },
+            step: runner.step,
+          }),
+      );
       return result;
     };
 

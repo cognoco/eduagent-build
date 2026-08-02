@@ -302,10 +302,18 @@ async function tryScheduleDeletionV2(
   db: Database,
   organizationId: string,
 ): Promise<Date | null> {
-  const scheduledAt = new Date();
   const [updated] = await db
     .update(organization)
-    .set({ deletionScheduledAt: scheduledAt })
+    .set({
+      deletionScheduledAt: sql`CASE
+        WHEN ${organization.deletionCancelledAt} IS NULL
+          THEN clock_timestamp()
+        ELSE GREATEST(
+          clock_timestamp(),
+          ${organization.deletionCancelledAt} + interval '1 millisecond'
+        )
+      END`,
+    })
     .where(
       and(
         eq(organization.id, organizationId),
@@ -327,7 +335,12 @@ export async function cancelDeletionV2(
 ): Promise<CancelDeletionResult> {
   const rows = await db
     .update(organization)
-    .set({ deletionCancelledAt: new Date() })
+    .set({
+      deletionCancelledAt: sql`GREATEST(
+        clock_timestamp(),
+        ${organization.deletionScheduledAt} + interval '1 millisecond'
+      )`,
+    })
     .where(
       and(
         eq(organization.id, organizationId),

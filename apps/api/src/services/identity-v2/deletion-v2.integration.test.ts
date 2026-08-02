@@ -462,6 +462,53 @@ const RUN = !!process.env.DATABASE_URL;
       expect(owner).toBeDefined();
     });
 
+    it('[WI-2788] writes a cancellation stamp newer than a future-skewed schedule', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const futureSchedule = new Date(Date.now() + 60_000);
+      await db
+        .update(organization)
+        .set({ deletionScheduledAt: futureSchedule, deletionCancelledAt: null })
+        .where(eq(organization.id, orgId));
+
+      await expect(cancelDeletionV2(db, orgId)).resolves.toBe('cancelled');
+      const stamps = await db.query.organization.findFirst({
+        where: eq(organization.id, orgId),
+        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+      });
+      expect(stamps?.deletionCancelledAt?.getTime()).toBeGreaterThan(
+        futureSchedule.getTime(),
+      );
+
+      await expect(
+        executeDeletionV2(db, {
+          organizationId: orgId,
+          ownerEmail: null,
+          reason: 'user_initiated',
+          deletedBy: ownerId,
+        }),
+      ).resolves.toBe('cancelled');
+    });
+
+    it('[WI-2788] writes a reschedule stamp newer than the prior cancellation', async () => {
+      const { orgId } = await seedScheduledOrgWithOwner();
+      const futureCancellation = new Date(Date.now() + 60_000);
+      await db
+        .update(organization)
+        .set({ deletionCancelledAt: futureCancellation })
+        .where(eq(organization.id, orgId));
+
+      await expect(scheduleDeletionV2(db, orgId)).resolves.toMatchObject({
+        scheduledNow: true,
+      });
+      const stamps = await db.query.organization.findFirst({
+        where: eq(organization.id, orgId),
+        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+      });
+      expect(stamps?.deletionScheduledAt?.getTime()).toBeGreaterThan(
+        futureCancellation.getTime(),
+      );
+    });
+
     // -----------------------------------------------------------------------
     // Gap 1 — a live subscription row must not block whole-org deletion.
     // `subscription.organization_id` and `subscription.payer_person_id` are

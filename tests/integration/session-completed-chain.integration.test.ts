@@ -46,6 +46,7 @@ jest.mock('@sentry/cloudflare', () => ({
       setUser: (...args: unknown[]) => unknown;
       setTag: (...args: unknown[]) => unknown;
       setExtra: (...args: unknown[]) => unknown;
+      setLevel: (...args: unknown[]) => unknown;
       [key: string]: unknown;
     }) => void,
   ) =>
@@ -53,6 +54,7 @@ jest.mock('@sentry/cloudflare', () => ({
       setUser: jest.fn(),
       setTag: (...args: unknown[]) => mockSetTag(...args),
       setExtra: jest.fn(),
+      setLevel: jest.fn(),
     }),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: jest.fn(),

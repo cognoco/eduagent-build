@@ -75,7 +75,7 @@ describe('Integration: Consent email delivery', () => {
 
   it('returns emailStatus "sent" when RESEND_API_KEY is in env', async () => {
     const env = {
-      ...buildIntegrationEnv(),
+      ...buildIntegrationEnv({ ENVIRONMENT: 'production' }),
       RESEND_API_KEY: FAKE_RESEND_KEY,
       EMAIL_FROM: 'test@mentomate.test',
     };
@@ -133,7 +133,7 @@ describe('Integration: Consent email delivery', () => {
 
   it('returns emailStatus "failed" when RESEND_API_KEY is missing from env', async () => {
     // No RESEND_API_KEY — reproduces the stale-secret bug
-    const env = buildIntegrationEnv();
+    const env = buildIntegrationEnv({ ENVIRONMENT: 'production' });
 
     const res = await app.request(
       '/v1/consent/request',

@@ -24,6 +24,7 @@ import {
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
 } from './weekly-progress-push';
+import { runWithInngestRequestContext } from '../helpers';
 
 // ── Fetch interceptor for Expo Push API ──────────────────────────────
 // Instead of jest.mock on internal modules, intercept at the HTTP boundary.
@@ -452,10 +453,22 @@ async function executeGenerateHandler(parentId: string): Promise<unknown> {
       fn: (ctx: unknown) => Promise<unknown>;
     }
   ).fn;
-  return handler({
-    event: { name: 'app/weekly-progress-push.generate', data: { parentId } },
-    step,
-  });
+  return runWithInngestRequestContext(
+    {
+      environment: 'production',
+      databaseUrl: process.env['DATABASE_URL'],
+      resendApiKey: process.env['RESEND_API_KEY'],
+      emailFrom: 'test@mentomate.test',
+    },
+    () =>
+      handler({
+        event: {
+          name: 'app/weekly-progress-push.generate',
+          data: { parentId },
+        },
+        step,
+      }),
+  );
 }
 
 beforeAll(async () => {

@@ -181,7 +181,7 @@ export const paymentFailedObserve = inngest.createFunction(
         throw new Error('billing alert delivery target not found');
       }
       if (!target.email) {
-        return { sent: false, reason: 'no_email' };
+        return { sent: false, reason: 'no_email' as const };
       }
       const manageBillingUrl =
         'mentomate://billing/manage?payerPersonId=' +
@@ -197,6 +197,11 @@ export const paymentFailedObserve = inngest.createFunction(
         },
       );
     });
+    const emailFailureReason = !email.sent
+      ? email.reason === 'resend_api_error'
+        ? `resend_api_error_${email.statusCode}`
+        : email.reason
+      : undefined;
 
     await step.run('record-payment-failed-email-outcome', async () => {
       const db = getStepDatabase();
@@ -204,7 +209,7 @@ export const paymentFailedObserve = inngest.createFunction(
         alertId: persisted.alertId,
         channel: 'email',
         sent: email.sent,
-        ...(!email.sent ? { reason: email.reason } : {}),
+        ...(emailFailureReason ? { reason: emailFailureReason } : {}),
       });
     });
     if (!email.sent) {
@@ -212,7 +217,7 @@ export const paymentFailedObserve = inngest.createFunction(
         alertId: persisted.alertId,
         subscriptionId: data.subscriptionId,
         channel: 'email',
-        reason: email.reason ?? 'unknown',
+        reason: emailFailureReason ?? 'unknown',
         timestamp: new Date().toISOString(),
       });
       await step.sendEvent('escalate-payment-failed-email', {
