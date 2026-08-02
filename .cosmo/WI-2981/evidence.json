@@ -1,0 +1,44 @@
+{
+  "workItem": "WI-2981",
+  "name": "Preserve main CI evidence across rapid merge concurrency",
+  "files": {
+    "workflow": ".github/workflows/ci.yml",
+    "contractTest": "scripts/ci-concurrency-contract.test.ts",
+    "redGreen": ".cosmo/WI-2981/red-green.md",
+    "completionSummary": ".cosmo/WI-2981/completion-summary.md"
+  },
+  "historicalEvidence": {
+    "cancelledZeroJobRuns": ["30688886377", "30688890531", "30688912863"],
+    "rootCause": "Main pushes shared ci-refs/heads/main, allowing GitHub to replace the single pending run when a third push arrives."
+  },
+  "redGreen": {
+    "red": {
+      "command": "pnpm exec jest --config scripts/jest.config.cjs scripts/ci-concurrency-contract.test.ts --runInBand --no-coverage",
+      "result": "exit 1; 1 suite failed; 3 tests failed and 1 passed against the baseline workflow"
+    },
+    "revertRed": {
+      "result": "exit 1; exact baseline concurrency restored; 3 tests failed and 1 passed"
+    },
+    "green": {
+      "result": "exit 0; 1 suite passed; 4 tests passed"
+    },
+    "restoreGreen": {
+      "result": "exit 0; exact candidate concurrency restored; 1 suite passed; 4 tests passed"
+    }
+  },
+  "securityScope": {
+    "deploymentAuthorityChanged": false,
+    "permissionsChanged": false,
+    "triggersChanged": false,
+    "requiredChecksChanged": false,
+    "mergeGatesChanged": false
+  },
+  "validations": {
+    "focusedWorkflowAndSecurityContracts": "exit 0; 2 suites; 57 tests passed",
+    "workflowSecurityCheck": "exit 0; GitHub workflow security check passed",
+    "yamlParse": "exit 0; .github/workflows/ci.yml parsed successfully",
+    "prettierCheck": "exit 0; all evidence and changed files formatted",
+    "scriptsSuite": "exit 0; 74 passed, 1 skipped; 1239 passed, 4 skipped tests",
+    "gitDiffCheck": "exit 0; git diff --check clean"
+  }
+}
