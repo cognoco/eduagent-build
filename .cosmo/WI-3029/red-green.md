@@ -15,7 +15,7 @@ and `./sim-budget` did not exist. No provider or paid/live command was run.
 ## Green
 
 The helper suites then passed 5/5 tests. The focused runner/gate suite passed
-150 tests (9 skipped), and the workflow contract passed 12/12 tests. TypeScript
+150 tests (9 skipped), and the workflow contract passed 14/14 tests. TypeScript
 API typecheck passed with exit 0.
 
 The deterministic dry-run reported:
@@ -42,7 +42,7 @@ helpers were not exported. Green review verification then passed:
 
 ```text
 apps/api/eval-llm/runner/budget.test.ts: 5 passed
-scripts/eval-live-gate-independence.test.ts: 13 passed
+scripts/eval-live-gate-independence.test.ts: 14 passed
 ```
 
 The executable envelope flow contract derives `329` outer invocations plus

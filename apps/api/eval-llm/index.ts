@@ -9,7 +9,7 @@
 //   pnpm eval:llm -- --profile 12yo-dinosaurs   # one profile
 //   pnpm eval:llm -- --flow exchanges --scenarios core   # 3 highest-signal scenarios
 //   pnpm eval:llm -- --flow exchanges --scenarios S1,S3  # specific scenarios
-//   pnpm eval:llm -- --max-live-calls 5         # cap live LLM calls (default 20)
+//   pnpm eval:llm -- --max-live-calls 5         # optional live-call cap (default 20)
 //   doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls)
 //
 //   doppler run -- pnpm eval:llm -- --flow safety-probes --live \
@@ -282,10 +282,10 @@ async function main(): Promise<void> {
     ) {
       clearZeroDriftReceipt();
       console.error(
-        `Envelope matrix requires ${budget.configuredBudget} configured calls ` +
-          `for ${budget.requiredSamples} samples (baseline=${budget.baselineSamples}, ` +
-          `headroom=${budget.headroomSamples}); --max-live-calls=${options.maxLiveCalls} ` +
-          'would truncate the matrix.',
+        `Envelope matrix requires ${budget.requiredSamples} samples plus ` +
+          `${budget.headroomSamples} headroom calls (configured floor=${budget.configuredBudget}; ` +
+          `baseline=${budget.baselineSamples}); supplied ` +
+          `--max-live-calls=${options.maxLiveCalls} is below the configured floor.`,
       );
       process.exit(2);
     }

@@ -28,24 +28,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 
-// The runtime registry imports API source that reaches the retention package's
-// published `.js` specifier. The scripts Jest config intentionally does not
-// rewrite that package specifier, so provide the source-test shim needed only
-// to load FLOWS for this registry contract.
-jest.mock(
-  '../packages/retention/src/sm2.js', // gc1-allow: scripts Jest cannot resolve the retention package published .js specifier and a virtual shim is required to load FLOWS for the registry contract
-  () => ({ sm2: jest.fn() }),
-  { virtual: true },
-);
-
 import { TEACHING_SCENARIOS } from '../apps/api/eval-llm/fixtures/teaching-scenarios';
 import { CHALLENGE_SIM_SCENARIOS } from '../apps/api/eval-llm/fixtures/challenge-personas';
 import { MAX_CHALLENGE_QUESTIONS } from '../apps/api/src/services/challenge-round/caps';
 import { PROFILES } from '../apps/api/eval-llm/fixtures/profiles';
 import { ENVELOPE_FLOWS } from '../apps/api/eval-llm/envelope-flow-registry';
 import { FLOWS } from '../apps/api/eval-llm/flow-registry';
-import { deriveEnvelopeBudgetFromMatrix } from '../apps/api/eval-llm/runner/budget';
 import {
+  deriveEnvelopeBudgetFromMatrix,
   deriveEnvelopeProviderDemandFromMatrix,
   resolveEnvelopeLiveCallCap,
 } from '../apps/api/eval-llm/runner/budget';
