@@ -392,12 +392,19 @@ describe('noticesSuppressedForPayload', () => {
     });
   });
 
-  // [WI-2911] The blind gate is scoped to the observation-LESS branch. A payload
-  // carrying its own observation is still judged on that observation, and this is
-  // what keeps a blind device from going dark for a whole session: the server's
-  // predicate V has already stripped notice data if the rollout is off, so a live
-  // reply is the one thing a device that cannot read its disk may still trust.
-  describe('a payload carrying its OWN observation, while storage is UNREADABLE', () => {
+  // [WI-2627] While the read is UNTRUSTED, suppression is unconditional — and
+  // that is asserted here as a property over every signal shape, not as a verdict
+  // on the one payload a reviewer happened to name.
+  //
+  // The scoping this block used to assert (gate on the observation-LESS branch,
+  // let a payload with its own observation through on the theory that the
+  // server's predicate V makes a live reply trustworthy) was the defect. It
+  // assumes the reply is live. A pre-rollback reply is equally well-formed and
+  // carries an equally valid observation; the only thing that could tell them
+  // apart is the disable floor, which is precisely what an unreadable device
+  // cannot consult. So "carries an observation" is not evidence of freshness
+  // while blind, and no per-shape rule can recover the distinction.
+  describe('while storage is UNREADABLE, suppression is unconditional', () => {
     const blindEnabledAt5 = {
       state: { revision: 5, enabled: true } as MentorNoticePolicyState,
       observed: true,
@@ -405,22 +412,30 @@ describe('noticesSuppressedForPayload', () => {
       trusted: false,
     };
 
-    it('still RENDERS at the revision we hold', () => {
-      expect(
-        noticesSuppressedForPayload(blindEnabledAt5, observation(5, true)),
-      ).toBe(false);
+    // Every shape `observationSignal` can return, including the two that would
+    // otherwise render: an observation AT the held revision, and one ABOVE it.
+    it.each([
+      ['absent', undefined],
+      ['malformed', { rolloutRevision: 'nope' }],
+      ['older than held', observation(4, true)],
+      ['same as held', observation(5, true)],
+      ['newer than held', observation(9, true)],
+      ['newer and disabled', observation(9, false)],
+    ])('suppresses a %s observation', (_shape, payload) => {
+      expect(noticesSuppressedForPayload(blindEnabledAt5, payload)).toBe(true);
     });
 
-    it('still suppresses a STALE one, and a DISABLED one', () => {
-      expect(
-        noticesSuppressedForPayload(blindEnabledAt5, observation(4, true)),
-      ).toBe(true);
+    // The counterpart, and what keeps the assertion above from being trivially
+    // true: flip ONLY `trusted`, change nothing else, and the same payload
+    // renders. Without this the block would pass against a function that
+    // suppressed everything unconditionally.
+    it('renders that same payload once a read has SUCCEEDED', () => {
       expect(
         noticesSuppressedForPayload(
-          { ...blindEnabledAt5, state: { revision: 5, enabled: false } },
+          { ...blindEnabledAt5, trusted: true },
           observation(5, true),
         ),
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 });
@@ -942,10 +957,15 @@ describe('useMentorNoticePolicy', () => {
       // down this file. A future reader arriving at the line above now finds the
       // answer beside it instead of having to know where else to look.
       expect(result.current.suppressed(undefined)).toBe(true);
-      // ...and the device is not dark: a payload carrying its own live
-      // observation still renders, because the server has already stripped notice
-      // data if the rollout is off.
-      expect(result.current.suppressed(observation(3, true))).toBe(false);
+      // ...and so does a payload carrying that same observation. [WI-2627] This
+      // line previously expected `false`, on the theory that a payload with its
+      // own observation is necessarily live because the server strips notice
+      // data when the rollout is off. That theory assumed away the threat: a
+      // pre-rollback reply carries notice data AND a well-formed observation,
+      // and a device that cannot read its disk cannot compare either against the
+      // durable disable floor. While the read is untrusted the fold is not
+      // evidence and neither is the payload.
+      expect(result.current.suppressed(observation(3, true))).toBe(true);
 
       // Wait for the write path to have FINISHED, by a condition both the fixed
       // and the broken implementation satisfy — otherwise this wait would itself
@@ -1728,11 +1748,13 @@ describe('useMentorNoticePolicy', () => {
           // notice cards while the rev-8 rollback sits unread on disk.
           expect(result.current.suppressed(undefined)).toBe(true);
 
-          // ...and the device is NOT dark: a payload carrying its own live
-          // observation still renders. The server's predicate V has already
-          // stripped notice data if the rollout is off, so this is the one thing
-          // a device that cannot read its disk may still trust.
-          expect(result.current.suppressed(observation(5, true))).toBe(false);
+          // ...and so is the reply that carries it. [WI-2627] The rev-5 reply in
+          // this very test IS the pre-rollback one — it is described as such two
+          // assertions above — so expecting it to render was asserting the
+          // resurrection rather than guarding against it. The device is blind to
+          // the rev-8 disable on disk and has no way to tell this reply from a
+          // live one; suppressing both is the only fail-closed answer.
+          expect(result.current.suppressed(observation(5, true))).toBe(true);
 
           await drainPersist();
         });
@@ -1852,14 +1874,19 @@ describe('useMentorNoticePolicy', () => {
       });
     });
 
-    // ── AC 7: RECOVERY ACROSS A RESTART, FAILURE STILL PRESENT ──────────────
-    // Asserting recovery in-session only is how a permanent brick ships. The
-    // property is that the recovery path is re-obtainable EVERY session while the
-    // fault persists — never one-shot, never poisoned by anything durable. Under
-    // this design the recovery surface is the LIVE payload, not the cached one:
-    // the cached surface stays suppressed for as long as storage is unreadable,
-    // by construction, and that is the intended end state rather than a gap.
-    it('recovers across a RESTART with the storage failure still present', async () => {
+    // ── AC 7: SUPPRESSION HOLDS ACROSS A RESTART, FAILURE STILL PRESENT ─────
+    // Asserting recovery in-session only is how a permanent brick ships, so the
+    // anti-brick property still has to be here — but [WI-2627] moved WHERE it is
+    // obtained. It used to be the live payload: notices came back mid-session on
+    // a reply carrying its own observation. That was the fail-open, because a
+    // pre-rollback reply is indistinguishable from a live one to a device that
+    // cannot read its floor. So while the fault persists there is no recovery
+    // surface at all, in either session, and that is deliberate.
+    //
+    // The brick is ruled out by the half of this test BELOW the fault clearing:
+    // the device returns to exactly the state of one that never failed, so the
+    // suppression is bounded by the fault rather than durable.
+    it('stays fail-closed across a RESTART with the storage failure still present', async () => {
       await seedStored(ACTOR, PROFILE, '{"revision":8,"enabled":false}');
 
       await whileUnreadable('both', async () => {
@@ -1869,7 +1896,7 @@ describe('useMentorNoticePolicy', () => {
         act(() => first.result.current.observe(observation(5, true)));
         expect(first.result.current.suppressed(undefined)).toBe(true);
         expect(first.result.current.suppressed(observation(5, true))).toBe(
-          false,
+          true,
         );
         await drainPersist();
 
@@ -1879,14 +1906,15 @@ describe('useMentorNoticePolicy', () => {
         // ── session 2 ──
         const second = mountPolicy();
         await waitFor(() => expect(second.result.current.hydrated).toBe(true));
-        // Still fail-closed on the observation-less surface...
+        // Fail-closed on the observation-less surface...
         expect(second.result.current.suppressed(undefined)).toBe(true);
 
-        // ...and still recoverable: a live reply renders on its own observation,
-        // exactly as it did in session 1. Nothing carried forward to brick it.
+        // ...and equally on the reply that carries its own observation, exactly
+        // as in session 1. Nothing carried forward — the second blind session is
+        // neither more nor less permissive than the first.
         act(() => second.result.current.observe(observation(5, true)));
         expect(second.result.current.suppressed(observation(5, true))).toBe(
-          false,
+          true,
         );
         expect(second.result.current.suppressed(undefined)).toBe(true);
 
