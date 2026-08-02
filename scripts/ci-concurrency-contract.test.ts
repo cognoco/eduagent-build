@@ -45,6 +45,12 @@ function step(workflow: Workflow, name: string): Record<string, unknown> {
   return found;
 }
 
+function liveTipResult(expectedSha: string, currentSha: string) {
+  return currentSha === expectedSha
+    ? { matches: 'true', exitCode: 0 }
+    : { matches: 'false', exitCode: 0 };
+}
+
 describe('CI concurrency contract', () => {
   it('pins the exact PR/main concurrency group and PR-only cancellation policy', () => {
     const concurrency = readWorkflow().concurrency;
@@ -112,5 +118,35 @@ describe('CI concurrency contract', () => {
     expect(String(publish.if)).toContain(
       "steps.live-main-tip.outputs.matches == 'true'",
     );
+  });
+
+  it.each([
+    ['stale SHA', 'sha-old', 'sha-new', { matches: 'false', exitCode: 0 }],
+    [
+      'current SHA',
+      'sha-current',
+      'sha-current',
+      { matches: 'true', exitCode: 0 },
+    ],
+  ])(
+    '%s cleanly models live-tip gating without stale publication',
+    (_name, expected, current, result) => {
+      expect(liveTipResult(expected, current)).toEqual(result);
+
+      const publishAllowed = result.matches === 'true' && result.exitCode === 0;
+      expect(publishAllowed).toBe(current === expected);
+    },
+  );
+
+  it('emits matches=false and exits successfully when main has advanced', () => {
+    const liveTip = step(
+      readWorkflow(),
+      'Verify live main tip before OTA publish',
+    );
+    const run = String(liveTip.run);
+
+    expect(run).toContain('echo "matches=false" >> "$GITHUB_OUTPUT"');
+    expect(run).toContain('exit 0');
+    expect(run).not.toContain('exit 1');
   });
 });

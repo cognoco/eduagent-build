@@ -741,7 +741,8 @@ jobs:
           current_main_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
             echo "Main advanced from $EXPECTED_SHA to $current_main_sha; refusing stale OTA publication."
-            exit 1
+            echo "matches=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           echo "matches=true" >> "$GITHUB_OUTPUT"
 
