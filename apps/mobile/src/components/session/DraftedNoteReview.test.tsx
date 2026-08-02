@@ -37,7 +37,7 @@ describe('DraftedNoteReview', () => {
 
     screen.getByTestId('drafted-note-review');
     screen.getByTestId('drafted-note-input');
-    // WI-2551: shared transcription-only mic renders with the editable draft.
+    // The shared transcription-only mic renders with the editable draft.
     screen.getByTestId('drafted-note-mic');
     screen.getByTestId('drafted-note-fallback-prompt');
     screen.getByText('Write this one in your own words.');

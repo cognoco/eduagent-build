@@ -42,7 +42,7 @@ describe('GuessWhoQuestion', () => {
       onResolved,
     });
 
-    // WI-2551: shared transcription-only mic renders with the guess field.
+    // The shared transcription-only mic renders with the guess field.
     screen.getByTestId('guess-who-mic');
     fireEvent.changeText(screen.getByTestId('guess-who-input'), 'Ada');
     fireEvent.press(screen.getByTestId('guess-who-submit'));

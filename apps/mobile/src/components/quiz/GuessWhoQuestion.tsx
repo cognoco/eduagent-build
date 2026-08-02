@@ -66,7 +66,7 @@ interface GuessWhoQuestionProps {
     options: GuessWhoCheckOptions,
   ) => Promise<boolean>;
   onResolved: (result: GuessWhoResolvedResult) => void;
-  /** Voice locale for the guess mic (WI-2551), resolved by the screen. */
+  /** Voice locale for the guess-field mic, resolved by the screen. */
   voiceLocale?: string;
 }
 

@@ -558,7 +558,7 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
 
   describe('transcript preview', () => {
-    // WI-2551 (PR #2861 P1): ChatShell only folds transcripts from captures
+    // ChatShell only folds transcripts from captures
     // it started itself — a preset foreign transcript no longer previews. All
     // preview tests therefore begin a real owned capture via the record
     // button before the transcript arrives.

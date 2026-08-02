@@ -565,7 +565,7 @@ export function ChatShell({
     } else {
       setPendingTranscript('');
       discardedRef.current = false; // BUG-359: allow effect to capture new transcript
-      ownCaptureRef.current = true; // WI-2551: this composer owns the capture
+      ownCaptureRef.current = true; // this composer owns the capture
       // Stop TTS when user starts recording
       stopSpeaking();
       await startListening();
@@ -590,7 +590,7 @@ export function ChatShell({
   // re-record or new recording.
   const discardedRef = useRef(false);
 
-  // WI-2551 (PR #2861 P1): the native recognizer is a singleton, so this
+  // The native recognizer is a singleton, so this
   // hook instance receives result events from EVERY capture — including one
   // started by the parking-lot or drafted-note mic while this composer is
   // mounted underneath. Only fold a transcript into the pending draft when

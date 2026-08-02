@@ -80,7 +80,7 @@ interface UseSpeechRecognitionOptions {
   continuous?: boolean;
 }
 
-// Module-scoped capture ownership (WI-2551): the native recognizer is a
+// Module-scoped capture ownership: the native recognizer is a
 // singleton that broadcasts result/error/end events to EVERY mounted hook
 // instance. Without ownership, a capture started by one surface (e.g. the
 // feedback sheet over a session) lands its transcript in every other

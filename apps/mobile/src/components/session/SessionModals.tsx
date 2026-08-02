@@ -25,7 +25,7 @@ export interface ParkingLotModalProps {
   onClose: () => void;
   parkingLotDraft: string;
   setParkingLotDraft: React.Dispatch<React.SetStateAction<string>>;
-  /** Voice locale for the parking-lot mic (WI-2551), resolved by the screen. */
+  /** Voice locale for the parking-lot mic, resolved by the screen. */
   voiceLocale?: string;
   handleSaveParkingLot: () => Promise<void>;
   parkingLot: ReturnType<typeof useParkingLot>;

@@ -15,7 +15,7 @@ export function DraftedNoteReview({
   fallbackPrompt?: string;
   onSave: (content: string) => Promise<unknown>;
   onSkip: () => void;
-  /** Voice locale for the note-edit mic (WI-2551), resolved by the screen. */
+  /** Voice locale for the note-edit mic, resolved by the screen. */
   voiceLocale?: string;
 }) {
   const { t } = useTranslation();

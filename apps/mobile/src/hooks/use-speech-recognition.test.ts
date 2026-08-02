@@ -154,7 +154,7 @@ describe('useSpeechRecognition', () => {
       useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
-    // Ownership (WI-2551): only the instance that started the capture
+    // Ownership: only the instance that started the capture
     // consumes engine events.
     await act(async () => {
       await result.current.startListening();
@@ -631,7 +631,7 @@ describe('useSpeechRecognition', () => {
     });
   });
 
-  describe('capture ownership (WI-2551)', () => {
+  describe('capture ownership', () => {
     // Harness note: the shared `listeners` map keeps only the LAST registered
     // handler per event, so the second-mounted instance's subscription is the
     // live one. Mount the instance under test SECOND. In production every
