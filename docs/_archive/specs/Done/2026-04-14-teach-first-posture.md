@@ -8,7 +8,7 @@
 
 **Tech Stack:** Hono API (system prompt assembly), React Native / Expo Router (mobile UI), Jest (unit + integration tests)
 
-**Spec:** `docs/superpowers/specs/2026-04-14-teach-first-posture-design.md`
+**Spec:** `docs/_archive/specs/Done/2026-04-14-teach-first-posture-design.md`
 
 ---
 

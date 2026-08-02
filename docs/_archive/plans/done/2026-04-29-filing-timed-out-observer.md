@@ -26,7 +26,7 @@
 
 **Tech Stack:** Hono + Inngest (Cloudflare Workers), Drizzle ORM + Postgres (Neon HTTP, no interactive transactions — `db.batch()` is the ACID escape hatch), Zod for runtime contracts in `@eduagent/schemas`, React Native + Expo Router + TanStack Query on mobile, Jest with co-located tests.
 
-**Spec:** `docs/superpowers/specs/2026-04-29-filing-timed-out-observer-design.md`
+**Spec:** `docs/_archive/specs/Done/2026-04-29-filing-timed-out-observer-design.md`
 **Finding ID:** `[FILING-TIMEOUT-OBS]`
 
 ---
@@ -463,7 +463,7 @@ The generated file SHOULD match this shape (re-author by hand only if the genera
 -- 0040_filing_state_tracking.sql
 -- [FILING-TIMEOUT-OBS] Add filing watermark + state machine + retry budget.
 -- Non-destructive: all columns nullable or default 0. Rollback procedure in
--- the spec at docs/superpowers/specs/2026-04-29-filing-timed-out-observer-design.md §4.3.
+-- the spec at docs/_archive/specs/Done/2026-04-29-filing-timed-out-observer-design.md §4.3.
 
 ALTER TABLE "learning_sessions"
   ADD COLUMN "filed_at" timestamp with time zone DEFAULT NULL;

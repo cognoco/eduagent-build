@@ -118,7 +118,7 @@ the build profile in question. As read from `apps/mobile/eas.json` and
 |---|---|---|---|---|
 | `production` (`eas.json:12-18`) | off | on | on | **Config T — sanctioned target** (flipped 2026-07-27, commit `09fe6671d`, WI-1341) |
 | `development` (`eas.json:25-31`) | on | on | on | Banned combo, grandfathered (`scripts/mode-nav-flag-combo-baseline.json`) |
-| `preview` (`eas.json:43-49`) + preview-channel OTA (`.github/workflows/ci.yml:728-730`) | on | on | on | Banned combo, grandfathered |
+| `preview` (`eas.json:43-49`) + preview-channel OTA (`.github/workflows/ci.yml:745-747`) | on | on | on | Banned combo, grandfathered |
 | `fallback` (`eas.json:57-63`) | on | on | off | Banned combo, grandfathered |
 | local example (`apps/mobile/.env.example:8`) | off | off | off | Flags-off legacy shell |
 
@@ -169,7 +169,7 @@ route entry goes through the contract. Representative current sites:
 | Family/child routes guard | `RequireFamilyContext` — **read-only** guard via `contract.canEnter(route, params)`; mode switch only via explicit user CTA (`useEnterFamilyMode`) | `components/guards/RequireFamilyContext.tsx:12-46` |
 | Recaps / library / vocabulary entry | `navigationContract.canEnter(...)` redirects | `recaps/index.tsx:19`, `recaps/[recapId].tsx:32`, `library.tsx:151`, `progress/vocabulary.tsx:105` |
 | Legacy own-learning tab | still uses legacy `resolveTabShape()` — sanctioned residual legacy read; the tab only exists in legacy/V0 shells | `own-learning.tsx:32-34` |
-| Consent-state interception | shell-level, **above** the contract's output: pending-consent and withdrawn gates in the app layout | `apps/mobile/src/app/(app)/_layout.tsx:955-966` |
+| Consent-state interception | shell-level, **above** the contract's output: pending-consent and withdrawn gates in the app layout | `apps/mobile/src/app/(app)/_layout.tsx:955-969` |
 
 ## UI navigation vs server authorization
 
@@ -211,7 +211,7 @@ adjacent risks are gone.
 | ID | Layer | Original concern | Disposition (2026-08-01) |
 |---|---|---|---|
 | F1 | Server | IDOR on `PATCH /profiles/:id` — a child profile could edit sibling profiles. | **Resolved.** Owner-or-self enforcement + headerless-identity rejection + `assertCanWriteProfile` (`apps/api/src/routes/profiles.ts:452-492`). The app-context PATCH (`:397-451`) carries the same guards. |
-| F2 | Shell (above contract) | Consent-state interception is shell-level, not a contract dimension. | **Still current, by design.** Pending-consent and withdrawn full-screen gates live in `(app)/_layout.tsx:955-966`, above the contract's output. Folding consent into the contract remains not-planned; treat consent gating as a separate layer when auditing. |
+| F2 | Shell (above contract) | Consent-state interception is shell-level, not a contract dimension. | **Still current, by design.** Pending-consent and withdrawn full-screen gates live in `(app)/_layout.tsx:955-969`, above the contract's output. Folding consent into the contract remains not-planned; treat consent gating as a separate layer when auditing. |
 | F3 | UI | Mentor-memory proxy redirect used a raw `isParentProxy` read. | **Resolved.** Entry now goes through `useEntryGate('mentor-memory')` (`mentor-memory.tsx:248`; `use-entry-gate.ts:14-33`). Remaining `navigationContract.isParentProxy` reads in that screen are in-screen content/pending-state branches, not the entry gate. |
 | F4 | — | Reserved slot; content never recovered from the lost audit. | **Retired.** No recoverable claim; nothing to re-derive. Do not cite F4. |
 | F5 | UI | `isOwner` content gating duplicated across ~13 sites with no single source of truth. | **Resolved.** Consolidated into `resolveGates()` (`navigation-contract.ts:364-439`); consumers read `gates.*` (see consumer table above). |

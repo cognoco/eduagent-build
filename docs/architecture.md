@@ -32,7 +32,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 
 **Functional Requirements:**
 
-149 FRs across 8 epics. Language Learning (FR96-FR107) and Concept Map (FR118-FR127) **deferred to v1.1** — architecture designs for extensibility but doesn't build. Full Voice Mode (FR144-FR145, FR147-FR149) shipped 2026-04-03 (see table below). FR146 (Language SPEAK/LISTEN voice) mapped to Epic 6. Effective MVP scope: 121 FRs.
+149 FRs across 8 epics. Concept Map (FR118-FR127) **deferred to v1.1** — architecture designs for extensibility but doesn't build. Language Learning (FR96-FR107) shipped; Full Voice Mode (FR144-FR145, FR147-FR149) shipped 2026-04-03 (see table below). FR146 (Language SPEAK/LISTEN voice) mapped to Epic 6. Effective MVP scope: 121 FRs.
 
 | PRD Category | FRs | Epic Mapping | Architectural Weight |
 |-------------|-----|-------------|---------------------|
@@ -46,7 +46,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 | Progress Tracking | FR67-FR76 | Epic 4 | Medium — Library, knowledge decay visualization, topic review |
 | Multi-Subject Learning | FR77-FR85 | Epic 4 | Medium — subject management, archive/pause, auto-archive |
 | Engagement & Motivation | FR86-FR95 | Epic 4 | Medium — honest streak, retention XP, interleaved retrieval |
-| Language Learning (v1.1) | FR96-FR107 | Epic 6 | Deferred — Four Strands, CEFR tracking, vocabulary spaced repetition |
+| Language Learning | FR96-FR107 | Epic 6 | Shipped — Four Strands (`pedagogyMode`), CEFR tracking, vocabulary spaced repetition |
 | Subscription Management | FR108-FR117 | Epic 5 | Medium — tiered billing, family pools, top-up credits, reverse trial |
 | Concept Map (Prerequisite-Aware Learning) | FR118-FR127 | Epic 7 | v1.1 — DAG data model, graph-aware coaching, visual concept map |
 | EVALUATE Verification / Devil's Advocate | FR128-FR133 | Epic 3 | Medium — plausibly flawed reasoning for student critique, Bloom's Level 5-6, reuses escalation rung system |
@@ -332,7 +332,7 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 |----------|-----------|-----------|
 | Code execution sandbox | v2.0 | Programming subjects not in MVP |
 | Offline capability | v2.0 | Requires local cache + sync protocol |
-| Language Learning mode | v1.1 | FR96-FR107, design for but don't build |
+| Language Learning mode | Shipped | FR96-FR107 — Four Strands (`pedagogyMode`) shipped alongside Socratic; no longer deferred |
 | OCR server-side fallback provider | Homework Help epic | Mathpix vs CF Workers AI — design the interface now, choose provider when evaluating real content |
 | Zustand (shared client state) | When justified | Start with TanStack Query + Context + local state |
 
@@ -1290,9 +1290,17 @@ All LLM calls that make state-machine decisions (close an interview, hold escala
     note_prompt?: { show: boolean; post_session?: boolean };
     fluency_drill?: { active: boolean; duration_s?: number; score?: { correct: number; total: number } };
   };
+  private_sources?: {      // Private provenance for complaint review and hallucination audits. Never rendered to the learner.
+    relied_on?: string[];        // Source IDs the reply relied on, referencing the prompt's source pack
+    insufficient?: boolean;      // Model judged the source pack didn't cover the claim
+    reason?: string;             // Free-text justification
+    factual_confidence?: number; // 0-1, model's self-rated confidence in the cited facts
+  };
   confidence?: 'low' | 'medium' | 'high';  // Model's self-assessed certainty
 }
 ```
+
+The server cross-checks `private_sources` against the prompt's source pack (`auditExchangeSources()`) and persists the result as `sourceAudit` on the exchange's `ai_response` event metadata (`services/session/session-exchange.ts`); `private_sources` itself is never persisted or shown to the learner.
 
 Key rules for the envelope pattern:
 
@@ -1414,7 +1422,7 @@ Two complementary mechanisms control how the AI teaches:
    - This is NOT re-teaching from scratch. The student knows the concept; they missed a critical evaluation step. The response targets analytical skill, not foundational knowledge.
    - Difficulty rung (`evaluateDifficultyRung` 1-4 on retention card) persists across sessions and advances independently of the Socratic escalation rung.
 
-**Epic 6 extension point (v1.1):** Language learning (FR96-107) will require a third mechanism — a per-subject `teachingMode` distinguishing Socratic (default) from Four Strands methodology (language) and direct error correction. The existing `teaching_method` enum covers _how_ to teach (visual vs step-by-step); the new mode would control _what pedagogy_ to use. Likely implemented as an additional column on subjects or a new `pedagogy_mode` enum. **Note:** FR146 (Language SPEAK/LISTEN voice) is mapped to Epic 6, not Epic 8. Epic 8 (Full Voice Mode stories 8.1-8.2) must complete before Epic 6 SPEAK/LISTEN stories can begin — voice infrastructure is the dependency.
+**Epic 6 (shipped): Language learning teaching mode.** Language learning (FR96-107) added the third mechanism: a per-subject pedagogy mode distinguishing Socratic (default) from Four Strands methodology (language). Implemented as `pedagogyModeSchema = z.enum(['socratic', 'four_strands'])` in `packages/schemas/src/language.ts`, carried on `subject.pedagogyMode`, and read throughout the exchange path (`services/exchange-prompts.ts`, `services/session/session-exchange.ts`, `services/language-curriculum.ts`) to select Four Strands prompting and gate language-specific extraction/summary steps. The existing `teaching_method` enum still covers _how_ to teach (visual vs step-by-step) independently of pedagogy mode. **Note:** FR146 (Language SPEAK/LISTEN voice) is mapped to Epic 6, not Epic 8. Epic 8 (Full Voice Mode stories 8.1-8.2) must complete before Epic 6 SPEAK/LISTEN stories can begin — voice infrastructure is the dependency.
 
 **Voice Mode Architecture (Epic 8 — v1.1):**
 
@@ -1551,7 +1559,7 @@ Service Function (business logic)
 | **Epic 3: Assessment** | `assessments.ts`, `retention.ts` | `assessments.ts`, `retention.ts`, `retention-data.ts` | `assessment/*` | `assessments.ts` | `schema/assessments.ts` |
 | **Epic 4: Progress** | `progress.ts`, `streaks.ts`, `dashboard.ts`, `parking-lot.ts` | `progress.ts`, `dashboard.ts`, `notifications.ts`, `streaks.ts`, `xp.ts`, `summaries.ts`, `parking-lot.ts` | `(app)/library.tsx`, `(app)/dashboard.tsx` | `progress.ts` | `schema/progress.ts` |
 | **Epic 5: Subscription** | `billing.ts`, `revenuecat-webhook.ts`, `stripe-webhook.ts` (dormant) | `billing.ts`, `subscription.ts`, `trial.ts`, `metering.ts` | `(app)/subscription.tsx` | `billing.ts` | `schema/billing.ts` |
-| **Epic 6: Language (v1.1)** | New route file | New service file | New component directory | New schema file | New schema file |
+| **Epic 6: Language** | `language-progress.ts`, `subjects.ts` (extend) | `language-curriculum.ts`, `language-detect.ts`, `language-prompts.ts`, `language-session-engine.ts`, `language-session-summary.ts` | `(app)/onboarding/language-setup.tsx`, `(app)/more/mentor-language.tsx` | `language.ts` | `schema/language.ts` |
 | **Epic 7: Concept Map (v1.1)** | `curriculum.ts` (extend), `concept-map.ts` | `concept-map.ts` (new), `coaching-cards.ts` (extend) | `concept-map/` (new), `book/` (extend) | `subjects.ts` (extend `topic_prerequisites`), `curriculumAdaptations` (add JSONB column) | `@eduagent/schemas` (prerequisiteContext Zod schema) |
 | **Epic 8: Full Voice Mode (v1.1)** | `sessions.ts` (extend for voice mode flag) | `exchanges.ts` (extend for voice context) | `session/` (extend: voice controls, waveform), `hooks/use-voice.ts` (new) | `sessions.ts` (extend: voice mode schemas) | `schema/sessions.ts` (voice mode flag on sessions) |
 
@@ -1869,7 +1877,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 2. **Clean separation of concerns**: Routes (thin) → Services (logic) → Database (scoped) — testable at every layer
 3. **Pragmatic caching strategy**: Workers KV for write-rare/read-often data, no over-engineered cache layer
 4. **Durable background processing**: Inngest step functions handle multi-step lifecycle chains with built-in retry and observability
-5. **Extensibility without overengineering**: Language Learning v1.1, Zustand, Durable Objects, dedicated vector store — all have clear migration paths without restructuring
+5. **Extensibility without overengineering**: Zustand, Durable Objects, dedicated vector store — all have clear migration paths without restructuring (Language Learning shipped on this same extensibility path)
 6. **Cost-conscious AI design**: Metering middleware + routing by conversation state + soft ceiling monitoring — cost control without compromising learning experience
 7. **Starting from existing infrastructure**: Fork of working Nx monorepo with CI/CD, commit quality, and testing already in place
 8. **Clear offline boundary**: Read-only cached data at MVP, no ambiguity about what works without connectivity

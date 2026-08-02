@@ -5,7 +5,7 @@
 **Status:** Challenged design, revised for implementation
 **Date:** 2026-05-13
 **Approach:** Ownership Map + Full Cleanup (Approach B)
-**Implementation plan:** `docs/superpowers/plans/2026-05-13-surface-ownership-boundaries.md`
+**Implementation plan:** `docs/_archive/plans/done/2026-05-13-surface-ownership-boundaries.md`
 
 ---
 

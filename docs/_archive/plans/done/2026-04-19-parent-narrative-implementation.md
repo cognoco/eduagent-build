@@ -8,7 +8,7 @@
 
 **Tech Stack:** React Native (Expo Router), NativeWind, Hono RPC, Drizzle ORM, Inngest, Zod, Jest + Testing Library
 
-**Spec:** `docs/superpowers/specs/2026-04-18-parent-narrative-design.md`
+**Spec:** `docs/_archive/specs/Done/2026-04-18-parent-narrative-design.md`
 
 **Review applied 2026-04-19:** High-priority plan review findings have been threaded into the tasks below. See `## Review Findings Threaded Into This Plan` near the bottom for the index.
 
@@ -142,7 +142,7 @@ Expected: FAIL — module not found
 
 /**
  * Parent-facing vocabulary canon.
- * Spec: docs/superpowers/specs/2026-04-18-parent-narrative-design.md
+ * Spec: docs/_archive/specs/Done/2026-04-18-parent-narrative-design.md
  */
 
 /** Maps a 0–100 mastery percentage to a plain-English understanding label. */
