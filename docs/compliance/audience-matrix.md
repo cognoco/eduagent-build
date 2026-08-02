@@ -154,7 +154,23 @@ the flags-off and V0 shells regardless of which profile currently carries them.
 
 The 2026-05 scaffold listed ~20 files with scattered raw `isOwner`/`role` reads.
 That consolidation has landed: screens now read `navigationContract.gates.*` and
-route entry goes through the contract. Representative current sites:
+route entry goes through the contract.
+
+**Owner vs non-owner visibility summary** (what the gating resolves to; moved here
+from AGENTS.md 2026-08-02 — the mechanism sites table below carries the cites).
+Billing/Security live inside `more/account.tsx`; Export/Delete live inside
+`more/privacy.tsx` — they are not top-level More rows:
+
+| Feature | Owner (guardian or solo) | Non-owner (child on parent's account) |
+|---|---|---|
+| Billing / subscription (in `more/account.tsx`) | visible | hidden |
+| Account security (in `more/account.tsx`) | visible | hidden |
+| Export / delete account (in `more/privacy.tsx`) | visible | hidden |
+| Add child | visible if 18+ | hidden |
+| Progress toggle (view children) | visible if has children | hidden |
+
+A solo owner and a child on a parent's account see the **same tabs** — they differ
+only in what's inside More/Progress. Representative current sites:
 
 | Surface | Current mechanism | Cite (2026-08-01) |
 |---|---|---|
