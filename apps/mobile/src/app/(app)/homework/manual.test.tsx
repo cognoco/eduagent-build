@@ -99,6 +99,8 @@ describe('ManualHomeworkScreen', () => {
     expect(screen.getByTestId('homework-entry-mode-manual')).toBeTruthy();
     expect(screen.getByTestId('homework-manual-entry-empty')).toBeTruthy();
     expect(screen.getByTestId('result-text-input').props.value).toBe('');
+    // The shared transcription-only mic renders with the problem field.
+    expect(screen.getByTestId('homework-manual-problem-mic')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('manual-entry-cancel'));
 

@@ -154,6 +154,11 @@ describe('useSpeechRecognition', () => {
       useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
+    // Ownership: only the instance that started the capture
+    // consumes engine events.
+    await act(async () => {
+      await result.current.startListening();
+    });
 
     act(() => {
       listeners.result?.({
@@ -179,6 +184,9 @@ describe('useSpeechRecognition', () => {
       useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
+    await act(async () => {
+      await result.current.startListening();
+    });
 
     // expo-speech-recognition delivers the N-best alternatives for one utterance
     // in results[]. They must NOT be concatenated — that produced the
@@ -277,6 +285,9 @@ describe('useSpeechRecognition', () => {
       useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
+    await act(async () => {
+      await result.current.startListening();
+    });
 
     act(() => {
       listeners.error?.({ message: 'No speech detected' });
@@ -617,6 +628,120 @@ describe('useSpeechRecognition', () => {
 
       expect(removeResult).toHaveBeenCalled();
       expect(removeError).toHaveBeenCalled();
+    });
+  });
+
+  describe('capture ownership', () => {
+    // Harness note: the shared `listeners` map keeps only the LAST registered
+    // handler per event, so the second-mounted instance's subscription is the
+    // live one. Mount the instance under test SECOND. In production every
+    // instance receives every native event; ownership decides who consumes.
+    function nativeModule() {
+      return {
+        requestPermissionsAsync: mockRequestPermissionsAsync,
+        start: mockStart,
+        stop: mockStop,
+        addListener: mockAddListener,
+      };
+    }
+
+    it('the capture owner consumes results; a bystander instance stays empty', async () => {
+      mockLoadSpeechModule.mockResolvedValue(nativeModule());
+      const bystander = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      const owner = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      await flushEffects();
+
+      await act(async () => {
+        await owner.result.current.startListening();
+      });
+      act(() => {
+        listeners.result?.({
+          isFinal: false,
+          results: [{ transcript: 'meant for the owner' }],
+        });
+      });
+
+      expect(owner.result.current.transcript).toBe('meant for the owner');
+      expect(bystander.result.current.transcript).toBe('');
+    });
+
+    it('a later start revokes the previous owner — its events are dropped, not consumed', async () => {
+      mockLoadSpeechModule.mockResolvedValue(nativeModule());
+      const other = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      const revoked = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      await flushEffects();
+
+      // `revoked` (whose subscription is live) starts, then `other` takes over.
+      await act(async () => {
+        await revoked.result.current.startListening();
+      });
+      await act(async () => {
+        await other.result.current.startListening();
+      });
+      act(() => {
+        listeners.result?.({
+          isFinal: true,
+          results: [{ transcript: 'should not land in revoked' }],
+        });
+      });
+
+      expect(revoked.result.current.transcript).toBe('');
+    });
+
+    it("a non-owner stopListening never stops the owner's native capture", async () => {
+      mockLoadSpeechModule.mockResolvedValue(nativeModule());
+      const owner = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      const nonOwner = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      await flushEffects();
+
+      await act(async () => {
+        await owner.result.current.startListening();
+      });
+      await act(async () => {
+        await nonOwner.result.current.stopListening();
+      });
+
+      expect(mockStop).not.toHaveBeenCalled();
+      // The non-owner settles to idle (it is owed no final result).
+      expect(nonOwner.result.current.status).toBe('idle');
+
+      await act(async () => {
+        await owner.result.current.stopListening();
+      });
+      expect(mockStop).toHaveBeenCalledTimes(1);
+    });
+
+    it('a foreign error does not reach a non-owner', async () => {
+      mockLoadSpeechModule.mockResolvedValue(nativeModule());
+      const other = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      const nonOwner = renderHook(() =>
+        useSpeechRecognition(mockLoadSpeechModule),
+      );
+      await flushEffects();
+
+      await act(async () => {
+        await other.result.current.startListening();
+      });
+      act(() => {
+        listeners.error?.({ message: 'engine failed' });
+      });
+
+      expect(nonOwner.result.current.status).toBe('idle');
+      expect(nonOwner.result.current.error).toBeNull();
     });
   });
 });

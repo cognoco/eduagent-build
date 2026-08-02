@@ -16,6 +16,12 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
+import { useProfile } from '../../../lib/profile';
+import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
+import {
+  VoiceInputControl,
+  appendTranscript,
+} from '../../../components/common';
 import { createHomeworkProblem } from '../../../components/homework/problem-cards';
 import { formatApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -75,6 +81,7 @@ function ManualHomeworkEntry({
 }): React.JSX.Element {
   const router = useRouter();
   const { t } = useTranslation();
+  const { activeProfile } = useProfile();
   const routeSubjectId = firstParam(params.subjectId);
   const routeSubjectName = firstParam(params.subjectName);
   const [problemText, setProblemText] = useState('');
@@ -237,6 +244,18 @@ function ManualHomeworkEntry({
           placeholder={t('homework.manualInputPlaceholder')}
           accessibilityLabel={t('homework.problemInputLabel', { number: 1 })}
         />
+        <View className="mt-2">
+          <VoiceInputControl
+            value={problemText}
+            voiceLocale={getVoiceLocaleForLanguage(
+              activeProfile?.conversationLanguage,
+            )}
+            testID="homework-manual-problem-mic"
+            onTranscript={(finalTranscript) =>
+              setProblemText((prev) => appendTranscript(prev, finalTranscript))
+            }
+          />
+        </View>
       </View>
 
       {!selectedSubject ? (

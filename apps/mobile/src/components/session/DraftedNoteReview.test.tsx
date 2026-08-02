@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 jest.mock(
-  'react-i18next',
+  'react-i18next' /* gc1-allow: i18n boundary — external package, canonical mock-i18n util returning en.json strings (repo convention, cf. FeedbackSheet.test) */,
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
@@ -37,6 +37,8 @@ describe('DraftedNoteReview', () => {
 
     screen.getByTestId('drafted-note-review');
     screen.getByTestId('drafted-note-input');
+    // The shared transcription-only mic renders with the editable draft.
+    screen.getByTestId('drafted-note-mic');
     screen.getByTestId('drafted-note-fallback-prompt');
     screen.getByText('Write this one in your own words.');
     expect(screen.queryByTestId('drafted-note-preview')).toBeNull();
@@ -82,5 +84,35 @@ describe('DraftedNoteReview', () => {
     render(<DraftedNoteReview {...defaultProps} />);
     fireEvent.press(screen.getByTestId('drafted-note-skip'));
     expect(defaultProps.onSkip).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rejected save resets saving so the learner can retry (no unhandled rejection)', async () => {
+    const onSave = jest.fn().mockRejectedValue(new Error('network down'));
+    render(
+      <DraftedNoteReview
+        initialContent={null}
+        fallbackPrompt="Write it"
+        onSave={onSave}
+        onSkip={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('drafted-note-input'),
+      'my drafted note',
+    );
+    fireEvent.press(screen.getByTestId('drafted-note-save'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledWith('my drafted note');
+    // Draft retained and controls live again for retry.
+    screen.getByDisplayValue('my drafted note');
+    fireEvent.press(screen.getByTestId('drafted-note-save'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledTimes(2);
   });
 });
