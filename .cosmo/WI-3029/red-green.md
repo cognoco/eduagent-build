@@ -50,3 +50,8 @@ The executable envelope flow contract derives `329` outer invocations plus
 `366` sequential provider calls. The omitted-cap contract resolves the
 envelope configured cap before `bootstrapLlmProviders()` and before
 `runHarness`, so the runner's default `20` cannot be reached.
+
+The mastery reproduce-capacity regression derives `216 - 192 = 24` remaining
+calls and `floor(24 / 8) = 3` rounds for one offender. This makes the existing
+single-offender three-round requalification path reachable; changing these
+budget numbers changes gate strictness, not just cost.

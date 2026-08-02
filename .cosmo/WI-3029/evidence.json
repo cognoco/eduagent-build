@@ -22,7 +22,7 @@
     },
     {
       "acRef": "AC-5",
-      "description": "Pure mastery budget tests cover the complete grid, changed counts, 215 rejection, and 216 acceptance.",
+      "description": "Pure mastery budget tests cover the complete grid, changed counts, 215 rejection, 216 acceptance, and derive that 216 configured versus 192 expected leaves exactly three 8-call reproduce rounds for one offender.",
       "pointer": "apps/api/eval-llm/runner/sim-budget.test.ts"
     },
     {

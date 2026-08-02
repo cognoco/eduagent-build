@@ -69,6 +69,7 @@ import { evaluateMainGridCompleteness } from './runner/sim-grid-gate';
 import {
   assertSufficientMasteryBudget,
   deriveMasteryBudget,
+  deriveMasteryReproduceCapacity,
 } from './runner/sim-budget';
 import {
   bootstrapLlmProviders,
@@ -572,17 +573,16 @@ async function main(): Promise<void> {
       // requalify EVERY offender REPRODUCE_N× within the remaining budget, fail
       // CLOSED — a detected breach is never silently dropped for lack of budget.
       const neededRounds = ids.length * REPRODUCE_N;
-      const remainingCalls = Math.max(
-        0,
-        effectiveMaxCalls - budget.expectedProviderCalls,
+      const reproduceCapacity = deriveMasteryReproduceCapacity(
+        budget,
+        effectiveMaxCalls,
+        REPRODUCE_N,
+        ids.length,
       );
-      const remainingRounds = Math.floor(
-        remainingCalls / budget.expectedProviderCallsPerRound,
-      );
-      if (remainingRounds < neededRounds) {
+      if (!reproduceCapacity.reachable) {
         console.error(
           `[eval:llm:sim] OVER-CREDIT CEILING BREACH on ${ids.join(', ')} — ` +
-            `insufficient budget to requalify (${remainingRounds} round(s) left, need ${neededRounds}). ` +
+            `insufficient budget to requalify (${reproduceCapacity.availableRounds} round(s) left, need ${neededRounds}). ` +
             `Failing closed; re-run with a higher --max-live-calls to re-test a suspected one-off slip.`,
         );
         process.exit(1);

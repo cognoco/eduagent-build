@@ -1,6 +1,7 @@
 import {
   deriveMasteryBudget,
   assertSufficientMasteryBudget,
+  deriveMasteryReproduceCapacity,
 } from './sim-budget';
 
 describe('deriveMasteryBudget', () => {
@@ -36,5 +37,16 @@ describe('deriveMasteryBudget', () => {
         216,
       ),
     ).not.toThrow();
+  });
+
+  it('derives three reachable reproduce rounds for one offender at the governed cap', () => {
+    const budget = deriveMasteryBudget({ scenarioCount: 8, runs: 3 });
+
+    expect(deriveMasteryReproduceCapacity(budget, 216, 3, 1)).toEqual({
+      remainingProviderCalls: 24,
+      availableRounds: 3,
+      requiredRounds: 3,
+      reachable: true,
+    });
   });
 });

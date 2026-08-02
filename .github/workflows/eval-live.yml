@@ -151,7 +151,11 @@ jobs:
       # holds. Budget: 8 challenge-sim scenarios × 3 runs × 9 governed
       # configured units/round (3 calls/question × MAX_CHALLENGE_QUESTIONS=3)
       # = 216. The separately reported expected provider demand is 8
-      # calls/round, 192 total; preflight still requires the governed 216 cap.
+      # calls/round, 192 total, leaving 24 calls: exactly three reproduce rounds
+      # at 8 calls each for a single over-credit offender. That makes the
+      # existing single-offender 3-round requalification path reachable.
+      # Changing any of these numbers changes gate strictness, not just cost;
+      # preflight still requires the governed 216 cap.
       # A reproduced over-credit breach exits 1 (the hard ceiling); soft drift
       # only warns. Distinct baseline from the signal one above — this reads
       # simulation-baseline.json. Seeded under DOPPLER_TOKEN_STG (same judge slug).

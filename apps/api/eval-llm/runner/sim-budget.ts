@@ -6,6 +6,13 @@ export interface MasteryBudget {
   expectedProviderCallsPerRound: number;
 }
 
+export interface MasteryReproduceCapacity {
+  remainingProviderCalls: number;
+  availableRounds: number;
+  requiredRounds: number;
+  reachable: boolean;
+}
+
 /**
  * A three-question round schedules learner + grader + tutor work per question,
  * but the final question has no follow-up tutor turn. The configured unit is
@@ -41,4 +48,26 @@ export function assertSufficientMasteryBudget(
         `--max-live-calls=${maxLiveCalls} is insufficient`,
     );
   }
+}
+
+export function deriveMasteryReproduceCapacity(
+  budget: MasteryBudget,
+  maxLiveCalls: number,
+  reproduceRounds: number,
+  offenderCount: number,
+): MasteryReproduceCapacity {
+  const remainingProviderCalls = Math.max(
+    0,
+    maxLiveCalls - budget.expectedProviderCalls,
+  );
+  const availableRounds = Math.floor(
+    remainingProviderCalls / budget.expectedProviderCallsPerRound,
+  );
+  const requiredRounds = offenderCount * reproduceRounds;
+  return {
+    remainingProviderCalls,
+    availableRounds,
+    requiredRounds,
+    reachable: availableRounds >= requiredRounds,
+  };
 }
