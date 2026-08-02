@@ -50,6 +50,16 @@ export type NowRefreshCaptureResult<Response, Payload> =
       payloadRead: Promise<NowRefreshPayloadReadResult<Payload>>;
     };
 
+interface NowRefreshPayloadCapturePage<Response> {
+  on(event: 'response', listener: (response: Response) => void): void;
+  off(event: 'response', listener: (response: Response) => void): void;
+}
+
+interface NowRefreshPayloadCaptureOptions<Response> {
+  page: NowRefreshPayloadCapturePage<Response>;
+  matchesResponse: (response: Response) => boolean;
+}
+
 async function readNowRefreshPayload<Payload>(
   readPayload: () => Promise<Payload>,
 ): Promise<NowRefreshPayloadReadResult<Payload>> {
@@ -68,22 +78,48 @@ async function readNowRefreshPayload<Payload>(
  * release the Network body once navigation completes, while the plain
  * `Response` handle itself remains settled and otherwise looks healthy.
  */
-export async function captureNowRefreshPayload<Response, Payload>(
+export function captureNowRefreshPayload<Response, Payload>(
   responsePromise: Promise<Response>,
   readPayload: (response: Response) => Promise<Payload>,
+  options?: NowRefreshPayloadCaptureOptions<Response>,
 ): Promise<NowRefreshCaptureResult<Response, Payload>> {
-  let response: Response;
-  try {
-    response = await responsePromise;
-  } catch (error) {
-    return { kind: 'response-rejected', error };
-  }
-
-  return {
-    kind: 'response-settled',
-    response,
-    payloadRead: readNowRefreshPayload(() => readPayload(response)),
+  let capturedResponse: Response | undefined;
+  let capturedPayloadRead:
+    | Promise<NowRefreshPayloadReadResult<Payload>>
+    | undefined;
+  const onResponse = (response: Response): void => {
+    if (
+      capturedPayloadRead === undefined &&
+      options?.matchesResponse(response)
+    ) {
+      capturedResponse = response;
+      capturedPayloadRead = readNowRefreshPayload(() => readPayload(response));
+    }
   };
+
+  if (options) options.page.on('response', onResponse);
+
+  const cleanup = (): void => {
+    if (options) options.page.off('response', onResponse);
+  };
+
+  return responsePromise.then(
+    (response) => {
+      cleanup();
+      return {
+        kind: 'response-settled' as const,
+        response,
+        payloadRead:
+          capturedResponse === response && capturedPayloadRead !== undefined
+            ? capturedPayloadRead
+            : readNowRefreshPayload(() => readPayload(response)),
+      };
+    },
+    (error) => {
+      cleanup();
+      return { kind: 'response-rejected' as const, error };
+    },
+  );
 }
 
 /**

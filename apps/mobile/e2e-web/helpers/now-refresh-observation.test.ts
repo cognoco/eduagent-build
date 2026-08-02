@@ -12,6 +12,86 @@ import {
 } from './now-refresh-observation';
 
 describe('exact Now-feed payload lifetime (WI-2961)', () => {
+  it('starts the body read from the response event before Chromium can release it', async () => {
+    let onResponse!: (response: object) => void;
+    let registeredListener!: (response: object) => void;
+    let resolveResponse!: (response: object) => void;
+    let bodyReleased = false;
+    let readCount = 0;
+    const readCandidates: object[] = [];
+    const response = {};
+    const unmatchedResponse = {};
+    const laterMatchingResponse = {};
+    const payload = { generatedAt: '2026-08-02T12:00:00.000Z' };
+    const page = {
+      on: jest.fn((event: string, listener: (response: object) => void) => {
+        if (event === 'response') {
+          onResponse = listener;
+          registeredListener = listener;
+        }
+      }),
+      off: jest.fn(),
+    };
+    const responsePromise = new Promise<object>((resolve) => {
+      resolveResponse = resolve;
+    });
+
+    const capturePromise = captureNowRefreshPayload(
+      responsePromise,
+      async (candidate) => {
+        readCount += 1;
+        readCandidates.push(candidate);
+        if (bodyReleased) {
+          throw new Error('Network.getResponseBody: No data found');
+        }
+        return payload;
+      },
+      {
+        page,
+        matchesResponse: (candidate) => candidate !== unmatchedResponse,
+      },
+    );
+
+    onResponse(unmatchedResponse);
+    expect(readCount).toBe(0);
+    onResponse(response);
+    onResponse(laterMatchingResponse);
+    expect(readCount).toBe(1);
+    expect(readCandidates).toEqual([response]);
+    bodyReleased = true;
+    resolveResponse(response);
+
+    await expect(
+      observeCapturedNowRefresh(capturePromise, {
+        armedAtMs: 0,
+        actionAtMs: 1,
+      }),
+    ).resolves.toEqual({
+      kind: 'settled',
+      response: { response, payload },
+    });
+    expect(page.off).toHaveBeenCalledWith('response', registeredListener);
+  });
+
+  it('removes the response listener when the exact response rejects', async () => {
+    let registeredListener!: (response: object) => void;
+    const page = {
+      on: jest.fn((_event: string, listener: (response: object) => void) => {
+        registeredListener = listener;
+      }),
+      off: jest.fn(),
+    };
+    const error = new Error('net::ERR_ABORTED');
+
+    await expect(
+      captureNowRefreshPayload(Promise.reject(error), async () => undefined, {
+        page,
+        matchesResponse: () => true,
+      }),
+    ).resolves.toEqual({ kind: 'response-rejected', error });
+    expect(page.off).toHaveBeenCalledWith('response', registeredListener);
+  });
+
   it('returns settled only after the response settles and its body parses (variant c: parsed response)', async () => {
     const payload = {
       scope: 'self',

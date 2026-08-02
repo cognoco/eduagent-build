@@ -139,6 +139,12 @@ test('WI-2234 returning learner: unfinished session resumes, exchanges, and retu
       (await response.json()) as {
         generatedAt?: unknown;
       },
+    {
+      page,
+      matchesResponse: (response) =>
+        response.request().method() === 'GET' &&
+        postBackNowMatchesUrl(new URL(response.url())),
+    },
   );
 
   await pressableClick(page.getByTestId('chat-shell-back'));
