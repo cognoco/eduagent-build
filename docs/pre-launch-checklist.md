@@ -130,7 +130,7 @@ Ref: `docs/plans/order.md` Tier 3 — explicitly marked "before launch"
 
 ## UX Fixes — Pre-Launch (2026-04-20)
 
-Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
+Ref: `docs/_archive/plans/done/2026-04-19-pre-launch-ux-fixes.md`
 
 ### Already Fixed (verified in codebase)
 

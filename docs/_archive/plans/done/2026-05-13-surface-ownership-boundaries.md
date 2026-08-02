@@ -6,7 +6,7 @@
 
 **Goal:** Turn the surface ownership design into an executable cleanup stream that prevents dashboard/progress/session/library/report concerns from bleeding across mobile surfaces.
 
-**Source spec:** `docs/superpowers/specs/2026-05-13-surface-ownership-boundaries-design.md`
+**Source spec:** `docs/_archive/specs/Done/2026-05-13-surface-ownership-boundaries-design.md`
 
 **Tech stack:** Expo / React Native, NativeWind semantic tokens, TanStack Query, Hono, Drizzle, `@eduagent/schemas`, Jest.
 
