@@ -3,6 +3,35 @@
 -- violate the repointed FK; the real restore at that point is the Neon branch snapshot
 -- br-rough-heart-ag22kigb (parent br-weathered-silence-agw4on4x @ LSN 0/31B53E00).
 BEGIN;
+
+-- Target guard — this script must be incapable of seeding rows into a CI clone or any
+-- other legacy-schema branch that happens to contain the same parent ids.
+-- (Absent from the original committed version; found in review of PR #2883.)
+DO $$
+DECLARE
+  actual_project text := current_setting('neon.project_id', true);
+  actual_branch  text := current_setting('neon.branch_id', true);
+BEGIN
+  IF actual_project IS DISTINCT FROM 'lingering-violet-30592106'
+     OR actual_branch IS DISTINCT FROM 'br-weathered-silence-agw4on4x' THEN
+    RAISE EXCEPTION 'WI-2633 rollback target mismatch: found project %, branch %', actual_project, actual_branch;
+  END IF;
+END $$;
+
+-- State guard — refuse if any target id already exists, so a partial or repeated restore
+-- cannot silently diverge from the recorded pre-mutation state.
+DO $$
+DECLARE present integer;
+BEGIN
+  SELECT count(*) INTO present FROM quota_pools
+  WHERE id = ANY(ARRAY['019d782a-ce22-7660-9a0d-73941f2830a0',
+                       '019dea4e-e828-7590-92ee-a794972fade3',
+                       '019df86f-0ddf-7440-9b66-a294d806de28']::uuid[]);
+  IF present <> 0 THEN
+    RAISE EXCEPTION 'WI-2633 rollback refused: % of the 3 target ids already present', present;
+  END IF;
+END $$;
+
 INSERT INTO quota_pools (id, subscription_id, monthly_limit, used_this_month, daily_limit, used_today, cycle_reset_at, created_at, updated_at)
 VALUES
   ('019d782a-ce22-7660-9a0d-73941f2830a0','019d782a-cddc-7e58-b06a-15f2a39815e5',100,0,10,0,'2026-07-10T16:12:44.450Z','2026-04-10T16:12:44.501Z','2026-06-11T09:44:45.187Z'),

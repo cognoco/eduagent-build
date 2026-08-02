@@ -1,5 +1,18 @@
 -- WI-2633 guarded repair: delete three orphaned quota_pools rows on the dev branch.
 -- Aborts on target mismatch, orphan-set drift, or unexpected delete count. Single transaction.
+--
+-- AS-EXECUTED, 2026-08-02. This file is the statement set that actually ran; it is deliberately
+-- NOT rewritten to look better in hindsight.
+-- KNOWN WEAKNESS, raised as P1 by two independent reviewers on PR #2883 and accepted as correct:
+-- the orphan SELECT and the id-only DELETE are separate statements with no row locks. Under READ
+-- COMMITTED that is a time-of-check/time-of-use window: a concurrent writer could acquire a new
+-- `subscription` parent for a target row, or mutate its counters, between the check and the
+-- delete. Combined with the fact that concurrent dev writes were NOT frozen (see README), the
+-- set-identity check is therefore WEAKER protection than the README originally implied.
+-- A re-run of this procedure MUST serialize the two, e.g. SELECT ... FOR UPDATE on the candidate
+-- rows, or an explicit lock/freeze, before the DELETE.
+-- Outcome as executed was nonetheless verified correct: exactly 3 rows deleted, 6 retained
+-- unchanged, 0 orphans remaining, 0 quota usage lost (see postcheck-results.json).
 BEGIN;
 DO $$
 DECLARE

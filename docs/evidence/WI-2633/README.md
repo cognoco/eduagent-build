@@ -8,9 +8,14 @@ orphan rows), mutation authorized, Neon restore-branch creation authorized.
 **Dev Neon branch only.** Migration `0129_m_repoint.sql` is a documented NO-OP on staging and
 production — its own header records that the legacy tables were already dropped there out-of-band,
 so the file "only has physical effect on dev/CI". **Staging and production were never connected to
-and were not touched.** Every read and the mutation itself asserted
-`neon.project_id = lingering-violet-30592106` and `neon.branch_id = br-weathered-silence-agw4on4x`
-before doing anything; the mutation aborts on mismatch.
+and were not touched.**
+
+*Correction, after review of PR #2883:* an earlier version of this section claimed "every read and
+the mutation itself asserted" the target. That overstated the committed artifacts. As executed, the
+target assertion was performed by the mutation transaction itself and by the Node wrapper that ran
+the read queries — **not** by `preflight.sql` as originally committed, which carried no guard. The
+guard has since been added to `preflight.sql`, `postcheck.sql` and `rollback.sql` so every file in
+this packet is independently incapable of reporting on, or writing to, the wrong database.
 
 ## Restore point (AC-3, first half)
 
@@ -82,10 +87,19 @@ schema is behind. `main` CI is green. Recorded as a separate finding, not a bloc
 
 AC-3 requires "create and verify a no-compute restore marker **and freeze or exclude concurrent
 dev writes**". The restore marker was created and verified. **Concurrent dev writes were NOT
-frozen or excluded.** What partially substitutes: the mutation asserted the orphan set matched the
-three expected ids and would have aborted on drift, so a concurrent write changing that set would
-have stopped the delete rather than corrupting it. What that does not cover: a concurrent write
-between preflight and mutation touching different rows, or mutating these rows in ways the
-identity check would not detect. The operator was informed and elected to disclose the deviation
+frozen or excluded.**
+
+An earlier version of this section claimed the orphan-set drift check "partially substitutes" for
+that freeze. **Two independent reviewers on PR #2883 raised this as P1 and they are correct that
+the claim was too generous.** The orphan `SELECT` and the id-only `DELETE` are separate statements
+with no row locks; under READ COMMITTED that is a time-of-check/time-of-use window. A concurrent
+writer could acquire a new `subscription` parent for a target row, or mutate its counters, between
+the check and the delete, and the set-identity check would not detect it. So the substitution is
+weaker than stated: it defends against the set *changing membership*, not against concurrent
+mutation of the members. A re-run must serialize the two (`SELECT ... FOR UPDATE`, or a real
+freeze). This is recorded in `mutation.sql` as an as-executed weakness rather than edited away.
+
+The executed outcome was nonetheless verified correct — exactly 3 deleted, 6 retained unchanged,
+0 orphans, 0 usage lost — and a restore point exists. The operator was informed and elected to disclose the deviation
 and let the independent reviewer rule on it rather than re-run the procedure. Narrowing the AC was
-deliberately not done.
+deliberately not done. The review findings above sharpen, rather than resolve, that deviation.
