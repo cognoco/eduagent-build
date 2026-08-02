@@ -33,7 +33,7 @@ export const persistedLearningTextRemediation = inngest.createFunction(
   },
   { event: 'admin/persisted-learning-text-remediation.requested' },
   async ({ step }) => {
-    const db = await getStepDatabase(step);
+    const db = getStepDatabase();
 
     const reports = await step.run('remediate-surfaces', async () =>
       remediatePersistedLearningText(db),
