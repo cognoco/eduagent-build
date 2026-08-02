@@ -502,6 +502,14 @@ describe('[WI-138 / DS-049 / WI-258] book-suggestions proxy-mode guard', () => {
       c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
       c.set('user' as never, { id: 'test-user' });
       c.set('profileMeta' as never, { isOwner: false });
+      // [WI-2876] Authority context for assertCanReadProfile: a proxying
+      // guardian's own person id (distinct from the selected profile).
+      // verifyPersonOwnershipV2 is mocked successful at file scope, modeling
+      // an active guardianship edge over an uncredentialed charge — without
+      // account/callerPersonId the read guard would fail closed and turn the
+      // proxy-read test below into an accepted 500.
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, 'guardian-person-id');
       await next();
     });
     proxyApp.route('/', bookSuggestionRoutes);
@@ -521,13 +529,22 @@ describe('[WI-138 / DS-049 / WI-258] book-suggestions proxy-mode guard', () => {
 
   it('GET /subjects/:subjectId/book-suggestions (no topup) allows proxy mode — reads are intentional', async () => {
     const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
-    // We only assert the guard does NOT intercept. The handler then runs
-    // against the empty stub db and is expected to throw → 500, OR return
-    // 200/empty for resilient code paths. Either is fine; the test only
-    // proves assertNotProxyMode did not fire on the read path.
     const res = await makeProxyApp().request(
       `/subjects/${SUBJECT_ID}/book-suggestions`,
     );
-    expect([200, 500]).toContain(res.status);
+
+    // [WI-2876] Neither assertNotProxyMode (write-only guard) nor the
+    // read-authority guard intercepts an authorized guardian's proxy read:
+    // the request reaches the suggestions service and returns its envelope.
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { suggestions: unknown[] };
+    expect(Array.isArray(body.suggestions)).toBe(true);
+    expect(
+      jest.mocked(getUnpickedBookSuggestionsEnvelope),
+    ).toHaveBeenCalledWith(
+      expect.anything(),
+      'a0000000-0000-4000-a000-000000000001',
+      SUBJECT_ID,
+    );
   });
 });
