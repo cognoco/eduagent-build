@@ -100,8 +100,8 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/lib/profile.ts',
     category: 'boundary',
     reason:
-      'boundary: profile provider owns raw owner/child profile selection, rejects cached owner fallbacks after authority refresh, permits only validated learner-only caches after transient transport failures, and clears impossible persisted proxy state.',
-    expectedFindings: { 'profile-owner-read': 12 },
+      'boundary: profile provider owns raw owner/child profile selection, keeps cached owner/proxy-capable profiles loading-gated during authority refresh, permits only validated learner-only caches after transient transport failures, and clears impossible persisted proxy state.',
+    expectedFindings: { 'profile-owner-read': 13 },
   },
   {
     file: 'apps/mobile/src/hooks/use-parent-proxy.ts',

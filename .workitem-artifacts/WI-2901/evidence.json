@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Only current-session validated non-owner authority remains usable during background refetch; cold, unvalidated, owner/guardian/proxy-capable, and missing-selection states remain loading-gated.",
+      "pointer": "apps/mobile/src/lib/profile.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Deferred-refetch provider tests keep cached owner/guardian/proxy capability behind loading while pending and preserve hard-error handling after failure or changed binding.",
+      "pointer": "apps/mobile/src/lib/profile.test.tsx"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The resolver and provider matrix covers cold start, learner mount, owner with charge, joined learner, repeated foreground refresh, success/failure, and authority transitions, and fails under the deliberate global-loading mutant.",
+      "pointer": ".workitem-artifacts/WI-2901/red-green.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Repeated AppState-active refreshes retain the intended call cadence, while layout regressions prove no shell, redirect, create-profile, or consent gate flash.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Full affected profile and layout suites, mobile typecheck, targeted lint, formatting, and whitespace validation are green; the PR supplies the authoritative full change-class gate.",
+      "pointer": ".workitem-artifacts/WI-2901/completion-summary.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": ".workitem-artifacts/WI-2901/red-green.md"
+}
