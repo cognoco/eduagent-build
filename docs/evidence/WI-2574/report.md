@@ -1,135 +1,78 @@
-# WI-2574 — final mentor-notice MVP acceptance audit
+# WI-2574 — mentor-notice MVP acceptance audit
 
-## Verdict
+## Verdict and inputs
 
-**PASS for independent Cosmo review and QA.** At audited base
-`790a27c07e38e12e854bf6daff41fe6e247f658c`, no unresolved finding violates
-MMT-ADR-0036 or the friendly-user MVP safety boundary. This is an evidence-only
-audit. It changes no product behavior and authorizes no rollout, deployment,
-OTA, app release, or mentor-notice push delivery.
+**PASS for independent review/QA.** Product base `790a27c07e38e12e854bf6daff41fe6e247f658c`; ADR: [MMT-ADR-0036](../../adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md); [specification](../../specs/2026-07-19-homework-notice-felt-moments.md). Disposable target `811f580999ce`, endpoint fingerprint `f0ca05e6457965df023f9c88d3eeb3b821f4c02a119a8a793f41b49592425bd7`, ruling `BID-35-WI-2574-EXACT-DB-AUDIT-2026-08-03`. No unresolved ADR/safety finding; no rollout, cohort, deployment, OTA, release, or push authorization.
 
-## Audit authority and immutable inputs
+## Artifact index
 
-- Decision: [`MMT-ADR-0036`](../../adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md)
-- Operational specification: [Mentor Notices — MVP specification](../../specs/2026-07-19-homework-notice-felt-moments.md)
-- Audited base: `790a27c07e38e12e854bf6daff41fe6e247f658c`, equal to
-  `origin/main` when the final gates began
-- Post-MVP delivery containment prerequisite: WI-2573, landed commit
-  `f346ee16c`
-- Final in-scope correction: WI-2629, landed commit `82d972341`
-- Disposable database operator ruling:
-  `BID-35-WI-2574-EXACT-DB-AUDIT-2026-08-03`
-- Revision-pinned bootstrap receipt:
-  [`.workitem-artifacts/WI-2939/WI-2574-final-audit-bootstrap-790a27c0.json`](../../../.workitem-artifacts/WI-2939/WI-2574-final-audit-bootstrap-790a27c0.json)
+[Report](report.md) · [completion summary](../../../.workitem-artifacts/WI-2574/completion-summary.md) · [evidence manifest](../../../.workitem-artifacts/WI-2574/evidence.json) · [PR body](../../../.workitem-artifacts/WI-2574/pr-body.md) · [bootstrap receipt](../../../.workitem-artifacts/WI-2939/WI-2574-final-audit-bootstrap-790a27c0.json)
 
-The prerequisite sequence was present on the base branch before the audit.
-The repository, runtime schemas, migrations, services, API/SSE contracts,
-mobile policy, registered jobs, and deployment configuration were inspected at
-the same base revision used by the final unit and database gates.
+## Native-flow waiver
 
-## Decision-to-evidence matrix
+The native Maestro/device flow was **required but not executed under a bounded host-capability waiver**: live comment `3b18bce9-1f7c-8147-8733-001d6b119696`, ruling `BID-35-WI-2574-NATIVE-FLOW-WAIVER-2026-08-03`. `adb`/Maestro were absent and Metro stopped; no implicit launch was authorized. Mandated substitutes passed: mobile 537/537 suites (7,148 tests), affected DB 51/51, cross-package DB 74/74 suites (one ADR-permitted default-off push skip), and exact-head `b8ec5d804` CI router/Playwright. This is not native-execution evidence and preserves the no-rollout boundary.
 
-| Requirement | Positive evidence | Negative control / boundary | Result |
+## Clause matrix
+
+`A`=ADR; `S`=spec. Evidence codes: `C` creation/evidence/completion; `V` visibility/routes; `T` state/offer/recheck/learning-day; `M` mobile policy/SSE/UI; `D` schema/migrations/purge DB; `L` learning-text gate; `J` jobs/config; `E` evals. Each includes its tests.
+
+|Keys|Positive evidence|Negative control / boundary|
+|---|---|---|
+|A1.1; S1|C/T/M: complete in-app loop|J: flag off; no activation|
+|A1.2–1.3; S2|C/E: homework/ordinary; age-neutral|C: interleaved/re-check reject; no age branch|
+|A1.4; S2|V/M: self projection|V: every proxy suppresses|
+|A2.1; S3.1|T/D: oldest+ID projection|D: no visible queue|
+|A2.2; S3.1|C/M: ack, receipt, card|C/M: rejection emits none; non-blocking|
+|A2.3–2.5; S3.2|T: independent judge/outcomes/detachment|T: no tutor verdict; third `continue` open; unresolved-only failure|
+|A2.6–2.7; S3.2|T/D: 04:00 defer; fade|T: `Not now` ≠ dismissal; stale hidden off|
+|A3.1; S6–7|M/J: in-app only|J: delivery default-off before DB|
+|A3.2; S1,6|J: internal QA → full friendly group|J: no cohorts|
+|A3.3–3.4; S6|M/C: monotonic disabled-wins; eviction|M: stale/malformed/unreadable cannot expose|
+|A3.5; S6|J: atomic flag+revision; increments|J: no production activation/deployment/release|
+|A4.1–4.4; S3.1,4|C/E: server authority/shared completion/optional quote|C: malformed/fabricated/mismatch reject|
+|A4.5–4.7; S4–5|C/L/T: scrubbed multilingual post-persist gate|L: protected/ambiguous failures close|
+|A5.1–5.5; S4–5|C/T/D: one state machine; uniqueness; purge survival|M/D: no client state/event FK; cascades retained|
+|A5.6; S5|C/D: required new identity; nullable legacy reads|D: rollback cannot erase identity|
+|S8–9|C–M/J/E: reconciliation + ledger|J: dormant push bounded; native only by waiver|
+
+## Blocker closure
+
+Live `Blocked by` relation; every row is `Closed/Done`, and `Anc=yes` means Fixed In is an ancestor of `790a27c0`.
+
+|Work Item|Status|Fixed In|Anc|
 |---|---|---|---|
-| Homework and ordinary single-subject learning are eligible | Shared completion paths call `createMentorNoticeFromSignal`; unit and real-database exchange tests accept both eligible types. | Interleaved and active re-check sessions are rejected before creation. No `topicId` exists in the runtime proposal. | Pass |
-| The lifecycle is identical for every learner age | The creation, visibility, transition, and mobile policy services receive no age discriminator; focused prompt profiles exercise ages 11, 12, 13, 15, and 17. | A word-boundary search across the authoritative mentor-notice API, route, and mobile-policy code found no age, birth, adult, or minor branch. | Pass |
-| Notice detail is learner-self only | `visibility.ts`, route tests, and real-database mobile-session coverage return the complete projection to the authenticated learner. | Guardian, supporter, payer, selected-child, and other proxy actor/subject combinations return no notice concept, hint, evidence, receipt, card, or celebration. | Pass |
-| The LLM signal is bounded and non-authoritative | `noticed_gap` carries concept, optional hint, required `answerEventId`, and optional transient `learnerQuote`; the server derives ownership and attribution. | Missing/malformed identity, wrong event type, wrong learner/session, quote mismatch, and fabricated evidence are rejected. Direct parsing accepts both omitted and present valid quotes. | Pass |
-| Completion is the only creation point | Streaming, non-streaming, and fallback completion share the server-owned creation boundary and emit only accepted transitions. | Prompt/prose snapshots make no future re-check promise; malformed and rejected signals produce no persisted or client-visible notice. | Pass |
-| Creation is evidence-aware, idempotent, and concurrency-safe | Partial unique indexes bind accepted evidence identity and real-database replay/race tests converge on one logical row. | The source session is not the permanent uniqueness boundary; distinct eligible evidence can create a later record. | Pass |
-| At most one actionable notice is projected | Real-database ordering selects the oldest eligible actionable row with an explicit ID tie-break. | Multiple durable rows never become a visible queue or backlog. | Pass |
-| `Continue` owns an attempt, not the durable verdict | Both transports persist the learner event and invoke the shared independent server judge; the tutor envelope contains no verdict. | Valid `continue/unclear`, including response three, changes no notice state. At the cap the attempt metadata detaches and the unresolved notice remains re-offerable. | Pass |
-| Only unresolved judging fails safe at response three | Exact outcome/reason pairs commit their bounded transitions. | Unavailable, malformed, mismatched-reason, or missing-event judging cannot terminalize before response three and becomes `not_yet/insufficient` only at response three. | Pass |
-| Terminal and quiet lifecycle semantics match the ADR | Evidence-backed `locked_in`, new-evidence-required `not_yet`, explicit-stop `dismissed`, and explicit-not-now `deferred` are covered by state and route tests. | `Not now` never claims mastery or dismisses the record; optimistic client state is withheld on rejected or malformed responses. | Pass |
-| Deferral uses the current learning day | `learning-day.ts` and tests cover the local IANA-zone 04:00 boundary. | Invalid or absent zones use the same 04:00 boundary in UTC; before-boundary civil dates resolve to the preceding learning day. | Pass |
-| Inactive open notices fade after 21 days | Fade job and projection apply the same activity cutoff, including while the feature is disabled. | Re-enable cannot expose a stale row before the scheduled fade job runs. | Pass |
-| Persistence is minimal and survives transcript purge | Stored fields are server-owned IDs, scrubbed concept/hint, state, and lifecycle timestamps. `answerEventId` is an immutable UUID scalar; transcript-purge integration retains it. | No quote, verbatim answer, model reasoning, confidence, or clinical label is stored. Profile/session cascade remains; rollback forbids erasing identity to restore the removed event FK. | Pass |
-| Persisted learning text uses the shared multilingual safety gate | The normalized ten-language and cross-language gate covers creation and derived persistence boundaries with provenance-aware independent judging. | Protected person-attributed text blocks; ambiguous LLM text without a producer vendor, migration/backfill ambiguity, judge failure, malformed output, and unclear verdict fail closed. | Pass |
-| Flag-off is ordered, durable, and complete | API policy emits monotonic revision plus revision-bound epoch; the learner-scoped mobile fold persists the observation across restart and clears every relevant cached surface. | Lower revisions are ignored, disabled wins ties, re-enable requires a higher revision, and malformed/missing/unreadable cold-start state remains hidden. | Pass |
-| MVP delivery is in-app only | `MENTOR_NOTICE_ENABLED` defaults off; fade remains active. Retained push scan/send functions reject before database work unless the separate post-MVP flag is explicitly enabled. | `MENTOR_NOTICE_PUSH_POST_MVP_ENABLED` defaults off, has no active deployment binding, and tests prove zero mentor primer, schedule, nudge, send, or push fan-out in MVP configuration. | Pass |
+|WI-2498 (proxy privacy)|Closed/Done|`c43a07cc5ca8cf0e1f5d788a35eb68da6c3f7076`|yes|
+|WI-2499 (actions/receipt)|Closed/Done|`1064163204183c1f1cc917b53f2a0f7ce519d116`|yes|
+|WI-2500 (contracts)|Closed/Done|`b2f494b2bfeb2441776d36c34ded79c91c58cdbb`|yes|
+|WI-2501 (`not_yet` idempotency)|Closed/Done|`da3a5ea2fedd4cb5e86a8082560359b8a4840aed`|yes|
+|WI-2504 (flag-off cache)|Closed/Done|`b848f5557b1020aa4c01053dc88e190422d728f5`|yes|
+|WI-2557 (learning day)|Closed/Done|`ec9435b09f1e9def8448c71deb07671a4f564483`|yes|
+|WI-2573 (push off)|Closed/Done|`f346ee16ca4e700b48201f1f5c86d7417cbc0100`|yes|
+|WI-2623 (canon)|Closed/Done|`f7e6d4fd61e3f674316627be8e4655d2513c056a`|yes|
+|WI-2624 (judge exclusion)|Closed/Done|`24f5b514df25f6ff0bdd78f65d2eb0e93e90bb0e`|yes|
+|WI-2625 (server judge)|Closed/Done|`f9424a787b49fa0683e16e2793429178127d08c0`|yes|
+|WI-2627 (policy revision)|Closed/Done|`32ac33fde5ace6515cd80649f47223cb0477fe2b`|yes|
+|WI-2628 (clinical gate)|Closed/Done|`5cec6b3765535edebe6986160ef65337576f3937`|yes|
+|WI-2629 (evidence identity)|Closed/Done|`82d972341de60ec81694aaec08c38be110c4a599`|yes|
+|WI-2670 (per-turn vendor)|Closed/Done|`ec9fc2faae6e9620ba111b152da99c012b2fc838`|yes|
+|WI-2753 (text remediation)|Closed/Done|`d7da06962425d5689fadf466cdd37ba8d58c64cc`|yes|
 
-## Boundary and storage inspection
+## Command ledger
 
-The audit inspected the canonical contracts and their consumers in:
+Every local test command below is prefixed by `rtk fnm exec --using=22.16.0 --`, with CWD `/Users/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2574-audit`, revision `790a27c0`, and no injected environment unless shown. Flags are literal; the `gh` row is remote metadata.
 
-- `packages/schemas/src/llm-envelope.ts`, `mentor-notices.ts`, `sessions.ts`,
-  `stream-fallback.ts`, and `now-feed.ts`;
-- `apps/api/src/services/mentor-notices/`, the streaming and non-streaming
-  session completion services, API routes, Now projection, SSE/fallback
-  handling, and the shared persisted-learning-text gate;
-- `packages/database/src/schema/mentor-notices.ts` and migrations 0147, 0149,
-  0150, 0151, and 0153 with their rollback documentation;
-- `apps/mobile/src/lib/mentor-notice-policy.ts`, SSE parsing, session summary,
-  chat acknowledgement, Mentor/Now surfaces, and cache handling;
-- `apps/api/src/inngest/` registration and the mentor fade, nudge-scan, and
-  nudge-send boundaries; and
-- runtime configuration and deployment manifests for active flag bindings.
-
-No contradictory active legacy path was found. Dormant post-MVP push machinery
-is retained behind the separate default-off boundary permitted by the ADR; it
-is not an MVP dependency and does not execute in the audited configuration.
-
-## Fresh verification
-
-All final-base commands used repository-required Node `22.16.0`. Database tests
-ran only against the operator-authorized disposable target. The receipt records
-target ID `811f580999ce`, endpoint fingerprint
-`f0ca05e6457965df023f9c88d3eeb3b821f4c02a119a8a793f41b49592425bd7`,
-audited revision `790a27c0…`, and a committed-migration-only bootstrap. The RLS
-runbook preflight proved the test role non-login, non-superuser,
-non-owner, non-bypass-RLS, and narrowly granted before the database gates.
-
-| Gate | Result |
-|---|---|
-| Direct optional-quote schema control | Without `learnerQuote`: accepted; with valid `learnerQuote`: accepted |
-| Focused shared-schema suites | 2/2 suites; 129/129 tests |
-| Affected mentor/exchange API unit suites | 5/5 suites; 403/403 tests |
-| Complete API unit gate | 525/525 suites; 10,442 passed, 9 expected skips; 3/3 snapshots; 205.334 s |
-| Complete mobile unit gate | 537/537 suites; 7,148/7,148 tests; 306.408 s |
-| Affected co-located real-database suites | 2/2 suites; 51/51 tests; 120.757 s |
-| Complete cross-package real-database gate | 74/74 suites; 612 passed, 1 intentional post-MVP-push skip; 1,447.36 s |
-| Migration immutability guard | Pass |
-| Migration enum-idempotency guard | Pass |
-| Integration typecheck | Pass; 75 Jest-selected roots |
-| Focused deterministic prompt evaluation | 30 snapshots; zero tracked drift after deterministic rerun |
-| Focused live prompt evaluation under the staging routing configuration | 30/30 live calls; 0 failures; 0 quality failures; 3 non-blocking warnings |
-
-The cross-package gate included the learner-self/proxy visibility matrix,
-mobile session flow, state lifecycle, learning-day boundary, push containment,
-and real-database evidence/idempotency controls. Its single skip is the
-intentional post-MVP push case behind the default-off flag. A separate
-loopback-only remediation test was not applicable to the remote disposable
-target and was not counted as exercised coverage.
-
-## Finding disposition
-
-The first direct schema control found one in-scope defect: the public envelope
-required `learnerQuote`, contradicting the ADR's optional transient-input rule.
-The finding was recorded in Cosmo and routed to the existing WI-2629 corrective
-lane rather than creating a duplicate Work Item. Landed commit `82d972341`
-makes only the quote optional, retains required `answerEventId`, preserves the
-non-empty bound for a present quote, and passed independent post-merge review.
-The final-base direct control and all affected/full gates above include that
-correction. No other finding remains open.
-
-## Bounded caveats
-
-- Native-device Maestro execution was not applicable on this audit host:
-  `adb` and `maestro` were absent and Metro was not running. The audit did not
-  implicitly launch an emulator. Mobile contract, rendering/policy unit tests,
-  and the real-database mobile-session path passed, but this report does not
-  claim a fresh physical-device gesture or visual run.
-- The full mobile gate emits existing Expo native-module/polyfill and React
-  `act(...)` warnings plus Jest's force-exit/open-handle advisory. The command
-  exited zero with every suite and test passing; the warnings did not identify
-  a mentor-notice contract failure.
-- The live prompt gate produced three warnings but zero failed calls and zero
-  quality failures. Deterministic snapshots were restored and clean.
-- No Clacks connection was made during this audit.
-
-## Conclusion
-
-The retained implementation conforms to the complete MMT-ADR-0036 decision
-matrix at the audited revision. The evidence supports advancing WI-2574 to
-independent review and QA after this report-only PR lands. Operational rollout
-and all mentor-notice push delivery remain unauthorized and disabled.
+|Gate|Exact command|Result|
+|---|---|---|
+|Schemas|`pnpm exec jest --config packages/schemas/jest.config.cjs --runInBand --runTestsByPath packages/schemas/src/llm-envelope.test.ts packages/schemas/src/mentor-notices.test.ts`|2 suites; 129 pass|
+|Affected API|`pnpm exec jest --config apps/api/jest.config.cjs --runInBand --runTestsByPath apps/api/src/services/llm/envelope.test.ts apps/api/src/services/mentor-notices/creation.test.ts apps/api/src/services/mentor-notices/evidence.test.ts apps/api/src/services/exchanges.test.ts apps/api/src/services/session/session-exchange.test.ts`|5; 403 pass|
+|Full API|`pnpm test:api:unit`|525; 10,442 pass; 9 skip|
+|Full mobile|`pnpm test:mobile:unit`|537; 7,148 pass|
+|Affected DB|`doppler run -c dev_integration -- pnpm exec jest --config apps/api/jest.integration.remote.config.cjs --runInBand --runTestsByPath apps/api/src/services/session/session-exchange.integration.test.ts apps/api/src/services/mentor-notices/state.integration.test.ts`|2; 51 pass|
+|Cross-package DB|`doppler run -c dev_integration -- pnpm test:api:integration:cross-package:ci`|74; 612 pass; 1 permitted skip|
+|Migration immutability|`pnpm check:migration-immutability`|pass|
+|Migration enum|`pnpm check:migration-enum-idempotency`|pass|
+|Integration type|`pnpm typecheck:integration`|pass; 75 roots|
+|Prompt snapshots|`pnpm eval:llm -- --flow homework-notice --flow recheck-judge --flow learning-text-safety-judge`|30; zero drift|
+|Live prompts|`doppler run -c stg -- pnpm eval:llm -- --live --flow homework-notice --flow recheck-judge --flow learning-text-safety-judge`|30/30; 0 failures/quality failures; 3 warnings|
+|Branch router|`BASE_REF=main bash scripts/check-change-class.sh --branch --run --fast`|5 evidence files; pass/no class|
+|Exact-head CI/E2E|`gh pr view 2955 --json headRefOid,statusCheckRollup`|`b8ec5d804`; `changes` + Playwright success|

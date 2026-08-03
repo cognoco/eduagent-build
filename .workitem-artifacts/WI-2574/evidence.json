@@ -2,33 +2,33 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "The report provides a requirement-by-requirement decision-to-evidence matrix for MMT-ADR-0036 and the ratified mentor-notice MVP specification.",
+      "description": "The compact clause matrix keys every numbered ADR and specification section to positive evidence and a negative control or bounded non-applicability.",
       "pointer": "docs/evidence/WI-2574/report.md"
     },
     {
       "acRef": "AC-2",
-      "description": "Fresh unit, prompt, mobile, and real-database evidence covers eligibility/exclusion, all-age authority, self/proxy privacy, proposal evidence, both transports and fallback, concurrency, one-actionable projection, all lifecycle outcomes, cap semantics, learning-day defer, fade, minimal persistence, ordered flag-off, and zero MVP push delivery.",
+      "description": "The clause matrix covers the complete eligibility, privacy, evidence, transport, lifecycle, persistence, rollback, safety, and in-app-only decision surface.",
       "pointer": "docs/evidence/WI-2574/report.md"
     },
     {
       "acRef": "AC-3",
-      "description": "Static inspection covers runtime schemas, migrations and rollback, centralized services, API/SSE/mobile parsing, job registration, configuration, and deployment manifests; no contradictory active legacy path remains.",
+      "description": "Boundary inspection and the matrix cover contracts, migrations/rollback, central services, API/SSE/mobile parsing, jobs, and deployment declarations without an active contradictory path.",
       "pointer": "docs/evidence/WI-2574/report.md"
     },
     {
       "acRef": "AC-4",
-      "description": "Applicable focused and complete gates include explicit negative controls. Native-device Maestro was unavailable and is bounded without claiming unexecuted coverage.",
+      "description": "The command ledger records reproducible unit, integration, real-database, mobile, prompt, migration, type, router, and exact-head CI/E2E evidence; native flow is bounded only by the cited operator waiver.",
       "pointer": "docs/evidence/WI-2574/report.md"
     },
     {
       "acRef": "AC-5",
-      "description": "The one initial in-scope finding was recorded and corrected through existing WI-2629; exact final-base retesting found no unresolved ADR or friendly-user MVP safety-boundary violation.",
+      "description": "The live 15-row blocker relation is Closed/Done and every Fixed In commit is proven ancestral to the audited base; no finding remains open.",
       "pointer": "docs/evidence/WI-2574/report.md"
     },
     {
       "acRef": "AC-6",
-      "description": "The report, completion summary, evidence manifest, PR body, and sanitized revision-pinned database receipt provide durable evidence for independent Cosmo review and QA.",
-      "pointer": ".workitem-artifacts/WI-2574/completion-summary.md"
+      "description": "The clearly named Artifact index directly links the report, completion summary, evidence manifest, PR body, and sanitized revision-pinned database receipt for independent review and QA.",
+      "pointer": "docs/evidence/WI-2574/report.md"
     }
   ],
   "noiseBaselineVersion": "2026-08-03",
