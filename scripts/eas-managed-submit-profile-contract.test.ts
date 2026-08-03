@@ -3,6 +3,27 @@ import { join } from 'node:path';
 
 const repoRoot = process.cwd();
 
+const androidOnlyRunbookProhibitions = [
+  'App Store Connect',
+  'TestFlight',
+  'eas build:list --platform ios',
+  'eas build --platform all',
+  'eas submit -p ios',
+  '--id $iosBuildId',
+];
+
+function expectAndroidOnlyRunbook(runbook: string) {
+  expect(runbook).toContain(
+    'eas build --platform android --profile production',
+  );
+  expect(runbook).toContain('eas submit -p android --profile production');
+  expect(runbook).toContain('--id $androidBuildId');
+
+  for (const prohibition of androidOnlyRunbookProhibitions) {
+    expect(runbook).not.toContain(prohibition);
+  }
+}
+
 describe('WI-2937 production EAS submit contract', () => {
   it('pins Config T, Play internal, and EAS-managed Android submission', () => {
     const eas = JSON.parse(
@@ -18,7 +39,7 @@ describe('WI-2937 production EAS submit contract', () => {
     expect(eas.submit.production.ios).toEqual({});
   });
 
-  it('has no local credential materializer contract', () => {
+  it('has no local credential materializer and only documents Android submission', () => {
     const gitignore = readFileSync(join(repoRoot, '.gitignore'), 'utf8');
     const runbook = readFileSync(
       join(repoRoot, 'docs/runbooks/store-submission.md'),
@@ -55,9 +76,20 @@ describe('WI-2937 production EAS submit contract', () => {
     expect(runbook).toContain('V0-retirement ruling');
     expect(runbook).toContain('spec section 13 S6');
     expect(runbook).toContain('Play internal');
-    expect(runbook).toContain('TestFlight');
-    expect(runbook).toContain('--id $androidBuildId');
-    expect(runbook).toContain('--id $iosBuildId');
     expect(runbook).not.toContain('--latest');
+    expectAndroidOnlyRunbook(runbook);
+  });
+
+  it('rejects reintroduced iOS or TestFlight runbook instructions', () => {
+    const runbook = readFileSync(
+      join(repoRoot, 'docs/runbooks/store-submission.md'),
+      'utf8',
+    );
+
+    for (const prohibition of androidOnlyRunbookProhibitions) {
+      expect(() =>
+        expectAndroidOnlyRunbook(`${runbook}\n${prohibition}`),
+      ).toThrow(prohibition);
+    }
   });
 });
