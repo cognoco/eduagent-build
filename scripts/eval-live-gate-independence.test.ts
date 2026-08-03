@@ -370,26 +370,40 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     // change that isn't also retuned here breaks this assertion instead of
     // silently going stale (or the test silently staying green on a wrong
     // denominator).
+    //
+    // [S2 — CodeRabbit 3701613388] Searching the WHOLE workflowComments
+    // string for a duration+ratio expression doesn't prove it's attached to
+    // the RIGHT gate — a swapped/mislabelled pair (e.g. the envelope
+    // duration printed under the "mastery" label) would still satisfy an
+    // unlabelled search. Extract just the AC-6 projection sentence into a
+    // bounded string, and require each pattern to include its own gate
+    // label immediately before the duration+ratio expression.
+    const projectionParagraphMatch = workflowComments.match(
+      /Projecting each gate's wall clock onto CURRENT[\s\S]*?180-minute\s+timeout-minutes\./,
+    );
+    expect(projectionParagraphMatch).not.toBeNull();
+    const projectionParagraph = projectionParagraphMatch![0];
+
     const envelopeExpr = new RegExp(
-      `${numBoundary(RETAINED_ENVELOPE_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
+      `envelope\\s+${numBoundary(RETAINED_ENVELOPE_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
         `${numBoundary(providerDemand.providerCalls)}\\/` +
         `${numBoundary(RETAINED_ENVELOPE_CALLS_AT_CAP)}`,
     );
-    expect(workflowComments).toMatch(envelopeExpr);
+    expect(projectionParagraph).toMatch(envelopeExpr);
 
     const teachingExpr = new RegExp(
-      `${numBoundary(RETAINED_TEACHING_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
+      `teaching\\s+${numBoundary(RETAINED_TEACHING_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
         `${numBoundary(currentTeachingScenarios)}\\/` +
         `${numBoundary(RETAINED_TEACHING_CALLS_AT_CAP)}`,
     );
-    expect(workflowComments).toMatch(teachingExpr);
+    expect(projectionParagraph).toMatch(teachingExpr);
 
     const masteryExpr = new RegExp(
-      `${numBoundary(RETAINED_MASTERY_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
+      `mastery\\s+${numBoundary(RETAINED_MASTERY_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
         `${numBoundary(masteryBudget.rounds)}\\/` +
         `${numBoundary(RETAINED_MASTERY_ROUNDS_COMPLETED)}`,
     );
-    expect(workflowComments).toMatch(masteryExpr);
+    expect(projectionParagraph).toMatch(masteryExpr);
 
     expect(workflowComments).toContain(`~${projectedMinutes} min`);
     expect(workflowComments).toContain(`~${headroomMultiple}×`);
@@ -430,8 +444,7 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       );
     }
     const safetyProbesForTailProfile =
-      safetyProbesFlow.enumerateScenarios?.(tailProfile, undefined as never) ??
-      [];
+      safetyProbesFlow.enumerateScenarios?.(tailProfile) ?? [];
     if (
       safetyProbesForTailProfile.length < RETAINED_SAFETY_PROBES_SKIPPED_COUNT
     ) {
@@ -451,9 +464,7 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     const languageQualityFlow = FLOWS.find((f) => f.id === 'language-quality');
     const languageQualityTotalScenarios = PROFILES.reduce(
       (sum, p) =>
-        sum +
-        (languageQualityFlow?.enumerateScenarios?.(p, undefined as never) ?? [])
-          .length,
+        sum + (languageQualityFlow?.enumerateScenarios?.(p) ?? []).length,
       0,
     );
     if (

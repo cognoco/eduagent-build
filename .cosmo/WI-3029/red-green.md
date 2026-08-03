@@ -836,3 +836,63 @@ Diff scope: `.github/workflows/eval-live.yml` (one sentence corrected,
 `RETAINED_*` constants, one derivation-bound assertion block added).
 `.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json`
 untouched. No Cosmo lifecycle mutation, no merge, no second PR.
+
+## AC-6 S1/S2 round (adversarial review at 87695fa94, 0 MUST_FIX / 2 SHOULD_FIX)
+
+**S1 — TS2554 uncaught.** `scripts/eval-live-gate-independence.test.ts`
+passed a second argument to `enumerateScenarios` at two call sites even
+though `FlowDefinition.enumerateScenarios?(profile: EvalProfile)`
+(`apps/api/eval-llm/runner/types.ts:113`) declares arity 1. No existing
+typecheck target reaches `scripts/`: `nx run api:typecheck` stops at
+`apps/api`; the pre-push `tsc --build` only walks
+`tsconfig.json`'s project references (packages/apps), not `scripts/`.
+Confirmed independently with the TS compiler API against
+`tsconfig.base.json`: 2 TS2554 diagnostics, exactly at lines 433 and 455.
+Fixed: removed the extra argument at both sites (no behavior change —
+JS ignores unused extra args). Added
+`scripts/eval-live-gate-independence-typecheck.test.ts`, a focused probe
+that compiles the target file with the TS compiler API and asserts zero
+TS2554 diagnostics — NOT zero diagnostics overall, since the transitive
+graph carries pre-existing, out-of-scope errors (2 TS2532, unrelated).
+RED (2 TS2554, matching lines 433/455) confirmed before the fix; GREEN
+after; RED again via a temporary re-introduction of the extra argument,
+then reverted byte-identically; GREEN restored.
+
+**S2 — CodeRabbit 3701613388.** The envelope/teaching/mastery
+duration-x-ratio regexes searched the entire `workflowComments` string
+without requiring their gate label, so a swapped/mislabelled pair (e.g.
+the envelope duration printed under a "mastery" label) would still
+satisfy an unlabelled search. Fixed: extracted the AC-6 projection
+sentence ("Projecting each gate's wall clock onto CURRENT ... 180-minute
+timeout-minutes.") into a bounded `projectionParagraph` string, and
+required each regex to include its gate label immediately before the
+duration+ratio expression (`numBoundary` guards kept). RED/GREEN proof
+(paired `Edit`/`Edit` on the workflow YAML, `git diff --stat` confirmed
+byte-identical revert): mutated `"envelope 839s x 366/300"` to
+`"mastery 839s x 366/300"` — RED (`envelopeExpr` requires the literal
+`envelope` label, no longer present); reverted; GREEN.
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts \
+    scripts/eval-live-gate-independence-typecheck.test.ts
+Tests: 17 passed, 17 total
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts scripts/eval-live-gate-independence-typecheck.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 75 passed, 75 of 76 total
+Tests: 4 skipped, 1260 passed, 1264 total
+```
+
+Diff scope: `scripts/eval-live-gate-independence.test.ts` (2 call sites
+fixed, projection paragraph extracted, 3 regexes gained label prefixes)
+and new file `scripts/eval-live-gate-independence-typecheck.test.ts`.
+`.github/workflows/eval-live.yml` has no net diff this round (the S2
+mutation proof was reverted). `.cosmo/WI-3029/workitem.json` and
+`.cosmo/WI-3029/merge-gate-dry-run.json` untouched. No Cosmo lifecycle
+mutation, no merge, no second PR.
