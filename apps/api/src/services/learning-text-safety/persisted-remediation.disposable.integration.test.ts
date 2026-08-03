@@ -30,8 +30,10 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  learningProfiles,
   learningSessions,
   membership,
+  memoryFacts,
   mentorNotices,
   needsDeepeningTopics,
   organization,
@@ -42,6 +44,8 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { closePoolAndDropScratchDatabase } from '../../db/scratch-database-teardown';
+import { normalizeMemoryText } from '../memory/backfill-mapping';
+import { normalizeMemoryValue } from '../learner-profile';
 import {
   REDACTED_PLACEHOLDER,
   remediatePersistedLearningText,
@@ -111,6 +115,11 @@ describeLoopbackOnly(
       attributionNoteId: '',
       educationalNoteId: '',
       attributionDeepeningId: '',
+      artifactNoteId: '',
+      attributionFactId: '',
+      hedgedFactId: '',
+      educationalFactId: '',
+      profileId: '',
     };
 
     beforeAll(async () => {
@@ -269,6 +278,107 @@ describeLoopbackOnly(
         .returning({ id: needsDeepeningTopics.id });
 
       seeded.attributionDeepeningId = deepening!.id;
+
+      // ── verified Challenge artifact: the SAME string in two columns ────────
+      // `persistVerifiedChallengeArtifacts` writes the gated string to
+      // `content` and, for a solid-quote artifact, duplicates it verbatim into
+      // `artifact_concept_key`. Seeding both is what makes the second column's
+      // remediation provable rather than asserted — the landed sweep scrubbed
+      // `content` and left this copy readable.
+      const [artifactNote] = await db
+        .insert(topicNotes)
+        .values({
+          topicId: topic!.id,
+          profileId,
+          content: ATTRIBUTION_ES,
+          artifactSource: 'challenge_solid_quote',
+          artifactConceptKey: ATTRIBUTION_ES,
+        })
+        .returning({ id: topicNotes.id });
+
+      seeded.artifactNoteId = artifactNote!.id;
+
+      // ── learner-profile JSONB, in the shapes PRODUCTION actually writes ────
+      // Not the shapes the Zod schema declares. `mergeInterests` writes bare
+      // strings into `interests`, and `buildAnalysisUpdates` writes
+      // `{topic, subject}` objects into `recentlyResolvedTopics`; the entry
+      // shapes in `packages/schemas` are a read-side coercion. Seeding the
+      // declared shapes would have produced a green sweep that scanned nothing.
+      await db.insert(learningProfiles).values({
+        profileId,
+        interests: [ATTRIBUTION_ES, BENIGN],
+        interestTimestamps: {
+          [normalizeMemoryValue(ATTRIBUTION_ES)]: new Date().toISOString(),
+          [normalizeMemoryValue(BENIGN)]: new Date().toISOString(),
+        },
+        strengths: [
+          {
+            subject: BENIGN,
+            topics: [ATTRIBUTION_ES, BENIGN],
+            confidence: 'medium',
+          },
+        ],
+        struggles: [
+          {
+            subject: BENIGN,
+            topic: ATTRIBUTION_ES,
+            attempts: 1,
+            confidence: 'medium',
+          },
+        ],
+        communicationNotes: [ATTRIBUTION_ES, EDUCATIONAL],
+        suppressedInferences: [ATTRIBUTION_ES],
+        recentlyResolvedTopics: [{ topic: ATTRIBUTION_ES, subject: null }],
+      });
+
+      // ── memory facts: text, the metadata copy, and a colliding duplicate ───
+      // Two active rows that scrub to the SAME placeholder in the same
+      // (profile, category, subject, context) group. Without the supersede they
+      // would collide on `memory_facts_active_unique_idx`, so this pair is what
+      // proves the collision handling rather than describing it.
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: { subject: ATTRIBUTION_ES, topics: [ATTRIBUTION_ES] },
+            observedAt: new Date(),
+            embedding: Array.from({ length: 1024 }, () => 0.01),
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: { subject: ATTRIBUTION_ES, topics: [] },
+            observedAt: new Date(),
+            embedding: Array.from({ length: 1024 }, () => 0.02),
+          },
+          {
+            profileId,
+            category: 'interest',
+            text: EDUCATIONAL,
+            textNormalized: normalizeMemoryText(EDUCATIONAL),
+            metadata: { label: EDUCATIONAL },
+            observedAt: new Date(),
+            embedding: null,
+          },
+        ])
+        .returning({ id: memoryFacts.id, text: memoryFacts.text });
+
+      seeded.attributionFactId = facts.find(
+        (row) => row.text === ATTRIBUTION_ES,
+      )!.id;
+      seeded.hedgedFactId = facts.find(
+        (row) => row.text === ATTRIBUTION_ES_HEDGED,
+      )!.id;
+      seeded.educationalFactId = facts.find(
+        (row) => row.text === EDUCATIONAL,
+      )!.id;
+      seeded.profileId = profileId;
     });
 
     afterAll(async () => {
@@ -298,9 +408,11 @@ describeLoopbackOnly(
       expect(bySurface.get('mentor_notices.correction_hint')).toMatchObject({
         remediated: 1,
       });
+      // Three notes now: the learner's attribution, the educational control, and
+      // the verified-artifact note whose content is the same attribution.
       expect(bySurface.get('topic_notes.content')).toMatchObject({
-        scanned: 2,
-        remediated: 1,
+        scanned: 3,
+        remediated: 2,
         review: 1,
       });
       expect(
@@ -377,6 +489,97 @@ describeLoopbackOnly(
         .from(mentorNotices)
         .where(eq(mentorNotices.id, seeded.educationalNoticeId));
       expect(notice[0]?.concept).toBe(EDUCATIONAL);
+    });
+    it('[AC-5] scrubbed the artifact concept key the landed sweep left behind', async () => {
+      // The crux of the rework. `content` and `artifact_concept_key` held the
+      // identical string; scrubbing only the first leaves the same clinical
+      // sentence readable in the second column of the same row.
+      const note = await db
+        .select({
+          content: topicNotes.content,
+          conceptKey: topicNotes.artifactConceptKey,
+        })
+        .from(topicNotes)
+        .where(eq(topicNotes.id, seeded.artifactNoteId));
+
+      expect(note[0]?.content).toBe(REDACTED_PLACEHOLDER);
+      // Not null: a CHECK constraint (migration 0154) requires this column to be
+      // non-null for a solid-quote artifact, which is every row this surface
+      // targets, so the placeholder is the only available scrub.
+      expect(note[0]?.conceptKey).toBe(REDACTED_PLACEHOLDER);
+    });
+
+    it('[AC-5] scrubbed learner-profile free text in the shapes production writes', async () => {
+      const rows = await db
+        .select({
+          interests: learningProfiles.interests,
+          interestTimestamps: learningProfiles.interestTimestamps,
+          strengths: learningProfiles.strengths,
+          struggles: learningProfiles.struggles,
+          communicationNotes: learningProfiles.communicationNotes,
+          suppressedInferences: learningProfiles.suppressedInferences,
+          recentlyResolvedTopics: learningProfiles.recentlyResolvedTopics,
+        })
+        .from(learningProfiles)
+        .where(eq(learningProfiles.profileId, seeded.profileId));
+
+      const row = rows[0]!;
+
+      // The attribution is gone from every array...
+      expect(JSON.stringify(row)).not.toContain('TEA');
+      // ...and the benign and educational entries survived, so the sweep is a
+      // discriminator rather than a blanket wipe.
+      expect(row.interests).toEqual([BENIGN]);
+      expect(row.communicationNotes).toEqual([EDUCATIONAL]);
+
+      // The DERIVED CARRIER: interestTimestamps is keyed by the normalized
+      // interest label, so a dropped interest must not leave an orphaned key.
+      const timestampKeys = Object.keys(
+        row.interestTimestamps as Record<string, string>,
+      );
+      expect(timestampKeys).toEqual([normalizeMemoryValue(BENIGN)]);
+    });
+
+    it('[AC-5] scrubbed all three memory-fact carriers and superseded the duplicate', async () => {
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          textNormalized: memoryFacts.textNormalized,
+          metadata: memoryFacts.metadata,
+          embedding: memoryFacts.embedding,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts)
+        .where(eq(memoryFacts.profileId, seeded.profileId));
+
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const attribution = byId.get(seeded.attributionFactId)!;
+      const hedged = byId.get(seeded.hedgedFactId)!;
+      const educational = byId.get(seeded.educationalFactId)!;
+
+      // Carrier 1: the column itself, and its derived normalized form.
+      expect(attribution.text).toBe(REDACTED_PLACEHOLDER);
+      expect(attribution.textNormalized).toBe(
+        normalizeMemoryText(REDACTED_PLACEHOLDER),
+      );
+      // Carrier 2: the second copy inside metadata.
+      expect(JSON.stringify(attribution.metadata)).not.toContain('TEA');
+      // Carrier 3: the vector of the pre-redaction sentence, which sits behind a
+      // cosine index — a scrubbed row would otherwise still be retrievable by
+      // similarity to the exact phrasing this item removes.
+      expect(attribution.embedding).toBeNull();
+
+      // The colliding duplicate scrubs to the same placeholder, so it leaves the
+      // partial unique index by being superseded BY the survivor — never by
+      // itself, which would be a cycle for the cascade-delete walker.
+      expect(hedged.text).toBe(REDACTED_PLACEHOLDER);
+      expect(hedged.supersededBy).toBe(seeded.attributionFactId);
+      expect(attribution.supersededBy).toBeNull();
+
+      // The educational fact is the control: ambiguous, reported, untouched.
+      expect(educational.text).toBe(EDUCATIONAL);
+      expect(educational.supersededBy).toBeNull();
     });
   },
 );
