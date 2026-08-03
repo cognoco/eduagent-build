@@ -44,9 +44,14 @@ function runPnpm(
     env: NodeJS.ProcessEnv;
     encoding: 'utf8';
   },
+  dependencies: {
+    platform?: NodeJS.Platform;
+    spawn?: typeof spawnSync;
+  } = {},
 ) {
-  const launch = pnpmLaunchShape();
-  const probe = spawnSync(launch.command, ['--version'], {
+  const launch = pnpmLaunchShape(dependencies.platform);
+  const spawn = dependencies.spawn ?? spawnSync;
+  const probe = spawn(launch.command, ['--version'], {
     ...options,
     shell: launch.shell,
   });
@@ -55,7 +60,7 @@ function runPnpm(
       `Unable to launch ${launch.command}; install the repository package manager and ensure it is on PATH.`,
     );
   }
-  const result = spawnSync(launch.command, args, {
+  const result = spawn(launch.command, args, {
     ...options,
     shell: launch.shell,
   });
@@ -100,6 +105,34 @@ describe('integration typecheck contract', () => {
       expect(pnpmLaunchShape(platform)).toEqual({ command, shell });
     },
   );
+
+  it('uses the Windows launcher through the shared pnpm runner', () => {
+    const spawn = jest
+      .fn()
+      .mockReturnValueOnce({ status: 0 })
+      .mockReturnValueOnce({ status: 0 });
+    const options = {
+      cwd: repoRoot,
+      env: process.env,
+      encoding: 'utf8' as const,
+    };
+
+    runPnpm(['exec', 'tsx', 'checker.ts'], options, {
+      platform: 'win32',
+      spawn: spawn as unknown as typeof spawnSync,
+    });
+
+    expect(spawn).toHaveBeenNthCalledWith(1, 'pnpm.cmd', ['--version'], {
+      ...options,
+      shell: true,
+    });
+    expect(spawn).toHaveBeenNthCalledWith(
+      2,
+      'pnpm.cmd',
+      ['exec', 'tsx', 'checker.ts'],
+      { ...options, shell: true },
+    );
+  });
 
   it('fails with an actionable error when the package manager cannot start', () => {
     expect(() =>
