@@ -23,15 +23,17 @@ import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
+import { Client, Pool } from 'pg';
 
 import {
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  learningProfiles,
   learningSessions,
   membership,
+  memoryFacts,
   mentorNotices,
   needsDeepeningTopics,
   organization,
@@ -42,10 +44,13 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { closePoolAndDropScratchDatabase } from '../../db/scratch-database-teardown';
+import { normalizeMemoryText } from '../memory/backfill-mapping';
+import { normalizeMemoryValue } from '../learner-profile';
 import {
   REDACTED_PLACEHOLDER,
   remediatePersistedLearningText,
 } from './persisted-remediation-apply';
+import { remediateMemoryFacts } from './persisted-remediation-memory';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
@@ -80,6 +85,34 @@ function buildScratchUrl(baseUrl: string, databaseName: string): string {
   return url.toString();
 }
 
+async function waitForBlockedMemoryFactUpdate(
+  adminPool: Pool,
+  databaseName: string,
+  remediationApplicationName: string,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = await adminPool.query<{ waiting: boolean }>(
+      `SELECT EXISTS (
+        SELECT 1
+        FROM pg_stat_activity
+        WHERE datname = $1
+          AND application_name = $2
+          AND wait_event_type = 'Lock'
+          AND query ILIKE 'update "memory_facts"%'
+      ) AS waiting`,
+      [databaseName, remediationApplicationName],
+    );
+    if (result.rows[0]?.waiting) return;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 20);
+    });
+  }
+
+  throw new Error('remediation update did not block on the concurrent writer');
+}
+
 const describeLoopbackOnly = hasLoopbackDatabaseUrl()
   ? describe
   : describe.skip;
@@ -111,6 +144,13 @@ describeLoopbackOnly(
       attributionNoteId: '',
       educationalNoteId: '',
       attributionDeepeningId: '',
+      artifactNoteId: '',
+      attributionFactId: '',
+      hedgedFactId: '',
+      educationalFactId: '',
+      concatenationCollisionFactIds: [] as string[],
+      delimiterCollisionFactIds: [] as string[],
+      profileId: '',
     };
 
     beforeAll(async () => {
@@ -269,6 +309,177 @@ describeLoopbackOnly(
         .returning({ id: needsDeepeningTopics.id });
 
       seeded.attributionDeepeningId = deepening!.id;
+
+      // ── verified Challenge artifact: the SAME string in two columns ────────
+      // `persistVerifiedChallengeArtifacts` writes the gated string to
+      // `content` and, for a solid-quote artifact, duplicates it verbatim into
+      // `artifact_concept_key`. Seeding both is what makes the second column's
+      // remediation provable rather than asserted — the landed sweep scrubbed
+      // `content` and left this copy readable.
+      const [artifactNote] = await db
+        .insert(topicNotes)
+        .values({
+          topicId: topic!.id,
+          profileId,
+          content: ATTRIBUTION_ES,
+          artifactSource: 'challenge_solid_quote',
+          artifactConceptKey: ATTRIBUTION_ES,
+        })
+        .returning({ id: topicNotes.id });
+
+      seeded.artifactNoteId = artifactNote!.id;
+
+      // ── learner-profile JSONB, in the shapes PRODUCTION actually writes ────
+      // Not the shapes the Zod schema declares. `mergeInterests` writes bare
+      // strings into `interests`, and `buildAnalysisUpdates` writes
+      // `{topic, subject}` objects into `recentlyResolvedTopics`; the entry
+      // shapes in `packages/schemas` are a read-side coercion. Seeding the
+      // declared shapes would have produced a green sweep that scanned nothing.
+      await db.insert(learningProfiles).values({
+        profileId,
+        interests: [ATTRIBUTION_ES, BENIGN],
+        interestTimestamps: {
+          [normalizeMemoryValue(ATTRIBUTION_ES)]: new Date().toISOString(),
+          [normalizeMemoryValue(BENIGN)]: new Date().toISOString(),
+        },
+        strengths: [
+          {
+            subject: BENIGN,
+            topics: [ATTRIBUTION_ES, BENIGN],
+            confidence: 'medium',
+          },
+        ],
+        struggles: [
+          {
+            subject: BENIGN,
+            topic: ATTRIBUTION_ES,
+            attempts: 1,
+            confidence: 'medium',
+          },
+        ],
+        communicationNotes: [ATTRIBUTION_ES, EDUCATIONAL],
+        suppressedInferences: [ATTRIBUTION_ES],
+        recentlyResolvedTopics: [{ topic: ATTRIBUTION_ES, subject: null }],
+      });
+
+      // ── memory facts: text, the metadata copy, and a colliding duplicate ───
+      // Two active rows that scrub to the SAME placeholder in the same
+      // (profile, category, subject, context) group. Without the supersede they
+      // would collide on `memory_facts_active_unique_idx`, so this pair is what
+      // proves the collision handling rather than describing it.
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: { subject: ATTRIBUTION_ES, topics: [ATTRIBUTION_ES] },
+            observedAt: new Date(),
+            embedding: Array.from({ length: 1024 }, () => 0.01),
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: { subject: ATTRIBUTION_ES, topics: [] },
+            observedAt: new Date(),
+            embedding: Array.from({ length: 1024 }, () => 0.02),
+          },
+          {
+            profileId,
+            category: 'interest',
+            text: EDUCATIONAL,
+            textNormalized: normalizeMemoryText(EDUCATIONAL),
+            metadata: { label: EDUCATIONAL },
+            observedAt: new Date(),
+            embedding: null,
+          },
+        ])
+        .returning({ id: memoryFacts.id, text: memoryFacts.text });
+
+      seeded.attributionFactId = facts.find(
+        (row) => row.text === ATTRIBUTION_ES,
+      )!.id;
+      seeded.hedgedFactId = facts.find(
+        (row) => row.text === ATTRIBUTION_ES_HEDGED,
+      )!.id;
+      seeded.educationalFactId = facts.find(
+        (row) => row.text === EDUCATIONAL,
+      )!.id;
+
+      const distinctTupleFacts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: { subject: 'Math', context: '', topics: [] },
+            observedAt: new Date(),
+            embedding: null,
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: { subject: 'Mat', context: 'h', topics: [] },
+            observedAt: new Date(),
+            embedding: null,
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: {
+              subject: 'Math\u001fadvanced',
+              context: 'school',
+              topics: [],
+            },
+            observedAt: new Date(),
+            embedding: null,
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: {
+              subject: 'Math',
+              context: 'advanced\u001fschool',
+              topics: [],
+            },
+            observedAt: new Date(),
+            embedding: null,
+          },
+        ])
+        .returning({ id: memoryFacts.id, metadata: memoryFacts.metadata });
+
+      seeded.concatenationCollisionFactIds = distinctTupleFacts
+        .filter((row) => {
+          const metadata = row.metadata as Record<string, unknown>;
+          return metadata.subject === 'Math' || metadata.subject === 'Mat';
+        })
+        .filter((row) => {
+          const metadata = row.metadata as Record<string, unknown>;
+          return metadata.context === '' || metadata.context === 'h';
+        })
+        .map((row) => row.id);
+      seeded.delimiterCollisionFactIds = distinctTupleFacts
+        .filter((row) => {
+          const metadata = row.metadata as Record<string, unknown>;
+          return (
+            metadata.subject === 'Math\u001fadvanced' ||
+            metadata.context === 'advanced\u001fschool'
+          );
+        })
+        .map((row) => row.id);
+      seeded.profileId = profileId;
     });
 
     afterAll(async () => {
@@ -298,9 +509,11 @@ describeLoopbackOnly(
       expect(bySurface.get('mentor_notices.correction_hint')).toMatchObject({
         remediated: 1,
       });
+      // Three notes now: the learner's attribution, the educational control, and
+      // the verified-artifact note whose content is the same attribution.
       expect(bySurface.get('topic_notes.content')).toMatchObject({
-        scanned: 2,
-        remediated: 1,
+        scanned: 3,
+        remediated: 2,
         review: 1,
       });
       expect(
@@ -377,6 +590,450 @@ describeLoopbackOnly(
         .from(mentorNotices)
         .where(eq(mentorNotices.id, seeded.educationalNoticeId));
       expect(notice[0]?.concept).toBe(EDUCATIONAL);
+    });
+    it('[AC-5] scrubbed the artifact concept key the landed sweep left behind', async () => {
+      // The crux of the rework. `content` and `artifact_concept_key` held the
+      // identical string; scrubbing only the first leaves the same clinical
+      // sentence readable in the second column of the same row.
+      const note = await db
+        .select({
+          content: topicNotes.content,
+          conceptKey: topicNotes.artifactConceptKey,
+        })
+        .from(topicNotes)
+        .where(eq(topicNotes.id, seeded.artifactNoteId));
+
+      expect(note[0]?.content).toBe(REDACTED_PLACEHOLDER);
+      // Not null: a CHECK constraint (migration 0154) requires this column to be
+      // non-null for a solid-quote artifact, which is every row this surface
+      // targets, so the placeholder is the only available scrub.
+      expect(note[0]?.conceptKey).toBe(REDACTED_PLACEHOLDER);
+    });
+
+    it('[AC-5] scrubbed learner-profile free text in the shapes production writes', async () => {
+      const rows = await db
+        .select({
+          interests: learningProfiles.interests,
+          interestTimestamps: learningProfiles.interestTimestamps,
+          strengths: learningProfiles.strengths,
+          struggles: learningProfiles.struggles,
+          communicationNotes: learningProfiles.communicationNotes,
+          suppressedInferences: learningProfiles.suppressedInferences,
+          recentlyResolvedTopics: learningProfiles.recentlyResolvedTopics,
+        })
+        .from(learningProfiles)
+        .where(eq(learningProfiles.profileId, seeded.profileId));
+
+      const row = rows[0]!;
+
+      // The attribution is gone from every array...
+      expect(JSON.stringify(row)).not.toContain('TEA');
+      // ...and the benign and educational entries survived, so the sweep is a
+      // discriminator rather than a blanket wipe.
+      expect(row.interests).toEqual([BENIGN]);
+      expect(row.communicationNotes).toEqual([EDUCATIONAL]);
+
+      // The DERIVED CARRIER: interestTimestamps is keyed by the normalized
+      // interest label, so a dropped interest must not leave an orphaned key.
+      const timestampKeys = Object.keys(
+        row.interestTimestamps as Record<string, string>,
+      );
+      expect(timestampKeys).toEqual([normalizeMemoryValue(BENIGN)]);
+    });
+
+    it('[AC-5] scrubbed all three memory-fact carriers and superseded the duplicate', async () => {
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          textNormalized: memoryFacts.textNormalized,
+          metadata: memoryFacts.metadata,
+          embedding: memoryFacts.embedding,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts)
+        .where(eq(memoryFacts.profileId, seeded.profileId));
+
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const attribution = byId.get(seeded.attributionFactId)!;
+      const hedged = byId.get(seeded.hedgedFactId)!;
+      const educational = byId.get(seeded.educationalFactId)!;
+
+      // Carrier 1: the column itself, and its derived normalized form.
+      expect(attribution.text).toBe(REDACTED_PLACEHOLDER);
+      expect(attribution.textNormalized).toBe(
+        normalizeMemoryText(REDACTED_PLACEHOLDER),
+      );
+      // Carrier 2: the second copy inside metadata.
+      expect(JSON.stringify(attribution.metadata)).not.toContain('TEA');
+      // Carrier 3: the vector of the pre-redaction sentence, which sits behind a
+      // cosine index — a scrubbed row would otherwise still be retrievable by
+      // similarity to the exact phrasing this item removes.
+      expect(attribution.embedding).toBeNull();
+
+      // The colliding duplicate scrubs to the same placeholder, so it leaves the
+      // partial unique index by being superseded BY the survivor — never by
+      // itself, which would be a cycle for the cascade-delete walker.
+      expect(hedged.text).toBe(REDACTED_PLACEHOLDER);
+      expect(hedged.supersededBy).toBe(seeded.attributionFactId);
+      expect(attribution.supersededBy).toBeNull();
+
+      // The educational fact is the control: ambiguous, reported, untouched.
+      expect(educational.text).toBe(EDUCATIONAL);
+      expect(educational.supersededBy).toBeNull();
+    });
+
+    it('[WI-3078 AC] does not supersede facts whose database tuples are distinct', async () => {
+      const protectedIds = [
+        ...seeded.concatenationCollisionFactIds,
+        ...seeded.delimiterCollisionFactIds,
+      ];
+      expect(protectedIds).toHaveLength(4);
+
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(rows.map((row) => [row.id, row]));
+
+      for (const id of protectedIds) {
+        expect(byId.get(id)?.text).toBe(REDACTED_PLACEHOLDER);
+        expect(byId.get(id)?.supersededBy).toBeNull();
+      }
+    });
+
+    it('[WI-2753] preserves PostgreSQL scalar subject index semantics', async () => {
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'suppressed',
+            text: 'Der Schüler hat ADHS.',
+            textNormalized: normalizeMemoryText('Der Schüler hat ADHS.'),
+            metadata: { subject: 3 },
+            observedAt: new Date('2026-08-03T10:30:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T10:30:00.000Z'),
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'suppressed',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: {},
+            observedAt: new Date('2026-08-03T10:45:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T10:45:00.000Z'),
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      await remediateMemoryFacts(db);
+
+      const ids = facts.map((fact) => fact.id);
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        rows.filter((row) => ids.includes(row.id)).map((row) => [row.id, row]),
+      );
+
+      for (const fact of facts) {
+        expect(byId.get(fact.id)).toMatchObject({
+          text: REDACTED_PLACEHOLDER,
+          supersededBy: null,
+        });
+      }
+    });
+
+    it('[WI-2753] converges distinct original groups on their post-redaction tuple', async () => {
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'struggle',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: { subject: ATTRIBUTION_ES, topic: BENIGN },
+            observedAt: new Date('2026-08-03T11:00:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T11:00:00.000Z'),
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'struggle',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: { subject: ATTRIBUTION_ES_HEDGED, topic: BENIGN },
+            observedAt: new Date('2026-08-03T12:00:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T12:00:00.000Z'),
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      const reports = await remediateMemoryFacts(db);
+      expect(
+        reports.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ skippedChanged: 0 });
+      expect(
+        reports.find((report) => report.surface === 'memory_facts.text')
+          ?.remediated,
+      ).toBeGreaterThanOrEqual(2);
+
+      const ids = facts.map((fact) => fact.id);
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          metadata: memoryFacts.metadata,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        rows.filter((row) => ids.includes(row.id)).map((row) => [row.id, row]),
+      );
+
+      expect(byId.get(facts[0]!.id)).toMatchObject({
+        text: REDACTED_PLACEHOLDER,
+        metadata: { subject: REDACTED_PLACEHOLDER, topic: BENIGN },
+        supersededBy: null,
+      });
+      expect(byId.get(facts[1]!.id)).toMatchObject({
+        text: REDACTED_PLACEHOLDER,
+        metadata: { subject: REDACTED_PLACEHOLDER, topic: BENIGN },
+        supersededBy: facts[0]!.id,
+      });
+
+      const rerun = await remediateMemoryFacts(db);
+      expect(
+        rerun.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ remediated: 0, skippedChanged: 0 });
+    });
+
+    it('[WI-2753] converges metadata-only redactions on their post-redaction tuple', async () => {
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'struggle',
+            text: BENIGN,
+            textNormalized: normalizeMemoryText(BENIGN),
+            metadata: { subject: ATTRIBUTION_ES, topic: BENIGN },
+            observedAt: new Date('2026-08-03T13:00:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T13:00:00.000Z'),
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'struggle',
+            text: BENIGN,
+            textNormalized: normalizeMemoryText(BENIGN),
+            metadata: { subject: ATTRIBUTION_ES_HEDGED, topic: BENIGN },
+            observedAt: new Date('2026-08-03T14:00:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T14:00:00.000Z'),
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      const reports = await remediateMemoryFacts(db);
+      expect(
+        reports.find((report) => report.surface === 'memory_facts.metadata'),
+      ).toMatchObject({ remediated: 2, skippedChanged: 0 });
+
+      const ids = facts.map((fact) => fact.id);
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          metadata: memoryFacts.metadata,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        rows.filter((row) => ids.includes(row.id)).map((row) => [row.id, row]),
+      );
+
+      expect(byId.get(facts[0]!.id)).toMatchObject({
+        text: BENIGN,
+        metadata: { subject: REDACTED_PLACEHOLDER, topic: BENIGN },
+        supersededBy: null,
+      });
+      expect(byId.get(facts[1]!.id)).toMatchObject({
+        text: BENIGN,
+        metadata: { subject: REDACTED_PLACEHOLDER, topic: BENIGN },
+        supersededBy: facts[0]!.id,
+      });
+
+      const rerun = await remediateMemoryFacts(db);
+      expect(
+        rerun.find((report) => report.surface === 'memory_facts.metadata'),
+      ).toMatchObject({ remediated: 0, skippedChanged: 0 });
+    });
+
+    it('[WI-3080] reuses a prior-run redacted survivor for later colliding facts', async () => {
+      const [priorRunFact] = await db
+        .insert(memoryFacts)
+        .values({
+          profileId: seeded.profileId,
+          category: 'communication_note',
+          text: 'Der Schüler hat ADHS.',
+          textNormalized: normalizeMemoryText('Der Schüler hat ADHS.'),
+          metadata: {},
+          observedAt: new Date('2026-08-03T08:00:00.000Z'),
+          embedding: null,
+        })
+        .returning({ id: memoryFacts.id });
+
+      const firstRun = await remediateMemoryFacts(db);
+      expect(
+        firstRun.find((report) => report.surface === 'memory_facts.text')
+          ?.remediated,
+      ).toBeGreaterThanOrEqual(1);
+
+      const laterFacts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'communication_note',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: {},
+            observedAt: new Date('2026-08-03T09:00:00.000Z'),
+            embedding: null,
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'communication_note',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: {},
+            observedAt: new Date('2026-08-03T10:00:00.000Z'),
+            embedding: null,
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      const secondRun = await remediateMemoryFacts(db);
+      expect(
+        secondRun.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ remediated: 2, skippedChanged: 0 });
+
+      const ids = [priorRunFact!.id, ...laterFacts.map((row) => row.id)];
+      const afterSecondRun = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        afterSecondRun
+          .filter((row) => ids.includes(row.id))
+          .map((row) => [row.id, row]),
+      );
+
+      expect(byId.get(priorRunFact!.id)).toMatchObject({
+        text: REDACTED_PLACEHOLDER,
+        supersededBy: null,
+      });
+      for (const fact of laterFacts) {
+        expect(byId.get(fact.id)).toMatchObject({
+          text: REDACTED_PLACEHOLDER,
+          supersededBy: priorRunFact!.id,
+        });
+      }
+
+      const thirdRun = await remediateMemoryFacts(db);
+      expect(
+        thirdRun.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ remediated: 0, skippedChanged: 0 });
+    });
+
+    it('[WI-3076 AC] reports a metadata-only concurrent update instead of overwriting it', async () => {
+      // This shape drives a metadata-only remediation: the primary text is
+      // benign, while metadata.subject carries the remediable attribution.
+      // The separate connection locks the row after the scan can read it, then
+      // writes an unrelated key before releasing the remediation update.
+      const [fact] = await db
+        .insert(memoryFacts)
+        .values({
+          profileId: seeded.profileId,
+          category: 'strength',
+          text: BENIGN,
+          textNormalized: normalizeMemoryText(BENIGN),
+          metadata: { subject: ATTRIBUTION_ES, topics: [] },
+          observedAt: new Date(),
+          embedding: null,
+        })
+        .returning({ id: memoryFacts.id });
+
+      const writer = new Client({
+        connectionString: scratchUrl,
+        application_name: `${scratchApplicationName}-concurrent-writer`,
+      });
+      await writer.connect();
+
+      try {
+        await writer.query('BEGIN');
+        await writer.query(
+          'SELECT id FROM memory_facts WHERE id = $1 FOR UPDATE',
+          [fact!.id],
+        );
+
+        const remediation = remediateMemoryFacts(db);
+        // Observe rejection immediately: if the wait helper fails first, the
+        // in-flight query must not mask that diagnostic as an unhandled promise.
+        void remediation.catch(() => undefined);
+        await waitForBlockedMemoryFactUpdate(
+          adminPool,
+          databaseName,
+          scratchApplicationName,
+        );
+
+        await writer.query(
+          `UPDATE memory_facts
+           SET metadata = metadata || $2::jsonb
+           WHERE id = $1`,
+          [fact!.id, JSON.stringify({ concurrentMarker: 'preserve-me' })],
+        );
+        await writer.query('COMMIT');
+
+        const reports = await remediation;
+        const metadataReport = reports.find(
+          (report) => report.surface === 'memory_facts.metadata',
+        );
+        expect(metadataReport?.skippedChanged).toBe(1);
+
+        const [after] = await db
+          .select({ text: memoryFacts.text, metadata: memoryFacts.metadata })
+          .from(memoryFacts)
+          .where(eq(memoryFacts.id, fact!.id));
+
+        // The predicate must protect both fields read to build the JSONB
+        // replacement. With the old id+text-only predicate, this assertion
+        // fails: subject is redacted and concurrentMarker is lost.
+        expect(after?.text).toBe(BENIGN);
+        expect(after?.metadata).toMatchObject({
+          subject: ATTRIBUTION_ES,
+          concurrentMarker: 'preserve-me',
+        });
+      } finally {
+        await writer.query('ROLLBACK').catch(() => undefined);
+        await writer.end();
+      }
     });
   },
 );
