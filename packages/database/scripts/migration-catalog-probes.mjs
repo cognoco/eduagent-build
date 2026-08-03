@@ -1,9 +1,104 @@
 export async function probeExists(query, probe) {
-  if (probe.kind === 'relation') {
-    const qualified = `"${probe.schema}"."${probe.name}"`;
+  if (probe.kind === 'relation' && probe.compatibleWhenAbsent) {
+    const relationKinds =
+      probe.relationKind === 'table'
+        ? ['r']
+        : probe.relationKind === 'partitioned-table'
+          ? ['p']
+          : ['i'];
+    if (
+      probe.relationKind === 'index' &&
+      probe.parentSchema &&
+      probe.parentTable
+    ) {
+      const [{ exists }] = await query(
+        `SELECT (
+          NOT EXISTS (
+            SELECT 1 FROM pg_class named_relation
+            INNER JOIN pg_namespace named_namespace
+              ON named_namespace.oid = named_relation.relnamespace
+            WHERE named_namespace.nspname = $1 AND named_relation.relname = $2
+          ) OR EXISTS (
+            SELECT 1 FROM pg_class relation
+            INNER JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+            INNER JOIN pg_index index_row ON index_row.indexrelid = relation.oid
+            INNER JOIN pg_class parent ON parent.oid = index_row.indrelid
+            INNER JOIN pg_namespace parent_namespace ON parent_namespace.oid = parent.relnamespace
+            WHERE namespace.nspname = $1 AND relation.relname = $2
+              AND relation.relkind = ANY($3::"char"[])
+              AND parent_namespace.nspname = $4 AND parent.relname = $5
+          )
+        ) AS exists`,
+        [
+          probe.schema,
+          probe.name,
+          relationKinds,
+          probe.parentSchema,
+          probe.parentTable,
+        ],
+      );
+      return exists;
+    }
     const [{ exists }] = await query(
-      'SELECT to_regclass($1) IS NOT NULL AS exists',
-      [qualified],
+      `SELECT (
+        NOT EXISTS (
+          SELECT 1 FROM pg_class named_relation
+          INNER JOIN pg_namespace named_namespace
+            ON named_namespace.oid = named_relation.relnamespace
+          WHERE named_namespace.nspname = $1 AND named_relation.relname = $2
+        ) OR EXISTS (
+          SELECT 1 FROM pg_class relation
+          INNER JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+          WHERE namespace.nspname = $1 AND relation.relname = $2
+            AND relation.relkind = ANY($3::"char"[])
+        )
+      ) AS exists`,
+      [probe.schema, probe.name, relationKinds],
+    );
+    return exists;
+  }
+
+  if (
+    probe.kind === 'relation' &&
+    probe.relationKind === 'index' &&
+    probe.expectedExists === true &&
+    probe.parentSchema &&
+    probe.parentTable
+  ) {
+    const [{ exists }] = await query(
+      `SELECT EXISTS (
+        SELECT 1 FROM pg_class relation
+        INNER JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+        INNER JOIN pg_index index_row ON index_row.indexrelid = relation.oid
+        INNER JOIN pg_class parent ON parent.oid = index_row.indrelid
+        INNER JOIN pg_namespace parent_namespace ON parent_namespace.oid = parent.relnamespace
+        WHERE namespace.nspname = $1 AND relation.relname = $2
+          AND relation.relkind = ANY($3::"char"[])
+          AND parent_namespace.nspname = $4 AND parent.relname = $5
+      ) AS exists`,
+      [probe.schema, probe.name, ['i'], probe.parentSchema, probe.parentTable],
+    );
+    return exists;
+  }
+
+  if (probe.kind === 'relation') {
+    const [{ exists }] = await query(
+      `SELECT EXISTS (
+        SELECT 1 FROM pg_class relation
+        INNER JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+        WHERE namespace.nspname = $1 AND relation.relname = $2
+          AND ($3::boolean = false OR relation.relkind = ANY($4::"char"[]))
+      ) AS exists`,
+      [
+        probe.schema,
+        probe.name,
+        probe.expectedExists === true,
+        probe.relationKind === 'table'
+          ? ['r']
+          : probe.relationKind === 'partitioned-table'
+            ? ['p']
+            : ['i'],
+      ],
     );
     return exists;
   }
