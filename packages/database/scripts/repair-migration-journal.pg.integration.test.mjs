@@ -84,10 +84,14 @@ test(
     const databaseNames = [
       `wi1628_native_${runId}`,
       `wi1628_mismatch_${runId}`,
+      `wi1628_catalog_stable_${runId}`,
       `wi1628_catalog_${runId}`,
     ];
     for (const name of databaseNames) {
-      assert.match(name, /^wi1628_(?:native|mismatch|catalog)_[0-9_]+$/);
+      assert.match(
+        name,
+        /^wi1628_(?:native|mismatch|catalog_stable|catalog)_[0-9_]+$/,
+      );
     }
 
     const baseline = new URL(baselineUrl);
@@ -224,32 +228,100 @@ test(
         await mismatch.end();
       }
 
-      const catalogUrl = databaseUrl(baselineUrl, databaseNames[2]);
-      const catalog = new pg.Client({ connectionString: catalogUrl });
-      await catalog.connect();
+      const stableCatalogUrl = databaseUrl(baselineUrl, databaseNames[2]);
+      const stableCatalog = new pg.Client({
+        connectionString: stableCatalogUrl,
+      });
+      await stableCatalog.connect();
       try {
-        await seedExactOrphans(catalog);
-        const catalogDryRunPath = path.join(receiptDir, 'catalog-dry-run.json');
-        const catalogDryRun = runRepair({
-          mode: 'dry-run',
-          targetUrl: catalogUrl,
-          receiptPath: catalogDryRunPath,
-          extraEnv: { GITHUB_RUN_ID: '9001' },
-        });
-        assert.equal(catalogDryRun.status, 0, catalogDryRun.stderr);
-        await catalog.query(
+        await seedExactOrphans(stableCatalog);
+        await stableCatalog.query(
           'CREATE TABLE public.wi1628_catalog_drift_probe (id integer)',
         );
-        const refused = runRepair({
+        const stableDryRunPath = path.join(
+          receiptDir,
+          'catalog-stable-dry-run.json',
+        );
+        const stableDryRun = runRepair({
+          mode: 'dry-run',
+          targetUrl: stableCatalogUrl,
+          receiptPath: stableDryRunPath,
+          extraEnv: { GITHUB_RUN_ID: '9001' },
+        });
+        assert.equal(stableDryRun.status, 0, stableDryRun.stderr);
+        const stableReceipt = JSON.parse(
+          fs.readFileSync(stableDryRunPath, 'utf8'),
+        );
+        assert.ok(stableReceipt.catalogInventory.differences > 0);
+        const stableApply = runRepair({
           mode: 'apply',
-          targetUrl: catalogUrl,
-          receiptPath: path.join(receiptDir, 'catalog-apply.json'),
+          targetUrl: stableCatalogUrl,
+          receiptPath: path.join(receiptDir, 'catalog-stable-apply.json'),
           extraEnv: {
             GITHUB_RUN_ID: '9002',
             WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
             WI1628_UNRECOVERED_EFFECTS_ACK:
               'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
             WI1628_REVIEWED_DRY_RUN_ID: '9001',
+            WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: stableDryRunPath,
+          },
+        });
+        assert.equal(stableApply.status, 0, stableApply.stderr);
+        assert.equal(await exactOrphanCount(stableCatalog), 0);
+      } finally {
+        await stableCatalog.end();
+      }
+
+      const catalogUrl = databaseUrl(baselineUrl, databaseNames[3]);
+      const catalog = new pg.Client({ connectionString: catalogUrl });
+      await catalog.connect();
+      try {
+        await seedExactOrphans(catalog);
+        await catalog.query(
+          'CREATE TABLE public.wi1628_catalog_drift_probe (id integer)',
+        );
+        const catalogDryRunPath = path.join(receiptDir, 'catalog-dry-run.json');
+        const catalogDryRun = runRepair({
+          mode: 'dry-run',
+          targetUrl: catalogUrl,
+          receiptPath: catalogDryRunPath,
+          extraEnv: { GITHUB_RUN_ID: '9101' },
+        });
+        assert.equal(catalogDryRun.status, 0, catalogDryRun.stderr);
+        await catalog.query(
+          'ALTER TABLE public.wi1628_catalog_drift_probe ALTER COLUMN id TYPE bigint',
+        );
+        const changedDryRunPath = path.join(
+          receiptDir,
+          'catalog-changed-dry-run.json',
+        );
+        const changedDryRun = runRepair({
+          mode: 'dry-run',
+          targetUrl: catalogUrl,
+          receiptPath: changedDryRunPath,
+          extraEnv: { GITHUB_RUN_ID: '9102' },
+        });
+        assert.equal(changedDryRun.status, 0, changedDryRun.stderr);
+        const before = JSON.parse(
+          fs.readFileSync(catalogDryRunPath, 'utf8'),
+        ).catalogInventory;
+        const after = JSON.parse(
+          fs.readFileSync(changedDryRunPath, 'utf8'),
+        ).catalogInventory;
+        assert.equal(after.baselineObjects, before.baselineObjects);
+        assert.equal(after.stagingObjects, before.stagingObjects);
+        assert.equal(after.differences, before.differences);
+        assert.notEqual(after.fingerprint, before.fingerprint);
+        const refused = runRepair({
+          mode: 'apply',
+          targetUrl: catalogUrl,
+          receiptPath: path.join(receiptDir, 'catalog-apply.json'),
+          extraEnv: {
+            GITHUB_RUN_ID: '9103',
+            WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
+            WI1628_UNRECOVERED_EFFECTS_ACK:
+              'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+            WI1628_REVIEWED_DRY_RUN_ID: '9101',
             WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: catalogDryRunPath,
           },
         });
