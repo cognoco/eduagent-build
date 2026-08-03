@@ -991,7 +991,7 @@ describe('ProfileProvider', () => {
       appStateListener?.('active');
     });
     await waitFor(() => {
-      expect(result.current.profileLoadError).toBeNull();
+      expect(result.current.profileRefreshError).toBeNull();
     });
     expect(result.current.profileRefreshError).toBeNull();
   });
