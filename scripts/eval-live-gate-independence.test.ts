@@ -34,6 +34,7 @@ import { MAX_CHALLENGE_QUESTIONS } from '../apps/api/src/services/challenge-roun
 import { PROFILES } from '../apps/api/eval-llm/fixtures/profiles';
 import { ENVELOPE_FLOWS } from '../apps/api/eval-llm/envelope-flow-registry';
 import { FLOWS } from '../apps/api/eval-llm/flow-registry';
+import { safetyProbesFlow } from '../apps/api/eval-llm/flows/safety-probes';
 import {
   deriveEnvelopeBudgetFromMatrix,
   deriveEnvelopeProviderDemandFromMatrix,
@@ -267,6 +268,21 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
   const RETAINED_TEACHING_CALLS_AT_CAP = 5;
   const RETAINED_MASTERY_WALL_CLOCK_SECONDS = 710;
   const RETAINED_MASTERY_ROUNDS_COMPLETED = 21;
+  // [WI-3029 AC-6 MUST-FIX] Historical facts about the retained run's 29
+  // budget-exceeded skips (read off the run log, not re-derivable from
+  // current code): safety-probes' 10 skips were ALL for one profile
+  // (17yo-french-advanced) — the log shows 10 consecutive "safety-probes ×
+  // 17yo-french-advanced" skip lines — and were the TAIL of that profile's
+  // scenario enumeration order (budget ran out partway through the last
+  // profile processed). Which of that tail are judge-bearing is NOT a
+  // historical fact frozen at retained-run time — it's re-derived below
+  // from the CURRENT registry, so a future battery/order change breaks this
+  // assertion instead of leaving a stale hardcoded split.
+  const RETAINED_SAFETY_PROBES_SKIPPED_TAIL_PROFILE_ID = '17yo-french-advanced';
+  const RETAINED_SAFETY_PROBES_SKIPPED_COUNT = 10;
+  const RETAINED_LANGUAGE_QUALITY_SKIPPED_COUNT = 6;
+  const RETAINED_CHALLENGE_ROUND_MASTERY_SKIPPED_COUNT = 3;
+  const RETAINED_REVIEW_CONTINUITY_OPENER_SKIPPED_COUNT = 10;
 
   test("[WI-3029 AC-6] timeout re-verification projects each gate's retained-run wall clock onto CURRENT demand and the ACTUAL configured timeout-minutes, not a stale flat per-call spike rate", () => {
     const workflow = readFileSync(
@@ -395,6 +411,78 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     expect(workflowComments).toMatch(/no P90/i);
     expect(workflowComments).toMatch(/2\s+failed/);
     expect(workflowComments).toMatch(/queue|latency/i);
+
+    // [MUST-FIX] The judge-bearing/non-judge-bearing split among the 29
+    // budget-exceeded skips must be DERIVED, not a disconnected hardcoded
+    // pair. Re-derive from the CURRENT registry: the tail profile's
+    // enumerateScenarios order determines which of its skipped
+    // safety-probes cases are legitimate_sensitive (judge-bearing,
+    // providerCallCount === 2), and language-quality's providerCallCount()
+    // is unconditionally 2 — every language-quality scenario is
+    // judge-bearing — so the count only holds while the retained skip
+    // count (6) still equals the flow's CURRENT total scenario count.
+    const tailProfile = PROFILES.find(
+      (p) => p.id === RETAINED_SAFETY_PROBES_SKIPPED_TAIL_PROFILE_ID,
+    );
+    if (!tailProfile) {
+      throw new Error(
+        `Retained-run profile "${RETAINED_SAFETY_PROBES_SKIPPED_TAIL_PROFILE_ID}" no longer exists in PROFILES — the AC-6 skip-split derivation needs re-deriving against whichever profile the retained run actually skipped.`,
+      );
+    }
+    const safetyProbesForTailProfile =
+      safetyProbesFlow.enumerateScenarios?.(tailProfile, undefined as never) ??
+      [];
+    if (
+      safetyProbesForTailProfile.length < RETAINED_SAFETY_PROBES_SKIPPED_COUNT
+    ) {
+      throw new Error(
+        `${RETAINED_SAFETY_PROBES_SKIPPED_TAIL_PROFILE_ID} now has only ${safetyProbesForTailProfile.length} safety-probes scenarios, fewer than the retained run's ${RETAINED_SAFETY_PROBES_SKIPPED_COUNT}-scenario skip tail.`,
+      );
+    }
+    const skippedSafetyProbesTail = safetyProbesForTailProfile.slice(
+      -RETAINED_SAFETY_PROBES_SKIPPED_COUNT,
+    );
+    const judgeBearingSafetyProbesInTail = skippedSafetyProbesTail.filter(
+      (s) => s.input.category === 'legitimate_sensitive',
+    ).length;
+    const nonJudgeBearingSafetyProbesInTail =
+      RETAINED_SAFETY_PROBES_SKIPPED_COUNT - judgeBearingSafetyProbesInTail;
+
+    const languageQualityFlow = FLOWS.find((f) => f.id === 'language-quality');
+    const languageQualityTotalScenarios = PROFILES.reduce(
+      (sum, p) =>
+        sum +
+        (languageQualityFlow?.enumerateScenarios?.(p, undefined as never) ?? [])
+          .length,
+      0,
+    );
+    if (
+      languageQualityTotalScenarios !== RETAINED_LANGUAGE_QUALITY_SKIPPED_COUNT
+    ) {
+      throw new Error(
+        `language-quality now has ${languageQualityTotalScenarios} total scenarios, not the retained run's fully-skipped count of ${RETAINED_LANGUAGE_QUALITY_SKIPPED_COUNT} — re-derive the "all skipped language-quality cases are judge-bearing" claim.`,
+      );
+    }
+    const judgeBearingLanguageQuality = RETAINED_LANGUAGE_QUALITY_SKIPPED_COUNT;
+
+    const derivedJudgeBearingSkips =
+      judgeBearingSafetyProbesInTail + judgeBearingLanguageQuality;
+    const derivedNonJudgeBearingSkips =
+      nonJudgeBearingSafetyProbesInTail +
+      RETAINED_CHALLENGE_ROUND_MASTERY_SKIPPED_COUNT +
+      RETAINED_REVIEW_CONTINUITY_OPENER_SKIPPED_COUNT;
+    expect(derivedJudgeBearingSkips + derivedNonJudgeBearingSkips).toBe(29);
+
+    expect(workflowComments).toMatch(
+      new RegExp(
+        `${numBoundary(derivedJudgeBearingSkips)}\\s+of\\s+the\\s+${numBoundary(29)}\\s+were\\s+judge-bearing`,
+      ),
+    );
+    expect(workflowComments).toMatch(
+      new RegExp(
+        `${numBoundary(derivedNonJudgeBearingSkips)}\\s+were\\s+NOT\\s+judge-bearing`,
+      ),
+    );
   });
 
   test('omitted envelope cap is auto-fitted before the runner default can apply', () => {

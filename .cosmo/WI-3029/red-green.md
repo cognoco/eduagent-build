@@ -710,24 +710,15 @@ $ awk -F'\t' '{print $3}' run30721918215.log | grep -c "flow does not apply to t
 ```
 
 Fix: added a sentence to the `.github/workflows/eval-live.yml` AC-6
-paragraph stating 29 of the run's 33 skips were budget-exceeded (the other
-4 were unrelated "flow does not apply to this profile" skips), that 16 of
-those 29 were the remaining judge-bearing safety-probes (10) and
-language-quality (6) cases, and that 13 were other, non-judge-bearing
-challenge-round-mastery (3) and review-continuity-opener (10) cases —
-explicitly NOT claiming all 29 carried an internal judge call (they don't:
-only safety-probes and language-quality declare internal judge calls in
-this unpinned/production-routing context; see the "Envelope provider
-demand" comment block above this paragraph). The existing "conservative
-scaling comparison, not a like-for-like measured provider-call rate"
-sentence was left as-is — it already avoids implying a measured or
-specific-magnitude conservatism margin, which is what this finding asked
-to preserve.
-
-This is prose-only; the projection arithmetic (`839s × 366/300` etc.) did
-not change, so no new deterministic assertion was added for this specific
-disclosure sentence (the review didn't ask for one, and the SHOULD-1 fix
-above already tightened the arithmetic-bearing assertions).
+paragraph stating 29 of the run's 33 skips were budget-exceeded (4
+unrelated) and that some were judge-bearing, some not — explicitly NOT
+claiming all 29 carried an internal judge call. **Correction:** the split
+originally landed here (16 judge-bearing / 13 not) conflated FLOW-level
+judge-bearing (safety-probes/language-quality) with CASE-level
+judge-bearing (only `legitimate_sensitive`-category safety-probes cases
+actually are). Fixed to 10/19 with a derivation-bound test — see "AC-6
+skip-split correction round" below. The "conservative scaling comparison"
+sentence was left as-is throughout.
 
 ### CONSIDER — word-boundary the configured-timeout regex
 
@@ -779,3 +770,69 @@ timeout regex gained the same guard). `.cosmo/WI-3029/workitem.json` and
 `.cosmo/WI-3029/merge-gate-dry-run.json` (both shepherd-owned artifacts)
 remain untouched and uncommitted. No Cosmo lifecycle mutation, no merge,
 no second PR, at any point in this round.
+
+## AC-6 skip-split correction round (adversarial review at b30a486c9, 1 MUST_FIX)
+
+The prior round's "16 judge-bearing / 13 non-judge-bearing" conflated
+FLOW-level judge-bearing (safety-probes/language-quality) with CASE-level
+judge-bearing (`safetyProbesFlow.providerCallCount()` is 2 only when
+`category === 'legitimate_sensitive'`; other categories are 1).
+
+**Verified derivation** (`cd apps/api && npx tsx -e ...`, current registry,
+not taken on faith): the 10 skipped safety-probes cases are the TAIL of
+`17yo-french-advanced` (last profile in `PROFILES` order) —
+`safetyProbesFlow.enumerateScenarios(profile).slice(-10)` yields 4
+`legitimate_sensitive` + 6 `crisis`. `language-quality`'s
+`providerCallCount()` is unconditionally 2, and its current total scenario
+count across all profiles is exactly 6 (matches the retained run's fully-
+skipped count) — so all 6 are judge-bearing. **Corrected split:** 4 + 6 =
+**10 judge-bearing**; 6 (safety-probes) + 3 (challenge-round-mastery) + 10
+(review-continuity-opener) = **19 non-judge-bearing**. Sum = 29, matching
+the retained skip total. `~35.1 min` / `~5.1×` arithmetic unchanged.
+
+Corrected the workflow sentence to "10 of the 29 were judge-bearing ...
+and 19 were NOT judge-bearing". Added a derivation-bound assertion to
+`scripts/eval-live-gate-independence.test.ts`'s AC-6 test (new import:
+`safetyProbesFlow`) that recomputes 10/19 from the current registry
+(profile-tail slice filtered by category, plus a language-quality
+total-count guard) and matches it against the workflow prose via
+`numBoundary`-guarded regexes — no hardcoded 10/19 literal. The
+pre-existing review-continuity-opener comment in the unrelated "omitted
+envelope cap" test was left untouched.
+
+RED/GREEN proof (paired `Edit`/`Edit` on the workflow YAML only,
+`git diff --stat` confirmed byte-identical revert):
+
+```text
+# Mutated back to the wrong "16 of the 29 were judge-bearing" — RED:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — derived value (10) no longer matches the mutated "16" text
+Tests: 1 failed, 15 skipped, 16 total
+
+# Reverted (git diff --stat: only 16->10 in the diff), GREEN:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+Full verification:
+
+```text
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+```
+
+Diff scope: `.github/workflows/eval-live.yml` (one sentence corrected,
+`timeout-minutes` still 180) and
+`scripts/eval-live-gate-independence.test.ts` (one import, five
+`RETAINED_*` constants, one derivation-bound assertion block added).
+`.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json`
+untouched. No Cosmo lifecycle mutation, no merge, no second PR.

@@ -66,10 +66,12 @@ jobs:
     # provider-call count). That exhaustion also skipped 29 of the run's
     # envelope scenarios that day ("Skipped: 33" total; the other 4 were
     # unrelated "flow does not apply to this profile" skips, not budget
-    # skips): 16 of the 29 were the remaining judge-bearing safety-probes
-    # (10) and language-quality (6) cases, and 13 were other
-    # challenge-round-mastery (3) and review-continuity-opener (10) cases —
-    # NOT all 29 carried an internal judge call. Teaching 271s at cap 5,
+    # skips): only 10 of the 29 were judge-bearing — 4 of the 10 skipped
+    # safety-probes cases (the tail of the 17yo-french-advanced profile's
+    # enumeration order) are legitimate_sensitive, plus all 6
+    # language-quality cases — and 19 were NOT judge-bearing (the other 6
+    # safety-probes cases, 3 challenge-round-mastery, and 10
+    # review-continuity-opener cases). Teaching 271s at cap 5,
     # un-truncated (5 ok, 0 failed). Mastery 710s, truncated to 21 of 24
     # scheduled rounds by its
     # then-cap of 189 units ("budget requested 24 rounds but
