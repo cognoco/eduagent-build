@@ -878,8 +878,10 @@ does not have:
 the supportee's notes, chats or Journal artifacts on any supporter edge. An
 appeal yields richer *structural* detail after a deliberate, audited request; it
 never crosses the wall.
-**Authority:** `MMT-ADR-0027` (Accepted) decisions 1–4 and 6, consequence 4;
-shell spec §6.1 (structural layer; EU-1 sealed-confession class) and §6.3.
+**Authority:** `MMT-ADR-0027` (Accepted) decisions 1–4 and 6, and its Consequences
+bullet "supporter cards and Journal shared records are read-time projections …
+not `mentor_activity_ledger` rows"; shell spec §6.1 (structural layer; EU-1
+sealed-confession class) and §6.3 (per-scope table; EU-8).
 **In code:** `projectSharedRecord` / `assertRenderEquivalent`
 (`apps/api/src/services/shared-record.ts:26,18`); gate `assertReportable`
 (`apps/api/src/services/reportability.ts:30`, safety bypass `:33`);
