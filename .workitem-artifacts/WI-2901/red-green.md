@@ -12,7 +12,7 @@ Separately, the resolver-first TDD run failed all new matrix rows before the res
 ## Green
 
 - Restored focused loading-policy matrix: 9/9 passed.
-- Full `apps/mobile/src/lib/profile.test.tsx`: 56/56 passed, including cold/unvalidated authority, owner capability, explicit proxy, joined learner, repeated `AppState` refresh, transition, success, and failure paths.
+- Full `apps/mobile/src/lib/profile.test.tsx`: 56/56 passed, including cold/unvalidated authority, owner/guardian/proxy capability, joined learner, repeated `AppState` refresh, transition, success, and failure paths.
 - Full `apps/mobile/src/app/(app)/_layout.test.tsx`: 149/149 passed, including learner-shell continuity and loading precedence over redirect, create-profile, and consent gates.
 - `pnpm exec nx run @eduagent/mobile:typecheck`: passed.
 - Targeted ESLint: passed with no errors and one existing `no-loop-func` warning in the test harness.

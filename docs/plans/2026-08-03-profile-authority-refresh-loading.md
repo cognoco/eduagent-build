@@ -8,8 +8,8 @@ status: done
 
 # Profile Authority Refresh Loading — Implementation Plan
 
-**Goal:** Keep validated learner-only sessions usable during background authority refreshes while preventing cached owner or proxy capability from remaining interactive until revalidation settles.
-**Approach:** Centralize the provider's loading decision in a pure resolver that distinguishes cold/unvalidated state, learner-only authority, and capability-bearing cached state. Exercise that resolver and the real foreground-refetch path with regressions before changing the provider wiring.
+**Goal:** Keep validated learner-only sessions usable during background authority refreshes while preventing cached owner/guardian/proxy capability from remaining interactive until revalidation settles.
+**Approach:** Centralize the provider's loading decision in a pure resolver that distinguishes cold/unvalidated state, learner-only authority, and owner/guardian/proxy-capable state. Exercise that resolver and the real foreground-refetch path with regressions before changing the provider wiring.
 
 ## Scope
 
@@ -27,7 +27,27 @@ Out of scope:
 
 ## Tasks
 
-- [x] T1: Specify the loading decision for cold start, validated learner-only cache, owner/family cache, joined learner, explicit proxy, missing selection, refresh completion, and role transition — done when: focused resolver regressions fail against the current owner-unscoped loading behavior and pass after the resolver is wired into `ProfileProvider`.
-- [x] T2: Exercise foreground and repeated refresh behavior through `AppState` — done when: deferred-refetch tests prove learner content remains usable, owner/proxy authority is loading-gated, cadence is unchanged, and success/failure cannot expose stale capability.
-- [x] T3: Prove shell/gate stability — done when: existing or focused app-layout tests demonstrate learner refresh keeps the navigator mounted while loading/error states take precedence over redirect, create-profile, and consent gates for capability-bearing authority.
-- [x] T4: Validate and prepare lifecycle evidence — done when: mobile typecheck, focused mobile suites, applicable change-class checks, red/green evidence, and completion artifacts are green and reviewable.
+- [x] T1: Add `resolveProfileAuthorityLoadingState()` and wire it into `ProfileProvider` in `apps/mobile/src/lib/profile.ts`; exercise its matrix in `apps/mobile/src/lib/profile.test.tsx` for cold start, validated learner-only cache, owner/guardian/proxy-capable cache, joined learner, explicit proxy, missing selection, refresh completion, and role transition — done when: focused resolver regressions fail against the global-loading behavior and pass after the resolver is wired.
+- [x] T2: Exercise the `ProfileProvider` → `useProfiles()` foreground-refetch path through `AppState` in `apps/mobile/src/lib/profile.test.tsx` — done when: deferred-refetch tests prove learner content remains usable, owner/guardian/proxy capability is loading-gated, cadence is unchanged, and success/failure cannot expose stale authority.
+- [x] T3: Prove `AppLayout` gate stability in `apps/mobile/src/app/(app)/_layout.test.tsx` — done when: learner refresh keeps the navigator mounted while loading/error states take precedence over redirect, create-profile, and consent gates for owner/guardian/proxy capability.
+- [x] T4: Validate and prepare lifecycle evidence — done when: the commands below, hosted change-class checks, red/green evidence, and completion artifacts are green and reviewable.
+
+## Reproduction and validation commands
+
+Run from the WI-2901 worktree root:
+
+```powershell
+pnpm exec jest apps/mobile/src/lib/profile.test.tsx --runInBand --forceExit
+pnpm exec jest "apps/mobile/src/app/(app)/_layout.test.tsx" --runInBand --forceExit
+pnpm exec jest apps/mobile/src/lib/profile.test.tsx "apps/mobile/src/app/(app)/_layout.test.tsx" --runInBand --forceExit
+pnpm exec jest apps/mobile/src/lib/navigation-contract-usage-guard.test.ts --runInBand
+pnpm exec nx run @eduagent/mobile:typecheck
+pnpm exec eslint apps/mobile/src/lib/profile.ts apps/mobile/src/lib/profile.test.tsx "apps/mobile/src/app/(app)/_layout.test.tsx" apps/mobile/src/lib/navigation-contract-usage-guard.test.ts
+pnpm exec prettier --check apps/mobile/src/lib/profile.ts apps/mobile/src/lib/profile.test.tsx "apps/mobile/src/app/(app)/_layout.test.tsx" apps/mobile/src/lib/navigation-contract-usage-guard.test.ts
+git diff --check
+```
+
+The explicit `git push origin HEAD:WI-2901` runs the repository pre-push
+change-class gate. The PR gate then requires `main`, flag-on integration,
+Windows/Orion contract, API quality, E2E web smoke, CodeQL, merge completeness,
+and exact-head independent review.

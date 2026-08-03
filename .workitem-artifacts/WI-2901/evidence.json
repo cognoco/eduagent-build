@@ -2,12 +2,12 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "Only current-session validated non-owner authority remains usable during background refetch; cold, unvalidated, owner/family, explicit-proxy, and missing-selection states remain loading-gated.",
+      "description": "Only current-session validated non-owner authority remains usable during background refetch; cold, unvalidated, owner/guardian/proxy-capable, and missing-selection states remain loading-gated.",
       "pointer": "apps/mobile/src/lib/profile.ts"
     },
     {
       "acRef": "AC-2",
-      "description": "Deferred-refetch provider tests keep owner/proxy-capable cached authority behind loading while pending and preserve hard-error handling after failure or changed binding.",
+      "description": "Deferred-refetch provider tests keep cached owner/guardian/proxy capability behind loading while pending and preserve hard-error handling after failure or changed binding.",
       "pointer": "apps/mobile/src/lib/profile.test.tsx"
     },
     {
