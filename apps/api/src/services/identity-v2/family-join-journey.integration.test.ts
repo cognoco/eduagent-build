@@ -41,7 +41,9 @@ const AS_OF = new Date('2026-08-01T12:00:00.000Z');
 // Invite redemption deliberately rechecks expiry against PostgreSQL now().
 // Keep ordinary fixtures live independent of the wall-clock date on which the
 // suite runs; expiry-specific cases pass an explicit boundary instead.
-const LIVE_INVITE_EXPIRES_AT = new Date('2099-01-01T00:00:00.000Z');
+function liveInviteExpiresAt(): Date {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000);
+}
 const POLICY_EFFECTIVE_AT = new Date(AS_OF.getTime() - 1);
 const POLICY_VERSION = `wi2534-${randomUUID()}`;
 const CLOSED_GATES = {
@@ -97,7 +99,7 @@ async function invite(
   inviterPersonId: string,
   familyOrgId: string,
   invitedEmail: string,
-  expiresAt = LIVE_INVITE_EXPIRES_AT,
+  expiresAt = liveInviteExpiresAt(),
 ) {
   const token = randomUUID();
   const [row] = await db
@@ -941,7 +943,7 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
     const afterBirthday = new Date('2026-08-02T12:00:00.000Z');
     await db
       .update(familyJoinInvite)
-      .set({ tokenExpiresAt: new Date('2026-08-03T12:00:00.000Z') })
+      .set({ tokenExpiresAt: liveInviteExpiresAt() })
       .where(eq(familyJoinInvite.id, issued.row.id));
 
     const resumed = await startOrResumeFamilyJoinJourney(db, {
