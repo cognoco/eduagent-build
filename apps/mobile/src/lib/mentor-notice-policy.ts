@@ -1134,6 +1134,15 @@ export function foldMentorNoticePolicyFor(
       signal.revision,
     );
   }
+  // [WI-2781 rework] An observation the monotonic fold DISCARDS carries no
+  // information about the policy, so it cannot be the readable observation that
+  // retires the flag. A stale revision-6 reply arriving after a malformed field
+  // at revision 7 is exactly the out-of-order case the fold already refuses to
+  // act on; letting it clear the suppression would re-show retained payloads on
+  // the strength of a message the reducer itself just ignored.
+  const staleArrival =
+    typeof signal === 'object' &&
+    compareRevision(signal.revision, entry.snapshot.state.revision) === 'older';
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
   // [WI-2911] An observation is NOT an authorizing signal for `trusted`, and this
   // is the load-bearing negative. Every fold site here fires only after a
@@ -1152,8 +1161,9 @@ export function foldMentorNoticePolicyFor(
     // raised the flag, so it clears it — the recovery path that does not require
     // a revision bump. This does NOT re-enable anything on its own: `next` is
     // the ordinary monotonic fold, so a genuine disable still governs and a
-    // re-enable still needs a strictly higher revision.
-    false,
+    // re-enable still needs a strictly higher revision. A DISCARDED (older)
+    // observation is not that information — see `staleArrival` above.
+    staleArrival ? entry.snapshot.malformedSuppressed : false,
   );
   // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
   // store holds when it actually reaches the disk, not this observation's

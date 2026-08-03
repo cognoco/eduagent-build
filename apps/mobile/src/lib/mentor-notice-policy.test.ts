@@ -2036,6 +2036,28 @@ describe('[WI-2781] malformed policy FIELD at the observe seam', () => {
     expect(result.current.state).toEqual({ revision: 5, enabled: true });
   });
 
+  it('VARIANT (a2): a STALE well-formed observation does NOT recover — the fold discarded it', async () => {
+    // The reducer refuses to act on an out-of-order older reply. A message the
+    // fold itself ignored cannot be the readable observation that retires the
+    // suppression, or a late revision-6 arrival re-shows retained revision-7
+    // payloads after a malformed field that may have carried a rollback.
+    await seedStored(ACTOR, PROFILE, '{"revision":7,"enabled":true}');
+    const { result } = mountPolicy();
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => result.current.observe(MALFORMED));
+    expect(result.current.suppressed(undefined)).toBe(true);
+
+    act(() => result.current.observe(observation(6, true)));
+    expect(result.current.suppressed(undefined)).toBe(true);
+    // The held state is untouched — this is the discard, not a disable.
+    expect(result.current.state).toEqual({ revision: 7, enabled: true });
+
+    // ...and a non-stale observation still recovers, so the flag is bounded.
+    act(() => result.current.observe(observation(7, true)));
+    expect(result.current.suppressed(undefined)).toBe(false);
+  });
+
   it('VARIANT (b): repeated corruption stays suppressed, and still writes nothing', async () => {
     await seedStored(ACTOR, PROFILE, '{"revision":5,"enabled":true}');
     const { result } = mountPolicy();
