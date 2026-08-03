@@ -34,7 +34,7 @@ ID; ruled keep 2026-08-02). Deep elaborations where they exist:
 
 | ID | Principle | Established by | Enforced by |
 |---|---|---|---|
-| PRIN-01 | `@eduagent/schemas` is the shared contract — never redefine API-facing types locally | — | `@nx/enforce-module-boundaries` (barrels) |
+| PRIN-01 | `@eduagent/schemas` is the shared contract — never redefine API-facing types locally | — | — |
 | PRIN-02 | Business logic lives in `services/`, never in route handlers | — | eslint G1/G5 (`eslint.config.mjs`) |
 | PRIN-03 | Scoped-table reads go through `createScopedRepository(profileId)`; sanctioned deviations pin `profileId` in the WHERE clause | — | — |
 | PRIN-04 | Writes verify ownership via explicit `profileId` or the parent chain | — | — |
