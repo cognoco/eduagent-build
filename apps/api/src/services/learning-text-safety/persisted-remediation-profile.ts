@@ -5,8 +5,8 @@ import type {
   FieldText,
   MultiTextRow,
   RowFieldVerdicts,
+  SurfaceRemediationReport,
 } from './persisted-remediation-fields';
-import type { SurfaceRemediationReport } from './persisted-remediation-apply';
 // Reused, not reimplemented (per the task brief): this is the SAME function
 // `mergeInterests` / `buildDeleteMemoryItemUpdates` use to derive the
 // `interest_timestamps` key from an interest's display text. If this module
