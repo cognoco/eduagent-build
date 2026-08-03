@@ -113,3 +113,37 @@ export async function classifyRowFields(input: {
     };
   });
 }
+
+/**
+ * [WI-2753] Applies the remediation classification to persisted rows.
+ *
+ * SCRUB-IN-PLACE, NOT DELETE. AC-2 inherits the scalar-evidence-identity
+ * precedent that a purge preserves the record: the row and its relationships
+ * survive, only the offending text goes. Two of the four columns here are
+ * NOT NULL `text`, which does NOT force a migration — "scrub" on a text column
+ * means overwriting with a redaction placeholder, not setting null. That
+ * distinction is what keeps this item free of any schema change.
+ */
+export const REDACTED_PLACEHOLDER = '[redacted: clinical inference removed]';
+
+export interface SurfaceRemediationReport {
+  readonly surface: string;
+  /** Rows carrying text that was classified. */
+  readonly scanned: number;
+  /** Rows whose text was an attribution and was scrubbed. */
+  readonly remediated: number;
+  /**
+   * Rows the gate blocked as `unclear` — reported, never modified. These are
+   * the ambiguous cases (an educational reference reads the same as a clinical
+   * one under migration provenance), and resolving ambiguity by destroying
+   * learner-visible text is not something an unattended backfill may do.
+   */
+  readonly review: number;
+  /**
+   * Rows classified `remediate` whose bytes changed between the scan and the
+   * write, so the guarded update matched nothing and the row was left alone.
+   * A later run reclassifies whatever is there now; reporting the count keeps
+   * that visible instead of letting `remediated` silently under-count.
+   */
+  readonly skippedChanged: number;
+}
