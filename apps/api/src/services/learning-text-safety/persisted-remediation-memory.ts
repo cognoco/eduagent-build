@@ -80,21 +80,18 @@ import { normalizeMemoryText } from '../memory/backfill-mapping';
  * (`packages/database/src/schema/memory-facts.ts`) is UNIQUE on `(profileId,
  * category, COALESCE(metadata->>'subject',''), COALESCE(metadata->>'context',''),
  * textNormalized)` WHERE `superseded_by IS NULL`. `text` is the only carrier
- * whose redaction can create a NEW collision here: it is rewritten to the same
+ * whose redaction always changes an indexed value: it is rewritten to the same
  * constant `REDACTED_PLACEHOLDER` for every remediated row, so
  * `text_normalized` collapses to `normalizeMemoryText(REDACTED_PLACEHOLDER)`
- * for all of them. Two ACTIVE rows in the same `(profileId, category, subject,
- * context)` group that both need `text` redacted would then collide on
- * update. `metadata.subject` alone becoming the placeholder does not create
- * this problem: it only changes one of the FIVE index columns, and the
- * surviving row is unique regardless of what its own `subject` becomes,
- * because every OTHER row that shared its original `(profileId, category,
- * subject, context)` group is superseded — see below — leaving exactly one
- * active row per original group.
+ * for all of them. The collision group must use the FINAL indexed subject and
+ * context too. Otherwise two rows from distinct original-subject groups can
+ * each look like a singleton and then both redact their subject to the same
+ * placeholder, colliding only when the second update reaches PostgreSQL.
  *
- * SUPERSEDE, DON'T DEDUPE-BY-DELETE. Within each `(profileId, category,
- * original metadata.subject, original metadata.context)` group of rows flagged
- * for a `text` redaction, ordered by `createdAt` (tie-broken by `id`, which is
+ * SUPERSEDE, DON'T DEDUPE-BY-DELETE. Within each projected `(profileId,
+ * category, post-redaction metadata.subject, post-redaction metadata.context)`
+ * group of rows flagged for a `text` redaction, ordered by `createdAt`
+ * (tie-broken by `id`, which is
  * a UUIDv7 and therefore already time-ordered — the tie-break exists only to
  * make the choice deterministic when timestamps coincide): the FIRST row is
  * scrubbed and stays active; every later row is scrubbed AND superseded by
@@ -283,14 +280,13 @@ export function memoryFactCasGuard(
 }
 
 /**
- * Group key for the collision-avoidance grouping described above. Computed
- * from the row's ORIGINAL `metadata` (before any redaction), because that is
- * what the partial unique index's existing rows were built against — the
- * point of grouping on it is to find every row that already shares an index
- * slot with this one. JSON tuple encoding keeps field boundaries unambiguous
- * even when a value contains a would-be separator. Missing, null, and empty
- * subject/context values are normalized to `''` first to mirror the index's
- * `COALESCE(..., '')` equality rather than inventing a different grouping.
+ * Database-aligned subject/context group key. Callers supply either current
+ * metadata (for an existing active placeholder survivor) or projected
+ * post-remediation metadata (for a row about to be redacted). JSON tuple
+ * encoding keeps field boundaries unambiguous even when a value contains a
+ * would-be separator. Missing, null, and empty subject/context values are
+ * normalized to `''` first to mirror the index's `COALESCE(..., '')` equality
+ * rather than inventing a different grouping.
  */
 export function memoryFactActiveGroupKey(row: {
   readonly profileId: string;
@@ -301,6 +297,23 @@ export function memoryFactActiveGroupKey(row: {
   const subject = typeof record.subject === 'string' ? record.subject : '';
   const context = typeof record.context === 'string' ? record.context : '';
   return JSON.stringify([row.profileId, row.category, subject, context]);
+}
+
+/**
+ * Projects the indexed metadata through this row's own field-level redactions
+ * before grouping. Every active text remediation has the same final
+ * `textNormalized`, so this projected subject/context tuple is the remaining
+ * part of the database uniqueness decision.
+ */
+function memoryFactPostRemediationGroupKey(
+  row: MemoryFactRemediationRow,
+  remediatePaths: readonly string[],
+): string {
+  const update = buildRowUpdate(row, remediatePaths);
+  return memoryFactActiveGroupKey({
+    ...row,
+    metadata: update.metadata ?? row.metadata,
+  });
 }
 
 /**
@@ -466,22 +479,26 @@ export async function remediateMemoryFacts(
       createdAt: row.createdAt,
     };
 
+    const remediatePaths = [
+      ...(textRemediate ? ['text'] : []),
+      ...metadataRemediatePaths,
+    ];
+
     // Grouping/superseding is only needed for ACTIVE rows getting a `text`
-    // redaction — that is the only case that can create a NEW collision on
-    // the partial unique index (see the module doc comment). Every other
+    // redaction — group those rows by their projected final database tuple.
+    // Every other
     // flagged row — already-superseded rows regardless of which carrier is
     // flagged, and active rows with only a metadata-path redaction — is
     // scrubbed in place with no grouping.
     if (row.supersededBy === null && textRemediate) {
-      const key = memoryFactActiveGroupKey(remediationRow);
+      const key = memoryFactPostRemediationGroupKey(
+        remediationRow,
+        remediatePaths,
+      );
       const group = activeTextGroups.get(key) ?? [];
       group.push(remediationRow);
       activeTextGroups.set(key, group);
     } else {
-      const remediatePaths = [
-        ...(textRemediate ? ['text'] : []),
-        ...metadataRemediatePaths,
-      ];
       otherUpdates.push({ row: remediationRow, remediatePaths });
     }
   }
@@ -491,7 +508,7 @@ export async function remediateMemoryFacts(
     tallyOutcome(remediatePaths, updated);
   }
 
-  for (const group of activeTextGroups.values()) {
+  for (const [postRemediationKey, group] of activeTextGroups) {
     const ordered = [...group].sort(
       (a, b) =>
         a.createdAt.getTime() - b.createdAt.getTime() ||
@@ -503,9 +520,8 @@ export async function remediateMemoryFacts(
     // A prior run already owns the active placeholder tuple. Every newly
     // remediable row must leave the partial unique index in the same statement
     // that writes its placeholder, just like same-run duplicates do below.
-    const existingSurvivorId = existingRedactedSurvivors.get(
-      memoryFactActiveGroupKey(survivor),
-    );
+    const existingSurvivorId =
+      existingRedactedSurvivors.get(postRemediationKey);
     if (existingSurvivorId) {
       for (const duplicate of ordered) {
         const duplicateVerdict = verdictById.get(duplicate.id);
@@ -705,12 +721,10 @@ export async function remediateTopicNoteArtifactConceptKeys(
  *   changing either source value makes the update affect zero rows; the report
  *   records `skippedChanged` so a later run can reclassify the current row
  *   rather than write a stale JSONB reconstruction.
- * - `activeGroupKey` groups on `metadata.subject`/`metadata.context` read from
- *   the ORIGINAL (pre-redaction) metadata. If a row's `metadata.subject` is
- *   ITSELF being redacted in the same pass, the grouping key used to decide
- *   "does this row collide with another" still reflects the pre-redaction
- *   value, which I believe is correct (see the module comment) but could not
- *   verify against a live database.
+ * - VERIFIED (WI-2753): active text remediations group by their projected
+ *   post-redaction subject/context tuple. A disposable migrated-PostgreSQL
+ *   regression proves two distinct original-subject groups that converge after
+ *   redaction choose one deterministic survivor without a unique violation.
  * - I did not verify whether any code path reads `memory_facts.metadata`
  *   assuming `topics` retains its original array LENGTH or order — I preserve
  *   both (only replacing flagged entries' string values), but did not find

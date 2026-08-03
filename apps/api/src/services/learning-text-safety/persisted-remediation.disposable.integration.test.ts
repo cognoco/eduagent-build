@@ -703,6 +703,72 @@ describeLoopbackOnly(
       }
     });
 
+    it('[WI-2753] converges distinct original groups on their post-redaction tuple', async () => {
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'struggle',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: { subject: ATTRIBUTION_ES, topic: BENIGN },
+            observedAt: new Date('2026-08-03T11:00:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T11:00:00.000Z'),
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'struggle',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: { subject: ATTRIBUTION_ES_HEDGED, topic: BENIGN },
+            observedAt: new Date('2026-08-03T12:00:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T12:00:00.000Z'),
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      const reports = await remediateMemoryFacts(db);
+      expect(
+        reports.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ skippedChanged: 0 });
+      expect(
+        reports.find((report) => report.surface === 'memory_facts.text')
+          ?.remediated,
+      ).toBeGreaterThanOrEqual(2);
+
+      const ids = facts.map((fact) => fact.id);
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          metadata: memoryFacts.metadata,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        rows.filter((row) => ids.includes(row.id)).map((row) => [row.id, row]),
+      );
+
+      expect(byId.get(facts[0]!.id)).toMatchObject({
+        text: REDACTED_PLACEHOLDER,
+        metadata: { subject: REDACTED_PLACEHOLDER, topic: BENIGN },
+        supersededBy: null,
+      });
+      expect(byId.get(facts[1]!.id)).toMatchObject({
+        text: REDACTED_PLACEHOLDER,
+        metadata: { subject: REDACTED_PLACEHOLDER, topic: BENIGN },
+        supersededBy: facts[0]!.id,
+      });
+
+      const rerun = await remediateMemoryFacts(db);
+      expect(
+        rerun.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ remediated: 0, skippedChanged: 0 });
+    });
+
     it('[WI-3080] reuses a prior-run redacted survivor for later colliding facts', async () => {
       const [priorRunFact] = await db
         .insert(memoryFacts)

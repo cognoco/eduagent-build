@@ -7,15 +7,26 @@ function source(name: string): string {
   return readFileSync(resolve(safetyDir, name), 'utf8');
 }
 
+function importedModules(contents: string): Set<string> {
+  return new Set(
+    [...contents.matchAll(/(?:\bfrom\s*|^\s*import\s*)['"]([^'"]+)['"]/gm)].map(
+      (match) => match[1]!,
+    ),
+  );
+}
+
 describe('persisted remediation import ownership [WI-3077]', () => {
   it('keeps shared field definitions outside the apply-to-surface dependency edge', () => {
-    const memory = source('persisted-remediation-memory.ts');
-    const profile = source('persisted-remediation-profile.ts');
+    const memoryImports = importedModules(
+      source('persisted-remediation-memory.ts'),
+    );
+    const profileImports = importedModules(
+      source('persisted-remediation-profile.ts'),
+    );
 
-    expect(memory).toContain('REDACTED_PLACEHOLDER,\n  type FieldText');
-    expect(memory).toContain('type SurfaceRemediationReport,');
-    expect(memory).not.toContain("from './persisted-remediation-apply'");
-    expect(profile).toContain('SurfaceRemediationReport,');
-    expect(profile).not.toContain("from './persisted-remediation-apply'");
+    expect(memoryImports).toContain('./persisted-remediation-fields');
+    expect(memoryImports).not.toContain('./persisted-remediation-apply');
+    expect(profileImports).toContain('./persisted-remediation-fields');
+    expect(profileImports).not.toContain('./persisted-remediation-apply');
   });
 });
