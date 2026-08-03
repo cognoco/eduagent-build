@@ -92,4 +92,20 @@ describe('WI-2937 production EAS submit contract', () => {
       ).toThrow(prohibition);
     }
   });
+
+  it('rejects removal of the required Android build instruction', () => {
+    const runbook = readFileSync(
+      join(repoRoot, 'docs/runbooks/store-submission.md'),
+      'utf8',
+    );
+    const withoutAndroidBuild = runbook.replace(
+      'eas build --platform android --profile production',
+      '',
+    );
+
+    expect(withoutAndroidBuild).not.toBe(runbook);
+    expect(() => expectAndroidOnlyRunbook(withoutAndroidBuild)).toThrow(
+      'eas build --platform android --profile production',
+    );
+  });
 });
