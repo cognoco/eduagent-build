@@ -924,14 +924,37 @@ describe('AppLayout', () => {
     expect(computeVisibleTabs(shape).has('own-learning')).toBe(true);
   });
 
-  it('[WI-2128][J-03] preserves the navigator while cached profile authority refreshes', async () => {
+  it('[WI-2901] preserves the learner navigator while validated learner-only authority refreshes', async () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Child',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileLoadError: null,
+      profileRefreshError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+      isExplicitProxyMode: false,
+    });
     const view = renderLayout();
-    await screen.findByTestId('tabs');
+    await waitFor(() => screen.getByTestId('tabs'), { timeout: 5_000 });
 
-    // ProfileProvider keeps isLoading=false when it has an active cached
-    // profile and only a background authority refetch is in flight. A
-    // language-change invalidation/remount must therefore leave the nested
-    // /more/account screen (including settings-app-language) mounted.
+    // A language-change invalidation/remount must leave the nested learner
+    // shell mounted while its non-authorizing profile cache revalidates.
     mockUseProfile.mockReturnValue({
       ...mockUseProfile(),
       isLoading: false,
@@ -940,6 +963,8 @@ describe('AppLayout', () => {
 
     expect(screen.getByTestId('tabs')).toBeTruthy();
     expect(screen.queryByTestId('profile-loading')).toBeNull();
+    expect(screen.queryByTestId('create-profile-gate')).toBeNull();
+    expect(screen.queryByTestId('consent-pending-gate')).toBeNull();
   });
 
   it('[WI-2900] keeps the learner navigator mounted with a visible profile-refresh retry', async () => {
@@ -1205,6 +1230,49 @@ describe('AppLayout', () => {
 
     screen.getByTestId('profile-loading');
     expect(screen.queryByTestId('tabs')).toBeNull();
+    expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it('[WI-2901] keeps capability-refresh loading ahead of shell and consent gates', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'p1',
+          displayName: 'Parent',
+          isOwner: true,
+          consentStatus: null,
+          birthYear: 1990,
+        },
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Child',
+        isOwner: false,
+        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+        birthYear: 2014,
+      },
+      isExplicitProxyMode: true,
+      isLoading: true,
+      profileLoadError: null,
+      profileRefreshError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    renderLayout();
+
+    screen.getByTestId('profile-loading');
+    expect(screen.queryByTestId('tabs')).toBeNull();
+    expect(screen.queryByTestId('create-profile-gate')).toBeNull();
+    expect(screen.queryByTestId('consent-pending-gate')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 

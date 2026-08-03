@@ -1,0 +1,7 @@
+**What was done:** Scoped the full-screen profile-authority refresh barrier to unvalidated or capability-bearing state so a validated learner-only session remains usable during background revalidation.
+
+**What changed:** `ProfileProvider` now delegates its loading decision to a pure resolver. Cold start, Clerk-session changes, missing active selections, owner/family caches, and explicit proxy sessions remain loading-gated. A current-session validated cache containing only non-owner learner authority stays mounted during mount and foreground refetches. Provider and layout regressions cover repeated refresh cadence, authority transitions, pending/failure behavior, and gate ordering.
+
+**Verification:** The deliberate global-loading mutation failed the same-session learner mount and joined-learner foreground cases, then the exact restored implementation passed the focused 9-case policy matrix. The complete profile suite passed 56/56 and the complete app-layout suite passed 149/149. Mobile Nx typecheck, affected-file Prettier, `git diff --check`, and targeted ESLint passed; ESLint reported only the existing test-harness `no-loop-func` warning.
+
+**Caveats / Follow-ups:** The exception is based only on current-session validated non-owner profile metadata. Any owner row, explicit proxy state, unvalidated cache, or missing active binding stays behind the full loading barrier. Query cadence, API authority, navigation contracts, and consent policy are unchanged.

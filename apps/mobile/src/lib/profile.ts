@@ -249,6 +249,53 @@ export function resolveProfileAuthorityErrorState(input: {
   };
 }
 
+export function resolveProfileAuthorityLoadingState(input: {
+  isProfilesLoading: boolean;
+  isProfilesFetching: boolean;
+  hasValidatedAuthority: boolean;
+  profiles: ReadonlyArray<Pick<Profile, 'isOwner'>>;
+  activeProfileId: string | null;
+  hasActiveProfile: boolean;
+  isRestoringId: boolean;
+  isRestoringProxyMode: boolean;
+  isExplicitProxyMode: boolean;
+}): boolean {
+  if (
+    input.isProfilesLoading ||
+    input.isRestoringId ||
+    input.isRestoringProxyMode
+  ) {
+    return true;
+  }
+
+  // Keep the existing anti-flash guards for a restored/created Person that
+  // has not reconciled with the latest profile list yet.
+  if (
+    (input.profiles.length > 0 && !input.hasActiveProfile) ||
+    (input.activeProfileId !== null &&
+      !input.hasActiveProfile &&
+      input.isProfilesFetching)
+  ) {
+    return true;
+  }
+
+  // A cached list is not usable between a Clerk-session change and the effect
+  // that starts its refetch. This closes the otherwise render-sized window in
+  // which stale authority could appear before `isFetching` flips to true.
+  if (!input.hasValidatedAuthority && input.profiles.length > 0) return true;
+
+  if (!input.isProfilesFetching) return false;
+
+  // A cache from a different Clerk session has not established authority for
+  // this session, even when it happens to contain only a learner. Once the
+  // current session is validated, only owner/proxy-capable caches need the
+  // full-screen refresh barrier; a learner-only self session remains usable.
+  return (
+    input.isExplicitProxyMode ||
+    input.profiles.some((profile) => profile.isOwner)
+  );
+}
+
 async function getSecureStoreItemWithTimeout(
   key: string,
   timeoutMs: number,
@@ -557,12 +604,17 @@ export function ProfileProvider({
   // validation effect hasn't fired yet.  Without this, isLoading falls to
   // false for one render frame with activeProfile === null, causing
   // CreateProfileGate ("Welcome!") to flash.
-  const isLoading =
-    isProfilesLoading ||
-    isRestoringId ||
-    isRestoringProxyMode ||
-    (!isRestoringId && profiles.length > 0 && activeProfile === null) ||
-    (activeProfileId !== null && activeProfile === null && isProfilesFetching);
+  const isLoading = resolveProfileAuthorityLoadingState({
+    isProfilesLoading,
+    isProfilesFetching,
+    hasValidatedAuthority: profilesQuery.hasValidatedAuthority,
+    profiles,
+    activeProfileId,
+    hasActiveProfile: activeProfile !== null,
+    isRestoringId,
+    isRestoringProxyMode,
+    isExplicitProxyMode,
+  });
 
   const value = useMemo<ProfileContextValue>(
     () => ({

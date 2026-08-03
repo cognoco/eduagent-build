@@ -1,0 +1,18 @@
+{
+  "pageId": "3ad8bce9-1f7c-818e-ae87-d6a775c64e90",
+  "id": "WI-2901",
+  "name": "Scope authority-refresh loading to profiles that can confer proxy capability",
+  "description": "Including every isProfilesFetching state in ProfileProvider isLoading combines with staleTime zero and refetchOnMount always to replace the whole app with a loading screen on mount and every active-state resume, even for learner-only profiles that cannot confer proxy authority.",
+  "acceptanceCriteria": "Root cause: WI-2128 added every isProfilesFetching state to ProfileProvider isLoading while useProfiles has staleTime zero and refetchOnMount always, so mount and AppState-active background refreshes replace the whole app with loading UI even for learner-only profiles. 1. Keep the full authority-refresh loading barrier only when the cached profile set can confer owner/guardian/proxy capability or when no validated profile state exists; learner-only self sessions retain usable content during a background refetch. 2. Do not expose stale owner/proxy authority while refresh is pending, failed, or returns a changed organization/person binding. 3. Mandatory regression tests must fail on the current global-loading implementation and pass with the fix for cold start, learner-only mount, owner-with-charge mount, joined learner, AppState-active resume, repeated focus/refetch, refresh success/failure, and role/capability transition. 4. Demonstrate refetch cadence remains intentional and no redirect, shell, or consent gate flashes during the scoped refresh. 5. Run mobile typecheck, focused/full mobile tests, and applicable change-class gates.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

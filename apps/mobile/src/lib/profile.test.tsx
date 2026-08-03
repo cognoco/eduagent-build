@@ -11,6 +11,7 @@ import {
   useHasLinkedChildren,
   PROFILE_SCOPED_KEYS,
   resolveProfileAuthorityErrorState,
+  resolveProfileAuthorityLoadingState,
 } from './profile';
 import {
   setActiveProfileId as pushProfileIdToApiClient,
@@ -113,6 +114,90 @@ function createWrapper() {
     );
   };
 }
+
+describe('resolveProfileAuthorityLoadingState [WI-2901]', () => {
+  const settledBase = {
+    isProfilesLoading: false,
+    isProfilesFetching: false,
+    hasValidatedAuthority: true,
+    profiles: [{ isOwner: false }],
+    activeProfileId: CHILD_PROFILE_ID,
+    hasActiveProfile: true,
+    isRestoringId: false,
+    isRestoringProxyMode: false,
+    isExplicitProxyMode: false,
+  };
+
+  it.each([
+    [
+      'cold start without validated authority',
+      {
+        ...settledBase,
+        isProfilesLoading: true,
+        isProfilesFetching: true,
+        hasValidatedAuthority: false,
+        profiles: [],
+        activeProfileId: null,
+        hasActiveProfile: false,
+      },
+      true,
+    ],
+    [
+      'same-session learner-only mount refresh',
+      { ...settledBase, isProfilesFetching: true },
+      false,
+    ],
+    [
+      'cached learner from an unvalidated Clerk session',
+      {
+        ...settledBase,
+        isProfilesFetching: true,
+        hasValidatedAuthority: false,
+      },
+      true,
+    ],
+    [
+      'cached learner before the new-session refetch effect starts',
+      { ...settledBase, hasValidatedAuthority: false },
+      true,
+    ],
+    [
+      'owner with a linked charge refreshing',
+      {
+        ...settledBase,
+        isProfilesFetching: true,
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        activeProfileId: OWNER_PROFILE_ID,
+      },
+      true,
+    ],
+    [
+      'joined learner foreground refresh',
+      { ...settledBase, isProfilesFetching: true },
+      false,
+    ],
+    [
+      'explicit proxy foreground refresh',
+      {
+        ...settledBase,
+        isProfilesFetching: true,
+        isExplicitProxyMode: true,
+      },
+      true,
+    ],
+    ['settled learner after refresh success or failure', settledBase, false],
+    [
+      'saved Person missing from a non-empty profile list',
+      { ...settledBase, hasActiveProfile: false },
+      true,
+    ],
+  ] as const)(
+    'returns the expected loading state for %s',
+    (_name, input, expected) => {
+      expect(resolveProfileAuthorityLoadingState(input)).toBe(expected);
+    },
+  );
+});
 
 describe('ProfileProvider', () => {
   beforeEach(() => {
@@ -382,7 +467,7 @@ describe('ProfileProvider', () => {
     );
   });
 
-  it('[WI-2128][J-03] keeps the cached shell mounted during an authoritative remount refetch', async () => {
+  it('[WI-2901][BREAK] blocks an unvalidated cached owner during an authoritative remount refetch', async () => {
     mockFetch.mockReset();
     let resolveProfiles!: (response: Response) => void;
     mockFetch.mockReturnValueOnce(
@@ -408,7 +493,7 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     });
-    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isLoading).toBe(true);
     expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(OWNER_PROFILE_ID);
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
 
@@ -426,7 +511,7 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile?.isOwner).toBe(false);
   });
 
-  it('[WI-2128][J-03] keeps the cached shell mounted during foreground authority revalidation', async () => {
+  it('[WI-2901][BREAK] blocks cached owner authority through a foreground role transition', async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
     const removeListener = jest.fn();
     jest
@@ -455,7 +540,7 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
-    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isLoading).toBe(true);
     expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(OWNER_PROFILE_ID);
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
 
@@ -471,6 +556,68 @@ describe('ProfileProvider', () => {
     });
     expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
 
+    unmount();
+    expect(removeListener).toHaveBeenCalled();
+  });
+
+  it('[WI-2901][BREAK] keeps a validated joined learner usable through repeated foreground refreshes', async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const removeListener = jest.fn();
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: removeListener };
+      });
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+        status: 200,
+      }),
+    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'mentomate_active_profile_id' ? CHILD_PROFILE_ID : null,
+        ),
+      );
+
+    const { result, unmount } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    for (let refresh = 0; refresh < 2; refresh += 1) {
+      let resolveProfiles!: (response: Response) => void;
+      mockFetch.mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveProfiles = resolve;
+        }),
+      );
+
+      act(() => {
+        appStateListener?.('active');
+      });
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(refresh + 2);
+      });
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+
+      await act(async () => {
+        resolveProfiles(
+          new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+            status: 200,
+          }),
+        );
+      });
+    }
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     unmount();
     expect(removeListener).toHaveBeenCalled();
   });
@@ -1004,18 +1151,32 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: 'Server error' }), {
-        status: 500,
+    let resolveFailure!: (response: Response) => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFailure = resolve;
       }),
     );
 
+    let refetch!: Promise<void>;
+    act(() => {
+      refetch = queryClient.refetchQueries({ queryKey: ['profiles'] });
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(true);
+    });
     await act(async () => {
-      await queryClient.refetchQueries({ queryKey: ['profiles'] });
+      resolveFailure(
+        new Response(JSON.stringify({ message: 'Server error' }), {
+          status: 500,
+        }),
+      );
+      await refetch;
     });
 
     expect(result.current.profiles).toEqual(mockProfiles);
     expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
+    expect(result.current.isLoading).toBe(false);
     expect(result.current.profileLoadError).toBeTruthy();
     expect(result.current.profileRefreshError).toBeNull();
   });
