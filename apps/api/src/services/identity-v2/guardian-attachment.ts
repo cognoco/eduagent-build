@@ -22,6 +22,33 @@ export class GuardianAttachmentRejectedError extends Error {
   }
 }
 
+type GuardianAttachmentLawfulBasis =
+  | 'coppa_parental_consent'
+  | 'gdpr_parental_consent';
+
+/**
+ * Explicit policy boundary for the credentialed guardian ceremony.
+ *
+ * Regime codes are DB-mastered and extensible, so an unknown code must never
+ * inherit a lawful basis from a permissive fallback.
+ */
+export function resolveGuardianAttachmentLawfulBasis(
+  regimeKey: string | null,
+): GuardianAttachmentLawfulBasis {
+  switch (regimeKey) {
+    case 'US_COPPA':
+      return 'coppa_parental_consent';
+    case 'EU_GDPR_13':
+    case 'EU_GDPR_14':
+    case 'EU_GDPR_15':
+    case 'EU_GDPR_16':
+    case 'UK_AADC':
+      return 'gdpr_parental_consent';
+    default:
+      throw new GuardianAttachmentRejectedError();
+  }
+}
+
 export interface GuardianAttachmentInput {
   /** Server-resolved from the authenticated Login, never X-Profile-Id. */
   callerPersonId: string;
@@ -281,10 +308,9 @@ export async function attachGuardianConsentForCredentialedLearner(
       throw new GuardianAttachmentRejectedError();
     }
 
-    const lawfulBasis =
-      context.policy.regimeKey === 'US_COPPA'
-        ? 'coppa_parental_consent'
-        : 'gdpr_parental_consent';
+    const lawfulBasis = resolveGuardianAttachmentLawfulBasis(
+      context.policy.regimeKey,
+    );
     const requests = await tx.query.consentRequest.findMany({
       where: and(
         eq(consentRequest.chargePersonId, input.chargePersonId),

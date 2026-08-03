@@ -1,0 +1,7 @@
+**What was done:** Closed the permissive guardian-attachment lawful-basis fallback so only policy regimes with an explicit, reviewed mapping can authorize the credentialed guardian ceremony.
+
+**What changed:** Added one exhaustive resolver that maps US_COPPA to `coppa_parental_consent`, maps EU_GDPR_13/14/15/16 and UK_AADC to `gdpr_parental_consent`, and rejects ROW, null, and future unmapped regime codes. The transaction resolves this basis before reading or writing guardian consent state. Added focused unit coverage and real-database regressions for every approved family plus ROW/unknown rejection with assertions that no Guardianship, consent grant, or consent-request mutation survives.
+
+**Verification:** The new policy matrix was observed red before the resolver existed, then passed all 9 focused assertions. Prettier and targeted ESLint passed. The guarded API integration runner passed all 25 guardian-attachment cases against the isolated local PostgreSQL 16 container. The COPPA mapping regression retains the synthetic XG policy's guardian-required threshold of 16 because the product excludes under-13 credentialed learners; canonical US threshold-13 admission remains owned by the country-policy suites.
+
+**Caveats / Follow-ups:** A newly introduced regime intentionally fails closed until policy owners add it to this explicit mapping or replace the mapping with another ratified policy-owned contract. CI remains the authoritative full disposable-database verification for this PR.

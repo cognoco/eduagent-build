@@ -4,11 +4,11 @@ Operator path for the Config-T production build and first store submissions. Thi
 
 ## Gate
 
-Credential provisioning was completed under **OPQ-37** on 2026-07-27. Do not merge the Config-T production flag change, change the production Doppler flag triple, trigger a production build, or submit to a store until **OPQ-155** records product approval of the Config-T store candidate.
+Credential provisioning was completed under **OPQ-37** on 2026-07-27. **OPQ-155** establishes that MentoMate is Android-only. Do not change the production Doppler flag triple, trigger a production build, or submit to Google Play unless the Config-T product gate is satisfied.
 
 Before that ruling, agents may refresh the branch and run static, unit, export, and configuration checks needed to present a current candidate. OPQ-155 is the current authority home for the V0-retirement ruling required by the mentor-is-the-app spec section 13 S6 gate and the M6 product go-ahead; approval does not itself build, upload, or release the app.
 
-The committed Android profile targets **Play internal** testing. The iOS profile relies on EAS-managed App Store Connect credentials and targets TestFlight through the normal EAS submit path. No Apple identifier or private key belongs in `eas.json`.
+The committed Android profile targets **Play internal** testing. This runbook covers Android only; it does not authorize a public Play release.
 
 ## Credential Preflight
 
@@ -54,18 +54,17 @@ pnpm exec jest --config scripts/jest.config.cjs scripts/eas-managed-submit-profi
 git status --short
 cd apps/mobile
 eas build:list --platform android --limit 3
-eas build:list --platform ios --limit 3
 ```
 
 The production profile must classify as Config T: V0 off, V1 on, V2 on. Stop if the worktree is dirty, OPQ-155 is not approved, a production build already covers the intended commit, or the managed-credential preflight fails. The production Doppler flag triple must also be aligned to Config T before running `pnpm env:sync`; otherwise that sync will restore V0 and invalidate the candidate.
 
 ## Build
 
-After approval, trigger exactly one production build for the required platform or `all` when both stores are ready:
+After approval, trigger exactly one Android production build:
 
 ```powershell
 cd apps/mobile
-eas build --platform all --profile production --non-interactive
+eas build --platform android --profile production --non-interactive
 ```
 
 Record each build ID, commit, profile, flag classification, and link. Verify the installed candidate against the production API and the Config-T shell before submission. Use that recorded build ID for submission; never select a candidate by recency.
@@ -89,15 +88,7 @@ eas submit -p android --profile production --id $androidBuildId --non-interactiv
 
 Confirm the submission succeeds and the build appears on Play internal testing before promoting any release.
 
-For iOS, submit the verified production build to TestFlight:
-
-```powershell
-cd apps/mobile
-$iosBuildId = Read-Host 'Recorded iOS build ID'
-eas submit -p ios --profile production --id $iosBuildId --non-interactive --wait
-```
-
-Confirm processing in App Store Connect and add only approved internal TestFlight groups.
+For the completed WI-1341 internal submission, record only the Android production build `fd1b0e50` (STORE `1.0.1`, versionCode `2`) and Play internal submission `b3aebb23`. Those records prove internal-track delivery, not a public release.
 
 ## Failure And Rollback
 

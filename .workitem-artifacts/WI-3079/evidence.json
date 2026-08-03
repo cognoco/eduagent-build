@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Both seeded-cache mutation variants pass and exit normally without --forceExit.",
+      "pointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The complete use-profiles test file terminates and passes 14/14.",
+      "pointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Display-name and app-context responses still merge without erasing conversationLanguageConfirmed or isCurrentUser.",
+      "pointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Retention is bounded to the exact query and cleanup always unmounts and removes it; production hook code is untouched by WI-3079.",
+      "pointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The recorded red/green sequence distinguishes non-termination, premature eviction, and the final normal exit.",
+      "pointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+}
