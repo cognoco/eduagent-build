@@ -1,0 +1,7 @@
+**What was done:** Completed the guardian-attachment route throttle so repeated initiation and redemption attempts are bounded by one source-IP window and over-limit callers receive deterministic retry guidance before verifier or attachment work begins.
+
+**What changed:** Retained the existing shared sliding-window limiter introduced with the guardian ceremony, named its 10-minute window and 30-attempt ceiling, added a deterministic `Retry-After: 600` header to both guarded routes, and added an isolated reset seam for route tests. Added route regressions for Cloudflare source identity, rotating proxy suffixes, mixed endpoints/tokens/charge IDs, the shared unknown-source bucket, independent sources, below-limit forbidden behavior, and service non-invocation after the ceiling.
+
+**Verification:** The regression was observed red with the first over-limit request returning HTTP 429 without `Retry-After`. The focused guardian-attachment matrix then passed 5/5, the complete consent route suite passed 79/79, the shared bounded/LRU limiter suite passed 16/16, Prettier and ESLint passed for both changed files, and the API TypeScript build passed.
+
+**Caveats / Follow-ups:** This is the existing in-isolate defense-in-depth limiter; cross-isolate global enforcement remains the documented accepted limitation of the shared rate-limit service. No authority tokens, learner identifiers, or verifier evidence are logged.

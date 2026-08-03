@@ -117,23 +117,37 @@ const consentRespondLimiter = createSlidingWindowRateLimiter({
   maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
 });
 
+export const GUARDIAN_ATTACHMENT_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const GUARDIAN_ATTACHMENT_RATE_LIMIT_MAX = 30;
+
 const guardianAttachmentLimiter = createSlidingWindowRateLimiter({
-  windowMs: 10 * 60 * 1000,
-  max: 30,
+  windowMs: GUARDIAN_ATTACHMENT_RATE_LIMIT_WINDOW_MS,
+  max: GUARDIAN_ATTACHMENT_RATE_LIMIT_MAX,
   maxEntries: CONSENT_RESPOND_MAP_MAX_ENTRIES,
 });
 
 function guardianAttachmentRateLimited(c: Context<ConsentRouteEnv>): boolean {
-  return guardianAttachmentLimiter.isLimited(
+  const limited = guardianAttachmentLimiter.isLimited(
     resolveRateLimitIp(
       c.req.header('cf-connecting-ip'),
       c.req.header('x-forwarded-for'),
     ),
   );
+  if (limited) {
+    c.header(
+      'Retry-After',
+      String(Math.ceil(GUARDIAN_ATTACHMENT_RATE_LIMIT_WINDOW_MS / 1000)),
+    );
+  }
+  return limited;
 }
 
 export function __resetConsentRespondRateLimit(): void {
   consentRespondLimiter.reset();
+}
+
+export function __resetGuardianAttachmentRateLimit(): void {
+  guardianAttachmentLimiter.reset();
 }
 
 // Re-exported so existing consumers (consent-web route, tests) keep their
