@@ -114,10 +114,23 @@ describe('WI-2937 production EAS submit contract', () => {
       'utf8',
     );
     for (const statement of requiredAndroidOnlyRunbookStatements) {
-      const mutatedRunbook = runbook.replace(statement, '');
+      const mutatedRunbook = runbook.split(statement).join('');
 
       expect(mutatedRunbook).not.toBe(runbook);
       expect(() => expectAndroidOnlyRunbook(mutatedRunbook)).toThrow(statement);
     }
+  });
+
+  it('rejects a required statement after every duplicate is removed', () => {
+    const runbook = readFileSync(
+      join(repoRoot, 'docs/runbooks/store-submission.md'),
+      'utf8',
+    );
+    const statement = 'it does not authorize a public Play release.';
+    const duplicatedRunbook = `${runbook}\n${statement}`;
+    const withoutEveryCopy = duplicatedRunbook.split(statement).join('');
+
+    expect(withoutEveryCopy).not.toContain(statement);
+    expect(() => expectAndroidOnlyRunbook(withoutEveryCopy)).toThrow(statement);
   });
 });
