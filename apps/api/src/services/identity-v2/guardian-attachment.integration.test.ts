@@ -430,7 +430,7 @@ function assertion(
 
     it('persists the COPPA basis for the explicit US_COPPA regime', async () => {
       const adult = await seedIdentity('adult-US_COPPA', 40);
-      const learner = await seedIdentity('learner-US_COPPA', 12);
+      const learner = await seedIdentity('learner-US_COPPA', 14);
       await db
         .update(countryPolicyRegistry)
         .set({ regimeId: US_COPPA_REGIME_ID, article8Threshold: 13 })
