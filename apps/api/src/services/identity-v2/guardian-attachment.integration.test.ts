@@ -431,9 +431,13 @@ function assertion(
     it('persists the COPPA basis for the explicit US_COPPA regime', async () => {
       const adult = await seedIdentity('adult-US_COPPA', 40);
       const learner = await seedIdentity('learner-US_COPPA', 14);
+      // Keep this synthetic country at its guardian-required threshold of 16.
+      // The canonical US threshold is 13, but the product does not admit
+      // under-13 credentialed learners. This case isolates the transaction's
+      // regime-to-basis mapping without pretending to exercise US admission.
       await db
         .update(countryPolicyRegistry)
-        .set({ regimeId: US_COPPA_REGIME_ID, article8Threshold: 13 })
+        .set({ regimeId: US_COPPA_REGIME_ID })
         .where(eq(countryPolicyRegistry.id, POLICY_ID));
       await db
         .update(consentRequest)
