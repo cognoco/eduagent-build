@@ -89,8 +89,10 @@ async function waitForBlockedMemoryFactUpdate(
   adminPool: Pool,
   databaseName: string,
   remediationApplicationName: string,
+  timeoutMs = 30_000,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     const result = await adminPool.query<{ waiting: boolean }>(
       `SELECT EXISTS (
         SELECT 1
@@ -703,6 +705,55 @@ describeLoopbackOnly(
       }
     });
 
+    it('[WI-2753] preserves PostgreSQL scalar subject index semantics', async () => {
+      const facts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'suppressed',
+            text: 'Der Schüler hat ADHS.',
+            textNormalized: normalizeMemoryText('Der Schüler hat ADHS.'),
+            metadata: { subject: 3 },
+            observedAt: new Date('2026-08-03T10:30:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T10:30:00.000Z'),
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'suppressed',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: {},
+            observedAt: new Date('2026-08-03T10:45:00.000Z'),
+            embedding: null,
+            createdAt: new Date('2026-08-03T10:45:00.000Z'),
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      await remediateMemoryFacts(db);
+
+      const ids = facts.map((fact) => fact.id);
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        rows.filter((row) => ids.includes(row.id)).map((row) => [row.id, row]),
+      );
+
+      for (const fact of facts) {
+        expect(byId.get(fact.id)).toMatchObject({
+          text: REDACTED_PLACEHOLDER,
+          supersededBy: null,
+        });
+      }
+    });
+
     it('[WI-2753] converges distinct original groups on their post-redaction tuple', async () => {
       const facts = await db
         .insert(memoryFacts)
@@ -943,6 +994,9 @@ describeLoopbackOnly(
         );
 
         const remediation = remediateMemoryFacts(db);
+        // Observe rejection immediately: if the wait helper fails first, the
+        // in-flight query must not mask that diagnostic as an unhandled promise.
+        void remediation.catch(() => undefined);
         await waitForBlockedMemoryFactUpdate(
           adminPool,
           databaseName,

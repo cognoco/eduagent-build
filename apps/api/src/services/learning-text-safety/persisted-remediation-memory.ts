@@ -298,8 +298,8 @@ export function memoryFactActiveGroupKey(row: {
   readonly textNormalized: string;
 }): string {
   const record = metadataRecord(row.metadata);
-  const subject = typeof record.subject === 'string' ? record.subject : '';
-  const context = typeof record.context === 'string' ? record.context : '';
+  const subject = indexedScalarText(record.subject);
+  const context = indexedScalarText(record.context);
   return JSON.stringify([
     row.profileId,
     row.category,
@@ -307,6 +307,15 @@ export function memoryFactActiveGroupKey(row: {
     context,
     row.textNormalized,
   ]);
+}
+
+/** Mirrors PostgreSQL JSONB `->>` for schema-valid scalar index values. */
+function indexedScalarText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
 }
 
 /**

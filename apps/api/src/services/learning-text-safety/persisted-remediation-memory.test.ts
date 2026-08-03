@@ -83,6 +83,34 @@ describe('memoryFactActiveGroupKey [WI-3078]', () => {
     ).toBe(empty);
     expect(memoryFactActiveGroupKey({ ...baseRow, metadata: {} })).toBe(empty);
   });
+
+  it('matches PostgreSQL text extraction for numeric and boolean scalars', () => {
+    const missing = memoryFactActiveGroupKey({ ...baseRow, metadata: {} });
+    const numeric = memoryFactActiveGroupKey({
+      ...baseRow,
+      metadata: { subject: 3 },
+    });
+    const boolean = memoryFactActiveGroupKey({
+      ...baseRow,
+      metadata: { subject: true },
+    });
+
+    expect(numeric).not.toBe(missing);
+    expect(boolean).not.toBe(missing);
+    expect(numeric).not.toBe(boolean);
+    expect(numeric).toBe(
+      memoryFactActiveGroupKey({
+        ...baseRow,
+        metadata: { subject: '3' },
+      }),
+    );
+    expect(boolean).toBe(
+      memoryFactActiveGroupKey({
+        ...baseRow,
+        metadata: { subject: 'true' },
+      }),
+    );
+  });
 });
 
 describe('memoryFactCasGuard [WI-3076]', () => {
