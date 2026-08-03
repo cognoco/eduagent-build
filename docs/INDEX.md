@@ -68,6 +68,12 @@ drain: `architecture.md`, `PRD.md`, `ux-design-specification.md` (per the Phase-
 `docs/` reorg, gated on this Phase-G canon-lock). Until then, find them at the repo
 root and in `docs/`.
 
+First drained cross-cutting canon, landed ahead of the rest:
+
+| Doc | What it is |
+|---|---|
+| [`canon/principles.md`](canon/principles.md) | **Principles & Invariants Catalog** — the `MMT-ADR-0000` §I.3 index of `PRIN-NN` principle IDs over the layered canon; the conformance surface the §II.1 significance gate reads against. Rule text lives in the pointed-at canon (marker = the ID), never in the catalog. |
+
 ---
 
 ## L2 — All decisions (ADRs)

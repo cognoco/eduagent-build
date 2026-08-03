@@ -1,0 +1,18 @@
+{
+  "pageId": "3ad8bce9-1f7c-816d-a2f5-eabc1054503c",
+  "id": "WI-2897",
+  "name": "Rate-limit guardian-attachment consent attempts",
+  "description": "The new authenticated guardian-attachment consent endpoint has HMAC and authority checks but no per-IP throttling, unlike adjacent sensitive consent and family-join endpoints, so burst probing reaches validation and database work without a bounded request window.",
+  "acceptanceCriteria": "Root cause: POST /consent/guardian-attachment was added without invoking the existing createSlidingWindowRateLimiter/resolveRateLimitIp pattern already imported by consent.ts. Behavioral variants: (1) repeated attempts from the same cf-connecting-ip share one bounded window; (2) rotating X-Forwarded-For suffixes cannot evade the leftmost-client bucket; (3) different authority tokens or charge IDs from the same source still share the source bucket; (4) attempts below the limit preserve existing authenticated success/forbidden behavior; (5) the first over-limit request returns 429 with deterministic Retry-After and never reaches token verification or the service transaction; (6) the limiter remains memory-bounded and the unknown-IP bucket cannot create unbounded keys. Add named route regression tests that fail without the limiter and pass with it for all variants; do not log tokens, learner identifiers, or authority evidence.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

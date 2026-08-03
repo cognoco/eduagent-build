@@ -719,6 +719,7 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
 | `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
 | `WORKER_DATABASE_BYPASSRLS_EXPECTED` (repository variable) | `deploy.yml`, `production-secret-sync.yml` — exact reviewed Worker BYPASSRLS posture (`true` or `false`) |
+| `STAGING_WORKER_ADMIN_EXCEPTION_ROLE` (temporary repository variable) | `deploy.yml` staging checks only — must be exactly `staging_worker`; permits only Neon's managed-admin capability set for the staging workaround. Production never receives it. Remove with WI-3062 before MVP launch. |
 | `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
 | `DOPPLER_TOKEN_PRD` | `deploy.yml`, `production-secret-sync.yml` — production Doppler service token for Worker secret sync |
 | `SKIP_DOPPLER_SYNC` | Deprecated tripwire only — protected staging/production deploys fail if it is `true`; remove the stale setting after confirming the guarded sync path |
@@ -763,6 +764,22 @@ Protected targets are deliberately single-target only. Never combine `stg` and
 Workers. Prefer the guarded deployment/scheduled workflows, which verify the
 target, application-role capabilities, migration-role separation, and reviewed
 BYPASSRLS posture before mutation.
+
+### Temporary staging Worker role exception
+
+OPQ-163 authorizes the staging Worker to use the Neon control-plane role
+`staging_worker` while Neon support resolves least-privilege role provisioning.
+Set `STAGING_WORKER_ADMIN_EXCEPTION_ROLE=staging_worker` only while that role is
+the staging `DATABASE_URL_STAGING_APP` credential. The verifier rejects a stale
+or mismatched exception flag, direct superuser status, direct application-object
+ownership, any other role name, and every production use. The reviewed managed
+role fingerprint does include `SET ROLE` and role-admin reach; OPQ-163 knowingly
+accepts that effective admin reach in staging only. The verifier pins the
+top-level reachability booleans but cannot detect expansion among roles inside
+an already-true reachability category; that residual risk is also accepted only
+for this temporary staging use. WI-3062 is a hard blocker of the final MVP
+compliance gate and requires the role, variable, verifier allowance, and
+credential to be removed.
 
 ### What gets filtered out
 

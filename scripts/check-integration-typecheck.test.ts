@@ -31,6 +31,55 @@ const mutantCheckerPath = join(
 // temporary manually coupled selector before WI-2578 could execute.
 const historicalPreFixSha = 'f9424a787b49fa0683e16e2793429178127d08c0';
 
+function pnpmLaunchShape(platform: NodeJS.Platform = process.platform) {
+  return platform === 'win32'
+    ? { command: 'pnpm.cmd', shell: true }
+    : { command: 'pnpm', shell: false };
+}
+
+function runPnpm(
+  args: string[],
+  options: {
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    encoding: 'utf8';
+  },
+  dependencies: {
+    platform?: NodeJS.Platform;
+    spawn?: typeof spawnSync;
+  } = {},
+) {
+  const launch = pnpmLaunchShape(dependencies.platform);
+  const spawn = dependencies.spawn ?? spawnSync;
+  const probe = spawn(launch.command, ['--version'], {
+    ...options,
+    shell: launch.shell,
+  });
+  if (probe.error || probe.status !== 0) {
+    throw new Error(
+      `Unable to launch ${launch.command}; install the repository package manager and ensure it is on PATH.`,
+    );
+  }
+  const result = spawn(launch.command, args, {
+    ...options,
+    shell: launch.shell,
+  });
+  if (result.error || result.status === null) {
+    throw new Error(
+      `Unable to launch ${launch.command}: ${result.error?.message ?? 'child process did not start'}`,
+    );
+  }
+  return result;
+}
+
+function envWithoutPath(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.toUpperCase() === 'PATH') delete env[key];
+  }
+  return { ...env, PATH: '' };
+}
+
 function disposableIndex() {
   const indexPath = join(tmpdir(), `wi2578-index-${process.pid}-${Date.now()}`);
   return { ...process.env, GIT_INDEX_FILE: indexPath };
@@ -45,6 +94,54 @@ describe('integration typecheck contract', () => {
     }
     rmSync(ignoredFixtureDir, { recursive: true, force: true });
     rmSync(mutantCheckerPath, { force: true });
+  });
+
+  it.each([
+    ['win32', 'pnpm.cmd', true],
+    ['linux', 'pnpm', false],
+  ] as const)(
+    'selects the platform-safe pnpm launcher for %s',
+    (platform, command, shell) => {
+      expect(pnpmLaunchShape(platform)).toEqual({ command, shell });
+    },
+  );
+
+  it('uses the Windows launcher through the shared pnpm runner', () => {
+    const spawn = jest
+      .fn()
+      .mockReturnValueOnce({ status: 0 })
+      .mockReturnValueOnce({ status: 0 });
+    const options = {
+      cwd: repoRoot,
+      env: process.env,
+      encoding: 'utf8' as const,
+    };
+
+    runPnpm(['exec', 'tsx', 'checker.ts'], options, {
+      platform: 'win32',
+      spawn: spawn as unknown as typeof spawnSync,
+    });
+
+    expect(spawn).toHaveBeenNthCalledWith(1, 'pnpm.cmd', ['--version'], {
+      ...options,
+      shell: true,
+    });
+    expect(spawn).toHaveBeenNthCalledWith(
+      2,
+      'pnpm.cmd',
+      ['exec', 'tsx', 'checker.ts'],
+      { ...options, shell: true },
+    );
+  });
+
+  it('fails with an actionable error when the package manager cannot start', () => {
+    expect(() =>
+      runPnpm(['--version'], {
+        cwd: repoRoot,
+        env: envWithoutPath(),
+        encoding: 'utf8',
+      }),
+    ).toThrow(/Unable to launch pnpm(?:\.cmd)?.*ensure it is on PATH/);
   });
 
   it('automates the named pre-fix, fixed, coverage-revert, and restored sequence', () => {
@@ -79,8 +176,7 @@ describe('integration typecheck contract', () => {
         { cwd: repoRoot, env, encoding: 'utf8' },
       );
       expect(historicalConfig.status).not.toBe(0);
-      const preFix = spawnSync(
-        'pnpm',
+      const preFix = runPnpm(
         [
           'exec',
           'tsc',
@@ -95,8 +191,7 @@ describe('integration typecheck contract', () => {
 
       // Fixed: Jest's source-selection properties feed the compiler roots, so
       // the exact same fixture is rejected by the owned checker command.
-      const fixed = spawnSync(
-        'pnpm',
+      const fixed = runPnpm(
         ['exec', 'tsx', 'scripts/check-integration-typecheck.ts'],
         { cwd: repoRoot, env, encoding: 'utf8' },
       );
@@ -119,8 +214,7 @@ describe('integration typecheck contract', () => {
         mutantCheckerPath,
         checker.replace(coverageExpression, 'const roots: string[] = [];'),
       );
-      const reverted = spawnSync(
-        'pnpm',
+      const reverted = runPnpm(
         ['exec', 'tsx', 'scripts/wi2578-coverage-revert-mutant.ts'],
         { cwd: repoRoot, env, encoding: 'utf8' },
       );
@@ -139,8 +233,7 @@ describe('integration typecheck contract', () => {
         ],
         { cwd: repoRoot, env },
       );
-      const restored = spawnSync(
-        'pnpm',
+      const restored = runPnpm(
         ['exec', 'tsx', 'scripts/check-integration-typecheck.ts'],
         { cwd: repoRoot, env, encoding: 'utf8' },
       );
@@ -179,8 +272,7 @@ describe('integration typecheck contract', () => {
         cwd: repoRoot,
         env,
       });
-      const result = spawnSync(
-        'pnpm',
+      const result = runPnpm(
         ['exec', 'tsx', 'scripts/check-integration-typecheck.ts'],
         { cwd: repoRoot, env, encoding: 'utf8' },
       );

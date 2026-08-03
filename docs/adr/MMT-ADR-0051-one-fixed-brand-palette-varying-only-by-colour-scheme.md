@@ -12,7 +12,7 @@ The **second** is a single fixed palette — a teal primary with a lavender seco
 
 The second direction is what the product means. The persona concept it depended on was removed from the data model, and shared components were made deliberately persona-unaware, so the per-persona system lost the input it needed to function and became a description of something that could no longer be built. Separately, an accent-selection capability was explored and deliberately removed rather than shipped.
 
-What made this genuinely confusing rather than merely stale is that residual machinery from the removed accent capability survives in the theme layer — a preset list including colours that are not brand colours, and the plumbing to apply one. Read as a feature it looks like a shipped picker, and the documentation was updated once to describe it as such. It is not reachable: no surface offers the choice, the selection is unset for every user, and with it unset the fixed palette renders unchanged. The machinery is legacy awaiting cleanup, not a capability.
+What made this genuinely confusing rather than merely stale is that residual machinery from the removed accent capability survives in the theme layer — a preset list including colours that are not brand colours, and the plumbing to apply one. Read as a feature it looks like a shipped picker, and the documentation was updated once to describe it as such. It is not reachable: no surface offers the choice, so on a fresh installation nothing is stored and the fixed palette renders unchanged — but it is not wholly inert, because the theme layer still reads a per-profile stored value, so an installation upgraded from a build where a selection was made can still have one applied. The machinery is legacy awaiting cleanup, not a capability.
 
 ## Decision
 
@@ -26,7 +26,7 @@ What made this genuinely confusing rather than merely stale is that residual mac
 
 5. **Per-persona visual moods are not the design.** Documentation describing distinct visual treatments per audience records a direction that was considered and not taken, and is superseded by this decision rather than pending implementation.
 
-6. **The surviving accent machinery is cleanup, not contract.** Its presence in the theme layer does not constitute a feature, nothing may be built against it, and removing it is a tidying change that does not alter rendered output.
+6. **The surviving accent machinery is cleanup, not contract.** Its presence in the theme layer does not constitute a feature, and nothing may be built against it. Removing it is not unconditionally a no-op: the theme layer still reads a per-profile stored value, so an installation upgraded from a build where a selection was made can still have one applied. The cleanup therefore includes clearing the persisted keys, and its correctness is a migration question rather than a pure deletion.
 
 ## Consequences
 

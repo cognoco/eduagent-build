@@ -1,6 +1,6 @@
 # Known Exceptions to Engineering Rules
 
-This is the registry of sanctioned deviations from the Non-Negotiable Engineering Rules in `AGENTS.md`. Reviewers must not "fix" these in unrelated PRs, and new contributors must not copy them as precedent. Each entry is either tracked toward a refactor, or promoted into an explicit rule.
+This is the registry of sanctioned deviations from the Non-Negotiable Engineering Rules in `AGENTS.md`. Reviewers must not "fix" these in unrelated PRs, and new contributors must not copy them as precedent. Each entry is either tracked toward a refactor, or promoted into an explicit rule. [PRIN-22]
 
 The always-loaded index of these exceptions lives in AGENTS.md § Known Exceptions; this file is the canonical home of each exception's full rationale.
 

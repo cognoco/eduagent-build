@@ -320,6 +320,29 @@ jest.mock(
   }),
 );
 
+const mockInitiateGuardianAuthorityVerification = jest.fn().mockResolvedValue({
+  authorityToken: 'signed-authority-token',
+});
+const mockAttachGuardianConsentFromDurableAuthorityToken = jest
+  .fn()
+  .mockResolvedValue({
+    status: 'attached',
+    consentSatisfied: true,
+  });
+
+jest.mock('../services/identity-v2/guardian-attachment-verifier', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/guardian-attachment-verifier',
+  ) as typeof import('../services/identity-v2/guardian-attachment-verifier');
+  return {
+    ...actual,
+    initiateGuardianAuthorityVerification: (...args: unknown[]) =>
+      mockInitiateGuardianAuthorityVerification(...args),
+    attachGuardianConsentFromDurableAuthorityToken: (...args: unknown[]) =>
+      mockAttachGuardianConsentFromDurableAuthorityToken(...args),
+  };
+});
+
 const mockVerifyPersonIsOrgAdminV2 = jest.fn().mockResolvedValue(true);
 
 // [WI-1989/WI-2516] assertCallerIsAccountOwner calls
@@ -353,6 +376,9 @@ import { ERROR_CODES } from '@eduagent/schemas';
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
   API_ORIGIN: 'https://api.test.mentomate.com',
+  GUARDIAN_AUTHORITY_TOKEN_SECRET: 'test-guardian-authority-secret',
+  GUARDIAN_AUTHORITY_VERIFIER_URL: 'https://verifier.test.example',
+  GUARDIAN_AUTHORITY_VERIFIER_KEY: 'test-verifier-key',
   // WI-867: database middleware checks `c.env.DATABASE_URL` before calling
   // createDatabase(). Without this, db is never injected into context and
   // resolveIdentityV2(db, ...) crashes on `undefined.query`. The @eduagent/database
@@ -404,6 +430,10 @@ afterAll(() => {
 
 beforeEach(() => {
   clearJWKSCache();
+  const { __resetGuardianAttachmentRateLimit } = jest.requireActual(
+    './consent',
+  ) as { __resetGuardianAttachmentRateLimit: () => void };
+  __resetGuardianAttachmentRateLimit();
   setMockCallerPersonId('test-profile-id');
   // WI-867: reset profile-v2 scope mocks to defaults.
   mockGetPersonScope.mockImplementation((_db: unknown, profileId: string) =>
@@ -441,6 +471,15 @@ beforeEach(() => {
   mockRestoreChildConsentV2.mockResolvedValue({ status: 'CONSENTED' });
   mockVerifyPersonIsOrgAdminV2.mockResolvedValue(true);
   mockGuardianshipFindFirst.mockResolvedValue({ id: 'test-guardianship-id' });
+  mockInitiateGuardianAuthorityVerification.mockReset().mockResolvedValue({
+    authorityToken: 'signed-authority-token',
+  });
+  mockAttachGuardianConsentFromDurableAuthorityToken
+    .mockReset()
+    .mockResolvedValue({
+      status: 'attached',
+      consentSatisfied: true,
+    });
   // WI-867: restore real-function delegation after per-test error injection.
   mockGetChildConsentForParentV2.mockImplementation((...args: unknown[]) =>
     realFamilyV2.getChildConsentForParentV2(
@@ -450,6 +489,219 @@ beforeEach(() => {
 });
 
 describe('consent routes', () => {
+  describe('guardian-attachment rate limiting [WI-2897]', () => {
+    const initiationBody = (chargePersonId: string, suffix: number) =>
+      JSON.stringify({
+        chargePersonId,
+        verificationHandle: `verification-handle-${suffix}`,
+      });
+    const attachmentBody = (chargePersonId: string, suffix: number) =>
+      JSON.stringify({
+        chargePersonId,
+        authorityToken: `authority-token-${suffix}`,
+      });
+
+    it('allows 30 attempts from one Cloudflare source, then returns 429 + Retry-After before verifier work', async () => {
+      const headers = {
+        ...AUTH_HEADERS,
+        'cf-connecting-ip': '203.0.113.170',
+      };
+
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const response = await app.request(
+          '/v1/consent/guardian-attachment/initiate',
+          {
+            method: 'POST',
+            headers,
+            body: initiationBody(TEST_PROFILE_ID_2, attempt),
+          },
+          TEST_ENV,
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const blocked = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers,
+          body: initiationBody(TEST_PROFILE_ID_2, 30),
+        },
+        TEST_ENV,
+      );
+
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.get('Retry-After')).toBe('600');
+      expect(mockInitiateGuardianAuthorityVerification).toHaveBeenCalledTimes(
+        30,
+      );
+
+      const independentSource = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'cf-connecting-ip': '203.0.113.171',
+          },
+          body: initiationBody(TEST_PROFILE_ID_2, 31),
+        },
+        TEST_ENV,
+      );
+      expect(independentSource.status).toBe(200);
+    });
+
+    it('uses the leftmost X-Forwarded-For client across rotating proxy suffixes', async () => {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const response = await app.request(
+          '/v1/consent/guardian-attachment',
+          {
+            method: 'POST',
+            headers: {
+              ...AUTH_HEADERS,
+              'x-forwarded-for': `198.51.100.170, 10.0.0.${attempt}`,
+            },
+            body: attachmentBody(TEST_PROFILE_ID_2, attempt),
+          },
+          TEST_ENV,
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const blocked = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'x-forwarded-for': '198.51.100.170, 192.0.2.250',
+          },
+          body: attachmentBody(TEST_PROFILE_ID_3, 30),
+        },
+        TEST_ENV,
+      );
+
+      expect(blocked.status).toBe(429);
+      expect(
+        mockAttachGuardianConsentFromDurableAuthorityToken,
+      ).toHaveBeenCalledTimes(30);
+    });
+
+    it('shares one source bucket across both endpoints, tokens, and charge IDs', async () => {
+      const headers = {
+        ...AUTH_HEADERS,
+        'cf-connecting-ip': '203.0.113.172',
+      };
+
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const response = await app.request(
+          '/v1/consent/guardian-attachment/initiate',
+          {
+            method: 'POST',
+            headers,
+            body: initiationBody(
+              attempt % 2 === 0 ? TEST_PROFILE_ID_2 : TEST_PROFILE_ID_3,
+              attempt,
+            ),
+          },
+          TEST_ENV,
+        );
+        expect(response.status).toBe(200);
+      }
+      for (let attempt = 15; attempt < 30; attempt++) {
+        const response = await app.request(
+          '/v1/consent/guardian-attachment',
+          {
+            method: 'POST',
+            headers,
+            body: attachmentBody(
+              attempt % 2 === 0 ? TEST_PROFILE_ID_2 : TEST_PROFILE_ID_3,
+              attempt,
+            ),
+          },
+          TEST_ENV,
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const blocked = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers,
+          body: attachmentBody(TEST_PROFILE_ID_3, 30),
+        },
+        TEST_ENV,
+      );
+
+      expect(blocked.status).toBe(429);
+      expect(mockInitiateGuardianAuthorityVerification).toHaveBeenCalledTimes(
+        15,
+      );
+      expect(
+        mockAttachGuardianConsentFromDurableAuthorityToken,
+      ).toHaveBeenCalledTimes(15);
+    });
+
+    it('keeps the shared unknown-source bucket bounded by the same request ceiling', async () => {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const response = await app.request(
+          '/v1/consent/guardian-attachment',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: attachmentBody(TEST_PROFILE_ID_2, attempt),
+          },
+          TEST_ENV,
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const blocked = await app.request(
+        '/v1/consent/guardian-attachment/initiate',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: initiationBody(TEST_PROFILE_ID_3, 30),
+        },
+        TEST_ENV,
+      );
+
+      expect(blocked.status).toBe(429);
+      expect(
+        mockAttachGuardianConsentFromDurableAuthorityToken,
+      ).toHaveBeenCalledTimes(30);
+      expect(mockInitiateGuardianAuthorityVerification).not.toHaveBeenCalled();
+    });
+
+    it('preserves the existing forbidden response below the ceiling', async () => {
+      const { GuardianAttachmentRejectedError } = jest.requireActual(
+        '../services/identity-v2/guardian-attachment',
+      ) as typeof import('../services/identity-v2/guardian-attachment');
+      mockAttachGuardianConsentFromDurableAuthorityToken.mockRejectedValueOnce(
+        new GuardianAttachmentRejectedError(),
+      );
+
+      const response = await app.request(
+        '/v1/consent/guardian-attachment',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'cf-connecting-ip': '203.0.113.173',
+          },
+          body: attachmentBody(TEST_PROFILE_ID_2, 0),
+        },
+        TEST_ENV,
+      );
+
+      expect(response.status).toBe(403);
+      expect(
+        mockAttachGuardianConsentFromDurableAuthorityToken,
+      ).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // POST /v1/consent/request
   // -------------------------------------------------------------------------

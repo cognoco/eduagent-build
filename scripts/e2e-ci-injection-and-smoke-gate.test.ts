@@ -1963,9 +1963,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     // Corpus-size canary proving the PARKED-prose detector still detects —
     // calibrated to the current parked corpus, not a policy target. WI-2548
-    // un-parked the two coach-bubble flows (11 → 9); re-calibrate when flows
-    // are parked or un-parked, never to paper over a detector regression.
-    expect(parkedFlows.length).toBeGreaterThanOrEqual(9);
+    // un-parked the two coach-bubble flows (11 → 9); WI-2887 deleted the
+    // permanently retired self-preview flow (9 → 8). Re-calibrate when flows
+    // are parked, un-parked, or removed, never to paper over a detector regression.
+    expect(parkedFlows.length).toBeGreaterThanOrEqual(8);
 
     for (const flow of parkedFlows) {
       const source = readFileSync(
@@ -4497,49 +4498,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           scrollUntilVisible?.element?.id === 'sign-out-button',
       ),
     ).toBe(false);
-  });
-
-  it('[WI-1864] parks preview-self while its product entry flag is hard-disabled', () => {
-    const source = readFileSync(
-      join(repoRoot, 'apps/mobile/e2e/flows/onboarding/preview-self.yaml'),
-      'utf8',
-    );
-    const flags = readFileSync(
-      join(repoRoot, 'apps/mobile/src/lib/feature-flags.ts'),
-      'utf8',
-    );
-    const header = parseAllDocuments(source)[0]?.toJSON() as {
-      tags?: string[];
-    };
-    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
-      runFlow?: { file?: string };
-      extendedWaitUntil?: { visible?: { id?: string } | string };
-    }>;
-    const welcomeBridge = commands.findIndex(
-      ({ runFlow }) =>
-        runFlow?.file === '../_setup/nav-welcome-to-sign-in.yaml',
-    );
-    const signIn = commands.findIndex(
-      ({ extendedWaitUntil }, index) =>
-        index > welcomeBridge &&
-        typeof extendedWaitUntil?.visible === 'object' &&
-        extendedWaitUntil.visible.id === 'sign-in-screen',
-    );
-
-    expect(welcomeBridge).toBe(0);
-    expect(signIn).toBeGreaterThan(welcomeBridge);
-    expect(flags).toContain('PREVIEW_ENTRY_CTA_ENABLED: false');
-    expect(source).toMatch(/^# PARKED\b/m);
-    expect(source).toMatch(/^# PM INTAKE: WI-2586\b/m);
-    expect(source).toContain(
-      'https://www.notion.so/3a48bce91f7c815ca25bdb077de9054c',
-    );
-    expect(source).toMatch(/^# OWNER: MentoMate Program Manager\b/m);
-    expect(source).toMatch(/^# UNBLOCK CONDITION:/m);
-    expect(header.tags).toContain('blocked');
-    expect(loadPlan('nightly').map(({ flow }) => flow)).not.toContain(
-      'flows/onboarding/preview-self.yaml',
-    );
   });
 
   it.each([

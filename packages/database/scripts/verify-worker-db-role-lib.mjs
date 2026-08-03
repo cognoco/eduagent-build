@@ -20,6 +20,15 @@ const FORBIDDEN_CAPABILITIES = [
   ],
 ];
 
+const TEMPORARY_STAGING_ADMIN_FINGERPRINT = new Map([
+  ['can_create_database', true],
+  ['can_create_role', true],
+  ['can_replicate', true],
+  ['can_create_schema', false],
+  ['has_forbidden_set_role_path', true],
+  ['has_role_admin_path', true],
+]);
+
 const REQUIRED_PRIVILEGE_COUNTS = [
   [
     'missing_table_select_count',
@@ -47,6 +56,21 @@ const REQUIRED_PRIVILEGE_COUNTS = [
   ],
 ];
 
+export function parseTemporaryStagingAdminException({ deployEnv, value }) {
+  if (!value) return null;
+  if (deployEnv !== 'staging') {
+    throw new Error(
+      'STAGING_WORKER_ADMIN_EXCEPTION_ROLE is forbidden outside staging',
+    );
+  }
+  if (value !== 'staging_worker') {
+    throw new Error(
+      'STAGING_WORKER_ADMIN_EXCEPTION_ROLE must be exactly "staging_worker"',
+    );
+  }
+  return value;
+}
+
 export function parseExpectedBypassRls(value) {
   if (value === 'true') return true;
   if (value === 'false') return false;
@@ -57,7 +81,7 @@ export function parseExpectedBypassRls(value) {
 
 export function assertWorkerDatabaseCapabilities(
   capabilities,
-  { expectedBypassRls } = {},
+  { deployEnv, expectedBypassRls, temporaryStagingAdminRole } = {},
 ) {
   if (typeof expectedBypassRls !== 'boolean') {
     throw new Error(
@@ -65,9 +89,42 @@ export function assertWorkerDatabaseCapabilities(
     );
   }
 
-  const violations = FORBIDDEN_CAPABILITIES.filter(
-    ([property]) => capabilities[property],
-  ).map(([, message]) => message);
+  const temporaryStagingAdminExceptionConfigured = Boolean(
+    temporaryStagingAdminRole,
+  );
+  const temporaryStagingAdminException =
+    deployEnv === 'staging' &&
+    temporaryStagingAdminRole === 'staging_worker' &&
+    capabilities.role_name === temporaryStagingAdminRole;
+  const violations = FORBIDDEN_CAPABILITIES.filter(([property]) => {
+    if (!capabilities[property]) return false;
+    return !(
+      temporaryStagingAdminException &&
+      TEMPORARY_STAGING_ADMIN_FINGERPRINT.has(property)
+    );
+  }).map(([, message]) => message);
+  if (
+    temporaryStagingAdminExceptionConfigured &&
+    !temporaryStagingAdminException
+  ) {
+    violations.push(
+      'configured exception role does not match the live Worker role',
+    );
+  }
+  if (temporaryStagingAdminException) {
+    const fingerprintDiffers = [
+      ...TEMPORARY_STAGING_ADMIN_FINGERPRINT.entries(),
+    ].some(
+      ([property, expected]) =>
+        typeof capabilities[property] !== 'boolean' ||
+        capabilities[property] !== expected,
+    );
+    if (fingerprintDiffers) {
+      violations.push(
+        'staging_worker Neon managed-admin fingerprint differs from the reviewed workaround',
+      );
+    }
+  }
   if (capabilities.bypasses_rls !== expectedBypassRls) {
     violations.push('role BYPASSRLS posture differs from the approved posture');
   }

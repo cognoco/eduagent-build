@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Repeated guardian-attachment attempts from one Cloudflare source share a 30-attempt, 10-minute window and a different source remains independent.",
+      "pointer": "apps/api/src/routes/consent.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Rotating X-Forwarded-For suffixes retain the leftmost originating-client bucket.",
+      "pointer": "apps/api/src/routes/consent.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Initiation and redemption requests with varied authority tokens and charge IDs share the same source bucket.",
+      "pointer": "apps/api/src/routes/consent.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Below-limit requests preserve success and typed forbidden behavior.",
+      "pointer": "apps/api/src/routes/consent.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The first over-limit request returns HTTP 429 with Retry-After 600 before verifier or attachment service work.",
+      "pointer": "apps/api/src/routes/consent.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Unknown requests collapse to one bounded source bucket; shared limiter tests verify the configured max-entry LRU contract.",
+      "pointer": "apps/api/src/services/rate-limit.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": ".workitem-artifacts/WI-2897/red-green.md"
+}

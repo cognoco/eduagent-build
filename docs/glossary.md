@@ -823,12 +823,108 @@ The V2 shell's third tab — "the paper trail of the relationship". Landing is
 list — no sub-tabs; shipped per the journal-redesign spec). ⚠ Not a diary the
 learner writes: it is the browse surface over artifacts other flows produced
 (§4's notes, session recaps, practice history, mentor-memory, Reports).
-**Authority:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §5;
-`docs/specs/2026-06-27-journal-redesign.md` (SHIPPED).
-**In code:** `apps/mobile/src/components/journal/JournalTabView.tsx`; route
-`journal` in `apps/mobile/src/lib/navigation-contract.ts:178`.
+⚠ **All of the above is the `me` scope only.** Journal is **scope-sensitive**:
+the tab *shape* never varies, only its content does — **`me`** the learner's own
+browse surface (above); **`supporter-hub`** the supporter's own record grouped
+by person (reports/recaps delivered *to them*, conversation starters, nudges,
+co-learning receipts, and mentor memory *of them as supporter*);
+**`person`** the **shared record** about one supportee (next entry). A supporter
+scope is never a redacted copy of the supportee's Journal — the artifact wall in
+the next entry is why.
+**Authority:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §5
+and §6.3 (the per-scope table; that spec's §3 tab table defers to it);
+`docs/specs/2026-06-27-journal-redesign.md` (SHIPPED — `me` scope only).
+**In code:** the scope branch lives in the **route, not the component** —
+`apps/mobile/src/app/(app)/journal/index.tsx:13,23,27` dispatches
+`supporter-hub` → `SupportHubJournalTab`, `person` →
+`PersonScopeJournalPlaceholder`, else `JournalTabView`.
+`apps/mobile/src/components/journal/JournalTabView.tsx:319` is the `me`-scope
+render and takes no scope argument. Route `journal` in
+`apps/mobile/src/lib/navigation-contract.ts:178`.
 ⚠ Unrelated grep collision: Drizzle's migration journal
 (`apps/api/drizzle/meta/_journal.json`) is a different "journal" entirely.
+
+#### Journal shared record (supporter scopes)
+What a **supporter** sees in Journal about one supportee: every report ever made
+to them about that person. The server also builds a **supportee mirror** of the
+same facts rendered for that audience — audience-appropriate framing only,
+**not** necessarily byte-identical text. ⚠ The mirror is **server-enforced but
+not yet exposed**: the schema carries both `supporterView` and `supporteeView`
+and the projection refuses to emit a record whose two fact-id sets differ, but
+the only shared-record endpoint authorizes the *caller as supporter*, and every
+renderer selects `supporterView` — no consumer reads `supporteeView` today.
+Treat supportee-side visibility as a built and asserted contract guarantee with
+no read surface yet, **not** as current behaviour. Two properties the
+learner-facing entry above does not have:
+
+- **Reportability-gated fact projections.** Supporter-visible content is built
+  from a server-side **allow-list** of fact kinds — `mastery`, `effort`,
+  `observable_engagement` — and unknown future classes are non-reportable **by
+  default**. Confided affect, self-doubt, private notes, raw chat and persisted
+  legacy LLM report prose are **never produced as supporter-reportable facts or
+  projections**. ⚠ That bounds *reporting*, not the artifacts themselves: the
+  supportee's notes and chats still exist and are still theirs. What the
+  contract removes is the supporter's read path to them (the artifact wall,
+  below) and, for confided affect and self-doubt specifically, the mentor's
+  licence to narrate them upward at all. The record is a **read-time
+  projection** over contract/notice/fact state — **not**
+  `mentor_activity_ledger` rows, and not a stored table. ⚠ Safety escalation is
+  deliberately *not* suppressed by the gate: an escalating fact bypasses the
+  kind check and is re-labelled `observable_engagement`.
+- **Already-delivered notices.** Durable one-per-audience records that a
+  contract-lifecycle event was *already* issued to a side — distinct from an
+  attention item, which is still live. Narrow by construction: exactly two types
+  (`support_link_ended`, `graduation_contract_restamped`), audience `supporter |
+  supportee`, delivered once (unique index), `acknowledgedAt` nullable.
+
+⚠ **A structural attention item is a different surface, not a third property.**
+Attention items belong to the supporter **Mentor** tab: shell spec §6.3 puts them
+in the *Mentor* row of the per-scope table (support-hub cockpit and person scope
+alike), where they rank inside the `/now` card budget, while the *Journal* row is
+this shared record. They are supporter-facing signals over the structural "grades
+layer" (subjects, mastery per chapter, streaks, activity level, next-up), read
+**live from the supportee's own tables through a server-enforced permission
+mask** — not an edge-replicated shadow copy the mentor maintains. ⚠ Declining one
+is **acknowledge/snooze, never dismiss**: it re-surfaces while the underlying
+condition persists, because it is a signal about a real person's struggle
+(EU-8). ⚠ The term is **designed, not named in code** — zero `attentionItem` /
+`attention_item` hits under `apps/` or `packages/`. Nearest built analogues:
+`supporter_feed_surface_state` (`packages/database/src/schema/supporter-feed.ts:17`,
+`snoozedUntil` `:38`) and the `support_hub_pointer` card kind
+(`packages/schemas/src/now-feed.ts:17`). ⚠ Do not read the supporter Journal
+components as attention-item surfaces: `SupportHubJournalTab` and
+`PersonScopeJournalPlaceholder` both render shared-record facts
+(`supporterView.facts`), the same source the supporter Mentor tab reads.
+
+⚠ **The artifact wall is mandatory:** supportership creates **no** read path to
+the supportee's notes, chats or Journal artifacts on any supporter edge. An
+appeal yields richer *structural* detail after a deliberate, audited request; it
+never crosses the wall.
+**Authority:** `MMT-ADR-0027` (Accepted) decisions 1–4 and 6, and its Consequences
+bullet "supporter cards and Journal shared records are read-time projections …
+not `mentor_activity_ledger` rows"; shell spec §6.1 (structural layer; EU-1
+sealed-confession class) and §6.3 (per-scope table; EU-8).
+**In code:** `projectSharedRecord` / `assertRenderEquivalent`
+(`apps/api/src/services/shared-record.ts:26,18`); gate `assertReportable`
+(`apps/api/src/services/reportability.ts:30`, safety bypass `:33`);
+`reportableFactKindSchema` (`packages/schemas/src/visibility-contract.ts:4`)
+with the DB floor at `packages/database/src/schema/visibility-contract.ts:73`;
+`supportVisibilityNotices` (same file, `:122`); edge `supportership`
+(`packages/database/src/schema/identity.ts:471`);
+`GET /visibility/reports/:personId/shared-record`
+(`apps/api/src/routes/visibility.ts:175`), appeal at `:142`; both authorize the
+caller as *supporter* via `findAcceptedContractForSupportee` (`:180`, `:148`).
+The two views are `supporterView` / `supporteeView`
+(`packages/schemas/src/visibility-contract.ts:90,93`, built at
+`apps/api/src/services/shared-record.ts:40,49`); every renderer reads
+`supporterView` — `SharedRecordView.tsx:56`, `SupportHubMentorTab.tsx:81`,
+`SupportHubJournalTab.tsx:17`, `PersonScopeJournalPlaceholder.tsx:13` (all under
+`apps/mobile/src/components/`) — and no non-test consumer reads `supporteeView`.
+⚠ Two word collisions. **"Report":** the weekly/monthly report pipelines deliver
+over the **guardianship** edge; the supporter-visible surface here is the shared
+record over **supportership** — two unrelated pipelines sharing one word.
+**"Notice":** §11a's *mentor notice* is learner-only per `MMT-ADR-0036`; a
+*visibility notice* here is contract-lifecycle and supportership-keyed.
 
 #### Moment
 A recent **notable event** shown to the learner ("you filed a session", a
