@@ -927,7 +927,37 @@ describe('mentor notice envelope fields', () => {
     expect(normaliseSignals(parsed.signals).noticed_gap).toBeNull();
   });
 
-  it('rejects a noticed_gap proposal without learner evidence', () => {
+  it('accepts a noticed_gap proposal when learnerQuote is omitted', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Keep going.',
+      signals: {
+        noticed_gap: {
+          concept: 'Sign changes',
+          answerEventId,
+        },
+      },
+    });
+
+    expect(parsed.signals?.noticed_gap).toEqual({
+      concept: 'Sign changes',
+      answerEventId,
+    });
+  });
+
+  it('still rejects a noticed_gap proposal without answerEventId', () => {
+    expect(
+      llmResponseEnvelopeSchema.safeParse({
+        reply: 'Keep going.',
+        signals: {
+          noticed_gap: {
+            concept: 'Sign changes',
+          },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('still rejects an empty learnerQuote when it is present', () => {
     expect(
       llmResponseEnvelopeSchema.safeParse({
         reply: 'Keep going.',
@@ -935,6 +965,7 @@ describe('mentor notice envelope fields', () => {
           noticed_gap: {
             concept: 'Sign changes',
             answerEventId,
+            learnerQuote: '',
           },
         },
       }).success,
