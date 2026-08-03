@@ -287,13 +287,20 @@ export function memoryFactCasGuard(
  * from the row's ORIGINAL `metadata` (before any redaction), because that is
  * what the partial unique index's existing rows were built against — the
  * point of grouping on it is to find every row that already shares an index
- * slot with this one.
+ * slot with this one. JSON tuple encoding keeps field boundaries unambiguous
+ * even when a value contains a would-be separator. Missing, null, and empty
+ * subject/context values are normalized to `''` first to mirror the index's
+ * `COALESCE(..., '')` equality rather than inventing a different grouping.
  */
-function activeGroupKey(row: MemoryFactRemediationRow): string {
+export function memoryFactActiveGroupKey(row: {
+  readonly profileId: string;
+  readonly category: string;
+  readonly metadata: unknown;
+}): string {
   const record = metadataRecord(row.metadata);
   const subject = typeof record.subject === 'string' ? record.subject : '';
   const context = typeof record.context === 'string' ? record.context : '';
-  return [row.profileId, row.category, subject, context].join('');
+  return JSON.stringify([row.profileId, row.category, subject, context]);
 }
 
 /**
@@ -450,7 +457,7 @@ export async function remediateMemoryFacts(
     // flagged, and active rows with only a metadata-path redaction — is
     // scrubbed in place with no grouping.
     if (row.supersededBy === null && textRemediate) {
-      const key = activeGroupKey(remediationRow);
+      const key = memoryFactActiveGroupKey(remediationRow);
       const group = activeTextGroups.get(key) ?? [];
       group.push(remediationRow);
       activeTextGroups.set(key, group);
