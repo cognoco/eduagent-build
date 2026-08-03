@@ -372,12 +372,14 @@ alarming pre-retune claim (a flat 30-60s/call OpenRouter queue-spike rate
 applied to all 643 calls, "5.4-10.7h") explicitly marked
 "not re-verified against this raised 643 demand". BID-31 initially routed
 this to an operator-gated paid-run wave (WI-3050); an independent evidence
-review (`/home/vetinari/nexus/_WIP/orca-herdr-spike/findings/wi3029-ac6-timeout-verification-from-retained-run-evidence.md`)
-argued AC-6's text asks for re-verification against *retained* run
-evidence, not a new paid run, and that evidence already exists for free.
-This round acted on that reading, using retained CI run `30721918215`
-(2026-08-01T22:44Z, pre-retune head) — no `--live`, no provider bootstrap,
-no paid call, no workflow dispatch at any point.
+review argued AC-6's text asks for re-verification against *retained* run
+evidence, not a new paid run, and that evidence already exists for free —
+in retained CI run `30721918215`
+(https://github.com/cognoco/eduagent-build/actions/runs/30721918215,
+2026-08-01T22:44Z, pre-retune head). This round acted on that reading,
+independently re-verifying the run's own job/log data via `gh` (below)
+rather than taking the review's numbers on faith — no `--live`, no
+provider bootstrap, no paid call, no workflow dispatch at any point.
 
 Retained-run facts verified independently via `gh` before writing anything
 (not taken from the analysis note on faith):
