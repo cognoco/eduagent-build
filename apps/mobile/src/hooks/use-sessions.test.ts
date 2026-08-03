@@ -2456,13 +2456,23 @@ describe('[WI-2627] mentor-notice policy observation reaches its consumers', () 
       expect(onDone).toHaveBeenCalledWith(
         expect.objectContaining({ mentorNotice: undefined }),
       );
-      // The mechanism: disabled AT the held revision, so a strictly higher
-      // revision can still lift it and one corrupt frame cannot blacken the
-      // surface forever.
-      await waitFor(async () =>
-        expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
-          '{"revision":7,"enabled":false}',
-        ),
+      // [WI-2781] The suppression above is the safety property and is unchanged.
+      // What changed is DURABILITY. This previously asserted a durable
+      // `{"revision":7,"enabled":false}` — and the comment that stood here
+      // claimed a strictly higher revision could still lift it, so "one corrupt
+      // frame cannot blacken the surface forever". Those two disagree: a
+      // same-revision fold keeps a disable by construction, so that durable
+      // record could ONLY be lifted by a deployment bumping the revision, which
+      // is the sticky-disable this Work Item removes.
+      //
+      // A malformed WIRE field now suppresses for the session without entering
+      // `state`, so the durable record is left exactly as the last readable
+      // signal set it.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1200));
+      });
+      expect(await AsyncStorage.getItem(POLICY_KEY)).toBe(
+        '{"revision":7,"enabled":true}',
       );
     });
 

@@ -296,6 +296,28 @@ export type MentorNoticePolicyKnowledge = {
   observed: boolean;
   hydrated: boolean;
   /**
+   * [WI-2781] A policy field arrived this session that was PRESENT but failed
+   * its schema, and no readable observation has arrived since.
+   *
+   * Deliberately in-memory only, and deliberately NOT folded into `state`.
+   * 'malformed' on the wire means a message arrived that could not be read —
+   * an absence of information, not an instruction from the server. Folding it
+   * into `state` conflated the two: the fold disables at the HELD revision and
+   * a same-revision fold keeps a disable, so one corrupted field durably
+   * disabled notices on that device until a deployment bumped the revision.
+   *
+   * Suppression for the session is still correct and is what this carries; it
+   * is the DURABILITY that was wrong. Because it never enters `state`, nothing
+   * about it reaches `durableCandidate` and there is no durable write to undo.
+   * A readable observation clears it — that being exactly the information whose
+   * absence raised it.
+   *
+   * NOTE this is the WIRE-field case only. A malformed STORED record is a
+   * different fact (the disk holds something unreadable) and still folds
+   * through the reducer as before.
+   */
+  malformedSuppressed: boolean;
+  /**
    * [WI-2911] Has a storage read for this pair SUCCEEDED this session?
    *
    * `hydrated` says a read attempt has COMPLETED; this says one has completed
@@ -405,6 +427,12 @@ export function noticesSuppressedForPayload(
   // session and recover on the next successful read at restart. That is the
   // trade fail-closed names.
   if (!knowledge.trusted) return true;
+  // [WI-2781] An unreadable policy field suppresses for the session, whatever
+  // this payload carries — the device cannot tell which of its own responses
+  // the corruption affected, so judging any of them on state that a corrupted
+  // message may have informed is the fail-open. Cleared by the next readable
+  // observation; never persisted.
+  if (knowledge.malformedSuppressed) return true;
   const signal = observationSignal(observation);
   if (signal === 'malformed') return true;
   if (signal === 'absent') {
@@ -556,6 +584,8 @@ const UNBOUND_SNAPSHOT: MentorNoticePolicySnapshot = {
   // nothing observable. `true` is the honest label for "no read was attempted",
   // which is why it stays.
   trusted: true,
+  // No pair, no key, no wire field folded — nothing can have been malformed.
+  malformedSuppressed: false,
 };
 
 /**
@@ -577,6 +607,7 @@ function getEntry(key: string): Entry {
         observed: false,
         hydrated: false,
         trusted: false,
+        malformedSuppressed: false,
       },
       listeners: new Set(),
       hydrating: false,
@@ -597,17 +628,25 @@ function commit(
   observed: boolean,
   hydrated: boolean,
   trusted: boolean,
+  malformedSuppressed: boolean,
 ): void {
   const previous = entry.snapshot;
   if (
     previous.state === state &&
     previous.observed === observed &&
     previous.hydrated === hydrated &&
-    previous.trusted === trusted
+    previous.trusted === trusted &&
+    previous.malformedSuppressed === malformedSuppressed
   ) {
     return;
   }
-  entry.snapshot = { state, observed, hydrated, trusted };
+  entry.snapshot = {
+    state,
+    observed,
+    hydrated,
+    trusted,
+    malformedSuppressed,
+  };
   for (const listener of entry.listeners) listener();
 }
 
@@ -1008,6 +1047,10 @@ async function readAndFold(key: string, entry: Entry): Promise<void> {
     // foreground re-read that throws cannot revoke a standing established by an
     // earlier successful read.
     entry.snapshot.trusted || readSucceeded,
+    // [WI-2781] Hydration says nothing about a WIRE field, so it neither raises
+    // nor clears this. A read that throws folds 'malformed' through the STORED
+    // path above, which is a different fact and still moves `state`.
+    entry.snapshot.malformedSuppressed,
   );
 }
 
@@ -1046,6 +1089,41 @@ export function foldMentorNoticePolicyFor(
   if (!signalIsObservation(signal)) return;
   const key = storageKey(actorId, profileId);
   const entry = getEntry(key);
+  // [WI-2781] A MALFORMED WIRE FIELD DOES NOT ENTER `state`, AND THEREFORE
+  // NEVER REACHES THE DISK.
+  //
+  // It used to fold like any other signal: disable at the held revision, then
+  // persist. But the fold keeps a disable at the SAME revision by construction,
+  // so that durable record could only be cleared by a deployment bumping the
+  // revision — one corrupted field bricked notices on the device until then.
+  //
+  // The fix is placement, not strength. Suppression for the session is right and
+  // is preserved via the snapshot flag; what was wrong is treating "a message
+  // arrived that we could not read" as if the server had said stop. Because
+  // `state` does not move, `durableCandidate` has nothing new to write and there
+  // is no durable disable to undo later.
+  //
+  // Returning here also skips `observedDisableRevision` below — correct, and
+  // load-bearing: that value is persisted to the disable-floor key set, and only
+  // a revision the server actually sent with `rolloutEnabled: false` may ever
+  // land there. A malformed field carries no trustworthy revision at all.
+  if (signal === 'malformed') {
+    commit(
+      entry,
+      entry.snapshot.state,
+      // `observed: true` — a malformed field IS something arriving, so the
+      // device forfeits the never-told benefit of the doubt, exactly as
+      // `signalIsObservation` documents and as every sibling fold site does.
+      // Passing the snapshot through here would leave a never-told device at
+      // `observed: false`, harmless only because `malformedSuppressed` is read
+      // first — an ordering, not an invariant.
+      true,
+      entry.snapshot.hydrated,
+      entry.snapshot.trusted,
+      true,
+    );
+    return;
+  }
   // [WI-2627 rework 3] Record that a GENUINE disable arrived, before the fold —
   // `flush` needs to tell a server kill-switch from the fail-closed state its
   // own failed read manufactures. Only a well-formed observation counts;
@@ -1062,6 +1140,15 @@ export function foldMentorNoticePolicyFor(
       signal.revision,
     );
   }
+  // [WI-2781 rework] An observation the monotonic fold DISCARDS carries no
+  // information about the policy, so it cannot be the readable observation that
+  // retires the flag. A stale revision-6 reply arriving after a malformed field
+  // at revision 7 is exactly the out-of-order case the fold already refuses to
+  // act on; letting it clear the suppression would re-show retained payloads on
+  // the strength of a message the reducer itself just ignored.
+  const staleArrival =
+    typeof signal === 'object' &&
+    compareRevision(signal.revision, entry.snapshot.state.revision) === 'older';
   const next = reduceMentorNoticePolicy(entry.snapshot.state, signal);
   // [WI-2911] An observation is NOT an authorizing signal for `trusted`, and this
   // is the load-bearing negative. Every fold site here fires only after a
@@ -1070,7 +1157,20 @@ export function foldMentorNoticePolicyFor(
   // straight to the stale enabled reply this closes, which is the whole
   // continuation. A blind device's recovery path is the LIVE payload, judged on
   // its own observation below, not a re-blessed cache.
-  commit(entry, next, true, entry.snapshot.hydrated, entry.snapshot.trusted);
+  commit(
+    entry,
+    next,
+    true,
+    entry.snapshot.hydrated,
+    entry.snapshot.trusted,
+    // [WI-2781] A readable observation is exactly the information whose absence
+    // raised the flag, so it clears it — the recovery path that does not require
+    // a revision bump. This does NOT re-enable anything on its own: `next` is
+    // the ordinary monotonic fold, so a genuine disable still governs and a
+    // re-enable still needs a strictly higher revision. A DISCARDED (older)
+    // observation is not that information — see `staleArrival` above.
+    staleArrival ? entry.snapshot.malformedSuppressed : false,
+  );
   // [WI-2627 rework] Not `persist(key, next)`. The write must carry whatever the
   // store holds when it actually reaches the disk, not this observation's
   // snapshot — otherwise a retried older ENABLED write can land after a newer
@@ -1100,6 +1200,9 @@ export function mentorNoticePolicySuppressesPayloadFor(
         hydrated: true,
         // [WI-2911] No pair, no key, no read — nothing was assembled blind.
         trusted: true,
+        // [WI-2781] No entry exists to carry a session flag, and this branch
+        // judges the payload on its own observation alone.
+        malformedSuppressed: false,
       },
       observation,
     );
@@ -1133,6 +1236,11 @@ export function useMentorNoticePolicy(
   hydrated: boolean;
   /** [WI-2911] Whether a storage read has SUCCEEDED for this pair this session. */
   trusted: boolean;
+  /**
+   * [WI-2781] Whether an unreadable policy FIELD has arrived this session with
+   * no readable observation since. Session-only and never persisted.
+   */
+  malformedSuppressed: boolean;
   /** Fold an observation off any surface into the shared state. */
   observe: (observation: MentorNoticePolicyObservation | undefined) => void;
   /** Whether THIS payload's notice content must be suppressed. */
@@ -1212,6 +1320,8 @@ export function useMentorNoticePolicy(
       observed: bound ? snapshot.observed : true,
       hydrated: bound ? snapshot.hydrated : true,
       trusted: bound ? snapshot.trusted : true,
+      // [WI-2781] An unbound pair has no entry and no session flag to carry.
+      malformedSuppressed: bound ? snapshot.malformedSuppressed : false,
       observe,
       suppressed,
     }),
@@ -1220,6 +1330,7 @@ export function useMentorNoticePolicy(
       snapshot.observed,
       snapshot.hydrated,
       snapshot.trusted,
+      snapshot.malformedSuppressed,
       bound,
       observe,
       suppressed,
