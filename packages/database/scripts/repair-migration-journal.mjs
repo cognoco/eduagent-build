@@ -18,10 +18,12 @@ import {
 } from './migration-catalog-probes.mjs';
 import {
   assertCatalogInventoriesMatch,
+  databaseTargetFingerprint,
   formatRepairFailure,
   parseRepairRequest,
   planExactJournalRepair,
   runCommitBoundary,
+  validateReviewedDryRunReceipt,
   verifyJournalRepairApplied,
 } from './repair-migration-journal-lib.mjs';
 
@@ -299,6 +301,25 @@ async function main() {
   const request = parseRepairRequest(process.argv.slice(2), process.env);
   const receiptPath = process.env.WI1628_RECEIPT_PATH;
   const migrations = loadCommittedMigrations();
+  if (request.mode === 'apply') {
+    let reviewedReceipt;
+    try {
+      reviewedReceipt = JSON.parse(
+        fs.readFileSync(request.reviewedDryRunReceiptPath, 'utf8'),
+      );
+    } catch (error) {
+      throw new Error(
+        'Cannot read the reviewed dry-run receipt: ' +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+    validateReviewedDryRunReceipt({
+      receipt: reviewedReceipt,
+      reviewedDryRunId: request.reviewedDryRunId,
+      currentHeadSha: process.env.GITHUB_SHA,
+      databaseUrl: request.databaseUrl,
+    });
+  }
   const staging = new pg.Client({ connectionString: request.databaseUrl });
   const baseline = new pg.Client({
     connectionString: request.baselineDatabaseUrl,
@@ -423,6 +444,10 @@ async function main() {
         (migration) => migration.tag,
       ),
       catalogObjectsCompared: baselineInventory.length,
+      githubRunId: process.env.GITHUB_RUN_ID ?? null,
+      headSha: process.env.GITHUB_SHA ?? null,
+      targetFingerprint: databaseTargetFingerprint(request.databaseUrl),
+      reviewedDryRunRunId: request.reviewedDryRunId ?? null,
       unrecoveredEffectsResidual:
         'The SQL bodies for journal rows 136/137 were not retained in Git ' +
         'or local worktrees. The bounded catalog comparison cannot exclude ' +

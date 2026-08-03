@@ -4,10 +4,12 @@ import test from 'node:test';
 import {
   EXPECTED_ORPHANED_ROWS,
   assertCatalogInventoriesMatch,
+  databaseTargetFingerprint,
   formatRepairFailure,
   parseRepairRequest,
   planExactJournalRepair,
   runCommitBoundary,
+  validateReviewedDryRunReceipt,
   verifyJournalRepairApplied,
 } from './repair-migration-journal-lib.mjs';
 
@@ -161,6 +163,8 @@ test('requires the exact apply confirmation string', () => {
       WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
       WI1628_UNRECOVERED_EFFECTS_ACK:
         'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+      WI1628_REVIEWED_DRY_RUN_ID: '12345',
+      WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: 'dry-run-receipt.json',
     }).mode,
     'apply',
   );
@@ -175,6 +179,68 @@ test('requires explicit acceptance of unrecovered staging migration effects', ()
       }),
     /WI1628_UNRECOVERED_EFFECTS_ACK/,
   );
+});
+
+test('requires a reviewed dry-run run ID and receipt path before apply', () => {
+  const applyEnv = {
+    ...targetEnv,
+    WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
+    WI1628_UNRECOVERED_EFFECTS_ACK:
+      'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+  };
+  assert.throws(
+    () => parseRepairRequest(['--apply'], applyEnv),
+    /WI1628_REVIEWED_DRY_RUN_ID/,
+  );
+  assert.throws(
+    () =>
+      parseRepairRequest(['--apply'], {
+        ...applyEnv,
+        WI1628_REVIEWED_DRY_RUN_ID: '12345',
+      }),
+    /WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH/,
+  );
+});
+
+test('binds a reviewed dry-run receipt to run, commit, target, and exact rows', () => {
+  const receipt = {
+    schema: 'zdx.wi1628.staging-journal-repair.v1',
+    mode: 'dry-run',
+    status: 'preflight-passed',
+    githubRunId: '12345',
+    headSha: 'abc123def456',
+    targetFingerprint: databaseTargetFingerprint(targetEnv.DATABASE_URL),
+    exactRows: EXPECTED_ORPHANED_ROWS,
+  };
+  assert.doesNotThrow(() =>
+    validateReviewedDryRunReceipt({
+      receipt,
+      reviewedDryRunId: '12345',
+      currentHeadSha: 'abc123def456',
+      databaseUrl: targetEnv.DATABASE_URL,
+    }),
+  );
+
+  for (const changedReceipt of [
+    { ...receipt, githubRunId: '99999' },
+    { ...receipt, headSha: 'different' },
+    {
+      ...receipt,
+      targetFingerprint: databaseTargetFingerprint(
+        targetEnv.DATABASE_URL.replace('mentomate', 'other'),
+      ),
+    },
+    { ...receipt, exactRows: EXPECTED_ORPHANED_ROWS.slice(0, 1) },
+  ]) {
+    assert.throws(() =>
+      validateReviewedDryRunReceipt({
+        receipt: changedReceipt,
+        reviewedDryRunId: '12345',
+        currentHeadSha: 'abc123def456',
+        databaseUrl: targetEnv.DATABASE_URL,
+      }),
+    );
+  }
 });
 
 test('verifies an already-applied repair without requiring mutation acknowledgements', () => {
@@ -270,5 +336,39 @@ test('refuses production, a wrong staging host, or a remote baseline', () => {
           'postgresql://owner:secret@ep-other.example.test/baseline',
       }),
     /baseline database must be local/,
+  );
+});
+
+test('refuses query parameters that override the validated connection identity', () => {
+  for (const parameter of [
+    'host',
+    'hostaddr',
+    'port',
+    'database',
+    'dbname',
+    'user',
+    'password',
+    'service',
+  ]) {
+    const separator = targetEnv.DATABASE_URL.includes('?') ? '&' : '?';
+    assert.throws(
+      () =>
+        parseRepairRequest(['--dry-run'], {
+          ...targetEnv,
+          DATABASE_URL:
+            targetEnv.DATABASE_URL +
+            separator +
+            `${parameter}=ep-production.example.test`,
+        }),
+      /must not override connection identity/,
+      parameter,
+    );
+  }
+
+  assert.doesNotThrow(() =>
+    parseRepairRequest(['--dry-run'], {
+      ...targetEnv,
+      DATABASE_URL: `${targetEnv.DATABASE_URL}&sslmode=require&channel_binding=require`,
+    }),
   );
 });

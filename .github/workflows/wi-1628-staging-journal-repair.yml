@@ -22,8 +22,14 @@ on:
         required: false
         default: ''
         type: string
+      reviewed_dry_run_run_id:
+        description: 'Apply only: successful dry-run workflow run ID reviewed by the operator'
+        required: false
+        default: ''
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 # Serialize with push-to-main staging deploys. deploy.yml resolves its main
@@ -60,6 +66,35 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
+
+      - name: Verify and download reviewed dry-run receipt
+        if: inputs.mode == 'apply'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_DRY_RUN_ID: ${{ inputs.reviewed_dry_run_run_id }}
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          RECEIPT_DIR: ${{ runner.temp }}/reviewed-dry-run
+        run: |
+          set -euo pipefail
+          case "$REVIEWED_DRY_RUN_ID" in
+            ''|*[!0-9]*)
+              echo 'Apply requires a numeric reviewed dry-run run ID' >&2
+              exit 1
+              ;;
+          esac
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REVIEWED_DRY_RUN_ID")"
+          jq -e \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            '.event == "workflow_dispatch" and
+             .conclusion == "success" and
+             .head_sha == $sha and
+             .name == "WI-1628 Staging Journal Repair"' \
+            <<<"$run_json" >/dev/null
+          mkdir -p "$RECEIPT_DIR"
+          gh run download "$REVIEWED_DRY_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "wi-1628-staging-journal-repair-$REVIEWED_DRY_RUN_ID" \
+            --dir "$RECEIPT_DIR"
 
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
@@ -135,6 +170,8 @@ jobs:
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
           WI1628_REPAIR_CONFIRM: ${{ inputs.confirmation }}
           WI1628_UNRECOVERED_EFFECTS_ACK: ${{ inputs.unrecovered_effects_ack }}
+          WI1628_REVIEWED_DRY_RUN_ID: ${{ inputs.reviewed_dry_run_run_id }}
+          WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: ${{ runner.temp }}/reviewed-dry-run/wi1628-repair-receipt.json
           WI1628_RECEIPT_PATH: ${{ runner.temp }}/wi1628-repair-receipt.json
         run: |
           set -euo pipefail

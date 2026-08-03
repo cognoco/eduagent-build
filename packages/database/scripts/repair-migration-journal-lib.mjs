@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { reconcileMigrationJournal } from './verify-migration-journal-lib.mjs';
 
 export const EXPECTED_ORPHANED_ROWS = Object.freeze([
@@ -16,6 +18,16 @@ export const EXPECTED_ORPHANED_ROWS = Object.freeze([
 const APPLY_CONFIRMATION = 'WI-1628:DELETE:136,137';
 const UNRECOVERED_EFFECTS_ACK =
   'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS';
+const CONNECTION_OVERRIDE_PARAMETERS = new Set([
+  'database',
+  'dbname',
+  'host',
+  'hostaddr',
+  'password',
+  'port',
+  'service',
+  'user',
+]);
 
 function parsedPostgresUrl(value, label) {
   if (!value) {
@@ -29,6 +41,15 @@ function parsedPostgresUrl(value, label) {
   }
   if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
     throw new Error(`${label} must use postgres or postgresql`);
+  }
+  const connectionOverrides = [...parsed.searchParams.keys()].filter((key) =>
+    CONNECTION_OVERRIDE_PARAMETERS.has(key.toLowerCase()),
+  );
+  if (connectionOverrides.length > 0) {
+    throw new Error(
+      `${label} must not override connection identity in query parameters: ` +
+        connectionOverrides.join(', '),
+    );
   }
   return parsed;
 }
@@ -82,6 +103,15 @@ export function parseRepairRequest(argv, env) {
         UNRECOVERED_EFFECTS_ACK,
     );
   }
+  if (
+    argv[0] === '--apply' &&
+    !/^\d+$/.test(env.WI1628_REVIEWED_DRY_RUN_ID ?? '')
+  ) {
+    throw new Error('Apply requires a numeric WI1628_REVIEWED_DRY_RUN_ID');
+  }
+  if (argv[0] === '--apply' && !env.WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH) {
+    throw new Error('Apply requires WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH');
+  }
 
   return {
     mode:
@@ -92,7 +122,55 @@ export function parseRepairRequest(argv, env) {
           : 'dry-run',
     databaseUrl,
     baselineDatabaseUrl,
+    ...(argv[0] === '--apply'
+      ? {
+          reviewedDryRunId: env.WI1628_REVIEWED_DRY_RUN_ID,
+          reviewedDryRunReceiptPath: env.WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH,
+        }
+      : {}),
   };
+}
+
+export function databaseTargetFingerprint(databaseUrl) {
+  const parsed = parsedPostgresUrl(databaseUrl, 'DATABASE_URL');
+  const identity = `${parsed.hostname.toLowerCase()}:${parsed.port || '5432'}${parsed.pathname}`;
+  return crypto.createHash('sha256').update(identity).digest('hex');
+}
+
+export function validateReviewedDryRunReceipt({
+  receipt,
+  reviewedDryRunId,
+  currentHeadSha,
+  databaseUrl,
+}) {
+  if (
+    receipt?.schema !== 'zdx.wi1628.staging-journal-repair.v1' ||
+    receipt?.mode !== 'dry-run' ||
+    receipt?.status !== 'preflight-passed'
+  ) {
+    throw new Error('Reviewed dry-run receipt has an invalid schema or state');
+  }
+  if (String(receipt.githubRunId) !== String(reviewedDryRunId)) {
+    throw new Error('Reviewed dry-run receipt run ID does not match the input');
+  }
+  if (!currentHeadSha || receipt.headSha !== currentHeadSha) {
+    throw new Error(
+      'Reviewed dry-run receipt is not bound to the current commit',
+    );
+  }
+  if (receipt.targetFingerprint !== databaseTargetFingerprint(databaseUrl)) {
+    throw new Error('Reviewed dry-run receipt targets a different database');
+  }
+  const expected = EXPECTED_ORPHANED_ROWS.map(rowIdentity).sort();
+  const actual = Array.isArray(receipt.exactRows)
+    ? receipt.exactRows.map(rowIdentity).sort()
+    : [];
+  if (
+    actual.length !== expected.length ||
+    actual.some((identity, index) => identity !== expected[index])
+  ) {
+    throw new Error('Reviewed dry-run receipt has the wrong exact-row set');
+  }
 }
 
 export function verifyJournalRepairApplied({ migrations, appliedRows }) {

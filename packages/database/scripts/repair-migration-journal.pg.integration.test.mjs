@@ -33,6 +33,8 @@ function runRepair({ mode, targetUrl, receiptPath, extraEnv = {} }) {
       DATABASE_URL_STAGING_HOST: new URL(targetUrl).hostname,
       DATABASE_URL_PRODUCTION_HOST: 'production.invalid',
       WI1628_RECEIPT_PATH: receiptPath,
+      GITHUB_SHA: 'abcdef0123456789abcdef0123456789abcdef01',
+      GITHUB_RUN_ID: '7001',
       ...extraEnv,
     },
   });
@@ -122,9 +124,15 @@ test(
           targetUrl,
           receiptPath: path.join(receiptDir, 'apply.json'),
           extraEnv: {
+            GITHUB_RUN_ID: '7002',
             WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
             WI1628_UNRECOVERED_EFFECTS_ACK:
               'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+            WI1628_REVIEWED_DRY_RUN_ID: '7001',
+            WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: path.join(
+              receiptDir,
+              'dry-run.json',
+            ),
           },
         });
         assert.equal(apply.status, 0, apply.stderr);
@@ -148,9 +156,15 @@ test(
           targetUrl,
           receiptPath: path.join(receiptDir, 'repeat.json'),
           extraEnv: {
+            GITHUB_RUN_ID: '7003',
             WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
             WI1628_UNRECOVERED_EFFECTS_ACK:
               'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+            WI1628_REVIEWED_DRY_RUN_ID: '7001',
+            WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: path.join(
+              receiptDir,
+              'dry-run.json',
+            ),
           },
         });
         assert.notEqual(repeatApply.status, 0);
@@ -165,6 +179,13 @@ test(
       await mismatch.connect();
       try {
         await seedExactOrphans(mismatch);
+        const mismatchDryRun = runRepair({
+          mode: 'dry-run',
+          targetUrl: mismatchUrl,
+          receiptPath: path.join(receiptDir, 'mismatch-dry-run.json'),
+          extraEnv: { GITHUB_RUN_ID: '8001' },
+        });
+        assert.equal(mismatchDryRun.status, 0, mismatchDryRun.stderr);
         await mismatch.query(
           `UPDATE drizzle."__drizzle_migrations"
            SET hash = 'changed'
@@ -176,9 +197,15 @@ test(
           targetUrl: mismatchUrl,
           receiptPath: path.join(receiptDir, 'mismatch.json'),
           extraEnv: {
+            GITHUB_RUN_ID: '8002',
             WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
             WI1628_UNRECOVERED_EFFECTS_ACK:
               'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+            WI1628_REVIEWED_DRY_RUN_ID: '8001',
+            WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: path.join(
+              receiptDir,
+              'mismatch-dry-run.json',
+            ),
           },
         });
         assert.notEqual(refused.status, 0);
