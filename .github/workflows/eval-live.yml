@@ -57,24 +57,35 @@ jobs:
     # (2026-08-01T22:44Z, pre-retune head) — NOT a fresh paid run; no paid
     # live run is authorized by this comment (AC-5 stands). Per-gate wall
     # clock from that run's job step timestamps: envelope 839s at its
-    # then-cap of 300 calls (298 ok + 2 failed = 300, budget exhausted
-    # exactly at the cap); teaching 271s at cap 5, un-truncated (5 ok, 0
-    # failed) and unchanged from today's cap; mastery 710s, truncated to 21
-    # of 24 scheduled rounds by its then-cap of 189 units ("budget requested
-    # 24 rounds but --max-live-calls=189 (~9 calls/round) caps at 21. 3
-    # round(s) dropped" per the run log). Projecting each gate's wall clock
-    # onto CURRENT demand: envelope 839s x 366/300 (current provider demand
-    # over that run's cap) + teaching 271s unscaled (already the full,
-    # un-truncated current demand) + mastery 710s x 24/21 (the full 24-round
-    # grid over the 21 rounds that actually ran) = ~35.1 min, leaving ~5.1×
-    # headroom under this step's 180-minute timeout-minutes.
+    # then-configured cap of 300 OUTER runLive() invocations
+    # (--max-live-calls 300 under the pre-retune code capped outer
+    # invocations only — internal judge calls inside each invocation were
+    # not separately counted by that cap or by the run's summary counters at
+    # the time; log: "Live calls OK: 298" + "Live calls failed: 2" = 300
+    # outer invocations, exhausting that then-cap — NOT a measured
+    # provider-call count). Teaching 271s at cap 5, un-truncated (5 ok, 0
+    # failed). Mastery 710s, truncated to 21 of 24 scheduled rounds by its
+    # then-cap of 189 units ("budget requested 24 rounds but
+    # --max-live-calls=189 (~9 calls/round) caps at 21. 3 round(s) dropped"
+    # per the run log). Projecting each gate's wall clock onto CURRENT
+    # demand: envelope 839s x 366/300 (current provider-call demand, which
+    # includes internal judge calls the retained run's outer-invocation
+    # denominator never separately counted — a conservative scaling
+    # comparison against that denominator, not a like-for-like measured
+    # provider-call rate) + teaching 271s x 5/5 (current TEACHING_SCENARIOS
+    # count over the retained run's cap of 5 — unscaled today only because
+    # both equal 5; stays correct if the scenario count changes) + mastery
+    # 710s x 24/21 (the full 24-round grid over the 21 rounds that actually
+    # ran) = ~35.1 min, leaving ~5.1× headroom under this step's 180-minute
+    # timeout-minutes.
     #
     # Uncertainty, explicit: this is a single retained run on an older head,
     # not a distribution — no P90 exists. That run's envelope gate had 2
-    # failed calls (unexplained, not chased here). OpenRouter provider/queue
-    # latency varies run to run and could exceed what this one run saw. Only
-    # envelope's 366 and mastery's 24 are freshly re-derived from the current
-    # registries — the 300/21 denominators and all three wall-clock times are
+    # failed outer invocations (unexplained, not chased here). OpenRouter
+    # provider/queue latency varies run to run and could exceed what this
+    # one run saw. Only envelope's 366, teaching's current scenario count,
+    # and mastery's 24 are freshly re-derived from the current registries —
+    # the 300/5/21 denominators and all three wall-clock times are
     # historical facts read off this one run, not re-measured. Reverify from
     # a fresh operator-authorized run before tightening timeout-minutes.
     timeout-minutes: 180

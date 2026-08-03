@@ -54,17 +54,41 @@ interface WorkflowStep {
 
 const repoRoot = join(__dirname, '..');
 
-function loadJobSteps(workflowPath: string, jobId: string): WorkflowStep[] {
+interface WorkflowJob {
+  steps?: WorkflowStep[];
+  'timeout-minutes'?: number;
+}
+
+function loadJob(workflowPath: string, jobId: string): WorkflowJob {
   const workflow = parse(
     readFileSync(join(repoRoot, workflowPath), 'utf8'),
   ) as {
-    jobs?: Record<string, { steps?: WorkflowStep[] }>;
+    jobs?: Record<string, WorkflowJob>;
   };
-  const steps = workflow.jobs?.[jobId]?.steps;
-  if (!steps) {
+  const job = workflow.jobs?.[jobId];
+  if (!job?.steps) {
     throw new Error(`No steps found for job "${jobId}" in ${workflowPath}`);
   }
-  return steps;
+  return job;
+}
+
+function loadJobSteps(workflowPath: string, jobId: string): WorkflowStep[] {
+  return loadJob(workflowPath, jobId).steps!;
+}
+
+// [WI-3029 AC-6 M1] The configured timeout-minutes MUST be read from the
+// same parsed YAML the steps come from, never hardcoded — a hardcoded
+// literal in the test can drift from the workflow's actual timeout-minutes
+// without either side noticing (proven by mutation: changing timeout-minutes
+// alone left the pre-fix version of this suite green).
+function loadJobTimeoutMinutes(workflowPath: string, jobId: string): number {
+  const timeoutMinutes = loadJob(workflowPath, jobId)['timeout-minutes'];
+  if (typeof timeoutMinutes !== 'number') {
+    throw new Error(
+      `Job "${jobId}" in ${workflowPath} must configure timeout-minutes`,
+    );
+  }
+  return timeoutMinutes;
 }
 
 function deriveWorkflowMasteryBudget(step: WorkflowStep) {
@@ -203,11 +227,16 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
   // Run 30721918215 (2026-08-01T22:44Z, pre-retune head) is the only
   // retrievable run log with per-gate wall clock AND per-gate call counts.
   // Its per-step start/completed timestamps (GitHub Actions job API):
-  //   envelope 22:45:14Z -> 22:59:13Z = 839s, at that run's then-cap of 300
-  //     (log: "Live calls OK: 298" + "Live calls failed: 2" = 300, budget
-  //     exhausted exactly at the cap);
+  //   envelope 22:45:14Z -> 22:59:13Z = 839s, at that run's then-configured
+  //     cap of 300 OUTER runLive() invocations (--max-live-calls 300 under
+  //     the pre-retune code capped outer invocations only — internal judge
+  //     calls inside each invocation were not separately counted by that
+  //     cap or by the run's summary counters at the time; log: "Live calls
+  //     OK: 298" + "Live calls failed: 2" = 300 outer invocations,
+  //     exhausting that then-cap exactly — this is NOT a measured
+  //     provider-call count);
   //   teaching 22:59:13Z -> 23:03:44Z = 271s, at cap 5 (log: "Live calls OK:
-  //     5" + "Live calls failed: 0" — un-truncated, same cap as today);
+  //     5" + "Live calls failed: 0" — un-truncated);
   //   mastery 23:03:44Z -> 23:15:34Z = 710s, at that run's then-cap of 189
   //     configured units (log: "budget requested 24 rounds but
   //     --max-live-calls=189 (~9 calls/round) caps at 21. 3 round(s)
@@ -215,15 +244,19 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
   // These are historical facts read off that one run and are NOT re-derived
   // from current code (the retained log cannot be re-fetched from live
   // derivation helpers), so they are hardcoded constants here, each cited to
-  // its source line above.
+  // its source line above. The retained TEACHING cap (5) is likewise a
+  // historical constant, but the projection's teaching NUMERATOR is bound to
+  // the CURRENT TEACHING_SCENARIOS count below, not hardcoded, so a future
+  // teaching-scenario-count change can't leave the "unscaled" claim stale.
   const RETAINED_RUN_ID = '30721918215';
   const RETAINED_ENVELOPE_WALL_CLOCK_SECONDS = 839;
   const RETAINED_ENVELOPE_CALLS_AT_CAP = 300;
   const RETAINED_TEACHING_WALL_CLOCK_SECONDS = 271;
+  const RETAINED_TEACHING_CALLS_AT_CAP = 5;
   const RETAINED_MASTERY_WALL_CLOCK_SECONDS = 710;
   const RETAINED_MASTERY_ROUNDS_COMPLETED = 21;
 
-  test("[WI-3029 AC-6] timeout re-verification projects each gate's retained-run wall clock onto CURRENT demand, not a stale flat per-call spike rate", () => {
+  test("[WI-3029 AC-6] timeout re-verification projects each gate's retained-run wall clock onto CURRENT demand and the ACTUAL configured timeout-minutes, not a stale flat per-call spike rate", () => {
     const workflow = readFileSync(
       join(repoRoot, '.github/workflows/eval-live.yml'),
       'utf8',
@@ -240,6 +273,22 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       /not re-verified against this raised 643\s*\n?\s*demand/,
     );
 
+    // [S1] Must not claim the retained run's summary counters (298 ok + 2
+    // failed) prove a measured PROVIDER-CALL exhaustion — those counters
+    // count outer runLive() invocations only, and the current 366 includes
+    // context-aware internal provider calls the pre-retune cap never
+    // separately counted. 366/300 is a conservative scaling COMPARISON
+    // against that outer-invocation denominator, not like-for-like measured
+    // provider-call throughput.
+    expect(workflowComments).not.toMatch(
+      /budget exhausted exactly at the cap\)/,
+    );
+    expect(workflowComments).toMatch(/outer runLive\(\) invocations/i);
+    expect(workflowComments).toMatch(/conservative scaling\s+comparison/);
+    expect(workflowComments).toMatch(
+      /not (a )?like-for-like measured\s+provider-call/,
+    );
+
     // The projection must be traceable to the retained run and reproduce
     // the exact ratios this test derives from CURRENT demand.
     expect(workflowComments).toContain(RETAINED_RUN_ID);
@@ -249,19 +298,39 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       PROFILES,
     );
     const masteryBudget = deriveWorkflowMasteryBudget(masteryStep!);
+    // [S1 scenario-drift hole] Bind the teaching numerator to the CURRENT
+    // fixture count, not the retained cap, so a future
+    // TEACHING_SCENARIOS/cap change can't leave "unscaled" stale.
+    const currentTeachingScenarios = TEACHING_SCENARIOS.length;
 
     const projectedEnvelopeSeconds =
       RETAINED_ENVELOPE_WALL_CLOCK_SECONDS *
       (providerDemand.providerCalls / RETAINED_ENVELOPE_CALLS_AT_CAP);
+    const projectedTeachingSeconds =
+      RETAINED_TEACHING_WALL_CLOCK_SECONDS *
+      (currentTeachingScenarios / RETAINED_TEACHING_CALLS_AT_CAP);
     const projectedMasterySeconds =
       RETAINED_MASTERY_WALL_CLOCK_SECONDS *
       (masteryBudget.rounds / RETAINED_MASTERY_ROUNDS_COMPLETED);
     const projectedTotalSeconds =
       projectedEnvelopeSeconds +
-      RETAINED_TEACHING_WALL_CLOCK_SECONDS +
+      projectedTeachingSeconds +
       projectedMasterySeconds;
     const projectedMinutes = (projectedTotalSeconds / 60).toFixed(1);
-    const headroomMultiple = ((180 * 60) / projectedTotalSeconds).toFixed(1);
+
+    // [M1] The configured timeout MUST come from the parsed job, not a
+    // hardcoded literal — proven by mutation in the red-green evidence: a
+    // 180 -> 20 timeout-minutes mutation left the pre-fix version of this
+    // assertion green because it computed headroom against a hardcoded 180
+    // instead of this value.
+    const configuredTimeoutMinutes = loadJobTimeoutMinutes(
+      '.github/workflows/eval-live.yml',
+      'live-evals',
+    );
+    const headroomMultiple = (
+      (configuredTimeoutMinutes * 60) /
+      projectedTotalSeconds
+    ).toFixed(1);
 
     // The comment must show its work: both scaling ratios (current demand
     // over the retained run's denominator) in the exact form this test
@@ -271,17 +340,26 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       `${providerDemand.providerCalls}/${RETAINED_ENVELOPE_CALLS_AT_CAP}`,
     );
     expect(workflowComments).toContain(
+      `${currentTeachingScenarios}/${RETAINED_TEACHING_CALLS_AT_CAP}`,
+    );
+    expect(workflowComments).toContain(
       `${masteryBudget.rounds}/${RETAINED_MASTERY_ROUNDS_COMPLETED}`,
     );
     expect(workflowComments).toContain(`~${projectedMinutes} min`);
     expect(workflowComments).toContain(`~${headroomMultiple}×`);
+    // The prose's stated timeout must bind to the ACTUAL configured value,
+    // not an independent literal — this is what makes a timeout-minutes-only
+    // mutation (no comment-text change) break the suite (M1).
+    expect(workflowComments).toMatch(
+      new RegExp(`${configuredTimeoutMinutes}-minute\\s+timeout-minutes`),
+    );
 
     // Uncertainty must be explicit (AC-6), not just a headline number:
     // single retained run (no distribution/P90), the 2 failed envelope
     // calls in that run, and that provider/queue latency varies.
     expect(workflowComments).toMatch(/single retained run/i);
     expect(workflowComments).toMatch(/no P90/i);
-    expect(workflowComments).toMatch(/2 failed/);
+    expect(workflowComments).toMatch(/2\s+failed/);
     expect(workflowComments).toMatch(/queue|latency/i);
   });
 

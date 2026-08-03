@@ -470,3 +470,152 @@ bootstrap, no paid/live call, no workflow dispatch, no deploy, no Cosmo
 lifecycle mutation (claim held by shepherd:codex:singles-lane throughout —
 this round did not claim, complete, close, or merge the item), at any
 point in this round.
+
+## AC-6 review-fix round (adversarial review on PR #2909 at 5cdc8bb79, 1 MUST_FIX + 1 SHOULD_FIX)
+
+An adversarial review of the prior round's commit (`5cdc8bb792b57b3049b9a5aa9bbb1bfc12d18469`,
+PR #2909) returned NOT APPROVED with one MUST_FIX and one SHOULD_FIX. No
+`--live`, no provider bootstrap, no paid/live call, no workflow dispatch,
+no deploy, no Cosmo lifecycle mutation at any point in this round (claim
+unchanged: shepherd:codex:singles-lane).
+
+### M1 (MUST_FIX, proven mutation) — test hardcoded `timeout-minutes: 180`
+
+The reviewer proved by mutation that
+`scripts/eval-live-gate-independence.test.ts`'s AC-6 test computed
+`headroomMultiple` against a hardcoded literal `180 * 60`, never reading
+the workflow's ACTUAL `timeout-minutes:` field — mutating
+`.github/workflows/eval-live.yml`'s `timeout-minutes: 180` to `20` still
+left the suite green (16/16), because nothing in the test derived its
+expected headroom from the parsed job.
+
+Fix (test-first): added `loadJob`/`loadJobTimeoutMinutes` helpers that
+parse `timeout-minutes` from the same YAML object `loadJobSteps` already
+parses `steps` from (`scripts/eval-live-gate-independence.test.ts`), and
+replaced `((180 * 60) / projectedTotalSeconds)` with
+`((configuredTimeoutMinutes * 60) / projectedTotalSeconds)` where
+`configuredTimeoutMinutes = loadJobTimeoutMinutes(...)`. Added a new
+assertion binding the comment's stated timeout prose to that same parsed
+value: `workflowComments` must match
+`` `${configuredTimeoutMinutes}-minute\s+timeout-minutes` ``.
+
+RED/GREEN/mutation-and-revert proof, via paired `Edit`/`Edit` on the
+workflow YAML only (never Bash/`sed`), `git diff --stat` confirming a
+byte-identical revert before moving on:
+
+```text
+# 1. Fixed code, unmutated workflow (timeout-minutes: 180) — GREEN, proving
+#    the fix doesn't regress the passing case:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+Tests: 1 passed, 15 skipped, 16 total
+
+# 2. Mutation applied (timeout-minutes: 180 -> 20, workflow prose
+#    untouched) — RED, proving the fix now catches exactly the drift the
+#    reviewer demonstrated:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).toContain(`~${headroomMultiple}×`) — the
+  comment still says "~5.1×" (computed against the old 180) while the
+  mutated headroomMultiple (against 20) is "~0.6×"
+Tests: 1 failed, 15 skipped, 16 total
+
+# 3. Mutation reverted (timeout-minutes: 20 -> 180):
+$ git diff --stat .github/workflows/eval-live.yml | grep timeout-minutes
+(no output — the timeout-minutes line is byte-identical to its pre-mutation
+ state; only the intended S1 wording changes remain in the diff)
+
+# 4. Reverted, fixed code — GREEN again:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+### S1 (SHOULD_FIX) — 298+2=300 overclaimed a measured provider-call exhaustion; teaching scenario-drift hole
+
+The reviewer verified that the retained run's `Live calls OK: 298` /
+`Live calls failed: 2` summary counters count OUTER `runLive()`
+invocations (the pre-retune `--max-live-calls` semantics), not total
+provider calls — the current `366` provider-call demand includes internal
+judge calls those counters never separately counted. The prior round's
+wording ("298 ok + 2 failed = 300, budget exhausted exactly at the cap")
+read as claiming a measured provider-call exhaustion, which it is not.
+
+Fix: reworded the `.github/workflows/eval-live.yml` AC-6 paragraph to (a)
+label 300 explicitly as the retained run's then-configured OUTER
+`runLive()`-invocation cap, not a provider-call count; (b) state plainly
+that internal judge calls were not separately counted by that cap or those
+summary counters at the time; and (c) call the resulting `366/300` ratio a
+"conservative scaling comparison against that denominator, not a
+like-for-like measured provider-call rate" — the reviewer's own framing,
+adopted verbatim rather than re-derived, since asserting a specific
+direction/magnitude of bias would itself be an unverified claim. The
+projection's arithmetic (`839s × 366/300`) is UNCHANGED — only the prose
+around what `300` represents changed.
+
+Scenario-drift hole (same round, flagged alongside S1): the teaching
+term was previously "271s unscaled (already the full, un-truncated
+current demand)" — a hardcoded claim that would go stale if
+`TEACHING_SCENARIOS` or the workflow's teaching cap ever changed without
+someone also editing this prose by hand. Fixed by expressing it as a
+ratio, `271s × 5/5`, where the historical retained-run cap (5) stays a
+cited constant (`RETAINED_TEACHING_CALLS_AT_CAP`) but the NUMERATOR is
+`TEACHING_SCENARIOS.length` (`currentTeachingScenarios` in the test) —
+today both equal 5 so the arithmetic is unchanged, but a future scenario-
+count change now has to update this term or the test's
+`` `${currentTeachingScenarios}/${RETAINED_TEACHING_CALLS_AT_CAP}` ``
+assertion breaks.
+
+RED (against the S1 wording added to the test, unmodified workflow prose)
+then GREEN (after correcting the workflow paragraph), both via the full
+AC-6 test:
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).toMatch(/outer runLive\(\) invocations/i)
+  — the old wording ("298 ok + 2 failed = 300, budget exhausted exactly at
+  the cap") never named outer invocations or "conservative scaling
+  comparison"
+Tests: 1 failed, 15 skipped, 16 total
+
+# (several intermediate RED iterations, not individually shown, while
+# tightening assertions to tolerate the YAML comment's own line-wrapping —
+# e.g. a case-sensitive "outer runLive() invocations" match, then
+# "conservative scaling" / "\n" / "comparison" needing \s+, then the
+# "180-minute" / "\n" / "timeout-minutes" toContain needing a regex, then
+# "2" / "\n" / "failed" needing \s+ — each was a test-assertion adjustment
+# to the SAME production-code fix, not a new production-code gap)
+
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+### Full verification after both fixes
+
+```text
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+(identical counts to the prior round's re-run on this same branch base —
+no test-count drift this round.)
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ node -e "require('yaml').parse(require('fs').readFileSync('.github/workflows/eval-live.yml','utf8'))"
+parsed OK, timeout-minutes = 180
+```
+
+Diff scope this round: `.github/workflows/eval-live.yml` (comment
+wording only — `timeout-minutes` confirmed still 180, no `run:` step or
+cap touched) and `scripts/eval-live-gate-independence.test.ts` (the AC-6
+test strengthened; `loadJobSteps` refactored onto a new shared `loadJob`
+helper with no behavior change for existing callers). No other product
+file changed. `.cosmo/WI-3029/workitem.json` (a fetched claim snapshot)
+remains deliberately uncommitted. No Cosmo lifecycle mutation, no merge,
+at any point in this round.
