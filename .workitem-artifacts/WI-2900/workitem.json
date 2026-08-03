@@ -1,0 +1,18 @@
+{
+  "pageId": "3ad8bce9-1f7c-8168-96b5-e12c0b02c179",
+  "id": "WI-2900",
+  "name": "Keep cached-profile sessions usable after transient authority refetch failures",
+  "description": "The WI-2128 mobile authority repair promotes every failed background profile refetch to a hard screen error even when a valid caller-authorized cached profile set exists, so a transient network loss can interrupt an active learner session.",
+  "acceptanceCriteria": "Root cause: WI-2128 changed profileLoadError from empty-cache-only failure to every profilesQuery error, so a third failed transient background refetch replaces an otherwise valid learner session with a hard error. 1. Classify profile-refresh failures so transient offline/network failures with a previously validated caller-authorized cache keep the active learner session usable while retaining a visible retry/degraded-state signal. 2. Continue to fail closed and withhold cached authority on authentication, authorization, malformed-response, caller/profile mismatch, empty-or-invalid authority, and other non-network failures. 3. Prove no cached owner/proxy capability is exposed while authority is uncertain, including owner-to-learner organization changes and a joined learner whose prior cache names the family owner. 4. Mandatory regression tests must fail on the current hard-error implementation and pass with the fix for first load, background refetch, retry exhaustion, offline/resume, cached learner, cached owner/proxy, auth failure, and recovery after connectivity returns. 5. Preserve query-cache identity scoping, sign-out cleanup, and navigation contracts; run mobile typecheck, focused/full mobile tests, and applicable change-class gates.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

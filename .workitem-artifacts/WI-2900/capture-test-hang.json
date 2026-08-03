@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Make the useProfiles gate-hint mutation regression terminate",
+    "type": "Bug",
+    "priority": "P2",
+    "description": "The existing useUpdateProfileName regression for preserving first-Mentor gate hints hangs indefinitely both alone and in the full use-profiles test file, preventing a complete mobile verification verdict.",
+    "acceptanceCriteria": "1. `preserves first-Mentor gate hints when the PATCH response omits them` terminates and passes in isolation without `--forceExit`. 2. The complete `apps/mobile/src/hooks/use-profiles.test.ts` suite terminates and passes within its normal test budget. 3. The regression still proves cached `conversationLanguageConfirmed` and `isCurrentUser` hints survive a PATCH response that omits them. 4. No fake-timer, query invalidation, mutation, or open-handle residue leaks into neighboring tests. 5. Record red/green evidence for the isolated test and full file.",
+    "found_in": "apps/mobile/src/hooks/use-profiles.test.ts:408; WI-2900 verification on Orion 2026-08-03",
+    "related_items": ["WI-2900"],
+    "tags": ["rework"]
+  }
+]

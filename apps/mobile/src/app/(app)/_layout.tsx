@@ -437,6 +437,7 @@ export default function AppLayout() {
     activeProfile,
     isLoading: isProfileLoading,
     profileLoadError,
+    profileRefreshError,
     profileWasRemoved,
     acknowledgeProfileRemoval,
     switchProfile,
@@ -1051,6 +1052,37 @@ export default function AppLayout() {
             }
             testID="app-navigator-shell"
           >
+            {profileRefreshError ? (
+              <View
+                className="absolute left-4 right-4 z-50 flex-row items-center rounded-xl bg-warning px-4 py-3"
+                style={{ bottom: tabBarBottomInset + 72 }}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                testID="profile-refresh-warning"
+              >
+                <Text className="flex-1 text-caption font-medium text-background">
+                  {formatApiError(profileRefreshError)}
+                </Text>
+                <Pressable
+                  className="ms-3 rounded-lg border border-background px-3 py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.retry')}
+                  onPress={() => {
+                    void queryClient.invalidateQueries({
+                      queryKey: ['profiles'],
+                    });
+                    void queryClient.refetchQueries({
+                      queryKey: ['profiles'],
+                    });
+                  }}
+                  testID="profile-refresh-retry"
+                >
+                  <Text className="text-caption font-semibold text-background">
+                    {t('common.retry')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
             {proxyBanner && (
               <ProxyBanner
                 childName={proxyBanner.childName}

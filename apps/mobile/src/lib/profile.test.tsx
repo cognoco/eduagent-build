@@ -2,7 +2,7 @@ import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { PublicProfile } from '@eduagent/schemas';
+import { ApiResponseShapeError, type PublicProfile } from '@eduagent/schemas';
 import * as ExpoSecureStore from 'expo-secure-store';
 import {
   ProfileProvider,
@@ -10,6 +10,7 @@ import {
   useLinkedChildren,
   useHasLinkedChildren,
   PROFILE_SCOPED_KEYS,
+  resolveProfileAuthorityErrorState,
 } from './profile';
 import {
   setActiveProfileId as pushProfileIdToApiClient,
@@ -18,6 +19,12 @@ import {
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { queryKeys } from './query-keys';
 import { NOW_FEED_CACHE_POLICY_EPOCH } from './now-feed-cache';
+import {
+  NetworkError,
+  TimeoutError,
+  UnauthorizedError,
+  UpstreamError,
+} from './api-errors';
 import {
   consumeHubToSessionTransition,
   markHubToSessionTransition,
@@ -931,6 +938,64 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile).toBeNull();
   });
 
+  it('[WI-2900][BREAK] keeps a validated learner session usable after a background transport failure and recovers on resume', async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+        status: 200,
+      }),
+    );
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockImplementation((key: string) =>
+        Promise.resolve(
+          key === 'mentomate_active_profile_id' ? CHILD_PROFILE_ID : null,
+        ),
+      );
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    });
+
+    jest.useFakeTimers();
+    mockFetch.mockRejectedValue(new NetworkError());
+    act(() => {
+      appStateListener?.('active');
+    });
+    await act(async () => {
+      await jest.runAllTimersAsync();
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
+    expect(result.current.profileLoadError).toBeNull();
+    expect(result.current.profileRefreshError).toBeInstanceOf(NetworkError);
+
+    jest.useRealTimers();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [mockProfiles[1]!] }), {
+        status: 200,
+      }),
+    );
+    act(() => {
+      appStateListener?.('active');
+    });
+    await waitFor(() => {
+      expect(result.current.profileLoadError).toBeNull();
+    });
+    expect(result.current.profileRefreshError).toBeNull();
+  });
+
   it('[WI-2128][BREAK] fails closed when an authoritative profile refetch fails with cached capability metadata', async () => {
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
@@ -952,6 +1017,7 @@ describe('ProfileProvider', () => {
     expect(result.current.profiles).toEqual(mockProfiles);
     expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(result.current.profileLoadError).toBeTruthy();
+    expect(result.current.profileRefreshError).toBeNull();
   });
 
   it('[BREAK] clears mentomate_parent_home_seen on sign-out', async () => {
@@ -963,6 +1029,88 @@ describe('ProfileProvider', () => {
       `mentomate_parent_home_seen_${OWNER_PROFILE_ID}`,
     );
   });
+});
+
+describe('resolveProfileAuthorityErrorState [WI-2900]', () => {
+  const learnerOnly = [{ isOwner: false }];
+
+  it.each([
+    [
+      'first-load cache before current-session validation',
+      new NetworkError(),
+      false,
+      learnerOnly,
+      false,
+    ],
+    [
+      'cached family owner capability',
+      new NetworkError(),
+      true,
+      [{ isOwner: true }, { isOwner: false }],
+      false,
+    ],
+    [
+      'cached explicit proxy capability',
+      new NetworkError(),
+      true,
+      learnerOnly,
+      true,
+    ],
+    [
+      'authentication failure',
+      new UnauthorizedError('Session expired'),
+      true,
+      learnerOnly,
+      false,
+    ],
+    [
+      'malformed authority response',
+      new ApiResponseShapeError('profiles', [{ message: 'invalid authority' }]),
+      true,
+      learnerOnly,
+      false,
+    ],
+    [
+      'server-side authority failure',
+      new UpstreamError('Profile service unavailable', 'UPSTREAM_ERROR', 500),
+      true,
+      learnerOnly,
+      false,
+    ],
+    ['empty authority', new NetworkError(), true, [], false],
+  ])(
+    'fails closed for %s',
+    (_name, error, hasValidatedAuthority, profiles, isExplicitProxyMode) => {
+      expect(
+        resolveProfileAuthorityErrorState({
+          error,
+          hasValidatedAuthority,
+          profiles,
+          isExplicitProxyMode,
+        }),
+      ).toEqual({
+        profileLoadError: error,
+        profileRefreshError: null,
+      });
+    },
+  );
+
+  it.each([new NetworkError(), new TimeoutError()])(
+    'keeps validated learner-only authority usable for %s',
+    (error) => {
+      expect(
+        resolveProfileAuthorityErrorState({
+          error,
+          hasValidatedAuthority: true,
+          profiles: learnerOnly,
+          isExplicitProxyMode: false,
+        }),
+      ).toEqual({
+        profileLoadError: null,
+        profileRefreshError: error,
+      });
+    },
+  );
 });
 
 describe('useLinkedChildren', () => {

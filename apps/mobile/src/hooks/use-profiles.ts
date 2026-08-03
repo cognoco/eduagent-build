@@ -23,7 +23,12 @@ import { queryKeys } from '../lib/query-keys';
 
 const refreshedProfileAuthorities = new WeakMap<QueryClient, Set<string>>();
 
-export function useProfiles(): UseQueryResult<Profile[]> {
+export type ProfilesQueryResult = UseQueryResult<Profile[]> & {
+  /** True only after this QueryClient observed authority for this Clerk session. */
+  hasValidatedAuthority: boolean;
+};
+
+export function useProfiles(): ProfilesQueryResult {
   // Profile metadata is the authority refresh itself. This client omits the
   // selected Person/proxy context only from its own requests, so a stale owner
   // selection cannot block caller-bound recovery without mutating the shared
@@ -110,7 +115,10 @@ export function useProfiles(): UseQueryResult<Profile[]> {
     };
   }, [isSignedIn, refetch]);
 
-  return query;
+  return {
+    ...query,
+    hasValidatedAuthority: refreshedAuthorities.has(authorityKey),
+  };
 }
 
 export function useUpdateProfileName() {

@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "A current-session validated learner-only cache remains usable for transient network and timeout refresh failures and exposes a retryable degraded signal.",
+      "pointer": "apps/mobile/src/lib/profile.test.tsx"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Authentication, malformed-response, upstream, empty, and first-load failures remain hard profile-load errors.",
+      "pointer": "apps/mobile/src/lib/profile.test.tsx"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Cached owner/family and explicit proxy capability are withheld while authority is uncertain.",
+      "pointer": "apps/mobile/src/lib/profile.test.tsx"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The regression matrix covers first load, background refresh, retry exhaustion, offline/resume, learner cache, owner/proxy cache, auth failure, and recovery.",
+      "pointer": "apps/mobile/src/hooks/use-profiles.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Session-scoped authority provenance, navigation continuity, visible retry, and existing sign-out behavior remain covered with mobile typecheck and full affected suites green.",
+      "pointer": "apps/mobile/src/app/(app)/_layout.test.tsx"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "apps/mobile/src/lib/profile.test.tsx"
+}

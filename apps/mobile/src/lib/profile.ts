@@ -20,6 +20,7 @@ import {
   setProxyMode,
 } from './api-client';
 import { formatApiError } from './format-api-error';
+import { NetworkError, TimeoutError } from './api-errors';
 import { clearNavigationTransitionProvenance } from './navigation-transition-provenance';
 
 export type { Profile };
@@ -102,6 +103,8 @@ export interface ProfileContextValue {
   isLoading: boolean;
   /** Set when the account's profile list could not be loaded. */
   profileLoadError: unknown | null;
+  /** Non-blocking transport failure while validated learner authority remains usable. */
+  profileRefreshError?: unknown | null;
   /** Set when a saved profile is no longer operable and we selected a safe fallback. */
   profileWasRemoved: boolean;
   /** Clear the profileWasRemoved flag after user acknowledges */
@@ -186,6 +189,7 @@ export const ProfileContext = createContext<ProfileContextValue>({
   switchProfile: async () => ({ success: true }),
   isLoading: true,
   profileLoadError: null,
+  profileRefreshError: null,
   profileWasRemoved: false,
   acknowledgeProfileRemoval: () => undefined,
 });
@@ -213,6 +217,36 @@ export function useLinkedChildren(): Profile[] {
 
 export function useHasLinkedChildren(): boolean {
   return useLinkedChildren().length > 0;
+}
+
+export function resolveProfileAuthorityErrorState(input: {
+  error: unknown | null;
+  hasValidatedAuthority: boolean;
+  profiles: ReadonlyArray<Pick<Profile, 'isOwner'>>;
+  isExplicitProxyMode: boolean;
+}): {
+  profileLoadError: unknown | null;
+  profileRefreshError: unknown | null;
+} {
+  const isTransientTransportFailure =
+    input.error instanceof NetworkError || input.error instanceof TimeoutError;
+  const hasLearnerOnlyAuthority =
+    input.hasValidatedAuthority &&
+    input.profiles.length === 1 &&
+    input.profiles[0]?.isOwner === false &&
+    !input.isExplicitProxyMode;
+
+  if (input.error && isTransientTransportFailure && hasLearnerOnlyAuthority) {
+    return {
+      profileLoadError: null,
+      profileRefreshError: input.error,
+    };
+  }
+
+  return {
+    profileLoadError: input.error,
+    profileRefreshError: null,
+  };
 }
 
 async function getSecureStoreItemWithTimeout(
@@ -253,10 +287,6 @@ export function ProfileProvider({
   );
   const isProfilesLoading = profilesQuery.isLoading;
   const isProfilesFetching = profilesQuery.isFetching;
-  // Profile rows carry capability metadata. A failed authoritative refetch
-  // must not fall back to a cached owner shell after a same-subject family
-  // join, so surface the error even when TanStack still holds old data.
-  const profileLoadError = profilesQuery.error;
   const client = useApiClient();
   const queryClient = useQueryClient();
 
@@ -268,6 +298,16 @@ export function ProfileProvider({
   // false; restored from SecureStore on cold start.
   const [isExplicitProxyMode, setIsExplicitProxyMode] = useState(false);
   const [isRestoringProxyMode, setIsRestoringProxyMode] = useState(true);
+  // A transport-only refresh failure may keep a learner-only cache usable
+  // after this Clerk session has already validated it. Owner/proxy authority,
+  // first-load caches, HTTP denials and malformed responses always fail hard.
+  const { profileLoadError, profileRefreshError } =
+    resolveProfileAuthorityErrorState({
+      error: profilesQuery.error,
+      hasValidatedAuthority: profilesQuery.hasValidatedAuthority,
+      profiles,
+      isExplicitProxyMode,
+    });
 
   // Navigation ancestry is account/profile-scoped even though its short-lived
   // proof is kept in a module singleton. Never let that proof survive the
@@ -532,6 +572,7 @@ export function ProfileProvider({
       switchProfile,
       isLoading,
       profileLoadError,
+      profileRefreshError,
       profileWasRemoved,
       acknowledgeProfileRemoval,
     }),
@@ -542,6 +583,7 @@ export function ProfileProvider({
       switchProfile,
       isLoading,
       profileLoadError,
+      profileRefreshError,
       profileWasRemoved,
       acknowledgeProfileRemoval,
     ],

@@ -1,0 +1,7 @@
+**What was done:** Kept an already-authorized learner session usable when a background profile-authority refresh fails for a transient transport reason, while preserving fail-closed handling for every capability-bearing or non-transient case.
+
+**What changed:** The profiles hook now exposes whether this Clerk session has successfully validated authority. The profile provider classifies refresh errors through one pure policy: only a single non-owner profile, already validated in the current session and outside explicit proxy mode, may degrade on network or timeout errors. The app shell stays mounted and shows a visible localized retry alert. Owner/family, proxy, first-load, empty, authentication, malformed-response, and upstream failures continue to hard-error.
+
+**Verification:** Red evidence showed the current implementation retained cached learner data but surfaced the transient refresh as `profileLoadError`. The final run reported 60 of 60 profile/provider and hook assertions successful and 148 of 148 layout assertions successful through the repository's canonical force-exit posture. Affected-file ESLint and Prettier returned exit 0, and the mobile TypeScript build returned exit 0.
+
+**Caveats / Follow-ups:** The degradation exception is intentionally narrower than “cached data exists”: it never grants cached owner or proxy capability. The canonical mobile test command already uses `--forceExit` under WI-2845; the independently discovered use-profiles-specific non-termination was captured and repaired as WI-3079 in this same landing.
