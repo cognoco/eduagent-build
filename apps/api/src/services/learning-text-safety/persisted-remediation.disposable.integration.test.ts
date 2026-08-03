@@ -23,7 +23,7 @@ import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
+import { Client, Pool } from 'pg';
 
 import {
   curricula,
@@ -50,6 +50,7 @@ import {
   REDACTED_PLACEHOLDER,
   remediatePersistedLearningText,
 } from './persisted-remediation-apply';
+import { remediateMemoryFacts } from './persisted-remediation-memory';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
@@ -82,6 +83,32 @@ function buildScratchUrl(baseUrl: string, databaseName: string): string {
   const url = new URL(baseUrl);
   url.pathname = `/${databaseName}`;
   return url.toString();
+}
+
+async function waitForBlockedMemoryFactUpdate(
+  adminPool: Pool,
+  databaseName: string,
+  remediationApplicationName: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const result = await adminPool.query<{ waiting: boolean }>(
+      `SELECT EXISTS (
+        SELECT 1
+        FROM pg_stat_activity
+        WHERE datname = $1
+          AND application_name = $2
+          AND wait_event_type = 'Lock'
+          AND query ILIKE 'update "memory_facts"%'
+      ) AS waiting`,
+      [databaseName, remediationApplicationName],
+    );
+    if (result.rows[0]?.waiting) return;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 20);
+    });
+  }
+
+  throw new Error('remediation update did not block on the concurrent writer');
 }
 
 const describeLoopbackOnly = hasLoopbackDatabaseUrl()
@@ -580,6 +607,77 @@ describeLoopbackOnly(
       // The educational fact is the control: ambiguous, reported, untouched.
       expect(educational.text).toBe(EDUCATIONAL);
       expect(educational.supersededBy).toBeNull();
+    });
+
+    it('[WI-3076 AC] reports a metadata-only concurrent update instead of overwriting it', async () => {
+      // This shape drives a metadata-only remediation: the primary text is
+      // benign, while metadata.subject carries the remediable attribution.
+      // The separate connection locks the row after the scan can read it, then
+      // writes an unrelated key before releasing the remediation update.
+      const [fact] = await db
+        .insert(memoryFacts)
+        .values({
+          profileId: seeded.profileId,
+          category: 'strength',
+          text: BENIGN,
+          textNormalized: normalizeMemoryText(BENIGN),
+          metadata: { subject: ATTRIBUTION_ES, topics: [] },
+          observedAt: new Date(),
+          embedding: null,
+        })
+        .returning({ id: memoryFacts.id });
+
+      const writer = new Client({
+        connectionString: scratchUrl,
+        application_name: `${scratchApplicationName}-concurrent-writer`,
+      });
+      await writer.connect();
+
+      try {
+        await writer.query('BEGIN');
+        await writer.query(
+          'SELECT id FROM memory_facts WHERE id = $1 FOR UPDATE',
+          [fact!.id],
+        );
+
+        const remediation = remediateMemoryFacts(db);
+        await waitForBlockedMemoryFactUpdate(
+          adminPool,
+          databaseName,
+          scratchApplicationName,
+        );
+
+        await writer.query(
+          `UPDATE memory_facts
+           SET metadata = metadata || $2::jsonb
+           WHERE id = $1`,
+          [fact!.id, JSON.stringify({ concurrentMarker: 'preserve-me' })],
+        );
+        await writer.query('COMMIT');
+
+        const reports = await remediation;
+        const metadataReport = reports.find(
+          (report) => report.surface === 'memory_facts.metadata',
+        );
+        expect(metadataReport?.skippedChanged).toBe(1);
+
+        const [after] = await db
+          .select({ text: memoryFacts.text, metadata: memoryFacts.metadata })
+          .from(memoryFacts)
+          .where(eq(memoryFacts.id, fact!.id));
+
+        // The predicate must protect both fields read to build the JSONB
+        // replacement. With the old id+text-only predicate, this assertion
+        // fails: subject is redacted and concurrentMarker is lost.
+        expect(after?.text).toBe(BENIGN);
+        expect(after?.metadata).toMatchObject({
+          subject: ATTRIBUTION_ES,
+          concurrentMarker: 'preserve-me',
+        });
+      } finally {
+        await writer.query('ROLLBACK').catch(() => undefined);
+        await writer.end();
+      }
     });
   },
 );
