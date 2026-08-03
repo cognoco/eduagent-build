@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The compact clause matrix keys every numbered ADR and specification section to positive evidence and a negative control or bounded non-applicability.",
+      "pointer": "docs/evidence/WI-2574/report.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The clause matrix covers the complete eligibility, privacy, evidence, transport, lifecycle, persistence, rollback, safety, and in-app-only decision surface.",
+      "pointer": "docs/evidence/WI-2574/report.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Boundary inspection and the matrix cover contracts, migrations/rollback, central services, API/SSE/mobile parsing, jobs, and deployment declarations without an active contradictory path.",
+      "pointer": "docs/evidence/WI-2574/report.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The command ledger records reproducible unit, integration, real-database, mobile, prompt, migration, type, router, and exact-head CI/E2E evidence; native flow is bounded only by the cited operator waiver.",
+      "pointer": "docs/evidence/WI-2574/report.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The live 15-row blocker relation is Closed/Done and every Fixed In commit is proven ancestral to the audited base; no finding remains open.",
+      "pointer": "docs/evidence/WI-2574/report.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "The clearly named Artifact index directly links the report, completion summary, evidence manifest, PR body, and sanitized revision-pinned database receipt for independent review and QA.",
+      "pointer": "docs/evidence/WI-2574/report.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-03",
+  "redGreenPointer": "packages/schemas/src/llm-envelope.test.ts"
+}

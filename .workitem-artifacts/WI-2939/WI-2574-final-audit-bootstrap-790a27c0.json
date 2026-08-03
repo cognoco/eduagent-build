@@ -1,0 +1,15 @@
+{
+  "schema": "zdx.disposable-schema-bootstrap.v1",
+  "workItem": "WI-2939",
+  "targetId": "811f580999ce",
+  "endpointFingerprint": "f0ca05e6457965df023f9c88d3eeb3b821f4c02a119a8a793f41b49592425bd7",
+  "revision": "790a27c07e38e12e854bf6daff41fe6e247f658c",
+  "chainFingerprint": "3327f8a883e944f787568bc96c7be6add8e3d958fc2cc33579f62aaba0e98901",
+  "operatorRuling": "BID-35-WI-2574-EXACT-DB-AUDIT-2026-08-03",
+  "action": "bootstrapped",
+  "schemaFingerprint": "8093ab2d1bc9a376ed14480ea01980a61e20506b692bdeab96118a0f6c294d89",
+  "startedAt": "2026-08-03T21:39:41.532Z",
+  "completedAt": "2026-08-03T21:40:39.683Z",
+  "cleanup": "Destroy the disposable target identified by endpointFingerprint; never migrate, repair, or copy data into shared development, staging, or production.",
+  "dataPolicy": "Applied only revision-pinned committed migration SQL; no separate seed command or imported/copied user data."
+}
