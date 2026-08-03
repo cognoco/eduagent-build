@@ -76,9 +76,13 @@ async function main() {
     appliedRows,
   });
   const drift = [];
+  const priorPendingMigrations = [];
 
   for (const migration of pending) {
-    const unsupported = findUnsupportedDdlStatements(migration.sql);
+    const unsupported = findUnsupportedDdlStatements(migration.sql, {
+      appliedMigrations: applied,
+      priorPendingMigrations,
+    });
     if (unsupported.length > 0) {
       throw new Error(
         `Cannot safely verify pending DDL in ${migration.tag}; add catalog ` +
@@ -87,6 +91,7 @@ async function main() {
     }
     for (const probe of pendingMigrationDdlProbes({
       appliedMigrations: applied,
+      priorPendingMigrations,
       pendingMigration: migration,
     })) {
       const exists = await probeExists(query, probe);
@@ -94,6 +99,7 @@ async function main() {
         drift.push(`${migration.tag}: ${probe.description}`);
       }
     }
+    priorPendingMigrations.push(migration);
   }
 
   if (drift.length > 0) {

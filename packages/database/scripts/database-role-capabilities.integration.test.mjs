@@ -265,6 +265,10 @@ test(
     await client.query(
       'CREATE INDEX records_value_idx ON wi1628_guard.records (value)',
     );
+    await client.query('CREATE TABLE wi1628_guard.records_other (id integer)');
+    await client.query(
+      'CREATE TABLE wi1628_guard.partitioned_records (id integer) PARTITION BY RANGE (id)',
+    );
     await client.query(
       'ALTER TABLE wi1628_guard.records ADD CONSTRAINT records_value_check CHECK (length(value) > 0)',
     );
@@ -330,6 +334,102 @@ test(
         `an existing unjournaled ${probe.kind} must be additive drift`,
       );
     }
+
+    const attachedIndexProbe = {
+      kind: 'relation',
+      relationKind: 'index',
+      schema: 'wi1628_guard',
+      name: 'records_value_idx',
+      expectedExists: true,
+      parentSchema: 'wi1628_guard',
+      parentTable: 'records',
+    };
+    assert.equal(await probeExists(query, attachedIndexProbe), true);
+    assert.equal(
+      await probeExists(query, {
+        ...attachedIndexProbe,
+        parentTable: 'records_other',
+      }),
+      false,
+    );
+    assert.equal(
+      await probeExists(query, {
+        ...attachedIndexProbe,
+        compatibleWhenAbsent: true,
+      }),
+      true,
+    );
+    assert.equal(
+      await probeExists(query, {
+        ...attachedIndexProbe,
+        name: 'not_created_idx',
+        compatibleWhenAbsent: true,
+      }),
+      true,
+    );
+    assert.equal(
+      await probeExists(query, {
+        ...attachedIndexProbe,
+        parentTable: 'records_other',
+        compatibleWhenAbsent: true,
+      }),
+      false,
+    );
+    assert.equal(
+      await probeExists(query, {
+        kind: 'relation',
+        relationKind: 'partitioned-table',
+        schema: 'wi1628_guard',
+        name: 'partitioned_records',
+        expectedExists: true,
+      }),
+      true,
+    );
+    assert.equal(
+      await probeExists(query, {
+        kind: 'relation',
+        relationKind: 'table',
+        schema: 'wi1628_guard',
+        name: 'partitioned_records',
+        expectedExists: true,
+        compatibleWhenAbsent: true,
+      }),
+      false,
+    );
+
+    await client.query(
+      'CREATE TABLE wi1628_guard.parent_precondition (value text)',
+    );
+    const parentPrecondition = {
+      kind: 'relation',
+      relationKind: 'table',
+      schema: 'wi1628_guard',
+      name: 'parent_precondition',
+      expectedExists: true,
+    };
+    const columnPrecondition = {
+      kind: 'column',
+      schema: 'wi1628_guard',
+      table: 'parent_precondition',
+      name: 'value',
+      expectedExists: true,
+    };
+    assert.equal(await probeExists(query, parentPrecondition), true);
+    assert.equal(await probeExists(query, columnPrecondition), true);
+    await client.query('DROP TABLE wi1628_guard.parent_precondition');
+    assert.equal(await probeExists(query, parentPrecondition), false);
+    assert.equal(await probeExists(query, columnPrecondition), false);
+    assert.equal(
+      await probeExists(query, {
+        kind: 'relation',
+        relationKind: 'partitioned-table',
+        schema: 'wi1628_guard',
+        name: 'records',
+        expectedExists: true,
+        compatibleWhenAbsent: true,
+      }),
+      false,
+    );
 
     const absentProbe = {
       kind: 'relation',
