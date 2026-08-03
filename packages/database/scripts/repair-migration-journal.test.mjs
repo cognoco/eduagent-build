@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import {
   EXPECTED_ORPHANED_ROWS,
-  assertCatalogInventoriesMatch,
+  catalogInventoryReport,
   databaseTargetFingerprint,
   formatRepairFailure,
   parseRepairRequest,
@@ -92,45 +92,67 @@ test('refuses a non-contiguous known migration prefix after removing orphans', (
   );
 });
 
-test('accepts identical canonical catalog inventories regardless of row order', () => {
-  assert.doesNotThrow(() =>
-    assertCatalogInventoriesMatch({
-      baseline: [
-        { key: 'table:public.alpha', definition: '{"kind":"r"}' },
-        { key: 'column:public.alpha.id', definition: '{"type":"uuid"}' },
-      ],
-      staging: [
-        { key: 'column:public.alpha.id', definition: '{"type":"uuid"}' },
-        { key: 'table:public.alpha', definition: '{"kind":"r"}' },
-      ],
-    }),
-  );
+test('fingerprints identical canonical catalog inventories regardless of row order', () => {
+  const report = catalogInventoryReport({
+    baseline: [
+      { key: 'table:public.alpha', definition: '{"kind":"r"}' },
+      { key: 'column:public.alpha.id', definition: '{"type":"uuid"}' },
+    ],
+    staging: [
+      { key: 'column:public.alpha.id', definition: '{"type":"uuid"}' },
+      { key: 'table:public.alpha', definition: '{"kind":"r"}' },
+    ],
+  });
+
+  assert.equal(report.baselineObjects, 2);
+  assert.equal(report.stagingObjects, 2);
+  assert.equal(report.differences, 0);
+  assert.match(report.fingerprint, /^[a-f0-9]{64}$/);
 });
 
-test('refuses missing, unexpected, or changed catalog objects', () => {
-  assert.throws(
-    () =>
-      assertCatalogInventoriesMatch({
-        baseline: [
-          { key: 'table:public.alpha', definition: '{"kind":"r"}' },
-          { key: 'table:public.beta', definition: '{"kind":"r"}' },
-        ],
-        staging: [
-          { key: 'table:public.alpha', definition: '{"kind":"p"}' },
-          { key: 'table:public.gamma', definition: '{"kind":"r"}' },
-        ],
-      }),
-    (error) => {
-      assert.match(
-        error.message,
-        /catalog inventory differs from migration 0166/,
-      );
-      assert.match(error.message, /changed: table:public.alpha/);
-      assert.match(error.message, /missing: table:public.beta/);
-      assert.match(error.message, /unexpected: table:public.gamma/);
-      return true;
-    },
+test('records missing, unexpected, and changed catalog objects deterministically', () => {
+  const report = catalogInventoryReport({
+    baseline: [
+      { key: 'table:public.alpha', definition: '{"kind":"r"}' },
+      { key: 'table:public.beta', definition: '{"kind":"r"}' },
+    ],
+    staging: [
+      { key: 'table:public.alpha', definition: '{"kind":"p"}' },
+      { key: 'table:public.gamma', definition: '{"kind":"r"}' },
+    ],
+  });
+
+  assert.equal(report.differences, 3);
+  assert.deepEqual(report.preview, [
+    'changed: table:public.alpha',
+    'missing: table:public.beta',
+    'unexpected: table:public.gamma',
+  ]);
+  assert.match(report.fingerprint, /^[a-f0-9]{64}$/);
+});
+
+test('uses locale-independent byte ordering for the catalog fingerprint', () => {
+  const report = catalogInventoryReport({
+    baseline: [
+      { key: 'public.Z', definition: '1' },
+      { key: 'public.a', definition: '1' },
+    ],
+    staging: [
+      { key: 'public.ä', definition: '3' },
+      { key: 'public.a', definition: '2' },
+      { key: 'public.Z', definition: '2' },
+    ],
+  });
+
+  assert.equal(
+    report.fingerprint,
+    'fa31c68293df74c61f95aadef66673b7ed6c2a7a9c1892fcd918fbd7b36fe912',
   );
+  assert.deepEqual(report.preview, [
+    'changed: public.Z',
+    'changed: public.a',
+    'unexpected: public.ä',
+  ]);
 });
 
 const targetEnv = {
@@ -211,6 +233,13 @@ test('binds a reviewed dry-run receipt to run, commit, target, and exact rows', 
     headSha: 'abc123def456',
     targetFingerprint: databaseTargetFingerprint(targetEnv.DATABASE_URL),
     exactRows: EXPECTED_ORPHANED_ROWS,
+    catalogInventory: {
+      baselineObjects: 2,
+      stagingObjects: 2,
+      differences: 0,
+      fingerprint: 'a'.repeat(64),
+      preview: [],
+    },
   };
   assert.doesNotThrow(() =>
     validateReviewedDryRunReceipt({
@@ -218,6 +247,7 @@ test('binds a reviewed dry-run receipt to run, commit, target, and exact rows', 
       reviewedDryRunId: '12345',
       currentHeadSha: 'abc123def456',
       databaseUrl: targetEnv.DATABASE_URL,
+      currentCatalogReport: receipt.catalogInventory,
     }),
   );
 
@@ -231,6 +261,7 @@ test('binds a reviewed dry-run receipt to run, commit, target, and exact rows', 
       ),
     },
     { ...receipt, exactRows: EXPECTED_ORPHANED_ROWS.slice(0, 1) },
+    { ...receipt, catalogInventory: undefined },
   ]) {
     assert.throws(() =>
       validateReviewedDryRunReceipt({
@@ -238,9 +269,25 @@ test('binds a reviewed dry-run receipt to run, commit, target, and exact rows', 
         reviewedDryRunId: '12345',
         currentHeadSha: 'abc123def456',
         databaseUrl: targetEnv.DATABASE_URL,
+        currentCatalogReport: receipt.catalogInventory,
       }),
     );
   }
+
+  assert.throws(
+    () =>
+      validateReviewedDryRunReceipt({
+        receipt,
+        reviewedDryRunId: '12345',
+        currentHeadSha: 'abc123def456',
+        databaseUrl: targetEnv.DATABASE_URL,
+        currentCatalogReport: {
+          ...receipt.catalogInventory,
+          fingerprint: 'b'.repeat(64),
+        },
+      }),
+    /catalog inventory changed since the reviewed dry run/,
+  );
 });
 
 test('verifies an already-applied repair without requiring mutation acknowledgements', () => {

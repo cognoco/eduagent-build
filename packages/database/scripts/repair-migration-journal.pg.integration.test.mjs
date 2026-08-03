@@ -84,9 +84,10 @@ test(
     const databaseNames = [
       `wi1628_native_${runId}`,
       `wi1628_mismatch_${runId}`,
+      `wi1628_catalog_${runId}`,
     ];
     for (const name of databaseNames) {
-      assert.match(name, /^wi1628_(?:native|mismatch)_[0-9_]+$/);
+      assert.match(name, /^wi1628_(?:native|mismatch|catalog)_[0-9_]+$/);
     }
 
     const baseline = new URL(baselineUrl);
@@ -118,6 +119,14 @@ test(
         });
         assert.equal(dryRun.status, 0, dryRun.stderr);
         assert.equal(await exactOrphanCount(target), 2);
+        const dryRunReceipt = JSON.parse(
+          fs.readFileSync(path.join(receiptDir, 'dry-run.json'), 'utf8'),
+        );
+        assert.equal(dryRunReceipt.catalogInventory.differences, 0);
+        assert.match(
+          dryRunReceipt.catalogInventory.fingerprint,
+          /^[a-f0-9]{64}$/,
+        );
 
         const apply = runRepair({
           mode: 'apply',
@@ -213,6 +222,45 @@ test(
         assert.equal(await exactOrphanCount(mismatch), 2);
       } finally {
         await mismatch.end();
+      }
+
+      const catalogUrl = databaseUrl(baselineUrl, databaseNames[2]);
+      const catalog = new pg.Client({ connectionString: catalogUrl });
+      await catalog.connect();
+      try {
+        await seedExactOrphans(catalog);
+        const catalogDryRunPath = path.join(receiptDir, 'catalog-dry-run.json');
+        const catalogDryRun = runRepair({
+          mode: 'dry-run',
+          targetUrl: catalogUrl,
+          receiptPath: catalogDryRunPath,
+          extraEnv: { GITHUB_RUN_ID: '9001' },
+        });
+        assert.equal(catalogDryRun.status, 0, catalogDryRun.stderr);
+        await catalog.query(
+          'CREATE TABLE public.wi1628_catalog_drift_probe (id integer)',
+        );
+        const refused = runRepair({
+          mode: 'apply',
+          targetUrl: catalogUrl,
+          receiptPath: path.join(receiptDir, 'catalog-apply.json'),
+          extraEnv: {
+            GITHUB_RUN_ID: '9002',
+            WI1628_REPAIR_CONFIRM: 'WI-1628:DELETE:136,137',
+            WI1628_UNRECOVERED_EFFECTS_ACK:
+              'WI-1628:ACCEPT:UNRECOVERED-STAGING-MIGRATION-EFFECTS',
+            WI1628_REVIEWED_DRY_RUN_ID: '9001',
+            WI1628_REVIEWED_DRY_RUN_RECEIPT_PATH: catalogDryRunPath,
+          },
+        });
+        assert.notEqual(refused.status, 0);
+        assert.match(
+          refused.stderr,
+          /catalog inventory changed since the reviewed dry run/,
+        );
+        assert.equal(await exactOrphanCount(catalog), 2);
+      } finally {
+        await catalog.end();
       }
     } finally {
       for (const name of databaseNames) {
