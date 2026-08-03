@@ -2,13 +2,11 @@ import { and, eq, type SQL } from 'drizzle-orm';
 import { memoryFacts, topicNotes, type Database } from '@eduagent/database';
 import {
   classifyRowFields,
+  REDACTED_PLACEHOLDER,
   type FieldText,
   type MultiTextRow,
-} from './persisted-remediation-fields';
-import {
-  REDACTED_PLACEHOLDER,
   type SurfaceRemediationReport,
-} from './persisted-remediation-apply';
+} from './persisted-remediation-fields';
 import { normalizeMemoryText } from '../memory/backfill-mapping';
 
 /**
