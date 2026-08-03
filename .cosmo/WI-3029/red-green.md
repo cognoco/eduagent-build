@@ -361,3 +361,112 @@ apps/api/eval-llm/ (all): 27 suites, 322 passed, 9 skipped, 331 total
 non-null-assertion warning in `index.ts`, unrelated to this change). No
 `--live`, no provider bootstrap, no paid/live call, no deploy, no GitHub
 thread reply, no merge, no Cosmo mutation at any point in this round.
+
+## AC-6 rework round (BID-31 shepherd, retained-run evidence — no paid run)
+
+The item was rework-bounced on **AC-6** ("timeout-minutes and workflow
+comments are re-verified against sequential demand and retained run
+evidence; the chosen headroom and uncertainty are explicit"): the
+`.github/workflows/eval-live.yml` comment stated an un-reverified,
+alarming pre-retune claim (a flat 30-60s/call OpenRouter queue-spike rate
+applied to all 643 calls, "5.4-10.7h") explicitly marked
+"not re-verified against this raised 643 demand". BID-31 initially routed
+this to an operator-gated paid-run wave (WI-3050); an independent evidence
+review (`/home/vetinari/nexus/_WIP/orca-herdr-spike/findings/wi3029-ac6-timeout-verification-from-retained-run-evidence.md`)
+argued AC-6's text asks for re-verification against *retained* run
+evidence, not a new paid run, and that evidence already exists for free.
+This round acted on that reading, using retained CI run `30721918215`
+(2026-08-01T22:44Z, pre-retune head) — no `--live`, no provider bootstrap,
+no paid call, no workflow dispatch at any point.
+
+Retained-run facts verified independently via `gh` before writing anything
+(not taken from the analysis note on faith):
+
+```text
+$ gh api repos/cognoco/eduagent-build/actions/jobs/91426988671 \
+    | jq -r '.steps[] | "\(.number)\t\(.name)\t\(.started_at)\t\(.completed_at)"'
+7   Tier-2 live evals + signal-drift check       2026-08-01T22:45:14Z  2026-08-01T22:59:13Z   (839s)
+8   Teaching-session live gate (...)             2026-08-01T22:59:13Z  2026-08-01T23:03:44Z   (271s)
+9   Mastery-simulation gate (...)                2026-08-01T23:03:44Z  2026-08-01T23:15:34Z   (710s)
+
+$ gh run view 30721918215 --job 91426988671 --log | grep -niE "max-live-calls|Live calls OK|Live calls failed"
+--max-live-calls 300   (envelope step)
+Live calls OK:      298
+Live calls failed:  2                                    # 298 + 2 = 300, budget exhausted exactly at cap
+--flow teaching-session --max-live-calls 5   (teaching step)
+Live calls OK:      5
+Live calls failed:  0                                    # un-truncated
+--max-live-calls 189 --runs 3   (mastery step, pre-retune stale cap)
+[budget] requested 24 rounds but --max-live-calls=189 (~9 calls/round) caps at 21. 3 round(s) dropped.
+```
+
+These confirm the exact wall-clock durations, the envelope run's
+budget-exhausted-at-cap behavior (300 attempted, matching the cap), and
+the mastery run's round truncation (21 of 24 scheduled rounds) — the two
+facts the projection's scaling ratios (`366/300` and `24/21`) are grounded
+in.
+
+RED: added a new deterministic test to
+`scripts/eval-live-gate-independence.test.ts` (`[WI-3029 AC-6] timeout
+re-verification projects each gate's retained-run wall clock onto CURRENT
+demand, not a stale flat per-call spike rate`) asserting (a) the stale
+`5.4-10.7h` / `30-60s/call` / "not re-verified against this raised 643
+demand" language is gone, (b) the workflow cites the retained run id, (c)
+the workflow's ratios and projected minutes/headroom exactly match values
+this test derives from the CURRENT `deriveEnvelopeProviderDemandFromMatrix`
+(366) and `deriveMasteryBudget` (24 rounds) against the retained run's
+hardcoded historical denominators (300, 21), and (d) explicit uncertainty
+language (single retained run, no P90, the 2 failed calls, queue/latency
+variance) is present. Run against the pre-fix workflow comment:
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).not.toMatch(/5\.4-10\.7h/) — received string
+  matching the pattern (the stale claim was still present)
+Tests: 1 failed, 15 skipped, 16 total
+```
+
+GREEN: replaced the stale flat-rate-spike paragraph in
+`.github/workflows/eval-live.yml`'s job-level comment with the gatewise
+projection — envelope `839s × 366/300` + teaching `271s` (unscaled,
+already un-truncated at today's cap) + mastery `710s × 24/21` ≈ 35.1 min,
+~5.1× headroom under the unchanged 180-minute `timeout-minutes` — plus the
+uncertainty paragraph (single run, no P90, the 2 failed envelope calls,
+queue/latency variance, which numbers are freshly re-derived vs. read off
+the one retained run). `timeout-minutes` itself was NOT changed (still
+180) — this is a re-verification of the existing timeout, not a retune of
+it.
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+(counts are higher than the prior round's 1221/1225 because this branch's
+base is a later `main` than the prior round's, with unrelated test suites
+landed in between — not attributable to this change, which touches only
+the two files listed below. The 1 skipped suite was not individually
+re-verified as the same pre-existing routing-suite skip in this round.)
+
+$ nx run api:typecheck
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ node -e "require('yaml').parse(require('fs').readFileSync('.github/workflows/eval-live.yml','utf8'))"
+parsed OK, timeout-minutes = 180
+```
+
+Diff scope: `.github/workflows/eval-live.yml` (comment block only, 26
+insertions / 9 deletions — no `run:` step, cap, or `timeout-minutes` value
+touched) and `scripts/eval-live-gate-independence.test.ts` (one new test,
+89 lines added). No other file changed. No `--live`, no provider
+bootstrap, no paid/live call, no workflow dispatch, no deploy, no Cosmo
+lifecycle mutation (claim held by shepherd:codex:singles-lane throughout —
+this round did not claim, complete, close, or merge the item), at any
+point in this round.

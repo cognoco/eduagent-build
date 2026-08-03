@@ -199,6 +199,92 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     );
   });
 
+  // [WI-3029 AC-6] Retained-run evidence for the timeout re-verification.
+  // Run 30721918215 (2026-08-01T22:44Z, pre-retune head) is the only
+  // retrievable run log with per-gate wall clock AND per-gate call counts.
+  // Its per-step start/completed timestamps (GitHub Actions job API):
+  //   envelope 22:45:14Z -> 22:59:13Z = 839s, at that run's then-cap of 300
+  //     (log: "Live calls OK: 298" + "Live calls failed: 2" = 300, budget
+  //     exhausted exactly at the cap);
+  //   teaching 22:59:13Z -> 23:03:44Z = 271s, at cap 5 (log: "Live calls OK:
+  //     5" + "Live calls failed: 0" — un-truncated, same cap as today);
+  //   mastery 23:03:44Z -> 23:15:34Z = 710s, at that run's then-cap of 189
+  //     configured units (log: "budget requested 24 rounds but
+  //     --max-live-calls=189 (~9 calls/round) caps at 21. 3 round(s)
+  //     dropped" — only 21 of 24 scheduled rounds actually ran).
+  // These are historical facts read off that one run and are NOT re-derived
+  // from current code (the retained log cannot be re-fetched from live
+  // derivation helpers), so they are hardcoded constants here, each cited to
+  // its source line above.
+  const RETAINED_RUN_ID = '30721918215';
+  const RETAINED_ENVELOPE_WALL_CLOCK_SECONDS = 839;
+  const RETAINED_ENVELOPE_CALLS_AT_CAP = 300;
+  const RETAINED_TEACHING_WALL_CLOCK_SECONDS = 271;
+  const RETAINED_MASTERY_WALL_CLOCK_SECONDS = 710;
+  const RETAINED_MASTERY_ROUNDS_COMPLETED = 21;
+
+  test("[WI-3029 AC-6] timeout re-verification projects each gate's retained-run wall clock onto CURRENT demand, not a stale flat per-call spike rate", () => {
+    const workflow = readFileSync(
+      join(repoRoot, '.github/workflows/eval-live.yml'),
+      'utf8',
+    );
+    const workflowComments = workflow.replace(/^\s*#\s?/gm, '');
+
+    // Must no longer assert the pre-retune flat-rate spike claim this AC was
+    // bounced for: it applied a 30-60s/call queue-spike rate to every one of
+    // 643 calls (a spike rate, not a run rate) and was never re-verified
+    // against the raised demand.
+    expect(workflowComments).not.toMatch(/5\.4-10\.7h/);
+    expect(workflowComments).not.toMatch(/30-60s\/call/);
+    expect(workflowComments).not.toMatch(
+      /not re-verified against this raised 643\s*\n?\s*demand/,
+    );
+
+    // The projection must be traceable to the retained run and reproduce
+    // the exact ratios this test derives from CURRENT demand.
+    expect(workflowComments).toContain(RETAINED_RUN_ID);
+
+    const providerDemand = deriveEnvelopeProviderDemandFromMatrix(
+      ENVELOPE_FLOWS,
+      PROFILES,
+    );
+    const masteryBudget = deriveWorkflowMasteryBudget(masteryStep!);
+
+    const projectedEnvelopeSeconds =
+      RETAINED_ENVELOPE_WALL_CLOCK_SECONDS *
+      (providerDemand.providerCalls / RETAINED_ENVELOPE_CALLS_AT_CAP);
+    const projectedMasterySeconds =
+      RETAINED_MASTERY_WALL_CLOCK_SECONDS *
+      (masteryBudget.rounds / RETAINED_MASTERY_ROUNDS_COMPLETED);
+    const projectedTotalSeconds =
+      projectedEnvelopeSeconds +
+      RETAINED_TEACHING_WALL_CLOCK_SECONDS +
+      projectedMasterySeconds;
+    const projectedMinutes = (projectedTotalSeconds / 60).toFixed(1);
+    const headroomMultiple = ((180 * 60) / projectedTotalSeconds).toFixed(1);
+
+    // The comment must show its work: both scaling ratios (current demand
+    // over the retained run's denominator) in the exact form this test
+    // derives them, so a future scenario-count change that isn't also
+    // retuned here breaks this assertion instead of silently going stale.
+    expect(workflowComments).toContain(
+      `${providerDemand.providerCalls}/${RETAINED_ENVELOPE_CALLS_AT_CAP}`,
+    );
+    expect(workflowComments).toContain(
+      `${masteryBudget.rounds}/${RETAINED_MASTERY_ROUNDS_COMPLETED}`,
+    );
+    expect(workflowComments).toContain(`~${projectedMinutes} min`);
+    expect(workflowComments).toContain(`~${headroomMultiple}×`);
+
+    // Uncertainty must be explicit (AC-6), not just a headline number:
+    // single retained run (no distribution/P90), the 2 failed envelope
+    // calls in that run, and that provider/queue latency varies.
+    expect(workflowComments).toMatch(/single retained run/i);
+    expect(workflowComments).toMatch(/no P90/i);
+    expect(workflowComments).toMatch(/2 failed/);
+    expect(workflowComments).toMatch(/queue|latency/i);
+  });
+
   test('omitted envelope cap is auto-fitted before the runner default can apply', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/api/eval-llm/index.ts'),

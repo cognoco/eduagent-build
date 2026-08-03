@@ -51,15 +51,32 @@ jobs:
     # configured units and 192 expected provider calls. The comparable estimated
     # provider demand is 366 + 85 + 192 = 643; configured caps remain
     # gate-specific because these units are heterogeneous and must not be added
-    # across gates. No paid
-    # full-run P90 is retained yet, so 180 minutes is an explicit conservative
-    # timeout with queue/latency uncertainty; reverify it from the first
-    # operator-authorized run evidence before tightening. The last observed
-    # per-call estimate (pre-retune, not re-verified against this raised 643
-    # demand) was ~30-60s/call for OpenRouter queue spikes — at that rate 643
-    # calls is ~5.4-10.7h, which would exceed 180 minutes. Reverify the
-    # per-call rate alongside the timeout from the first operator-authorized
-    # run at this demand before trusting either number.
+    # across gates.
+    #
+    # AC-6 timeout re-verification (WI-3029), from retained run 30721918215
+    # (2026-08-01T22:44Z, pre-retune head) — NOT a fresh paid run; no paid
+    # live run is authorized by this comment (AC-5 stands). Per-gate wall
+    # clock from that run's job step timestamps: envelope 839s at its
+    # then-cap of 300 calls (298 ok + 2 failed = 300, budget exhausted
+    # exactly at the cap); teaching 271s at cap 5, un-truncated (5 ok, 0
+    # failed) and unchanged from today's cap; mastery 710s, truncated to 21
+    # of 24 scheduled rounds by its then-cap of 189 units ("budget requested
+    # 24 rounds but --max-live-calls=189 (~9 calls/round) caps at 21. 3
+    # round(s) dropped" per the run log). Projecting each gate's wall clock
+    # onto CURRENT demand: envelope 839s x 366/300 (current provider demand
+    # over that run's cap) + teaching 271s unscaled (already the full,
+    # un-truncated current demand) + mastery 710s x 24/21 (the full 24-round
+    # grid over the 21 rounds that actually ran) = ~35.1 min, leaving ~5.1×
+    # headroom under this step's 180-minute timeout-minutes.
+    #
+    # Uncertainty, explicit: this is a single retained run on an older head,
+    # not a distribution — no P90 exists. That run's envelope gate had 2
+    # failed calls (unexplained, not chased here). OpenRouter provider/queue
+    # latency varies run to run and could exceed what this one run saw. Only
+    # envelope's 366 and mastery's 24 are freshly re-derived from the current
+    # registries — the 300/21 denominators and all three wall-clock times are
+    # historical facts read off this one run, not re-measured. Reverify from
+    # a fresh operator-authorized run before tightening timeout-minutes.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

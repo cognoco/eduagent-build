@@ -27,8 +27,8 @@
     },
     {
       "acRef": "AC-6",
-      "description": "Workflow comments record matrix-derived envelope provider demand including internal judge calls, sequential estimated provider demand, and gate-specific caps with explicit timeout uncertainty.",
-      "pointer": ".github/workflows/eval-live.yml"
+      "description": "Workflow comments record matrix-derived envelope provider demand including internal judge calls, sequential estimated provider demand, and gate-specific caps. Timeout re-verification (added in the AC-6 rework round): the comment projects each gate's retained-run-30721918215 wall clock (envelope 839s, teaching 271s, mastery 710s) onto CURRENT demand via ratios grounded in that run's own log (envelope 366/300, mastery 24/21) to ~35.1 min / ~5.1x headroom under the unchanged 180-minute timeout-minutes, with explicit uncertainty (single run, no P90, 2 failed envelope calls, queue/latency variance). No paid live run performed; timeout-minutes itself unchanged. A new deterministic test pins the exact ratios/figures against the live budget/mastery derivation functions so scenario-count drift breaks the comment instead of going stale.",
+      "pointer": "scripts/eval-live-gate-independence.test.ts (test: '[WI-3029 AC-6] timeout re-verification...'); also .github/workflows/eval-live.yml"
     },
     {
       "acRef": "AC-7",
