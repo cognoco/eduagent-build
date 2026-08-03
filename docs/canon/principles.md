@@ -40,9 +40,9 @@ ID; ruled keep 2026-08-02). Deep elaborations where they exist:
 | PRIN-04 | Writes verify ownership via explicit `profileId` or the parent chain | — | — |
 | PRIN-05 | Shared mobile components stay persona-unaware — semantic tokens, no hardcoded hex (SVG brand components excepted) | — | — |
 | PRIN-06 | Durable async work goes through Inngest — never fire-and-forget from route handlers | — | — |
-| PRIN-07 | LLM calls route through `services/llm/router.ts` only — no direct provider SDK calls | — | eslint G3 (`eslint.config.mjs`) |
+| PRIN-07 | LLM calls route through `services/llm/router.ts` or its barrel — no direct provider SDK calls | — | eslint G3 (`eslint.config.mjs`) |
 | PRIN-08 | Non-core Inngest dispatches go through `safeSend()`; bare `inngest.send` is core-only and `// core-send:`-annotated | — | `safe-non-core.guard.test.ts` |
-| PRIN-09 | State-driving LLM responses use the structured envelope, parsed with `parseEnvelope()`, with a hard cap per signal | — | `scripts/check-prompt-markers.sh` |
+| PRIN-09 | State-driving LLM responses use the structured envelope, parsed with `parseEnvelope()`, with a hard cap per signal | — | `scripts/check-prompt-markers.sh` (partial — legacy-marker detection only; envelope parse + caps unenforced) |
 | PRIN-10 | LLM prompt changes run the eval harness (Tier-1 snapshot; Tier-2 live) | — | pre-commit eval-snapshot guard |
 | PRIN-11 | Challenge Round mastery is server-owned and conservative over structured LLM evidence | `MMT-ADR-0014` (routing tiers) | — |
 
@@ -60,17 +60,19 @@ Rules; per-exception rationale in `docs/known-exceptions.md` (marker = the ID).
 Elaborated in `AGENTS.md` § Code Quality Guards (marker = the ID; ruled keep
 2026-08-02), except PRIN-19 and PRIN-20, whose canonical text lives in
 `.claude/memory/project_known_bug_patterns.md` (markers at the pattern
-headings; catalogued per WI-387 row 4).
+headings; catalogued per WI-387 row 4 — an interim home: the convergence
+follow-up migrates this text into L1 canon, where memory yields to canon
+on any conflict).
 
 | ID | Principle | Established by | Enforced by |
 |---|---|---|---|
-| PRIN-12 | No internal mocks in integration tests — mock only true external boundaries | — | — |
+| PRIN-12 | No internal mocks in tests — mock only true external boundaries | — | — |
 | PRIN-13 | No new internal `jest.mock()` (GC1) — `jest.requireActual()` with targeted overrides instead | — | GC1 CI ratchet (`scripts/check-gc1-pattern-a.ts`) |
 | PRIN-14 | Fetch Response bodies are single-use — never both `.json()` and `.text()` | — | — |
 | PRIN-15 | Classify raw errors before formatting them for display | — | — |
 | PRIN-16 | Removing a feature removes every artifact — types, keys, constants, fallback branches | — | — |
 | PRIN-17 | Verify JSX handler references exist after adding any `Pressable`/`Button` | — | — |
-| PRIN-18 | Every test-file edit removes the internal mocks it finds (GC6 boy-scout) | — | `post-edit-jest-mock-check.sh` PostToolUse hook |
+| PRIN-18 | Every test-file edit removes the internal mocks it finds (GC6 boy-scout) | — | — |
 | PRIN-19 | No silent fallbacks — a failure must never look like success to the caller | — | — |
 | PRIN-20 | Async mutation handlers guard concurrency with synchronous ref locks, not React state alone | — | — |
 
