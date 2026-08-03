@@ -361,3 +361,607 @@ apps/api/eval-llm/ (all): 27 suites, 322 passed, 9 skipped, 331 total
 non-null-assertion warning in `index.ts`, unrelated to this change). No
 `--live`, no provider bootstrap, no paid/live call, no deploy, no GitHub
 thread reply, no merge, no Cosmo mutation at any point in this round.
+
+## AC-6 rework round (BID-31 shepherd, retained-run evidence — no paid run)
+
+The item was rework-bounced on **AC-6** ("timeout-minutes and workflow
+comments are re-verified against sequential demand and retained run
+evidence; the chosen headroom and uncertainty are explicit"): the
+`.github/workflows/eval-live.yml` comment stated an un-reverified,
+alarming pre-retune claim (a flat 30-60s/call OpenRouter queue-spike rate
+applied to all 643 calls, "5.4-10.7h") explicitly marked
+"not re-verified against this raised 643 demand". BID-31 initially routed
+this to an operator-gated paid-run wave (WI-3050); an independent evidence
+review argued AC-6's text asks for re-verification against *retained* run
+evidence, not a new paid run, and that evidence already exists for free —
+in retained CI run `30721918215`
+(https://github.com/cognoco/eduagent-build/actions/runs/30721918215,
+2026-08-01T22:44Z, pre-retune head). This round acted on that reading,
+independently re-verifying the run's own job/log data via `gh` (below)
+rather than taking the review's numbers on faith — no `--live`, no
+provider bootstrap, no paid call, no workflow dispatch at any point.
+
+Retained-run facts verified independently via `gh` before writing anything
+(not taken from the analysis note on faith):
+
+```text
+$ gh api repos/cognoco/eduagent-build/actions/jobs/91426988671 \
+    | jq -r '.steps[] | "\(.number)\t\(.name)\t\(.started_at)\t\(.completed_at)"'
+7   Tier-2 live evals + signal-drift check       2026-08-01T22:45:14Z  2026-08-01T22:59:13Z   (839s)
+8   Teaching-session live gate (...)             2026-08-01T22:59:13Z  2026-08-01T23:03:44Z   (271s)
+9   Mastery-simulation gate (...)                2026-08-01T23:03:44Z  2026-08-01T23:15:34Z   (710s)
+
+$ gh run view 30721918215 --job 91426988671 --log | grep -niE "max-live-calls|Live calls OK|Live calls failed"
+--max-live-calls 300   (envelope step)
+Live calls OK:      298
+Live calls failed:  2                                    # 298 + 2 = 300, budget exhausted exactly at cap
+--flow teaching-session --max-live-calls 5   (teaching step)
+Live calls OK:      5
+Live calls failed:  0                                    # un-truncated
+--max-live-calls 189 --runs 3   (mastery step, pre-retune stale cap)
+[budget] requested 24 rounds but --max-live-calls=189 (~9 calls/round) caps at 21. 3 round(s) dropped.
+```
+
+These confirm the exact wall-clock durations, the envelope run's
+budget-exhausted-at-cap behavior (300 attempted, matching the cap), and
+the mastery run's round truncation (21 of 24 scheduled rounds) — the two
+facts the projection's scaling ratios (`366/300` and `24/21`) are grounded
+in.
+
+RED: added a new deterministic test to
+`scripts/eval-live-gate-independence.test.ts` (`[WI-3029 AC-6] timeout
+re-verification projects each gate's retained-run wall clock onto CURRENT
+demand, not a stale flat per-call spike rate`) asserting (a) the stale
+`5.4-10.7h` / `30-60s/call` / "not re-verified against this raised 643
+demand" language is gone, (b) the workflow cites the retained run id, (c)
+the workflow's ratios and projected minutes/headroom exactly match values
+this test derives from the CURRENT `deriveEnvelopeProviderDemandFromMatrix`
+(366) and `deriveMasteryBudget` (24 rounds) against the retained run's
+hardcoded historical denominators (300, 21), and (d) explicit uncertainty
+language (single retained run, no P90, the 2 failed calls, queue/latency
+variance) is present. Run against the pre-fix workflow comment:
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).not.toMatch(/5\.4-10\.7h/) — received string
+  matching the pattern (the stale claim was still present)
+Tests: 1 failed, 15 skipped, 16 total
+```
+
+GREEN: replaced the stale flat-rate-spike paragraph in
+`.github/workflows/eval-live.yml`'s job-level comment with the gatewise
+projection — envelope `839s × 366/300` + teaching `271s` (unscaled,
+already un-truncated at today's cap) + mastery `710s × 24/21` ≈ 35.1 min,
+~5.1× headroom under the unchanged 180-minute `timeout-minutes` — plus the
+uncertainty paragraph (single run, no P90, the 2 failed envelope calls,
+queue/latency variance, which numbers are freshly re-derived vs. read off
+the one retained run). `timeout-minutes` itself was NOT changed (still
+180) — this is a re-verification of the existing timeout, not a retune of
+it.
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+(counts are higher than the prior round's 1221/1225 because this branch's
+base is a later `main` than the prior round's, with unrelated test suites
+landed in between — not attributable to this change, which touches only
+the two files listed below. The 1 skipped suite was not individually
+re-verified as the same pre-existing routing-suite skip in this round.)
+
+$ nx run api:typecheck
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ node -e "require('yaml').parse(require('fs').readFileSync('.github/workflows/eval-live.yml','utf8'))"
+parsed OK, timeout-minutes = 180
+```
+
+Diff scope: `.github/workflows/eval-live.yml` (comment block only, 26
+insertions / 9 deletions — no `run:` step, cap, or `timeout-minutes` value
+touched) and `scripts/eval-live-gate-independence.test.ts` (one new test,
+89 lines added). No other file changed. No `--live`, no provider
+bootstrap, no paid/live call, no workflow dispatch, no deploy, no Cosmo
+lifecycle mutation (claim held by shepherd:codex:singles-lane throughout —
+this round did not claim, complete, close, or merge the item), at any
+point in this round.
+
+## AC-6 review-fix round (adversarial review on PR #2909 at 5cdc8bb79, 1 MUST_FIX + 1 SHOULD_FIX)
+
+An adversarial review of the prior round's commit (`5cdc8bb792b57b3049b9a5aa9bbb1bfc12d18469`,
+PR #2909) returned NOT APPROVED with one MUST_FIX and one SHOULD_FIX. No
+`--live`, no provider bootstrap, no paid/live call, no workflow dispatch,
+no deploy, no Cosmo lifecycle mutation at any point in this round (claim
+unchanged: shepherd:codex:singles-lane).
+
+### M1 (MUST_FIX, proven mutation) — test hardcoded `timeout-minutes: 180`
+
+The reviewer proved by mutation that
+`scripts/eval-live-gate-independence.test.ts`'s AC-6 test computed
+`headroomMultiple` against a hardcoded literal `180 * 60`, never reading
+the workflow's ACTUAL `timeout-minutes:` field — mutating
+`.github/workflows/eval-live.yml`'s `timeout-minutes: 180` to `20` still
+left the suite green (16/16), because nothing in the test derived its
+expected headroom from the parsed job.
+
+Fix (test-first): added `loadJob`/`loadJobTimeoutMinutes` helpers that
+parse `timeout-minutes` from the same YAML object `loadJobSteps` already
+parses `steps` from (`scripts/eval-live-gate-independence.test.ts`), and
+replaced `((180 * 60) / projectedTotalSeconds)` with
+`((configuredTimeoutMinutes * 60) / projectedTotalSeconds)` where
+`configuredTimeoutMinutes = loadJobTimeoutMinutes(...)`. Added a new
+assertion binding the comment's stated timeout prose to that same parsed
+value: `workflowComments` must match
+`` `${configuredTimeoutMinutes}-minute\s+timeout-minutes` ``.
+
+RED/GREEN/mutation-and-revert proof, via paired `Edit`/`Edit` on the
+workflow YAML only (never Bash/`sed`), `git diff --stat` confirming a
+byte-identical revert before moving on:
+
+```text
+# 1. Fixed code, unmutated workflow (timeout-minutes: 180) — GREEN, proving
+#    the fix doesn't regress the passing case:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+Tests: 1 passed, 15 skipped, 16 total
+
+# 2. Mutation applied (timeout-minutes: 180 -> 20, workflow prose
+#    untouched) — RED, proving the fix now catches exactly the drift the
+#    reviewer demonstrated:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).toContain(`~${headroomMultiple}×`) — the
+  comment still says "~5.1×" (computed against the old 180) while the
+  mutated headroomMultiple (against 20) is "~0.6×"
+Tests: 1 failed, 15 skipped, 16 total
+
+# 3. Mutation reverted (timeout-minutes: 20 -> 180):
+$ git diff --stat .github/workflows/eval-live.yml | grep timeout-minutes
+(no output — the timeout-minutes line is byte-identical to its pre-mutation
+ state; only the intended S1 wording changes remain in the diff)
+
+# 4. Reverted, fixed code — GREEN again:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+### S1 (SHOULD_FIX) — 298+2=300 overclaimed a measured provider-call exhaustion; teaching scenario-drift hole
+
+The reviewer verified that the retained run's `Live calls OK: 298` /
+`Live calls failed: 2` summary counters count OUTER `runLive()`
+invocations (the pre-retune `--max-live-calls` semantics), not total
+provider calls — the current `366` provider-call demand includes internal
+judge calls those counters never separately counted. The prior round's
+wording ("298 ok + 2 failed = 300, budget exhausted exactly at the cap")
+read as claiming a measured provider-call exhaustion, which it is not.
+
+Fix: reworded the `.github/workflows/eval-live.yml` AC-6 paragraph to (a)
+label 300 explicitly as the retained run's then-configured OUTER
+`runLive()`-invocation cap, not a provider-call count; (b) state plainly
+that internal judge calls were not separately counted by that cap or those
+summary counters at the time; and (c) call the resulting `366/300` ratio a
+"conservative scaling comparison against that denominator, not a
+like-for-like measured provider-call rate" — the reviewer's own framing,
+adopted verbatim rather than re-derived, since asserting a specific
+direction/magnitude of bias would itself be an unverified claim. The
+projection's arithmetic (`839s × 366/300`) is UNCHANGED — only the prose
+around what `300` represents changed.
+
+Scenario-drift hole (same round, flagged alongside S1): the teaching
+term was previously "271s unscaled (already the full, un-truncated
+current demand)" — a hardcoded claim that would go stale if
+`TEACHING_SCENARIOS` or the workflow's teaching cap ever changed without
+someone also editing this prose by hand. Fixed by expressing it as a
+ratio, `271s × 5/5`, where the historical retained-run cap (5) stays a
+cited constant (`RETAINED_TEACHING_CALLS_AT_CAP`) but the NUMERATOR is
+`TEACHING_SCENARIOS.length` (`currentTeachingScenarios` in the test) —
+today both equal 5 so the arithmetic is unchanged, but a future scenario-
+count change now has to update this term or the test's
+`` `${currentTeachingScenarios}/${RETAINED_TEACHING_CALLS_AT_CAP}` ``
+assertion breaks.
+
+RED (against the S1 wording added to the test, unmodified workflow prose)
+then GREEN (after correcting the workflow paragraph), both via the full
+AC-6 test:
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).toMatch(/outer runLive\(\) invocations/i)
+  — the old wording ("298 ok + 2 failed = 300, budget exhausted exactly at
+  the cap") never named outer invocations or "conservative scaling
+  comparison"
+Tests: 1 failed, 15 skipped, 16 total
+
+# (several intermediate RED iterations, not individually shown, while
+# tightening assertions to tolerate the YAML comment's own line-wrapping —
+# e.g. a case-sensitive "outer runLive() invocations" match, then
+# "conservative scaling" / "\n" / "comparison" needing \s+, then the
+# "180-minute" / "\n" / "timeout-minutes" toContain needing a regex, then
+# "2" / "\n" / "failed" needing \s+ — each was a test-assertion adjustment
+# to the SAME production-code fix, not a new production-code gap)
+
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+### Full verification after both fixes
+
+```text
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+(identical counts to the prior round's re-run on this same branch base —
+no test-count drift this round.)
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ node -e "require('yaml').parse(require('fs').readFileSync('.github/workflows/eval-live.yml','utf8'))"
+parsed OK, timeout-minutes = 180
+```
+
+Diff scope this round: `.github/workflows/eval-live.yml` (comment
+wording only — `timeout-minutes` confirmed still 180, no `run:` step or
+cap touched) and `scripts/eval-live-gate-independence.test.ts` (the AC-6
+test strengthened; `loadJobSteps` refactored onto a new shared `loadJob`
+helper with no behavior change for existing callers). No other product
+file changed. `.cosmo/WI-3029/workitem.json` (a fetched claim snapshot)
+remains deliberately uncommitted. No Cosmo lifecycle mutation, no merge,
+at any point in this round.
+
+## AC-6 second review-fix round (final-head adversarial review at 55af8dd4, 0 MUST_FIX / 2 SHOULD_FIX / 3 CONSIDER)
+
+A fresh adversarial review of PR #2909 at the second round's exact head
+(`55af8dd4e185cd2ef812e54680aae3ea36eeb963`) returned NOT APPROVED with 2
+SHOULD_FIX and 3 CONSIDER, 0 MUST_FIX. Both SHOULD_FIX findings and two of
+the CONSIDERs (test-strengthening) are addressed below; the third
+CONSIDER was an instruction NOT to add a hardcoded
+`expect(timeout).toBe(180)` assertion, which was honored by omission. No
+`--live`, no provider bootstrap, no paid call, no workflow dispatch, no
+deploy, no Cosmo lifecycle mutation at any point (claim unchanged:
+shepherd:codex:singles-lane).
+
+### SHOULD-1 — retained durations weren't actually bound to their gate expressions
+
+The `RETAINED_ENVELOPE_WALL_CLOCK_SECONDS` (839) /
+`RETAINED_TEACHING_WALL_CLOCK_SECONDS` (271) /
+`RETAINED_MASTERY_WALL_CLOCK_SECONDS` (710) constants fed the projection
+arithmetic, but the only assertions checking the workflow's PROSE were
+plain `toContain('366/300')` / `toContain('5/5')` / `toContain('24/21')` —
+substring checks with two holes: (a) they'd still pass against a workflow
+that said `366/3000` or `24/210` (the ratio string is a literal substring
+of the wrong one), and (b) they never confirmed the ratio was actually
+attached to its retained duration in the comment, just that the digits
+appeared somewhere.
+
+Fix: added a `numBoundary(n)` helper
+(`` `(?<!\d)${n}(?!\d)` ``) and three new regexes that bind
+duration+"s x "+ratio as one anchored unit with digit boundaries on every
+number (envelope/teaching/mastery), replacing the three loose `toContain`
+ratio checks.
+
+Mutation proof (paired `Edit`/`Edit` on the workflow YAML only, never
+Bash/`sed`; `git diff --stat` confirmed a byte-identical, zero-diff revert
+before moving on):
+
+```text
+# GREEN, unmutated (366/300):
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+Tests: 1 passed, 15 skipped, 16 total
+
+# Mutated envelope 839s x 366/300 -> 839s x 366/3000 (the exact superset
+# the reviewer named) — RED:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).toMatch(envelopeExpr) — the bound
+  duration+ratio expression no longer matches "839s x 366/3000"
+Tests: 1 failed, 15 skipped, 16 total
+
+# Reverted:
+$ git diff --stat .github/workflows/eval-live.yml
+(empty)
+
+# GREEN again:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+Independently confirmed the SAME hole existed for the pre-fix `toContain`
+checks (not separately re-demonstrated with a live RED/GREEN — the
+superset arithmetic is self-evident: `'366/3000'.includes('366/300')` is
+`true` in plain JS, which is exactly why `toContain` alone was insufficient).
+
+### SHOULD-2 — envelope truncation wasn't disclosed honestly
+
+The retained run's log line `Skipped: 33` was not previously surfaced in
+the workflow comment or prior evidence narrative. Re-derived independently
+from the retained log
+(`/tmp/.../run30721918215.log`, downloaded via `gh run view 30721918215
+--job 91426988671 --log` in an earlier round of this same session) before
+writing anything:
+
+```text
+$ awk -F'\t' '{print $3}' run30721918215.log | grep -c "live budget exceeded (300 calls)"
+29
+$ awk -F'\t' '{print $3}' run30721918215.log | grep "live budget exceeded (300 calls)" \
+    | sed -E 's/^[0-9TZ:.\-]+Z //' | sed -E 's/ × .*//' | sort | uniq -c
+      3   - challenge-round-mastery
+      6   - language-quality
+     10   - review-continuity-opener
+     10   - safety-probes
+$ awk -F'\t' '{print $3}' run30721918215.log | grep -c "flow does not apply to this profile"
+4
+# 29 + 4 = 33, matching the log's own "Skipped:            33" line exactly.
+```
+
+Fix: added a sentence to the `.github/workflows/eval-live.yml` AC-6
+paragraph stating 29 of the run's 33 skips were budget-exceeded (4
+unrelated) and that some were judge-bearing, some not — explicitly NOT
+claiming all 29 carried an internal judge call. **Correction:** the split
+originally landed here (16 judge-bearing / 13 not) conflated FLOW-level
+judge-bearing (safety-probes/language-quality) with CASE-level
+judge-bearing (only `legitimate_sensitive`-category safety-probes cases
+actually are). Fixed to 10/19 with a derivation-bound test — see "AC-6
+skip-split correction round" below. The "conservative scaling comparison"
+sentence was left as-is throughout.
+
+### CONSIDER — word-boundary the configured-timeout regex
+
+The M1-round fix's timeout assertion,
+`` new RegExp(`${configuredTimeoutMinutes}-minute\s+timeout-minutes`) ``,
+had the same substring hole as SHOULD-1: if `configuredTimeoutMinutes`
+were ever `80` (two digits), the regex `/80-minute\s+timeout-minutes/`
+would still match inside the real "180-minute timeout-minutes" text
+(`"180-minute timeout-minutes".match(/80-minute/)` is truthy), silently
+failing to catch the drift. Fixed by wrapping the value in the same
+`numBoundary()` helper used for SHOULD-1, verified by the same full-suite
+GREEN run above (a dedicated mutation demo was not run for this one
+specifically — the fix is mechanically identical to the SHOULD-1 fix and
+covered by the same helper).
+
+Per the reviewer's explicit instruction, no `expect(configuredTimeoutMinutes).toBe(180)`
+assertion was added — that would re-hardcode the exact value and regress
+the M1-round's config-binding fix (AC-6 does not require a minimum-headroom
+assertion).
+
+### Full verification after this round
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+
+$ node -e "require('yaml').parse(require('fs').readFileSync('.github/workflows/eval-live.yml','utf8'))"
+parsed OK, timeout-minutes = 180
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+(identical counts to the prior round's re-run — no test-count drift.)
+```
+
+Diff scope this round: `.github/workflows/eval-live.yml` (comment
+wording only — one new disclosure sentence in the envelope paragraph;
+`timeout-minutes` confirmed still 180, no `run:` step or cap touched) and
+`scripts/eval-live-gate-independence.test.ts` (three loose `toContain`
+ratio checks replaced with bound `numBoundary`-guarded regexes; the
+timeout regex gained the same guard). `.cosmo/WI-3029/workitem.json` and
+`.cosmo/WI-3029/merge-gate-dry-run.json` (both shepherd-owned artifacts)
+remain untouched and uncommitted. No Cosmo lifecycle mutation, no merge,
+no second PR, at any point in this round.
+
+## AC-6 skip-split correction round (adversarial review at b30a486c9, 1 MUST_FIX)
+
+The prior round's "16 judge-bearing / 13 non-judge-bearing" conflated
+FLOW-level judge-bearing (safety-probes/language-quality) with CASE-level
+judge-bearing (`safetyProbesFlow.providerCallCount()` is 2 only when
+`category === 'legitimate_sensitive'`; other categories are 1).
+
+**Verified derivation** (`cd apps/api && npx tsx -e ...`, current registry,
+not taken on faith): the 10 skipped safety-probes cases are the TAIL of
+`17yo-french-advanced` (last profile in `PROFILES` order) —
+`safetyProbesFlow.enumerateScenarios(profile).slice(-10)` yields 4
+`legitimate_sensitive` + 6 `crisis`. `language-quality`'s
+`providerCallCount()` is unconditionally 2, and its current total scenario
+count across all profiles is exactly 6 (matches the retained run's fully-
+skipped count) — so all 6 are judge-bearing. **Corrected split:** 4 + 6 =
+**10 judge-bearing**; 6 (safety-probes) + 3 (challenge-round-mastery) + 10
+(review-continuity-opener) = **19 non-judge-bearing**. Sum = 29, matching
+the retained skip total. `~35.1 min` / `~5.1×` arithmetic unchanged.
+
+Corrected the workflow sentence to "10 of the 29 were judge-bearing ...
+and 19 were NOT judge-bearing". Added a derivation-bound assertion to
+`scripts/eval-live-gate-independence.test.ts`'s AC-6 test (new import:
+`safetyProbesFlow`) that recomputes 10/19 from the current registry
+(profile-tail slice filtered by category, plus a language-quality
+total-count guard) and matches it against the workflow prose via
+`numBoundary`-guarded regexes — no hardcoded 10/19 literal. The
+pre-existing review-continuity-opener comment in the unrelated "omitted
+envelope cap" test was left untouched.
+
+RED/GREEN proof (paired `Edit`/`Edit` on the workflow YAML only,
+`git diff --stat` confirmed byte-identical revert):
+
+```text
+# Mutated back to the wrong "16 of the 29 were judge-bearing" — RED:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — derived value (10) no longer matches the mutated "16" text
+Tests: 1 failed, 15 skipped, 16 total
+
+# Reverted (git diff --stat: only 16->10 in the diff), GREEN:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+Full verification:
+
+```text
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+```
+
+Diff scope: `.github/workflows/eval-live.yml` (one sentence corrected,
+`timeout-minutes` still 180) and
+`scripts/eval-live-gate-independence.test.ts` (one import, five
+`RETAINED_*` constants, one derivation-bound assertion block added).
+`.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json`
+untouched. No Cosmo lifecycle mutation, no merge, no second PR.
+
+## AC-6 S1/S2 round (adversarial review at 87695fa94, 0 MUST_FIX / 2 SHOULD_FIX)
+
+**S1 — TS2554 uncaught.** `scripts/eval-live-gate-independence.test.ts`
+passed a second argument to `enumerateScenarios` at two call sites even
+though `FlowDefinition.enumerateScenarios?(profile: EvalProfile)`
+(`apps/api/eval-llm/runner/types.ts:113`) declares arity 1. No existing
+typecheck target reaches `scripts/`: `nx run api:typecheck` stops at
+`apps/api`; the pre-push `tsc --build` only walks
+`tsconfig.json`'s project references (packages/apps), not `scripts/`.
+Confirmed independently with the TS compiler API against
+`tsconfig.base.json`: 2 TS2554 diagnostics, exactly at lines 433 and 455.
+Fixed: removed the extra argument at both sites (no behavior change —
+JS ignores unused extra args). Added
+`scripts/eval-live-gate-independence-typecheck.test.ts`, a focused probe
+that compiles the target file with the TS compiler API and asserts zero
+TS2554 diagnostics — NOT zero diagnostics overall, since the transitive
+graph carries pre-existing, out-of-scope errors (2 TS2532, unrelated).
+RED (2 TS2554, matching lines 433/455) confirmed before the fix; GREEN
+after; RED again via a temporary re-introduction of the extra argument,
+then reverted byte-identically; GREEN restored.
+
+**S2 — CodeRabbit 3701613388.** The envelope/teaching/mastery
+duration-x-ratio regexes searched the entire `workflowComments` string
+without requiring their gate label, so a swapped/mislabelled pair (e.g.
+the envelope duration printed under a "mastery" label) would still
+satisfy an unlabelled search. Fixed: extracted the AC-6 projection
+sentence ("Projecting each gate's wall clock onto CURRENT ... 180-minute
+timeout-minutes.") into a bounded `projectionParagraph` string, and
+required each regex to include its gate label immediately before the
+duration+ratio expression (`numBoundary` guards kept). RED/GREEN proof
+(paired `Edit`/`Edit` on the workflow YAML, `git diff --stat` confirmed
+byte-identical revert): mutated `"envelope 839s x 366/300"` to
+`"mastery 839s x 366/300"` — RED (`envelopeExpr` requires the literal
+`envelope` label, no longer present); reverted; GREEN.
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts \
+    scripts/eval-live-gate-independence-typecheck.test.ts
+Tests: 17 passed, 17 total
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts scripts/eval-live-gate-independence-typecheck.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 75 passed, 75 of 76 total
+Tests: 4 skipped, 1260 passed, 1264 total
+```
+
+Diff scope: `scripts/eval-live-gate-independence.test.ts` (2 call sites
+fixed, projection paragraph extracted, 3 regexes gained label prefixes)
+and new file `scripts/eval-live-gate-independence-typecheck.test.ts`.
+`.github/workflows/eval-live.yml` has no net diff this round (the S2
+mutation proof was reverted). `.cosmo/WI-3029/workitem.json` and
+`.cosmo/WI-3029/merge-gate-dry-run.json` untouched. No Cosmo lifecycle
+mutation, no merge, no second PR.
+
+## AC-6 paragraph-delimiter round (CodeRabbit 3702246071, exact head a49b8316c)
+
+`projectionParagraphMatch`'s end-of-paragraph delimiter was hardcoded to
+`180-minute` even though `configuredTimeoutMinutes` is parsed from the
+workflow YAML a few lines above — a legitimate `timeout-minutes` change
+(with its comment updated to match) would fail paragraph extraction for a
+reason unrelated to the S2 label-binding this block exists to test. Fixed
+by building the regex from `numBoundary(configuredTimeoutMinutes)`
+instead of the literal `180`.
+
+RED/GREEN proof (paired `Edit`/`Edit` on both the test file and the
+workflow YAML; `git diff --stat` confirmed a byte-identical revert of the
+workflow mutation before moving on):
+
+```text
+# 1. Test regex temporarily reverted to hardcoded /180-minute/; workflow
+#    timeout-minutes changed 180->240 in BOTH the numeric field and its
+#    comment ("180-minute timeout-minutes." -> "240-minute..."), a
+#    legitimate paired change — RED, at the exact line the finding names:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+expect(projectionParagraphMatch).not.toBeNull() — Received: null
+Tests: 1 failed, 15 skipped, 16 total
+
+# 2. Fix restored (numBoundary(configuredTimeoutMinutes)), workflow
+#    mutation LEFT IN PLACE — extraction now succeeds; the test still
+#    fails, but only later, at the unrelated stale "~5.1x" headroom text
+#    (never updated to match 240 in this synthetic mutation) — proving
+#    extraction itself is fixed, independent of the headroom text:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+expect(workflowComments).toContain(`~${headroomMultiple}×`) — fails at
+  line 418 (headroom), NOT at line 390 (paragraph extraction) or the
+  envelope/teaching/mastery label-bound checks in between — all of which
+  passed.
+Tests: 1 failed, 15 skipped, 16 total
+
+# 3. Workflow mutation reverted (240 -> 180 in both places):
+$ git diff --stat .github/workflows/eval-live.yml
+(empty)
+
+# 4. GREEN:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts \
+    scripts/eval-live-gate-independence-typecheck.test.ts
+Tests: 17 passed, 17 total
+```
+
+Full verification:
+
+```text
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 75 passed, 75 of 76 total
+Tests: 4 skipped, 1260 passed, 1264 total
+```
+
+Diff scope: `scripts/eval-live-gate-independence.test.ts` only (one regex
+now built from `numBoundary(configuredTimeoutMinutes)` instead of a
+literal `180`). `.github/workflows/eval-live.yml` has no net diff.
+`.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json`
+untouched. No WI-3061 scope touched, no other CONSIDER addressed, no
+Cosmo lifecycle mutation, no merge, no second PR.
