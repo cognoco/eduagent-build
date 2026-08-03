@@ -9,6 +9,7 @@ describe('memoryFactActiveGroupKey [WI-3078]', () => {
   const baseRow = {
     profileId: 'profile-1',
     category: 'strength',
+    textNormalized: 'same normalized text',
   };
 
   it('keeps concatenation-colliding subject/context tuples distinct', () => {
@@ -49,6 +50,21 @@ describe('memoryFactActiveGroupKey [WI-3078]', () => {
       memoryFactActiveGroupKey({
         ...baseRow,
         metadata: { subject: 'Math', context: 'advanced\u001fschool' },
+      }),
+    );
+  });
+
+  it('keeps distinct normalized texts in distinct index tuples', () => {
+    expect(
+      memoryFactActiveGroupKey({
+        ...baseRow,
+        metadata: { subject: 'Math', context: 'school' },
+      }),
+    ).not.toBe(
+      memoryFactActiveGroupKey({
+        ...baseRow,
+        textNormalized: 'different normalized text',
+        metadata: { subject: 'Math', context: 'school' },
       }),
     );
   });

@@ -89,13 +89,15 @@ import { normalizeMemoryText } from '../memory/backfill-mapping';
  * placeholder, colliding only when the second update reaches PostgreSQL.
  *
  * SUPERSEDE, DON'T DEDUPE-BY-DELETE. Within each projected `(profileId,
- * category, post-redaction metadata.subject, post-redaction metadata.context)`
- * group of rows flagged for a `text` redaction, ordered by `createdAt`
+ * category, post-redaction metadata.subject, post-redaction metadata.context,
+ * post-redaction textNormalized)` group of active rows flagged for any
+ * redaction, ordered by `createdAt`
  * (tie-broken by `id`, which is
  * a UUIDv7 and therefore already time-ordered — the tie-break exists only to
- * make the choice deterministic when timestamps coincide): the FIRST row is
- * scrubbed and stays active; every later row is scrubbed AND superseded by
- * pointing `supersededBy` at the survivor, stamping `supersededAt` and
+ * make the choice deterministic when timestamps coincide): an existing row
+ * already occupying the final tuple remains the survivor; otherwise the FIRST
+ * row is scrubbed and stays active. Every other row is scrubbed AND superseded
+ * by pointing `supersededBy` at the survivor, stamping `supersededAt` and
  * `updatedAt` — exactly the mechanism `dedup-actions.ts`'s `applyDedupAction`
  * already uses for a `supersede` outcome (around its `action.action ===
  * 'supersede'` branch). A scrubbed duplicate genuinely IS a duplicate of the
@@ -126,6 +128,7 @@ interface MemoryFactRemediationRow {
   readonly profileId: string;
   readonly category: string;
   readonly text: string;
+  readonly textNormalized: string;
   readonly metadata: unknown;
   readonly supersededBy: string | null;
   readonly createdAt: Date;
@@ -280,9 +283,9 @@ export function memoryFactCasGuard(
 }
 
 /**
- * Database-aligned subject/context group key. Callers supply either current
- * metadata (for an existing active placeholder survivor) or projected
- * post-remediation metadata (for a row about to be redacted). JSON tuple
+ * Database-aligned active-tuple key. Callers supply either current values (for
+ * an existing active survivor) or projected post-remediation values (for a row
+ * about to be redacted). JSON tuple
  * encoding keeps field boundaries unambiguous even when a value contains a
  * would-be separator. Missing, null, and empty subject/context values are
  * normalized to `''` first to mirror the index's `COALESCE(..., '')` equality
@@ -292,18 +295,24 @@ export function memoryFactActiveGroupKey(row: {
   readonly profileId: string;
   readonly category: string;
   readonly metadata: unknown;
+  readonly textNormalized: string;
 }): string {
   const record = metadataRecord(row.metadata);
   const subject = typeof record.subject === 'string' ? record.subject : '';
   const context = typeof record.context === 'string' ? record.context : '';
-  return JSON.stringify([row.profileId, row.category, subject, context]);
+  return JSON.stringify([
+    row.profileId,
+    row.category,
+    subject,
+    context,
+    row.textNormalized,
+  ]);
 }
 
 /**
  * Projects the indexed metadata through this row's own field-level redactions
- * before grouping. Every active text remediation has the same final
- * `textNormalized`, so this projected subject/context tuple is the remaining
- * part of the database uniqueness decision.
+ * before grouping. This covers both text redactions, which replace
+ * `textNormalized`, and metadata-only redactions, which preserve it.
  */
 function memoryFactPostRemediationGroupKey(
   row: MemoryFactRemediationRow,
@@ -313,6 +322,7 @@ function memoryFactPostRemediationGroupKey(
   return memoryFactActiveGroupKey({
     ...row,
     metadata: update.metadata ?? row.metadata,
+    textNormalized: update.textNormalized ?? row.textNormalized,
   });
 }
 
@@ -430,25 +440,29 @@ export async function remediateMemoryFacts(
   let metadataRemediated = 0;
   let metadataSkippedChanged = 0;
 
-  const activeTextGroups = new Map<string, MemoryFactRemediationRow[]>();
-  const existingRedactedSurvivors = new Map<string, string>();
+  const activeRemediationGroups = new Map<
+    string,
+    {
+      row: MemoryFactRemediationRow;
+      remediatePaths: string[];
+    }[]
+  >();
+  const existingActiveRows = new Map<string, string>();
   const otherUpdates: {
     row: MemoryFactRemediationRow;
     remediatePaths: string[];
   }[] = [];
 
-  // The placeholder classifies `clear`, so a survivor written by an earlier
-  // run never appears in `activeTextGroups`. Index those survivors from the
-  // same snapshot separately. Requiring both stored text forms to agree avoids
-  // treating a drifted row as a safe redacted survivor.
-  const redactedTextNormalized = normalizeMemoryText(REDACTED_PLACEHOLDER);
+  // An unchanged active row may already own a tuple that a remediation would
+  // project onto. Index every unchanged active tuple from the same snapshot so
+  // text and metadata-only redactions reuse that occupant rather than trying
+  // to create a second active row at the same unique-index key.
   for (const row of rows) {
     if (
       row.supersededBy === null &&
-      row.text === REDACTED_PLACEHOLDER &&
-      row.textNormalized === redactedTextNormalized
+      (verdictById.get(row.id)?.remediate.length ?? 0) === 0
     ) {
-      existingRedactedSurvivors.set(memoryFactActiveGroupKey(row), row.id);
+      existingActiveRows.set(memoryFactActiveGroupKey(row), row.id);
     }
   }
   for (const row of rows) {
@@ -474,6 +488,7 @@ export async function remediateMemoryFacts(
       profileId: row.profileId,
       category: row.category,
       text: row.text,
+      textNormalized: row.textNormalized,
       metadata: row.metadata,
       supersededBy: row.supersededBy,
       createdAt: row.createdAt,
@@ -484,20 +499,19 @@ export async function remediateMemoryFacts(
       ...metadataRemediatePaths,
     ];
 
-    // Grouping/superseding is only needed for ACTIVE rows getting a `text`
-    // redaction — group those rows by their projected final database tuple.
-    // Every other
-    // flagged row — already-superseded rows regardless of which carrier is
-    // flagged, and active rows with only a metadata-path redaction — is
-    // scrubbed in place with no grouping.
-    if (row.supersededBy === null && textRemediate) {
+    // Every active update is grouped by its full projected unique-index tuple.
+    // Metadata-only redactions can change the indexed subject while retaining
+    // `textNormalized`, so they need the same survivor path as text redactions.
+    // Already-superseded rows are outside the partial unique index and remain
+    // safe to scrub in place.
+    if (row.supersededBy === null) {
       const key = memoryFactPostRemediationGroupKey(
         remediationRow,
         remediatePaths,
       );
-      const group = activeTextGroups.get(key) ?? [];
-      group.push(remediationRow);
-      activeTextGroups.set(key, group);
+      const group = activeRemediationGroups.get(key) ?? [];
+      group.push({ row: remediationRow, remediatePaths });
+      activeRemediationGroups.set(key, group);
     } else {
       otherUpdates.push({ row: remediationRow, remediatePaths });
     }
@@ -508,62 +522,54 @@ export async function remediateMemoryFacts(
     tallyOutcome(remediatePaths, updated);
   }
 
-  for (const [postRemediationKey, group] of activeTextGroups) {
+  for (const [postRemediationKey, group] of activeRemediationGroups) {
     const ordered = [...group].sort(
       (a, b) =>
-        a.createdAt.getTime() - b.createdAt.getTime() ||
-        a.id.localeCompare(b.id),
+        a.row.createdAt.getTime() - b.row.createdAt.getTime() ||
+        a.row.id.localeCompare(b.row.id),
     );
-    const [survivor, ...duplicates] = ordered;
-    if (!survivor) continue;
+    const firstCandidate = ordered[0];
+    if (!firstCandidate) continue;
 
-    // A prior run already owns the active placeholder tuple. Every newly
-    // remediable row must leave the partial unique index in the same statement
-    // that writes its placeholder, just like same-run duplicates do below.
-    const existingSurvivorId =
-      existingRedactedSurvivors.get(postRemediationKey);
+    // Prefer the row that already owns the projected tuple. It may be an
+    // unchanged survivor from an earlier run or a candidate whose remediation
+    // changes only a non-indexed metadata carrier. Every other candidate leaves
+    // the partial unique index in the same statement that scrubs it.
+    const existingCandidate = ordered.find(
+      ({ row }) => memoryFactActiveGroupKey(row) === postRemediationKey,
+    );
+    const existingSurvivorId = existingActiveRows.get(postRemediationKey);
     if (existingSurvivorId) {
       for (const duplicate of ordered) {
-        const duplicateVerdict = verdictById.get(duplicate.id);
-        const duplicatePaths = [
-          'text',
-          ...(duplicateVerdict?.remediate.filter((path) => path !== 'text') ??
-            []),
-        ];
         const duplicateUpdated = await scrubAndSupersedeDuplicate(
           db,
-          duplicate,
-          duplicatePaths,
+          duplicate.row,
+          duplicate.remediatePaths,
           existingSurvivorId,
         );
-        tallyOutcome(duplicatePaths, duplicateUpdated);
+        tallyOutcome(duplicate.remediatePaths, duplicateUpdated);
       }
       continue;
     }
 
-    // Recompute this row's own remediate paths — `verdictById` still has them.
-    const survivorVerdict = verdictById.get(survivor.id);
-    const survivorPaths = [
-      'text',
-      ...(survivorVerdict?.remediate.filter((path) => path !== 'text') ?? []),
-    ];
-    const survivorUpdated = await scrubRowInPlace(db, survivor, survivorPaths);
-    tallyOutcome(survivorPaths, survivorUpdated);
+    const survivor = existingCandidate ?? firstCandidate;
+    const survivorUpdated = await scrubRowInPlace(
+      db,
+      survivor.row,
+      survivor.remediatePaths,
+    );
+    tallyOutcome(survivor.remediatePaths, survivorUpdated);
 
-    for (const duplicate of duplicates) {
-      const duplicateVerdict = verdictById.get(duplicate.id);
-      const duplicatePaths = [
-        'text',
-        ...(duplicateVerdict?.remediate.filter((path) => path !== 'text') ??
-          []),
-      ];
+    for (const duplicate of ordered.filter(
+      ({ row }) => row.id !== survivor.row.id,
+    )) {
       const duplicateUpdated = await scrubAndSupersedeDuplicate(
         db,
-        duplicate,
-        duplicatePaths,
-        survivor.id,
+        duplicate.row,
+        duplicate.remediatePaths,
+        survivor.row.id,
       );
-      tallyOutcome(duplicatePaths, duplicateUpdated);
+      tallyOutcome(duplicate.remediatePaths, duplicateUpdated);
     }
   }
 
@@ -721,10 +727,10 @@ export async function remediateTopicNoteArtifactConceptKeys(
  *   changing either source value makes the update affect zero rows; the report
  *   records `skippedChanged` so a later run can reclassify the current row
  *   rather than write a stale JSONB reconstruction.
- * - VERIFIED (WI-2753): active text remediations group by their projected
- *   post-redaction subject/context tuple. A disposable migrated-PostgreSQL
- *   regression proves two distinct original-subject groups that converge after
- *   redaction choose one deterministic survivor without a unique violation.
+ * - VERIFIED (WI-2753): every active remediation groups by its full projected
+ *   unique-index tuple. Disposable migrated-PostgreSQL regressions prove both
+ *   text+subject and classifier-divergent metadata-only redactions choose one
+ *   deterministic survivor without a unique violation.
  * - I did not verify whether any code path reads `memory_facts.metadata`
  *   assuming `topics` retains its original array LENGTH or order — I preserve
  *   both (only replacing flagged entries' string values), but did not find
