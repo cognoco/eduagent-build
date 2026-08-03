@@ -703,6 +703,86 @@ describeLoopbackOnly(
       }
     });
 
+    it('[WI-3080] reuses a prior-run redacted survivor for later colliding facts', async () => {
+      const [priorRunFact] = await db
+        .insert(memoryFacts)
+        .values({
+          profileId: seeded.profileId,
+          category: 'communication_note',
+          text: 'Der Schüler hat ADHS.',
+          textNormalized: normalizeMemoryText('Der Schüler hat ADHS.'),
+          metadata: {},
+          observedAt: new Date('2026-08-03T08:00:00.000Z'),
+          embedding: null,
+        })
+        .returning({ id: memoryFacts.id });
+
+      const firstRun = await remediateMemoryFacts(db);
+      expect(
+        firstRun.find((report) => report.surface === 'memory_facts.text')
+          ?.remediated,
+      ).toBeGreaterThanOrEqual(1);
+
+      const laterFacts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId: seeded.profileId,
+            category: 'communication_note',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: {},
+            observedAt: new Date('2026-08-03T09:00:00.000Z'),
+            embedding: null,
+          },
+          {
+            profileId: seeded.profileId,
+            category: 'communication_note',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: {},
+            observedAt: new Date('2026-08-03T10:00:00.000Z'),
+            embedding: null,
+          },
+        ])
+        .returning({ id: memoryFacts.id });
+
+      const secondRun = await remediateMemoryFacts(db);
+      expect(
+        secondRun.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ remediated: 2, skippedChanged: 0 });
+
+      const ids = [priorRunFact!.id, ...laterFacts.map((row) => row.id)];
+      const afterSecondRun = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(
+        afterSecondRun
+          .filter((row) => ids.includes(row.id))
+          .map((row) => [row.id, row]),
+      );
+
+      expect(byId.get(priorRunFact!.id)).toMatchObject({
+        text: REDACTED_PLACEHOLDER,
+        supersededBy: null,
+      });
+      for (const fact of laterFacts) {
+        expect(byId.get(fact.id)).toMatchObject({
+          text: REDACTED_PLACEHOLDER,
+          supersededBy: priorRunFact!.id,
+        });
+      }
+
+      const thirdRun = await remediateMemoryFacts(db);
+      expect(
+        thirdRun.find((report) => report.surface === 'memory_facts.text'),
+      ).toMatchObject({ remediated: 0, skippedChanged: 0 });
+    });
+
     it('[WI-3076 AC] reports a metadata-only concurrent update instead of overwriting it', async () => {
       // This shape drives a metadata-only remediation: the primary text is
       // benign, while metadata.subject carries the remediable attribution.

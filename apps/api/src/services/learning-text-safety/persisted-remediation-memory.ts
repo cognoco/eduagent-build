@@ -386,6 +386,7 @@ export async function remediateMemoryFacts(
       profileId: memoryFacts.profileId,
       category: memoryFacts.category,
       text: memoryFacts.text,
+      textNormalized: memoryFacts.textNormalized,
       metadata: memoryFacts.metadata,
       supersededBy: memoryFacts.supersededBy,
       createdAt: memoryFacts.createdAt,
@@ -417,11 +418,26 @@ export async function remediateMemoryFacts(
   let metadataSkippedChanged = 0;
 
   const activeTextGroups = new Map<string, MemoryFactRemediationRow[]>();
+  const existingRedactedSurvivors = new Map<string, string>();
   const otherUpdates: {
     row: MemoryFactRemediationRow;
     remediatePaths: string[];
   }[] = [];
 
+  // The placeholder classifies `clear`, so a survivor written by an earlier
+  // run never appears in `activeTextGroups`. Index those survivors from the
+  // same snapshot separately. Requiring both stored text forms to agree avoids
+  // treating a drifted row as a safe redacted survivor.
+  const redactedTextNormalized = normalizeMemoryText(REDACTED_PLACEHOLDER);
+  for (const row of rows) {
+    if (
+      row.supersededBy === null &&
+      row.text === REDACTED_PLACEHOLDER &&
+      row.textNormalized === redactedTextNormalized
+    ) {
+      existingRedactedSurvivors.set(memoryFactActiveGroupKey(row), row.id);
+    }
+  }
   for (const row of rows) {
     textScanned += 1; // text is NOT NULL — every row has one to classify.
     const hasMetadataFields =
@@ -483,6 +499,31 @@ export async function remediateMemoryFacts(
     );
     const [survivor, ...duplicates] = ordered;
     if (!survivor) continue;
+
+    // A prior run already owns the active placeholder tuple. Every newly
+    // remediable row must leave the partial unique index in the same statement
+    // that writes its placeholder, just like same-run duplicates do below.
+    const existingSurvivorId = existingRedactedSurvivors.get(
+      memoryFactActiveGroupKey(survivor),
+    );
+    if (existingSurvivorId) {
+      for (const duplicate of ordered) {
+        const duplicateVerdict = verdictById.get(duplicate.id);
+        const duplicatePaths = [
+          'text',
+          ...(duplicateVerdict?.remediate.filter((path) => path !== 'text') ??
+            []),
+        ];
+        const duplicateUpdated = await scrubAndSupersedeDuplicate(
+          db,
+          duplicate,
+          duplicatePaths,
+          existingSurvivorId,
+        );
+        tallyOutcome(duplicatePaths, duplicateUpdated);
+      }
+      continue;
+    }
 
     // Recompute this row's own remediate paths — `verdictById` still has them.
     const survivorVerdict = verdictById.get(survivor.id);
