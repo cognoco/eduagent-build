@@ -15,12 +15,14 @@ import {
   assertMigratorDatabaseTarget,
   assertWorkerDatabaseCapabilities,
   assertWorkerDatabaseTarget,
+  parseTemporaryStagingAdminException,
 } from './verify-worker-db-role-lib.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 
 const dmlOnlyCapabilities = {
+  role_name: 'app_user',
   is_superuser: false,
   can_create_database: false,
   can_create_role: false,
@@ -40,6 +42,140 @@ const dmlOnlyCapabilities = {
   missing_sequence_usage_count: 0,
   missing_sequence_update_count: 0,
 };
+
+const neonManagedAdminCapabilities = {
+  ...dmlOnlyCapabilities,
+  role_name: 'staging_worker',
+  can_create_database: true,
+  can_create_role: true,
+  can_replicate: true,
+  bypasses_rls: true,
+  can_create_schema: false,
+  has_forbidden_set_role_path: true,
+  has_role_admin_path: true,
+};
+
+test('accepts only the exact staging_worker Neon managed-admin workaround in staging', () => {
+  assert.equal(
+    parseTemporaryStagingAdminException({
+      deployEnv: 'staging',
+      value: 'staging_worker',
+    }),
+    'staging_worker',
+  );
+  assert.doesNotThrow(() =>
+    assertWorkerDatabaseCapabilities(neonManagedAdminCapabilities, {
+      deployEnv: 'staging',
+      expectedBypassRls: true,
+      temporaryStagingAdminRole: 'staging_worker',
+    }),
+  );
+});
+
+test('keeps the staging workaround fail-closed for production, wrong roles, and unapproved capabilities', () => {
+  assert.throws(
+    () =>
+      parseTemporaryStagingAdminException({
+        deployEnv: 'production',
+        value: 'staging_worker',
+      }),
+    /forbidden outside staging/i,
+  );
+  assert.throws(
+    () =>
+      parseTemporaryStagingAdminException({
+        deployEnv: 'staging',
+        value: 'some_other_role',
+      }),
+    /must be exactly "staging_worker"/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(neonManagedAdminCapabilities, {
+        deployEnv: 'staging',
+        expectedBypassRls: true,
+      }),
+    /database create/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(dmlOnlyCapabilities, {
+        deployEnv: 'staging',
+        expectedBypassRls: false,
+        temporaryStagingAdminRole: 'staging_worker',
+      }),
+    /configured exception role does not match the live Worker role/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(
+        { ...neonManagedAdminCapabilities, role_name: 'lookalike_worker' },
+        {
+          deployEnv: 'staging',
+          expectedBypassRls: true,
+          temporaryStagingAdminRole: 'staging_worker',
+        },
+      ),
+    /database create/i,
+  );
+  for (const capability of ['is_superuser', 'owns_application_objects']) {
+    assert.throws(
+      () =>
+        assertWorkerDatabaseCapabilities(
+          { ...neonManagedAdminCapabilities, [capability]: true },
+          {
+            deployEnv: 'staging',
+            expectedBypassRls: true,
+            temporaryStagingAdminRole: 'staging_worker',
+          },
+        ),
+      /not an approved application role/i,
+    );
+  }
+  for (const capability of [
+    'can_create_database',
+    'can_create_role',
+    'can_replicate',
+    'has_forbidden_set_role_path',
+    'has_role_admin_path',
+  ]) {
+    assert.throws(
+      () =>
+        assertWorkerDatabaseCapabilities(
+          { ...neonManagedAdminCapabilities, [capability]: false },
+          {
+            deployEnv: 'staging',
+            expectedBypassRls: true,
+            temporaryStagingAdminRole: 'staging_worker',
+          },
+        ),
+      /managed-admin fingerprint differs/i,
+    );
+  }
+  const missingFalseCapability = { ...neonManagedAdminCapabilities };
+  delete missingFalseCapability.can_create_schema;
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(missingFalseCapability, {
+        deployEnv: 'staging',
+        expectedBypassRls: true,
+        temporaryStagingAdminRole: 'staging_worker',
+      }),
+    /managed-admin fingerprint differs/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(
+        { ...neonManagedAdminCapabilities, can_create_schema: true },
+        {
+          deployEnv: 'staging',
+          expectedBypassRls: true,
+          temporaryStagingAdminRole: 'staging_worker',
+        },
+      ),
+    /managed-admin fingerprint differs/i,
+  );
+});
 
 test('accepts a non-owner DML role under an explicit RLS posture', () => {
   assert.doesNotThrow(() =>
@@ -226,7 +362,10 @@ test('protected workflows verify the Worker role before migration or secret sync
     apiDeployStart,
   );
   assert.ok(apiDeployStart >= 0, 'api-deploy job is missing');
-  assert.ok(apiDeployEnd > apiDeployStart, 'api-deploy job boundary is missing');
+  assert.ok(
+    apiDeployEnd > apiDeployStart,
+    'api-deploy job boundary is missing',
+  );
   const apiDeploy = deploy.slice(apiDeployStart, apiDeployEnd);
 
   const deployVerify = apiDeploy.indexOf('verify-worker-db-role.mjs');
@@ -247,6 +386,21 @@ test('protected workflows verify the Worker role before migration or secret sync
     deployVerify < deploySync,
     'role verifier must precede secret sync',
   );
+  const stagingOnlyExceptionLine =
+    "STAGING_WORKER_ADMIN_EXCEPTION_ROLE: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && vars.STAGING_WORKER_ADMIN_EXCEPTION_ROLE || '' }}";
+  const stagingExceptionOccurrences = apiDeploy
+    .split('\n')
+    .filter((line) => line.trim() === stagingOnlyExceptionLine);
+  assert.equal(
+    stagingExceptionOccurrences.length,
+    2,
+    'the staging-only exception must be passed to both deploy role checks',
+  );
+  assert.equal(
+    apiDeploy.match(/STAGING_WORKER_ADMIN_EXCEPTION_ROLE:/g)?.length,
+    stagingExceptionOccurrences.length,
+    'every staging exception reference must preserve the complete staging-only predicate',
+  );
 
   const scheduledVerify = productionSync.indexOf('verify-worker-db-role.mjs');
   const scheduledSync = productionSync.indexOf('pnpm secrets:sync prd');
@@ -254,5 +408,10 @@ test('protected workflows verify the Worker role before migration or secret sync
   assert.ok(
     scheduledVerify < scheduledSync,
     'scheduled role verifier must precede secret sync',
+  );
+  assert.doesNotMatch(
+    productionSync,
+    /STAGING_WORKER_ADMIN_EXCEPTION_ROLE/,
+    'production secret sync must never receive the staging exception',
   );
 });

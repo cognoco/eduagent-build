@@ -19,6 +19,7 @@ import {
   assertWorkerDatabaseCapabilities,
   assertWorkerDatabaseTarget,
   parseExpectedBypassRls,
+  parseTemporaryStagingAdminException,
 } from './verify-worker-db-role-lib.mjs';
 
 async function main() {
@@ -46,6 +47,10 @@ async function main() {
   const expectedBypassRls = parseExpectedBypassRls(
     process.env.WORKER_DATABASE_BYPASSRLS_EXPECTED,
   );
+  const temporaryStagingAdminRole = parseTemporaryStagingAdminException({
+    deployEnv,
+    value: process.env.STAGING_WORKER_ADMIN_EXCEPTION_ROLE,
+  });
 
   const workerSql = neon(workerDatabaseUrl);
   const migratorSql = neon(migratorDatabaseUrl);
@@ -55,7 +60,11 @@ async function main() {
   if (!capabilities || !migratorIdentity) {
     throw new Error('Could not resolve PostgreSQL role capabilities');
   }
-  assertWorkerDatabaseCapabilities(capabilities, { expectedBypassRls });
+  assertWorkerDatabaseCapabilities(capabilities, {
+    deployEnv,
+    expectedBypassRls,
+    temporaryStagingAdminRole,
+  });
   assertDistinctDatabaseCredentials({
     workerDatabaseUrl,
     migratorDatabaseUrl,
@@ -65,6 +74,11 @@ async function main() {
   console.log(
     `✓ Worker database role is catalog-verified for ${deployEnv} host ${host}`,
   );
+  if (temporaryStagingAdminRole) {
+    console.warn(
+      '⚠ Accepted temporary staging_worker Neon managed-admin workaround; removal is launch-blocked by WI-3062',
+    );
+  }
 }
 
 try {
