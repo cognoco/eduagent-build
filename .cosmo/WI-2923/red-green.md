@@ -13,7 +13,7 @@ or mutated.
 - Case: `rejects a wrong audience before writing local signed-in state`
 - Enforcement point: `apps/mobile/e2e-web/helpers/auth.ts`, where
   `markPreAuthIntroSeen` calls `assertDevelopmentClerkTokenAudience` before
-  writing signed-in browser state.
+  continuing to the device-scoped `preAuthIntroSeen.v1` marker write.
 - Test command used for every phase:
 
   ```sh
@@ -46,9 +46,10 @@ or mutated.
    Resolved to value: true
    ```
 
-   This is the precise behavioral regression under test: with the audience
-   check removed, a wrong-audience token reaches the browser-state write and
-   resolves successfully instead of failing closed.
+   This is the precise observed behavioral regression: with the audience check
+   removed, the helper resolves successfully instead of rejecting the
+   wrong-audience token. The run did not separately assert that the subsequent
+   intro-marker write occurred.
 4. **Exact restore:** restored the guarded call byte-for-byte. `git diff
    --exit-code` over the implementation and test returned `0`.
 5. **Restored pass:** exit `0`; the same selected test passed again, with two
