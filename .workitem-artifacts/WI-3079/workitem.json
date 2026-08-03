@@ -1,0 +1,18 @@
+{
+  "pageId": "3b18bce9-1f7c-8136-a89b-d338ce6aca26",
+  "id": "WI-3079",
+  "name": "Make the useProfiles gate-hint mutation regression terminate",
+  "description": "Two useProfiles cache-preservation mutation regressions complete their assertions but leave the Jest process alive. The tests replace the shared hook harness's cleanup-safe query gcTime=0 with Infinity, mutate an actually populated profiles cache through fire-and-forget mutation callbacks, and do not explicitly settle/unmount that cache-update notification path. A neighboring mutation test without the seeded-cache path exits normally. Restore deterministic teardown without weakening the gate-hint cache-merge proof or changing product behavior.",
+  "acceptanceCriteria": "Root cause: the two seeded-cache mutation regressions override the cleanup-safe QueryClient lifetime with gcTime=Infinity and leave the populated-cache update notification/teardown path unsettled; the assertion passes, but normal Jest execution does not terminate. Variants: (a) display-name PATCH preserves conversationLanguageConfirmed and isCurrentUser when omitted from the response; (b) app-context PATCH preserves the same hints. 1. Each named variant passes and the Jest process exits normally without --forceExit. 2. The full apps/mobile/src/hooks/use-profiles.test.ts file terminates and passes. 3. Both tests continue proving that the cached conversationLanguageConfirmed and isCurrentUser fields survive the response merge. 4. The fix removes test timer, QueryClient, mutation, observer, and open-handle residue; production hook behavior is unchanged unless execution evidence proves a production defect. 5. Red/green evidence records the pre-fix normal-run non-termination and the post-fix normal exit.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

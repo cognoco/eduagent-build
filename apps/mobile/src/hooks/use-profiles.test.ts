@@ -7,6 +7,7 @@ import {
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
 import {
+  NetworkError,
   setActiveProfileId,
   setProxyMode,
   useApiClient,
@@ -92,6 +93,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   queryClient?.clear();
   setActiveProfileId(undefined);
   setProxyMode(false);
@@ -184,6 +186,52 @@ describe('useProfiles', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
+    hook.unmount();
+  });
+
+  it('[WI-2900] retains current-session authority after transport retry exhaustion and clears the error on recovery', async () => {
+    const learner = createPublicProfile({
+      id: CHILD_PROFILE_ID,
+      isOwner: false,
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [learner] }), { status: 200 }),
+    );
+    const wrapper = createWrapper();
+    const hook = renderHook(() => useProfiles(), { wrapper });
+
+    await waitFor(() => {
+      expect(hook.result.current.isSuccess).toBe(true);
+    });
+    expect(hook.result.current.hasValidatedAuthority).toBe(true);
+
+    jest.useFakeTimers();
+    mockFetch.mockRejectedValue(new TypeError('Network request failed'));
+    let failedRefresh!: ReturnType<typeof hook.result.current.refetch>;
+    act(() => {
+      failedRefresh = hook.result.current.refetch();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(7_500);
+      await failedRefresh;
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(6);
+    expect(hook.result.current.error).toBeInstanceOf(NetworkError);
+    expect(hook.result.current.data).toEqual([learner]);
+    expect(hook.result.current.hasValidatedAuthority).toBe(true);
+
+    jest.useRealTimers();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profiles: [learner] }), { status: 200 }),
+    );
+    await act(async () => {
+      await hook.result.current.refetch();
+    });
+    await waitFor(() => {
+      expect(hook.result.current.error).toBeNull();
+    });
+    expect(hook.result.current.hasValidatedAuthority).toBe(true);
     hook.unmount();
   });
 
@@ -370,29 +418,31 @@ describe('useUpdateProfileName', () => {
     );
 
     const wrapper = createWrapper();
-    queryClient.setDefaultOptions({
-      queries: { retry: false, gcTime: Infinity },
-    });
-    queryClient.setQueryData(['profiles', 'user-1'], [cachedProfile]);
-    const { result } = renderHook(() => useUpdateProfileName(), { wrapper });
-
-    result.current.mutate({
-      profileId: OWNER_PROFILE_ID,
-      displayName: 'New Name',
+    const profileKey = ['profiles', 'user-1'] as const;
+    queryClient.setQueryDefaults(profileKey, { gcTime: 30_000 });
+    queryClient.setQueryData(profileKey, [cachedProfile]);
+    const { result, unmount } = renderHook(() => useUpdateProfileName(), {
+      wrapper,
     });
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-    expect(
-      queryClient.getQueryData<PublicProfile[]>(['profiles', 'user-1']),
-    ).toEqual([
-      expect.objectContaining({
-        displayName: 'New Name',
-        conversationLanguageConfirmed: false,
-        isCurrentUser: true,
-      }),
-    ]);
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({
+          profileId: OWNER_PROFILE_ID,
+          displayName: 'New Name',
+        });
+      });
+      expect(queryClient.getQueryData<PublicProfile[]>(profileKey)).toEqual([
+        expect.objectContaining({
+          displayName: 'New Name',
+          conversationLanguageConfirmed: false,
+          isCurrentUser: true,
+        }),
+      ]);
+    } finally {
+      unmount();
+      queryClient.removeQueries({ queryKey: profileKey, exact: true });
+    }
   });
 });
 
@@ -473,30 +523,30 @@ describe('useUpdateProfileAppContext', () => {
     );
 
     const wrapper = createWrapper();
-    queryClient.setDefaultOptions({
-      queries: { retry: false, gcTime: Infinity },
-    });
-    queryClient.setQueryData(['profiles', 'user-1'], [cachedProfile]);
-    const { result } = renderHook(() => useUpdateProfileAppContext(), {
+    const profileKey = ['profiles', 'user-1'] as const;
+    queryClient.setQueryDefaults(profileKey, { gcTime: 30_000 });
+    queryClient.setQueryData(profileKey, [cachedProfile]);
+    const { result, unmount } = renderHook(() => useUpdateProfileAppContext(), {
       wrapper,
     });
 
-    result.current.mutate({
-      profileId: OWNER_PROFILE_ID,
-      defaultAppContext: 'family',
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-    expect(
-      queryClient.getQueryData<PublicProfile[]>(['profiles', 'user-1']),
-    ).toEqual([
-      expect.objectContaining({
-        defaultAppContext: 'family',
-        conversationLanguageConfirmed: false,
-        isCurrentUser: true,
-      }),
-    ]);
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({
+          profileId: OWNER_PROFILE_ID,
+          defaultAppContext: 'family',
+        });
+      });
+      expect(queryClient.getQueryData<PublicProfile[]>(profileKey)).toEqual([
+        expect.objectContaining({
+          defaultAppContext: 'family',
+          conversationLanguageConfirmed: false,
+          isCurrentUser: true,
+        }),
+      ]);
+    } finally {
+      unmount();
+      queryClient.removeQueries({ queryKey: profileKey, exact: true });
+    }
   });
 });

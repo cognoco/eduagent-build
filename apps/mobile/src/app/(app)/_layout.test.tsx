@@ -942,6 +942,49 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('profile-loading')).toBeNull();
   });
 
+  it('[WI-2900] keeps the learner navigator mounted with a visible profile-refresh retry', async () => {
+    const refreshError = Object.assign(new Error('offline'), {
+      name: 'NetworkError',
+    });
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    const refetchSpy = jest.spyOn(testQueryClient, 'refetchQueries');
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
+      ],
+      activeProfile: {
+        id: 'c1',
+        displayName: 'Child',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileLoadError: null,
+      profileRefreshError: refreshError,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+      isExplicitProxyMode: false,
+    });
+
+    renderLayout();
+
+    await waitFor(() => screen.getByTestId('tabs'), { timeout: 5_000 });
+    screen.getByTestId('profile-refresh-warning');
+    expect(screen.queryByTestId('profile-load-error')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('profile-refresh-retry'));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
+    expect(refetchSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
+  });
+
   // [BUG-923] AUTH-DEBUG must log only on auth state transitions, not on
   // every render of the (app) layout. Pre-fix the log fired on every render,
   // drowning real signal in noise during debugging sessions.
