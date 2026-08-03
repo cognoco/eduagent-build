@@ -45,7 +45,14 @@ loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
 const RUN_ID = randomUUID();
 const POLICY_ID = 'c2533000-0000-4000-8000-000000000001';
-const REGIME_ID = 'c2533000-0000-4000-8000-000000000002';
+const UNMAPPED_REGIME_ID = 'c2533000-0000-4000-8000-000000000002';
+const US_COPPA_REGIME_ID = 'a1000000-0000-4000-8000-000000000001';
+const EU_GDPR_13_REGIME_ID = 'a1000000-0000-4000-8000-000000000013';
+const EU_GDPR_14_REGIME_ID = 'a1000000-0000-4000-8000-000000000014';
+const EU_GDPR_15_REGIME_ID = 'a1000000-0000-4000-8000-000000000015';
+const EU_GDPR_16_REGIME_ID = 'a1000000-0000-4000-8000-000000000016';
+const UK_AADC_REGIME_ID = 'a1000000-0000-4000-8000-000000000098';
+const ROW_REGIME_ID = 'a1000000-0000-4000-8000-000000000099';
 const COUNTRY = 'XG';
 const POLICY_VERSION = 'XG-WI-2533-v1';
 const AS_OF = new Date('2026-07-30T12:00:00.000Z');
@@ -145,7 +152,7 @@ function assertion(
     beforeAll(async () => {
       db = createDatabase(process.env.DATABASE_URL!);
       await db.insert(regimes).values({
-        id: REGIME_ID,
+        id: UNMAPPED_REGIME_ID,
         code: `WI_2533_${RUN_ID}`,
         description: 'WI-2533 integration fixture',
       });
@@ -153,7 +160,7 @@ function assertion(
         id: POLICY_ID,
         countryCode: COUNTRY,
         countryName: 'Guardian attachment test country',
-        regimeId: REGIME_ID,
+        regimeId: EU_GDPR_16_REGIME_ID,
         article8Threshold: 16,
         authorizationForm: 'guardian',
         launchStatus: 'enabled',
@@ -229,7 +236,7 @@ function assertion(
       await db
         .delete(countryPolicyRegistry)
         .where(eq(countryPolicyRegistry.id, POLICY_ID));
-      await db.delete(regimes).where(eq(regimes.id, REGIME_ID));
+      await db.delete(regimes).where(eq(regimes.id, UNMAPPED_REGIME_ID));
       restoreFetch();
     });
 
@@ -301,6 +308,7 @@ function assertion(
       expect(grants).toHaveLength(2);
       expect(
         grants.map((grant) => ({
+          lawfulBasis: grant.lawfulBasis,
           jurisdiction: grant.snapshotJurisdictionAtGrant,
           method: grant.assuranceMethod,
           evidence: grant.assuranceToken,
@@ -308,6 +316,7 @@ function assertion(
         })),
       ).toEqual(
         Array(2).fill({
+          lawfulBasis: 'gdpr_parental_consent',
           jurisdiction: COUNTRY,
           method: 'verified_parental_responsibility_credential',
           evidence: expect.stringMatching(/^vpc:/),
@@ -372,6 +381,95 @@ function assertion(
           'gdpr_parental_consent',
         ),
       ).resolves.toBe('CONSENTED');
+    });
+
+    it.each([
+      ['EU_GDPR_13', EU_GDPR_13_REGIME_ID],
+      ['EU_GDPR_14', EU_GDPR_14_REGIME_ID],
+      ['EU_GDPR_15', EU_GDPR_15_REGIME_ID],
+      ['UK_AADC', UK_AADC_REGIME_ID],
+    ])(
+      'persists the GDPR basis for the explicit %s regime',
+      async (label, regimeId) => {
+        const adult = await seedIdentity(`adult-${label}`, 40);
+        const learner = await seedIdentity(`learner-${label}`, 14);
+        await db
+          .update(countryPolicyRegistry)
+          .set({ regimeId })
+          .where(eq(countryPolicyRegistry.id, POLICY_ID));
+
+        try {
+          await attachGuardianConsentForCredentialedLearner(db, {
+            callerPersonId: adult.personId,
+            chargePersonId: learner.personId,
+            authority: assertion(
+              adult.personId,
+              learner.personId,
+              learner.organizationId,
+            ),
+            asOf: AS_OF,
+          });
+
+          const grants = await db.query.consentGrant.findMany({
+            where: eq(consentGrant.chargePersonId, learner.personId),
+          });
+          expect(grants).toHaveLength(2);
+          expect(
+            grants.every(
+              (grant) => grant.lawfulBasis === 'gdpr_parental_consent',
+            ),
+          ).toBe(true);
+        } finally {
+          await db
+            .update(countryPolicyRegistry)
+            .set({ regimeId: EU_GDPR_16_REGIME_ID })
+            .where(eq(countryPolicyRegistry.id, POLICY_ID));
+        }
+      },
+    );
+
+    it('persists the COPPA basis for the explicit US_COPPA regime', async () => {
+      const adult = await seedIdentity('adult-US_COPPA', 40);
+      const learner = await seedIdentity('learner-US_COPPA', 12);
+      await db
+        .update(countryPolicyRegistry)
+        .set({ regimeId: US_COPPA_REGIME_ID, article8Threshold: 13 })
+        .where(eq(countryPolicyRegistry.id, POLICY_ID));
+      await db
+        .update(consentRequest)
+        .set({ requestedBasis: 'coppa_parental_consent' })
+        .where(eq(consentRequest.chargePersonId, learner.personId));
+
+      try {
+        await attachGuardianConsentForCredentialedLearner(db, {
+          callerPersonId: adult.personId,
+          chargePersonId: learner.personId,
+          authority: assertion(
+            adult.personId,
+            learner.personId,
+            learner.organizationId,
+          ),
+          asOf: AS_OF,
+        });
+
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, learner.personId),
+        });
+        expect(grants).toHaveLength(2);
+        expect(
+          grants.every(
+            (grant) => grant.lawfulBasis === 'coppa_parental_consent',
+          ),
+        ).toBe(true);
+      } finally {
+        await db
+          .update(countryPolicyRegistry)
+          .set({
+            regimeId: EU_GDPR_16_REGIME_ID,
+            article8Threshold: 16,
+          })
+          .where(eq(countryPolicyRegistry.id, POLICY_ID));
+      }
     });
 
     it('confirms an identical retry without duplicating edge or grants', async () => {
@@ -520,6 +618,63 @@ function assertion(
         }),
       ).resolves.toEqual([]);
     });
+
+    it.each([
+      ['ROW', ROW_REGIME_ID],
+      ['an unknown future regime', UNMAPPED_REGIME_ID],
+    ])(
+      'rejects %s before guardianship or consent writes survive',
+      async (_label, regimeId) => {
+        const adult = await seedIdentity(`adult-${regimeId}`, 40);
+        const learner = await seedIdentity(`learner-${regimeId}`, 14);
+        const requestsBefore = await db.query.consentRequest.findMany({
+          where: eq(consentRequest.chargePersonId, learner.personId),
+          orderBy: (request, { asc }) => [asc(request.purpose)],
+        });
+
+        await db
+          .update(countryPolicyRegistry)
+          .set({ regimeId })
+          .where(eq(countryPolicyRegistry.id, POLICY_ID));
+
+        try {
+          await expect(
+            attachGuardianConsentForCredentialedLearner(db, {
+              callerPersonId: adult.personId,
+              chargePersonId: learner.personId,
+              authority: assertion(
+                adult.personId,
+                learner.personId,
+                learner.organizationId,
+              ),
+              asOf: AS_OF,
+            }),
+          ).rejects.toBeInstanceOf(GuardianAttachmentRejectedError);
+
+          await expect(
+            db.query.guardianship.findMany({
+              where: eq(guardianship.chargePersonId, learner.personId),
+            }),
+          ).resolves.toEqual([]);
+          await expect(
+            db.query.consentGrant.findMany({
+              where: eq(consentGrant.chargePersonId, learner.personId),
+            }),
+          ).resolves.toEqual([]);
+          await expect(
+            db.query.consentRequest.findMany({
+              where: eq(consentRequest.chargePersonId, learner.personId),
+              orderBy: (request, { asc }) => [asc(request.purpose)],
+            }),
+          ).resolves.toEqual(requestsBefore);
+        } finally {
+          await db
+            .update(countryPolicyRegistry)
+            .set({ regimeId: EU_GDPR_16_REGIME_ID })
+            .where(eq(countryPolicyRegistry.id, POLICY_ID));
+        }
+      },
+    );
 
     it('rejects a minor caller and a different existing valid guardian', async () => {
       const minor = await seedIdentity('minor-caller', 16);

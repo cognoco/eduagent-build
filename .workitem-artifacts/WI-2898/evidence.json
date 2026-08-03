@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "US_COPPA explicitly resolves to and persists coppa_parental_consent.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "EU_GDPR_13, EU_GDPR_14, EU_GDPR_15, and EU_GDPR_16 explicitly resolve to gdpr_parental_consent.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "UK_AADC explicitly resolves to and persists gdpr_parental_consent.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "ROW and unknown regimes reject before Guardianship or consent writes survive the transaction.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.integration.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The resolver has no permissive default, so a new or null regime cannot silently inherit a lawful basis.",
+      "pointer": "apps/api/src/services/identity-v2/guardian-attachment.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "pnpm exec jest --config apps/api/jest.config.cjs --runInBand apps/api/src/services/identity-v2/guardian-attachment.test.ts"
+}

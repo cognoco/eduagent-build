@@ -1,0 +1,18 @@
+{
+  "pageId": "3ad8bce9-1f7c-81b4-bf22-d0f28a3f12bb",
+  "id": "WI-2898",
+  "name": "Fail closed on unmapped guardian-attachment lawful-basis regimes",
+  "description": "Guardian attachment maps US_COPPA to COPPA and every other DB-mastered regime to GDPR, so a future or accidentally enabled non-GDPR regime could be persisted with a false gdpr_parental_consent lawful basis instead of failing closed.",
+  "acceptanceCriteria": "Root cause: guardian-attachment.ts uses a binary US_COPPA/else expression even though regimes.code is DB-mastered and intentionally extensible. Behavioral variants: (1) US_COPPA persists coppa_parental_consent; (2) EU_GDPR_13/14/15/16 persist gdpr_parental_consent; (3) UK_AADC persists the explicitly ratified UK/GDPR lawful basis; (4) ROW and any unknown/unmapped regime are rejected before Guardianship or consent writes; (5) adding a new regime cannot silently inherit a lawful basis without an explicit mapping or policy-owned value. Add named unit and transactional real-database regression tests that fail against the permissive else branch and pass with fail-closed mapping, preserve atomic rollback, and keep the mapping aligned with the DB-mastered country-policy contract.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}
