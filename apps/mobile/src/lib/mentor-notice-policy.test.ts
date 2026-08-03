@@ -2113,6 +2113,20 @@ describe('[WI-2781] malformed policy FIELD at the observe seam', () => {
     // strength of a message it could not read, and never-told is what lets a
     // legitimate cached projection keep painting after a relaunch.
     expect(await AsyncStorage.getItem(stateKey(ACTOR, PROFILE))).toBeNull();
+
+    // The two senses of "told" are different, and only the durable one is
+    // withheld. IN-SESSION the device IS told: a malformed field is something
+    // arriving, so `observed` moves and the never-told benefit of the doubt is
+    // forfeited for this session — asserted directly rather than left to ride
+    // on `malformedSuppressed` being read first.
+    expect(result.current.observed).toBe(true);
+
+    // ── relaunch ── nothing was written, so the fresh process is never-told
+    // again and a legitimate cached projection may keep painting.
+    resetMentorNoticePolicyStoreForTests();
+    const relaunched = mountPolicy();
+    await waitFor(() => expect(relaunched.result.current.hydrated).toBe(true));
+    expect(relaunched.result.current.observed).toBe(false);
   });
 
   it('AC-3 control: a genuine server disable is still durable, and a HIGHER revision still re-enables', async () => {

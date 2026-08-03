@@ -1111,7 +1111,13 @@ export function foldMentorNoticePolicyFor(
     commit(
       entry,
       entry.snapshot.state,
-      entry.snapshot.observed,
+      // `observed: true` — a malformed field IS something arriving, so the
+      // device forfeits the never-told benefit of the doubt, exactly as
+      // `signalIsObservation` documents and as every sibling fold site does.
+      // Passing the snapshot through here would leave a never-told device at
+      // `observed: false`, harmless only because `malformedSuppressed` is read
+      // first — an ordering, not an invariant.
+      true,
       entry.snapshot.hydrated,
       entry.snapshot.trusted,
       true,
