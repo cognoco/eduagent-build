@@ -7,6 +7,11 @@ import {
   remediateNeedsDeepening,
   remediateTopicNotes,
 } from '../../services/learning-text-safety/persisted-remediation-apply';
+import { remediateLearnerProfileFreeText } from '../../services/learning-text-safety/persisted-remediation-profile';
+import {
+  remediateMemoryFacts,
+  remediateTopicNoteArtifactConceptKeys,
+} from '../../services/learning-text-safety/persisted-remediation-memory';
 
 const logger = createLogger();
 
@@ -55,9 +60,18 @@ export const persistedLearningTextRemediation = inngest.createFunction(
       await step.run('remediate-topic-notes', async () =>
         remediateTopicNotes(db),
       ),
+      await step.run('remediate-topic-note-artifact-concept-keys', async () =>
+        remediateTopicNoteArtifactConceptKeys(db),
+      ),
       await step.run('remediate-needs-deepening', async () =>
         remediateNeedsDeepening(db),
       ),
+      ...(await step.run('remediate-learner-profile-free-text', async () =>
+        remediateLearnerProfileFreeText(db),
+      )),
+      ...(await step.run('remediate-memory-facts', async () =>
+        remediateMemoryFacts(db),
+      )),
     ];
 
     // Observability records surface, counts and nothing else — never the text,
