@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import { memoryFacts, topicNotes, type Database } from '@eduagent/database';
 import {
   classifyRowFields,
@@ -265,6 +265,26 @@ function rowUpdateAffectedCount(
 }
 
 /**
+ * Compare-and-set predicate for a memory-fact remediation row. Metadata-only
+ * redactions rebuild JSONB from the scanned value, so the write must refuse a
+ * row whose text OR metadata changed after that scan. A refused write is
+ * reported as `skippedChanged` and a later run reclassifies current data.
+ */
+export function memoryFactCasGuard(
+  row: Pick<MemoryFactRemediationRow, 'id' | 'text' | 'metadata'>,
+): SQL {
+  const guard = and(
+    eq(memoryFacts.id, row.id),
+    eq(memoryFacts.text, row.text),
+    eq(memoryFacts.metadata, row.metadata),
+  );
+  if (!guard) {
+    throw new Error('memory_facts remediation requires a CAS predicate');
+  }
+  return guard;
+}
+
+/**
  * Group key for the collision-avoidance grouping described above. Computed
  * from the row's ORIGINAL `metadata` (before any redaction), because that is
  * what the partial unique index's existing rows were built against — the
@@ -279,14 +299,10 @@ function activeGroupKey(row: MemoryFactRemediationRow): string {
 }
 
 /**
- * Scrubs one row in place via a compare-and-set guarded on its original
- * `text` — the same simplification the landed surfaces in
- * `persisted-remediation-apply.ts` use (they guard on the single column they
- * classified; this guards on `text` even when only a `metadata` path is being
- * rewritten). This is a KNOWN weaker guard than matching the whole row: a
- * concurrent metadata-only write between scan and write, with `text`
- * unchanged, would not be caught. Flagged in the trailing uncertainty block
- * rather than silently accepted.
+ * Scrubs one row in place via a compare-and-set guarded on both values read to
+ * build its replacement. A concurrent text or metadata update leaves the row
+ * unchanged and is counted as `skippedChanged`, so a later run can classify
+ * the current row instead of writing a stale JSONB reconstruction.
  */
 async function scrubRowInPlace(
   db: Database,
@@ -298,10 +314,10 @@ async function scrubRowInPlace(
 
   const result = await db
     .update(memoryFacts)
-    // scope-allow: guarded by the row id plus its exact prior text; the job is
-    // deliberately cross-profile.
+    // scope-allow: guarded by the row id plus its exact prior text and
+    // metadata; the job is deliberately cross-profile.
     .set({ ...update, updatedAt: new Date() })
-    .where(and(eq(memoryFacts.id, row.id), eq(memoryFacts.text, row.text)))
+    .where(memoryFactCasGuard(row))
     .returning({ id: memoryFacts.id });
 
   return rowUpdateAffectedCount(result) > 0;
@@ -334,15 +350,15 @@ async function scrubAndSupersedeDuplicate(
 
   const result = await db
     .update(memoryFacts)
-    // scope-allow: guarded by the row id plus its exact prior text; the job is
-    // deliberately cross-profile.
+    // scope-allow: guarded by the row id plus its exact prior text and
+    // metadata; the job is deliberately cross-profile.
     .set({
       ...update,
       supersededBy: survivorId,
       supersededAt: now,
       updatedAt: now,
     })
-    .where(and(eq(memoryFacts.id, row.id), eq(memoryFacts.text, row.text)))
+    .where(memoryFactCasGuard(row))
     .returning({ id: memoryFacts.id });
 
   return rowUpdateAffectedCount(result) > 0;
@@ -638,15 +654,11 @@ export async function remediateTopicNoteArtifactConceptKeys(
  *   (each is scanned independently under every grammar). If it turns out the
  *   classifier disagrees across the two strings more often than expected,
  *   this design will under-redact one carrier while over-trusting the other.
- * - The compare-and-set guard on `memory_facts` updates only checks
- *   `eq(memoryFacts.text, row.text)`, even for metadata-only redactions where
- *   `text` is not being written. This mirrors the landed surfaces' pattern
- *   (they guard on the single column they scrubbed) but is weaker here
- *   because `metadata` can change without `text` changing. I did not add a
- *   `eq(memoryFacts.metadata, sql\`${row.metadata}::jsonb\`)` guard because I
- *   was not confident it would compile/behave correctly against drizzle's
- *   jsonb column without being able to run it, and a broken guard (that
- *   silently never matches) seemed worse than a known-weaker one.
+ * - VERIFIED (WI-3076): the compare-and-set guard matches the original
+ *   `memory_facts.id`, `text`, and JSONB `metadata` value. A concurrent writer
+ *   changing either source value makes the update affect zero rows; the report
+ *   records `skippedChanged` so a later run can reclassify the current row
+ *   rather than write a stale JSONB reconstruction.
  * - `activeGroupKey` groups on `metadata.subject`/`metadata.context` read from
  *   the ORIGINAL (pre-redaction) metadata. If a row's `metadata.subject` is
  *   ITSELF being redacted in the same pass, the grouping key used to decide
@@ -687,14 +699,9 @@ export async function remediateTopicNoteArtifactConceptKeys(
  *
  * (3) OTHER THINGS ON THESE ROWS KEYED BY THE SCRUBBED TEXT
  *
- * - `memory_facts.embedding` (pgvector) is very likely derived from `text` at
- *   write time for semantic search, but I did not find the embedding
- *   write-path in the files I was given access to, so I neither read nor
- *   wrote it here. If it is populated from the pre-redaction text, a stale
- *   embedding would still let a similarity search surface the redacted row
- *   for a query resembling the original clinical content, without exposing
- *   the raw text itself. Flagging for the operator to check the embedding
- *   write-path before treating this remediation as complete for that column.
+ * - VERIFIED (WI-3076): `memory_facts.embedding` is cleared whenever `text`
+ *   is remediated. It is a semantic carrier of the pre-redaction sentence, so
+ *   retaining it would leave the scrubbed fact retrievable by similarity.
  * - `memory_facts.sourceSessionIds` / `sourceEventIds` point at transcript
  *   rows that may themselves still contain the original clinical text
  *   (this module never touches transcripts) — out of scope for a
