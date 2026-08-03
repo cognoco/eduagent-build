@@ -234,17 +234,17 @@ Two language enums **intentionally diverge** — the UI shell set (`SUPPORTED_LA
 
 ## Non-Negotiable Engineering Rules
 
-- `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.
-- Business logic belongs in `services/`, not in route handlers (lint-enforced: eslint G1/G5).
-- Reads use `createScopedRepository(profileId)` for single scoped tables; two sanctioned `db.select()` alternatives exist — parent-chain joins, and single-table queries the scoped repo API cannot express — always with `profileId` pinned in the WHERE. It is the **inexpressibility** that sanctions the pattern. Full rule + worked examples: `docs/architecture.md` § Enforcement Rules (scoped-read discipline).
-- Writes include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
-- Shared mobile components stay persona-unaware: semantic tokens and CSS variables, no persona checks or hardcoded hex (exception: annotated brand-fixed hex inside SVG-internal animation/celebration components).
-- Durable async work goes through Inngest — never fire-and-forget from route handlers.
-- LLM calls go through `services/llm/router.ts` or its barrel, never direct provider SDKs.
-- Non-core Inngest dispatches go through `safeSend()`; bare `inngest.send(...)` is reserved for CORE flows and carries a `// core-send: <reason>` comment (ratchet-tested). Full discipline: `docs/project_context.md` § safeSend.
-- LLM responses that drive state-machine decisions use the structured envelope (`llmResponseEnvelopeSchema` via `parseEnvelope()`) — never `[MARKER]` tokens or JSON blobs in free text — and **every envelope signal has a server-side hard cap**. Full contract: `docs/architecture.md` § LLM Response Envelope.
-- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `services/llm/*.ts`), run the eval harness: `pnpm eval:llm` (Tier-1 snapshots) and `pnpm eval:llm --live` (Tier 2). The pre-commit hook does NOT run the harness — this obligation is on you. Mechanics: `docs/architecture.md`; receipt path: `docs/change-classes.md`.
-- Challenge Round mastery is server-owned and conservative: the LLM proposes per-concept evaluations (`signals.challenge_round_evaluation`, each with `answerEventId` + `learnerQuote`); `decideMasteryAndReview()` verifies mastery only when **every** concept is `solid`. Note drafts use only `solidAnswerQuotes` and pass the hallucination guard in `services/challenge-round/note-draft.ts`. Routing goes through `resolveExchangeLlmRouting()` per MMT-ADR-0014 (Gemini excluded under-18). Full policy + history: `docs/project_context.md` § Challenge Round.
+- `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally. [PRIN-01]
+- Business logic belongs in `services/`, not in route handlers (lint-enforced: eslint G1/G5). [PRIN-02]
+- Reads use `createScopedRepository(profileId)` for single scoped tables; two sanctioned `db.select()` alternatives exist — parent-chain joins, and single-table queries the scoped repo API cannot express — always with `profileId` pinned in the WHERE. It is the **inexpressibility** that sanctions the pattern. Full rule + worked examples: `docs/architecture.md` § Enforcement Rules (scoped-read discipline). [PRIN-03]
+- Writes include explicit `profileId` protection or verify ownership through the parent chain before updating child records. [PRIN-04]
+- Shared mobile components stay persona-unaware: semantic tokens and CSS variables, no persona checks or hardcoded hex (exception: annotated brand-fixed hex inside SVG-internal animation/celebration components). [PRIN-05]
+- Durable async work goes through Inngest — never fire-and-forget from route handlers. [PRIN-06]
+- LLM calls go through `services/llm/router.ts` or its barrel, never direct provider SDKs. [PRIN-07]
+- Non-core Inngest dispatches go through `safeSend()`; bare `inngest.send(...)` is reserved for CORE flows and carries a `// core-send: <reason>` comment (ratchet-tested). Full discipline: `docs/project_context.md` § safeSend. [PRIN-08]
+- LLM responses that drive state-machine decisions use the structured envelope (`llmResponseEnvelopeSchema` via `parseEnvelope()`) — never `[MARKER]` tokens or JSON blobs in free text — and **every envelope signal has a server-side hard cap**. Full contract: `docs/architecture.md` § LLM Response Envelope. [PRIN-09]
+- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `services/llm/*.ts`), run the eval harness: `pnpm eval:llm` (Tier-1 snapshots) and `pnpm eval:llm --live` (Tier 2). The pre-commit hook does NOT run the harness — this obligation is on you. Mechanics: `docs/architecture.md`; receipt path: `docs/change-classes.md`. [PRIN-10]
+- Challenge Round mastery is server-owned and conservative: the LLM proposes per-concept evaluations (`signals.challenge_round_evaluation`, each with `answerEventId` + `learnerQuote`); `decideMasteryAndReview()` verifies mastery only when **every** concept is `solid`. Note drafts use only `solidAnswerQuotes` and pass the hallucination guard in `services/challenge-round/note-draft.ts`. Routing goes through `resolveExchangeLlmRouting()` per MMT-ADR-0014 (Gemini excluded under-18). Full policy + history: `docs/project_context.md` § Challenge Round. [PRIN-11]
 
 ## Known Exceptions to Engineering Rules
 
@@ -311,13 +311,13 @@ Changed code is not fixed code. Every fix must be verified.
 
 These rules catch bugs that survive type-checking and only surface at runtime. Learned from adversarial review (2026-04-05).
 
-- **Internal mocks are backlog, never acceptable state.** Never `jest.mock` your own database, services, or middleware; mock only true external boundaries (Stripe, Clerk JWKS, LLM via `routeAndCall`, push, email — bare specifiers). To stub named exports of an internal module: `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`).
-- **GC1 (CI-armed):** any new relative-path `jest.mock` of an internal module in `*.test.ts` / `*.test.tsx` fails CI. The `// gc1-allow: <reason>` escape applies only when the real code genuinely cannot run in the test environment — never convenience.
-- **GC6 — every test-file edit:** remove the file's internal mocks (relative-path or `@eduagent/*` specifiers) before the edit is complete; the PostToolUse hook's output is a **blocker on completion**, not a follow-up. Deferral (file paths + count in the commit message) only when burn-down would balloon a focused task. Full workflow: `/my:sweep-mocks`.
-- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
-- **Classify errors before formatting.** When code branches on error *type* and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
-- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence; leaked storage keys waste device storage forever.
-- **Verify JSX handler references exist** after adding any `Pressable` or `Button` — an `onPress={handleX}` that points at a removed or renamed handler type-checks but is dead at runtime.
+- **Internal mocks are backlog, never acceptable state.** Never `jest.mock` your own database, services, or middleware; mock only true external boundaries (Stripe, Clerk JWKS, LLM via `routeAndCall`, push, email — bare specifiers). To stub named exports of an internal module: `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/archive-cleanup.test.ts`). [PRIN-12]
+- **GC1 (CI-armed):** any new relative-path `jest.mock` of an internal module in `*.test.ts` / `*.test.tsx` fails CI. The `// gc1-allow: <reason>` escape applies only when the real code genuinely cannot run in the test environment — never convenience. [PRIN-13]
+- **GC6 — every test-file edit:** remove the file's internal mocks (relative-path or `@eduagent/*` specifiers) before the edit is complete; the PostToolUse hook's output is a **blocker on completion**, not a follow-up. Deferral (file paths + count in the commit message) only when burn-down would balloon a focused task. Full workflow: `/my:sweep-mocks`. [PRIN-18]
+- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers. [PRIN-14]
+- **Classify errors before formatting.** When code branches on error *type* and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on. [PRIN-15]
+- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence; leaked storage keys waste device storage forever. [PRIN-16]
+- **Verify JSX handler references exist** after adding any `Pressable` or `Button` — an `onPress={handleX}` that points at a removed or renamed handler type-checks but is dead at runtime. [PRIN-17]
 
 ## Planning Discipline
 
