@@ -130,7 +130,6 @@
     "flows/consent/post-approval-landing.yaml": "post-approval-ready",
     "flows/edge/animated-splash.yaml": null,
     "flows/onboarding/create-subject.yaml": "onboarding-complete",
-    "flows/onboarding/preview-self.yaml": null,
     "flows/onboarding/view-curriculum.yaml": "onboarding-complete",
     "flows/onboarding/welcome-intro-parent.yaml": null,
     "flows/onboarding/welcome-intro.yaml": "onboarding-complete",
