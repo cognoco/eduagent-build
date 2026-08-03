@@ -1,0 +1,46 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Forward migration 0153 drops only the answer-event foreign key while retaining the UUID column and both partial unique indexes; prior migrations remain immutable.",
+      "pointer": "apps/api/drizzle/0153_wi2629_mentor_notice_answer_event_scalar.sql"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The Drizzle schema retains answerEventId as a scalar while profile and source-session ownership continues to cascade notices.",
+      "pointer": "packages/database/src/schema/mentor-notices.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Real-database purge coverage proves transcript events are deleted while notices survive with their original answerEventId values.",
+      "pointer": "apps/api/src/services/transcript-purge.integration.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The public envelope accepts an omitted learnerQuote while retaining required answerEventId and non-empty validation for a present quote.",
+      "pointer": "packages/schemas/src/llm-envelope.test.ts"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Downstream evidence validation still checks event existence, user-message type, learner/session ownership, and quote overlap only when the optional quote is present.",
+      "pointer": "apps/api/src/services/mentor-notices/evidence.test.ts"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "The write boundary rejects fresh notices without answerEventId while legacy nullable rows remain readable.",
+      "pointer": "apps/api/src/services/mentor-notices/state.integration.test.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Rollback documentation permits restoring the foreign key only when no dangling evidence identifiers exist and forbids identity loss to force the constraint.",
+      "pointer": "apps/api/drizzle/0153_wi2629_mentor_notice_answer_event_scalar.rollback.md"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "Focused schema regression and existing real-database coverage preserve the complete red-green variant matrix and migration immutability contract.",
+      "pointer": "packages/schemas/src/llm-envelope.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-01",
+  "redGreenPointer": "packages/schemas/src/llm-envelope.test.ts"
+}

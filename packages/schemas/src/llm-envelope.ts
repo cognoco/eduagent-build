@@ -384,7 +384,7 @@ export const noticedGapSignalSchema = z.object({
   concept: z.string().min(1).max(200),
   correctionHint: z.string().min(1).max(500).optional(),
   answerEventId: z.string().uuid(),
-  learnerQuote: z.string().min(1).max(500),
+  learnerQuote: z.string().min(1).max(500).optional(),
 });
 export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
 
