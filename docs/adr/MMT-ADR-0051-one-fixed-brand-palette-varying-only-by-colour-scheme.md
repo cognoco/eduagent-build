@@ -26,7 +26,7 @@ What made this genuinely confusing rather than merely stale is that residual mac
 
 5. **Per-persona visual moods are not the design.** Documentation describing distinct visual treatments per audience records a direction that was considered and not taken, and is superseded by this decision rather than pending implementation.
 
-6. **The surviving accent machinery is cleanup, not contract.** Its presence in the theme layer does not constitute a feature, nothing may be built against it, and removing it is a tidying change that does not alter rendered output.
+6. **The surviving accent machinery is cleanup, not contract.** Its presence in the theme layer does not constitute a feature, and nothing may be built against it. Removing it is not unconditionally a no-op: the theme layer still reads a per-profile stored value, so an installation upgraded from a build where a selection was made can still have one applied. The cleanup therefore includes clearing the persisted keys, and its correctness is a migration question rather than a pure deletion.
 
 ## Consequences
 
