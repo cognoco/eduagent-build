@@ -7,15 +7,23 @@ const androidOnlyRunbookProhibitions = [
   'App Store Connect',
   'TestFlight',
   'eas build:list --platform ios',
+  'eas build --platform ios',
   'eas build --platform all',
   'eas submit -p ios',
+  'eas submit --platform ios',
   '--id $iosBuildId',
 ];
 
+const requiredAndroidOnlyRunbookStatements = [
+  'eas build --platform android --profile production',
+  'it does not authorize a public Play release.',
+];
+
 function expectAndroidOnlyRunbook(runbook: string) {
-  expect(runbook).toContain(
-    'eas build --platform android --profile production',
-  );
+  for (const statement of requiredAndroidOnlyRunbookStatements) {
+    expect(runbook).toContain(statement);
+  }
+
   expect(runbook).toContain('eas submit -p android --profile production');
   expect(runbook).toContain('--id $androidBuildId');
 
@@ -86,26 +94,43 @@ describe('WI-2937 production EAS submit contract', () => {
       'utf8',
     );
 
-    for (const prohibition of androidOnlyRunbookProhibitions) {
-      expect(() =>
-        expectAndroidOnlyRunbook(`${runbook}\n${prohibition}`),
-      ).toThrow(prohibition);
+    const mutations = [
+      ...androidOnlyRunbookProhibitions,
+      'eas submit --platform ios --profile production --id SOME_IOS_BUILD',
+    ];
+
+    for (const mutation of mutations) {
+      expect(() => expectAndroidOnlyRunbook(`${runbook}\n${mutation}`)).toThrow(
+        mutation.includes('eas submit --platform ios')
+          ? 'eas submit --platform ios'
+          : mutation,
+      );
     }
   });
 
-  it('rejects removal of the required Android build instruction', () => {
+  it('rejects removal of required Android-only safety statements', () => {
     const runbook = readFileSync(
       join(repoRoot, 'docs/runbooks/store-submission.md'),
       'utf8',
     );
-    const withoutAndroidBuild = runbook.replace(
-      'eas build --platform android --profile production',
-      '',
-    );
+    for (const statement of requiredAndroidOnlyRunbookStatements) {
+      const mutatedRunbook = runbook.split(statement).join('');
 
-    expect(withoutAndroidBuild).not.toBe(runbook);
-    expect(() => expectAndroidOnlyRunbook(withoutAndroidBuild)).toThrow(
-      'eas build --platform android --profile production',
+      expect(mutatedRunbook).not.toBe(runbook);
+      expect(() => expectAndroidOnlyRunbook(mutatedRunbook)).toThrow(statement);
+    }
+  });
+
+  it('rejects a required statement after every duplicate is removed', () => {
+    const runbook = readFileSync(
+      join(repoRoot, 'docs/runbooks/store-submission.md'),
+      'utf8',
     );
+    const statement = 'it does not authorize a public Play release.';
+    const duplicatedRunbook = `${runbook}\n${statement}`;
+    const withoutEveryCopy = duplicatedRunbook.split(statement).join('');
+
+    expect(withoutEveryCopy).not.toContain(statement);
+    expect(() => expectAndroidOnlyRunbook(withoutEveryCopy)).toThrow(statement);
   });
 });
