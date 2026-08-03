@@ -146,6 +146,8 @@ describeLoopbackOnly(
       attributionFactId: '',
       hedgedFactId: '',
       educationalFactId: '',
+      concatenationCollisionFactIds: [] as string[],
+      delimiterCollisionFactIds: [] as string[],
       profileId: '',
     };
 
@@ -405,6 +407,76 @@ describeLoopbackOnly(
       seeded.educationalFactId = facts.find(
         (row) => row.text === EDUCATIONAL,
       )!.id;
+
+      const distinctTupleFacts = await db
+        .insert(memoryFacts)
+        .values([
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: { subject: 'Math', context: '', topics: [] },
+            observedAt: new Date(),
+            embedding: null,
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: { subject: 'Mat', context: 'h', topics: [] },
+            observedAt: new Date(),
+            embedding: null,
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES),
+            metadata: {
+              subject: 'Math\u001fadvanced',
+              context: 'school',
+              topics: [],
+            },
+            observedAt: new Date(),
+            embedding: null,
+          },
+          {
+            profileId,
+            category: 'strength',
+            text: ATTRIBUTION_ES_HEDGED,
+            textNormalized: normalizeMemoryText(ATTRIBUTION_ES_HEDGED),
+            metadata: {
+              subject: 'Math',
+              context: 'advanced\u001fschool',
+              topics: [],
+            },
+            observedAt: new Date(),
+            embedding: null,
+          },
+        ])
+        .returning({ id: memoryFacts.id, metadata: memoryFacts.metadata });
+
+      seeded.concatenationCollisionFactIds = distinctTupleFacts
+        .filter((row) => {
+          const metadata = row.metadata as Record<string, unknown>;
+          return metadata.subject === 'Math' || metadata.subject === 'Mat';
+        })
+        .filter((row) => {
+          const metadata = row.metadata as Record<string, unknown>;
+          return metadata.context === '' || metadata.context === 'h';
+        })
+        .map((row) => row.id);
+      seeded.delimiterCollisionFactIds = distinctTupleFacts
+        .filter((row) => {
+          const metadata = row.metadata as Record<string, unknown>;
+          return (
+            metadata.subject === 'Math\u001fadvanced' ||
+            metadata.context === 'advanced\u001fschool'
+          );
+        })
+        .map((row) => row.id);
       seeded.profileId = profileId;
     });
 
@@ -607,6 +679,28 @@ describeLoopbackOnly(
       // The educational fact is the control: ambiguous, reported, untouched.
       expect(educational.text).toBe(EDUCATIONAL);
       expect(educational.supersededBy).toBeNull();
+    });
+
+    it('[WI-3078 AC] does not supersede facts whose database tuples are distinct', async () => {
+      const protectedIds = [
+        ...seeded.concatenationCollisionFactIds,
+        ...seeded.delimiterCollisionFactIds,
+      ];
+      expect(protectedIds).toHaveLength(4);
+
+      const rows = await db
+        .select({
+          id: memoryFacts.id,
+          text: memoryFacts.text,
+          supersededBy: memoryFacts.supersededBy,
+        })
+        .from(memoryFacts);
+      const byId = new Map(rows.map((row) => [row.id, row]));
+
+      for (const id of protectedIds) {
+        expect(byId.get(id)?.text).toBe(REDACTED_PLACEHOLDER);
+        expect(byId.get(id)?.supersededBy).toBeNull();
+      }
     });
 
     it('[WI-3076 AC] reports a metadata-only concurrent update instead of overwriting it', async () => {
