@@ -621,3 +621,161 @@ helper with no behavior change for existing callers). No other product
 file changed. `.cosmo/WI-3029/workitem.json` (a fetched claim snapshot)
 remains deliberately uncommitted. No Cosmo lifecycle mutation, no merge,
 at any point in this round.
+
+## AC-6 second review-fix round (final-head adversarial review at 55af8dd4, 0 MUST_FIX / 2 SHOULD_FIX / 3 CONSIDER)
+
+A fresh adversarial review of PR #2909 at the second round's exact head
+(`55af8dd4e185cd2ef812e54680aae3ea36eeb963`) returned NOT APPROVED with 2
+SHOULD_FIX and 3 CONSIDER, 0 MUST_FIX. Both SHOULD_FIX findings and two of
+the CONSIDERs (test-strengthening) are addressed below; the third
+CONSIDER was an instruction NOT to add a hardcoded
+`expect(timeout).toBe(180)` assertion, which was honored by omission. No
+`--live`, no provider bootstrap, no paid call, no workflow dispatch, no
+deploy, no Cosmo lifecycle mutation at any point (claim unchanged:
+shepherd:codex:singles-lane).
+
+### SHOULD-1 — retained durations weren't actually bound to their gate expressions
+
+The `RETAINED_ENVELOPE_WALL_CLOCK_SECONDS` (839) /
+`RETAINED_TEACHING_WALL_CLOCK_SECONDS` (271) /
+`RETAINED_MASTERY_WALL_CLOCK_SECONDS` (710) constants fed the projection
+arithmetic, but the only assertions checking the workflow's PROSE were
+plain `toContain('366/300')` / `toContain('5/5')` / `toContain('24/21')` —
+substring checks with two holes: (a) they'd still pass against a workflow
+that said `366/3000` or `24/210` (the ratio string is a literal substring
+of the wrong one), and (b) they never confirmed the ratio was actually
+attached to its retained duration in the comment, just that the digits
+appeared somewhere.
+
+Fix: added a `numBoundary(n)` helper
+(`` `(?<!\d)${n}(?!\d)` ``) and three new regexes that bind
+duration+"s x "+ratio as one anchored unit with digit boundaries on every
+number (envelope/teaching/mastery), replacing the three loose `toContain`
+ratio checks.
+
+Mutation proof (paired `Edit`/`Edit` on the workflow YAML only, never
+Bash/`sed`; `git diff --stat` confirmed a byte-identical, zero-diff revert
+before moving on):
+
+```text
+# GREEN, unmutated (366/300):
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+Tests: 1 passed, 15 skipped, 16 total
+
+# Mutated envelope 839s x 366/300 -> 839s x 366/3000 (the exact superset
+# the reviewer named) — RED:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+FAIL — expect(workflowComments).toMatch(envelopeExpr) — the bound
+  duration+ratio expression no longer matches "839s x 366/3000"
+Tests: 1 failed, 15 skipped, 16 total
+
+# Reverted:
+$ git diff --stat .github/workflows/eval-live.yml
+(empty)
+
+# GREEN again:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+```
+
+Independently confirmed the SAME hole existed for the pre-fix `toContain`
+checks (not separately re-demonstrated with a live RED/GREEN — the
+superset arithmetic is self-evident: `'366/3000'.includes('366/300')` is
+`true` in plain JS, which is exactly why `toContain` alone was insufficient).
+
+### SHOULD-2 — envelope truncation wasn't disclosed honestly
+
+The retained run's log line `Skipped: 33` was not previously surfaced in
+the workflow comment or prior evidence narrative. Re-derived independently
+from the retained log
+(`/tmp/.../run30721918215.log`, downloaded via `gh run view 30721918215
+--job 91426988671 --log` in an earlier round of this same session) before
+writing anything:
+
+```text
+$ awk -F'\t' '{print $3}' run30721918215.log | grep -c "live budget exceeded (300 calls)"
+29
+$ awk -F'\t' '{print $3}' run30721918215.log | grep "live budget exceeded (300 calls)" \
+    | sed -E 's/^[0-9TZ:.\-]+Z //' | sed -E 's/ × .*//' | sort | uniq -c
+      3   - challenge-round-mastery
+      6   - language-quality
+     10   - review-continuity-opener
+     10   - safety-probes
+$ awk -F'\t' '{print $3}' run30721918215.log | grep -c "flow does not apply to this profile"
+4
+# 29 + 4 = 33, matching the log's own "Skipped:            33" line exactly.
+```
+
+Fix: added a sentence to the `.github/workflows/eval-live.yml` AC-6
+paragraph stating 29 of the run's 33 skips were budget-exceeded (the other
+4 were unrelated "flow does not apply to this profile" skips), that 16 of
+those 29 were the remaining judge-bearing safety-probes (10) and
+language-quality (6) cases, and that 13 were other, non-judge-bearing
+challenge-round-mastery (3) and review-continuity-opener (10) cases —
+explicitly NOT claiming all 29 carried an internal judge call (they don't:
+only safety-probes and language-quality declare internal judge calls in
+this unpinned/production-routing context; see the "Envelope provider
+demand" comment block above this paragraph). The existing "conservative
+scaling comparison, not a like-for-like measured provider-call rate"
+sentence was left as-is — it already avoids implying a measured or
+specific-magnitude conservatism margin, which is what this finding asked
+to preserve.
+
+This is prose-only; the projection arithmetic (`839s × 366/300` etc.) did
+not change, so no new deterministic assertion was added for this specific
+disclosure sentence (the review didn't ask for one, and the SHOULD-1 fix
+above already tightened the arithmetic-bearing assertions).
+
+### CONSIDER — word-boundary the configured-timeout regex
+
+The M1-round fix's timeout assertion,
+`` new RegExp(`${configuredTimeoutMinutes}-minute\s+timeout-minutes`) ``,
+had the same substring hole as SHOULD-1: if `configuredTimeoutMinutes`
+were ever `80` (two digits), the regex `/80-minute\s+timeout-minutes/`
+would still match inside the real "180-minute timeout-minutes" text
+(`"180-minute timeout-minutes".match(/80-minute/)` is truthy), silently
+failing to catch the drift. Fixed by wrapping the value in the same
+`numBoundary()` helper used for SHOULD-1, verified by the same full-suite
+GREEN run above (a dedicated mutation demo was not run for this one
+specifically — the fix is mechanically identical to the SHOULD-1 fix and
+covered by the same helper).
+
+Per the reviewer's explicit instruction, no `expect(configuredTimeoutMinutes).toBe(180)`
+assertion was added — that would re-hardcode the exact value and regress
+the M1-round's config-binding fix (AC-6 does not require a minimum-headroom
+assertion).
+
+### Full verification after this round
+
+```text
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts
+Tests: 16 passed, 16 total
+
+$ node -e "require('yaml').parse(require('fs').readFileSync('.github/workflows/eval-live.yml','utf8'))"
+parsed OK, timeout-minutes = 180
+
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 74 passed, 74 of 75 total
+Tests: 4 skipped, 1259 passed, 1263 total
+(identical counts to the prior round's re-run — no test-count drift.)
+```
+
+Diff scope this round: `.github/workflows/eval-live.yml` (comment
+wording only — one new disclosure sentence in the envelope paragraph;
+`timeout-minutes` confirmed still 180, no `run:` step or cap touched) and
+`scripts/eval-live-gate-independence.test.ts` (three loose `toContain`
+ratio checks replaced with bound `numBoundary`-guarded regexes; the
+timeout regex gained the same guard). `.cosmo/WI-3029/workitem.json` and
+`.cosmo/WI-3029/merge-gate-dry-run.json` (both shepherd-owned artifacts)
+remain untouched and uncommitted. No Cosmo lifecycle mutation, no merge,
+no second PR, at any point in this round.

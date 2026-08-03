@@ -76,6 +76,18 @@ function loadJobSteps(workflowPath: string, jobId: string): WorkflowStep[] {
   return loadJob(workflowPath, jobId).steps!;
 }
 
+// [WI-3029 AC-6 SHOULD-1/CONSIDER] Guards a numeric literal against
+// superset/incidental substring matches: numBoundary(366) matches the "366"
+// in "366/300" but NOT the "366" inside "3660" or "13660", and
+// numBoundary(80) does NOT match the "80" inside "180". Plain `toContain`
+// on a bare ratio string (e.g. "366/300") would still pass if the workflow
+// actually said "366/3000" or "24/210" (superset) or if the digits appeared
+// incidentally elsewhere unrelated to the gate expression they're meant to
+// pin — this closes both holes.
+function numBoundary(n: number): string {
+  return `(?<!\\d)${n}(?!\\d)`;
+}
+
 // [WI-3029 AC-6 M1] The configured timeout-minutes MUST be read from the
 // same parsed YAML the steps come from, never hardcoded — a hardcoded
 // literal in the test can drift from the workflow's actual timeout-minutes
@@ -332,26 +344,48 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       projectedTotalSeconds
     ).toFixed(1);
 
-    // The comment must show its work: both scaling ratios (current demand
-    // over the retained run's denominator) in the exact form this test
-    // derives them, so a future scenario-count change that isn't also
-    // retuned here breaks this assertion instead of silently going stale.
-    expect(workflowComments).toContain(
-      `${providerDemand.providerCalls}/${RETAINED_ENVELOPE_CALLS_AT_CAP}`,
+    // [SHOULD-1] The comment must bind each FULL gate expression — retained
+    // wall-clock duration immediately followed by its scaling ratio, in
+    // that order — not just contain the ratio digits somewhere. Plain
+    // toContain('366/300') would also pass against a workflow that said
+    // '366/3000' (superset) or against the ratio appearing unattached to
+    // its duration; these anchor duration-x-ratio as one unit with
+    // digit-boundary guards on every number, so a future scenario-count
+    // change that isn't also retuned here breaks this assertion instead of
+    // silently going stale (or the test silently staying green on a wrong
+    // denominator).
+    const envelopeExpr = new RegExp(
+      `${numBoundary(RETAINED_ENVELOPE_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
+        `${numBoundary(providerDemand.providerCalls)}\\/` +
+        `${numBoundary(RETAINED_ENVELOPE_CALLS_AT_CAP)}`,
     );
-    expect(workflowComments).toContain(
-      `${currentTeachingScenarios}/${RETAINED_TEACHING_CALLS_AT_CAP}`,
+    expect(workflowComments).toMatch(envelopeExpr);
+
+    const teachingExpr = new RegExp(
+      `${numBoundary(RETAINED_TEACHING_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
+        `${numBoundary(currentTeachingScenarios)}\\/` +
+        `${numBoundary(RETAINED_TEACHING_CALLS_AT_CAP)}`,
     );
-    expect(workflowComments).toContain(
-      `${masteryBudget.rounds}/${RETAINED_MASTERY_ROUNDS_COMPLETED}`,
+    expect(workflowComments).toMatch(teachingExpr);
+
+    const masteryExpr = new RegExp(
+      `${numBoundary(RETAINED_MASTERY_WALL_CLOCK_SECONDS)}s\\s+x\\s+` +
+        `${numBoundary(masteryBudget.rounds)}\\/` +
+        `${numBoundary(RETAINED_MASTERY_ROUNDS_COMPLETED)}`,
     );
+    expect(workflowComments).toMatch(masteryExpr);
+
     expect(workflowComments).toContain(`~${projectedMinutes} min`);
     expect(workflowComments).toContain(`~${headroomMultiple}×`);
     // The prose's stated timeout must bind to the ACTUAL configured value,
     // not an independent literal — this is what makes a timeout-minutes-only
-    // mutation (no comment-text change) break the suite (M1).
+    // mutation (no comment-text change) break the suite (M1). [CONSIDER]
+    // digit-boundary guarded so a mutated/wrong 2-digit value (e.g. 80)
+    // cannot match as a substring of the real 3-digit "180".
     expect(workflowComments).toMatch(
-      new RegExp(`${configuredTimeoutMinutes}-minute\\s+timeout-minutes`),
+      new RegExp(
+        `${numBoundary(configuredTimeoutMinutes)}-minute\\s+timeout-minutes`,
+      ),
     );
 
     // Uncertainty must be explicit (AC-6), not just a headline number:

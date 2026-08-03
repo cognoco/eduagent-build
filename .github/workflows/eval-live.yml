@@ -63,8 +63,15 @@ jobs:
     # not separately counted by that cap or by the run's summary counters at
     # the time; log: "Live calls OK: 298" + "Live calls failed: 2" = 300
     # outer invocations, exhausting that then-cap — NOT a measured
-    # provider-call count). Teaching 271s at cap 5, un-truncated (5 ok, 0
-    # failed). Mastery 710s, truncated to 21 of 24 scheduled rounds by its
+    # provider-call count). That exhaustion also skipped 29 of the run's
+    # envelope scenarios that day ("Skipped: 33" total; the other 4 were
+    # unrelated "flow does not apply to this profile" skips, not budget
+    # skips): 16 of the 29 were the remaining judge-bearing safety-probes
+    # (10) and language-quality (6) cases, and 13 were other
+    # challenge-round-mastery (3) and review-continuity-opener (10) cases —
+    # NOT all 29 carried an internal judge call. Teaching 271s at cap 5,
+    # un-truncated (5 ok, 0 failed). Mastery 710s, truncated to 21 of 24
+    # scheduled rounds by its
     # then-cap of 189 units ("budget requested 24 rounds but
     # --max-live-calls=189 (~9 calls/round) caps at 21. 3 round(s) dropped"
     # per the run log). Projecting each gate's wall clock onto CURRENT
