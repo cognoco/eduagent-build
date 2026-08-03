@@ -244,6 +244,7 @@ jobs:
           DATABASE_URL_STAGING_HOST: ${{ secrets.DATABASE_URL_STAGING_HOST }}
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
           WORKER_DATABASE_BYPASSRLS_EXPECTED: ${{ vars.WORKER_DATABASE_BYPASSRLS_EXPECTED }}
+          STAGING_WORKER_ADMIN_EXCEPTION_ROLE: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && vars.STAGING_WORKER_ADMIN_EXCEPTION_ROLE || '' }}
         run: node packages/database/scripts/verify-worker-db-role.mjs
 
       - name: Render Cloudflare identifiers into wrangler.toml
@@ -310,6 +311,7 @@ jobs:
           DATABASE_URL_STAGING_HOST: ${{ secrets.DATABASE_URL_STAGING_HOST }}
           DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
           WORKER_DATABASE_BYPASSRLS_EXPECTED: ${{ vars.WORKER_DATABASE_BYPASSRLS_EXPECTED }}
+          STAGING_WORKER_ADMIN_EXCEPTION_ROLE: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && vars.STAGING_WORKER_ADMIN_EXCEPTION_ROLE || '' }}
         run: node packages/database/scripts/verify-worker-db-role.mjs
 
       # [BUG-803] Sync secrets to the (already-deployed) Worker BEFORE switching
