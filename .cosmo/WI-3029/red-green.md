@@ -896,3 +896,72 @@ and new file `scripts/eval-live-gate-independence-typecheck.test.ts`.
 mutation proof was reverted). `.cosmo/WI-3029/workitem.json` and
 `.cosmo/WI-3029/merge-gate-dry-run.json` untouched. No Cosmo lifecycle
 mutation, no merge, no second PR.
+
+## AC-6 paragraph-delimiter round (CodeRabbit 3702246071, exact head a49b8316c)
+
+`projectionParagraphMatch`'s end-of-paragraph delimiter was hardcoded to
+`180-minute` even though `configuredTimeoutMinutes` is parsed from the
+workflow YAML a few lines above — a legitimate `timeout-minutes` change
+(with its comment updated to match) would fail paragraph extraction for a
+reason unrelated to the S2 label-binding this block exists to test. Fixed
+by building the regex from `numBoundary(configuredTimeoutMinutes)`
+instead of the literal `180`.
+
+RED/GREEN proof (paired `Edit`/`Edit` on both the test file and the
+workflow YAML; `git diff --stat` confirmed a byte-identical revert of the
+workflow mutation before moving on):
+
+```text
+# 1. Test regex temporarily reverted to hardcoded /180-minute/; workflow
+#    timeout-minutes changed 180->240 in BOTH the numeric field and its
+#    comment ("180-minute timeout-minutes." -> "240-minute..."), a
+#    legitimate paired change — RED, at the exact line the finding names:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+expect(projectionParagraphMatch).not.toBeNull() — Received: null
+Tests: 1 failed, 15 skipped, 16 total
+
+# 2. Fix restored (numBoundary(configuredTimeoutMinutes)), workflow
+#    mutation LEFT IN PLACE — extraction now succeeds; the test still
+#    fails, but only later, at the unrelated stale "~5.1x" headroom text
+#    (never updated to match 240 in this synthetic mutation) — proving
+#    extraction itself is fixed, independent of the headroom text:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts -t "AC-6"
+expect(workflowComments).toContain(`~${headroomMultiple}×`) — fails at
+  line 418 (headroom), NOT at line 390 (paragraph extraction) or the
+  envelope/teaching/mastery label-bound checks in between — all of which
+  passed.
+Tests: 1 failed, 15 skipped, 16 total
+
+# 3. Workflow mutation reverted (240 -> 180 in both places):
+$ git diff --stat .github/workflows/eval-live.yml
+(empty)
+
+# 4. GREEN:
+$ pnpm exec jest --config scripts/jest.config.cjs --no-coverage \
+    scripts/eval-live-gate-independence.test.ts \
+    scripts/eval-live-gate-independence-typecheck.test.ts
+Tests: 17 passed, 17 total
+```
+
+Full verification:
+
+```text
+$ npx eslint scripts/eval-live-gate-independence.test.ts
+No issues found
+
+$ nx run api:typecheck --skip-nx-cache
+Successfully ran target typecheck for project api and 5 tasks it depends on
+
+$ pnpm run test:scripts
+Test Suites: 1 skipped, 75 passed, 75 of 76 total
+Tests: 4 skipped, 1260 passed, 1264 total
+```
+
+Diff scope: `scripts/eval-live-gate-independence.test.ts` only (one regex
+now built from `numBoundary(configuredTimeoutMinutes)` instead of a
+literal `180`). `.github/workflows/eval-live.yml` has no net diff.
+`.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json`
+untouched. No WI-3061 scope touched, no other CONSIDER addressed, no
+Cosmo lifecycle mutation, no merge, no second PR.

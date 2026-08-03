@@ -69,3 +69,11 @@ Scope this round: `.github/workflows/eval-live.yml` (one sentence corrected), `s
 Verification: 17/17 focused tests, `pnpm run test:scripts` 75/76 suites (1 pre-existing unrelated skip) / 1260 passed, `nx run api:typecheck` clean, `eslint` clean. Full commands: `.cosmo/WI-3029/red-green.md` § "AC-6 S1/S2 round".
 
 Scope: `scripts/eval-live-gate-independence.test.ts` (2 call sites fixed, projection paragraph extracted, regexes labeled) and new `scripts/eval-live-gate-independence-typecheck.test.ts`. `.github/workflows/eval-live.yml` has no net diff this round. `.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json` untouched. No claim/complete/close/merge, no second PR. Live claim remains with shepherd:codex:singles-lane.
+
+## AC-6 paragraph-delimiter round (2026-08-03, CodeRabbit 3702246071)
+
+The projection-paragraph extraction's end delimiter was hardcoded to `180-minute` despite `configuredTimeoutMinutes` being parsed dynamically a few lines above — a legitimate `timeout-minutes` change (with its comment updated to match) would fail extraction for a reason unrelated to the S2 label-binding fix. Rebuilt the regex from `numBoundary(configuredTimeoutMinutes)`. Proven RED (temporarily reverted the fix, paired `timeout-minutes: 180→240` mutation of both the field and its comment — extraction returns `null` exactly where the finding says) then GREEN (fix restored with the same mutation still in place — extraction now succeeds; the test only fails later, at the unrelated stale `~5.1×` headroom text, isolating this fix from headroom concerns) then a byte-identical revert of the workflow mutation and full GREEN.
+
+Verification: 17/17 focused tests, `pnpm run test:scripts` 75/76 suites (1 pre-existing unrelated skip) / 1260 passed, `nx run api:typecheck` clean, `eslint` clean. Full commands: `.cosmo/WI-3029/red-green.md` § "AC-6 paragraph-delimiter round".
+
+Scope: `scripts/eval-live-gate-independence.test.ts` only (one regex). `.github/workflows/eval-live.yml` has no net diff. `.cosmo/WI-3029/workitem.json` and `.cosmo/WI-3029/merge-gate-dry-run.json` untouched. No WI-3061 scope touched, no other CONSIDER addressed, no claim/complete/close/merge, no second PR. Live claim remains with shepherd:codex:singles-lane.

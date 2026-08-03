@@ -378,8 +378,17 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
     // unlabelled search. Extract just the AC-6 projection sentence into a
     // bounded string, and require each pattern to include its own gate
     // label immediately before the duration+ratio expression.
+    //
+    // [CodeRabbit 3702246071] The end-of-paragraph delimiter must bind to
+    // the ACTUAL configured timeout, not a hardcoded "180" — a legitimate
+    // timeout-minutes change (with its comment updated to match) would
+    // otherwise fail extraction here for a reason that has nothing to do
+    // with the label-binding this block exists to test.
     const projectionParagraphMatch = workflowComments.match(
-      /Projecting each gate's wall clock onto CURRENT[\s\S]*?180-minute\s+timeout-minutes\./,
+      new RegExp(
+        `Projecting each gate's wall clock onto CURRENT[\\s\\S]*?` +
+          `${numBoundary(configuredTimeoutMinutes)}-minute\\s+timeout-minutes\\.`,
+      ),
     );
     expect(projectionParagraphMatch).not.toBeNull();
     const projectionParagraph = projectionParagraphMatch![0];
