@@ -4,7 +4,7 @@ description: Two recurring bug patterns found across the codebase in 2026-04-13 
 type: project
 ---
 
-## Pattern 1: Silent Fallbacks
+## Pattern 1: Silent Fallbacks [PRIN-19]
 
 Code that silently degrades to a "safe" default instead of surfacing an error. Found in API services and mobile query consumers.
 
@@ -18,7 +18,7 @@ Code that silently degrades to a "safe" default instead of surfacing an error. F
 
 **How to apply:** When writing any catch block or fallback path, ask: "Does this look like success to the caller?" If yes, it's a silent fallback bug.
 
-## Pattern 2: React State Timing Gaps
+## Pattern 2: React State Timing Gaps [PRIN-20]
 
 `isPending` or `useState` booleans used as concurrency guards but vulnerable to React's async batching. Found in mobile screens with mutation + Alert retry patterns.
 
