@@ -16,6 +16,7 @@ export {
   setLlmRoutingV2Enabled,
   setLlmKillSwitchActive,
   setLlmEnvironment,
+  setLlmTransferEvidenceVerified,
 } from './router';
 export { CONVERSATION_LANGUAGE_NAMES } from './router';
 // [WI-2628] The judge-independence exclusion pool + resolver. Exported so a guard

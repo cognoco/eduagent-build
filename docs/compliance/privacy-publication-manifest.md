@@ -44,7 +44,7 @@ code-verified is explicitly *not* established by this repository.
 | 10 | Unambiguously adult owner's display name may be sent for personalisation (§5) | code-verified | Same two gates (`isUnambiguouslyAdult` path) |
 | 11 | Providers do not train general-purpose models on customer content (§5, §8; summary "learning memory") | contract-dependent | Stated as a launch *requirement*, not a fact, in both documents; evidence → OPQ-110 vendor DPAs (ledger 2026-07-25) |
 | 12 | Processor list: Clerk, AI/embedding providers, Neon, Cloudflare, Resend, Sentry, Inngest, Expo/APNs/FCM, Apple/Google/RevenueCat (§6) | code-verified (inventory); contract-dependent (terms) | Matches live-recipient inventory in [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) (Inngest added to the notice 2026-08-01 — was a repo-owned omission); DPAs/terms → OPQ-110 |
-| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | contract-dependent | Honest future-tense claim. Runtime currently pins a global serving-region placeholder (`apps/api/src/services/llm/router.ts`, `V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)); SCCs/TIAs → OPQ-110 |
+| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | code-verified (enforcement); contract-dependent (safeguards) | Honest future-tense claim, now **runtime-enforced**: the WI-3020 launch-stop refuses production LLM routing (503 `LLM_UNAVAILABLE`) while the transfer-evidence lever is unsatisfied — `apps/api/src/services/llm/transfer-evidence-gate.ts`, checked at both router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`), test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)) — which is precisely why the stop is armed. Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
 | 14 | Age/residence data kept while account active; assertion-history retention period pending approval (§8) | code-verified (behaviour); external/legal (period) | Retention period → OPQ-24 counsel-approved retention schedule |
 | 15 | Chat transcripts deleted ~30 days after summary generation; delayed cases detected and alerted from day 37 (§8; summary "How long") | code-verified + config-dependent | `apps/api/src/inngest/functions/transcript-purge-cron.ts` (30-day cutoff; day-37 delayed detection + alert); flag `RETENTION_PURGE_ENABLED` (`apps/api/src/config.ts`, `apps/api/src/inngest/helpers.ts`); production run evidence [`2026-07-24-wi-1194-production-transcript-purge-evidence.md`](2026-07-24-wi-1194-production-transcript-purge-evidence.md) — re-verify at publication gate |
 | 16 | Learning memory persists while account active; may contain short learner quotations; not used for advertising (§8; summary) | code-verified | [`ropa.md`](ropa.md) learning-model record; quotation guard in `apps/api/src/services/challenge-round/note-draft.ts`; no ad SDK (worksheet Advertising row). Dormancy retention remains an open DPO item |
@@ -104,22 +104,32 @@ outside this repository's authority.
    under `docs/compliance/evidence/` (or the controller's records system) with
    a source date and integrity hash, per the evidence rules in
    [`README.md`](README.md).
-9. **Named missing control — international-routing launch-stop** *(gap; the
-   absence of this control is recorded as a fact, never represented as
-   compliance)*: no executable runtime control currently blocks learner data
-   from being routed to non-EEA AI providers while the OPQ-110 transfer
-   evidence is pending. The serving-region seam is
-   `V2_SERVING_REGION_PLACEHOLDER` in `apps/api/src/services/llm/router.ts`,
-   which today pins all traffic — EU included — to the US-hosted primary
-   (claim row #13). Before publication and launch, the launch-compliance gate
-   this checklist feeds (WI-1577 — launch-compliance gate) must hold either
-   verified OPQ-110 safeguards for every provider actually routed, or an
-   implemented technical stop. Bounded Work-Item shape for capture
-   (engineering, not this docs item): a config-gated launch-stop at the
-   `V2_SERVING_REGION_PLACEHOLDER` seam — an explicit setting the router
-   checks before selecting a non-EEA provider for learner traffic, failing
-   over to the tier's EU secondary or refusing the call — verified at the
-   launch gate. Accountable owner: engineering, under the launch-compliance
+9. **International-routing launch-stop** *(implemented WI-3020; the control is
+   armed, and the underlying safeguards are still pending)*: the §7 commitment
+   is enforced by the runtime, not by prose. `apps/api/src/services/llm/
+   transfer-evidence-gate.ts` refuses production LLM routing at both router
+   choke points (`routeAndCall` / `routeAndStream`,
+   `apps/api/src/services/llm/router.ts`) unless the OPQ-110 transfer-evidence
+   lever is explicitly satisfied, surfacing as the already-handled `503
+   LLM_UNAVAILABLE` degradation. Fail-closed on absence (an unset or
+   partially-synced binding leaves the stop armed) and inert outside
+   production, so dev/staging are unaffected. The serving-region seam is still
+   `V2_SERVING_REGION_PLACEHOLDER` pinned to `'global'` (claim row #13) — the
+   stop exists precisely because no serving region carries verified
+   safeguards; it deliberately does not build the region axis. The control is
+   environment-scoped rather than traffic-class-scoped: scoping to "learner
+   data" would key on optional router options, so an omitting call site would
+   fail open. Both directions are proven by
+   `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`.
+   **Release lever** (flip only when OPQ-110 clears for every provider actually
+   routed, then redeploy): `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` in
+   `apps/api/wrangler.toml` `[env.production.vars]` — currently `"false"`. It
+   lives in the repo rather than Doppler so the launch-stop's live state is
+   auditable in git; it is a compliance assertion, not a secret. The
+   launch-compliance gate this checklist feeds (WI-1577 — launch-compliance
+   gate) verifies the lever's state at the gate; registered in
+   [`../pre-launch-checklist.md`](../pre-launch-checklist.md) → Verification
+   Before Go-Live. Accountable owner: engineering, under the launch-compliance
    gate.
 10. **Pre-publication re-verification**: `RETENTION_PURGE_ENABLED` still
    enabled in production (latest evidence 2026-07-24); the live provider set

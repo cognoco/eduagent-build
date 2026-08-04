@@ -10,13 +10,17 @@ import {
   runWithLlmRequestContext,
   setLlmRoutingV2Enabled,
   setLlmKillSwitchActive,
+  setLlmTransferEvidenceVerified,
 } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
 import { createAnthropicProvider } from '../services/llm/providers/anthropic';
 import { createCerebrasProvider } from '../services/llm/providers/cerebras';
 import { createMistralProvider } from '../services/llm/providers/mistral';
-import { isLlmRoutingV2Enabled } from '../config';
+import {
+  isLlmRoutingV2Enabled,
+  isInternationalTransferEvidenceVerified,
+} from '../config';
 import { createLogger } from '../services/logger';
 import { readLlmKillSwitch } from '../services/kv';
 
@@ -31,6 +35,9 @@ type LLMEnv = {
     MISTRAL_API_KEY?: string;
     LLM_ROUTING_V2_ENABLED?: string;
     ENVIRONMENT?: string;
+    // WI-3020 — international-routing launch-stop release lever. Declared in
+    // wrangler.toml [env.production.vars]; absence leaves the stop armed.
+    INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED?: string;
     // WI-1505 — reused for the aggregate LLM kill switch (key
     // `llm:kill-switch`); no new KV namespace/binding needed.
     SUBSCRIPTION_KV?: KVNamespace;
@@ -168,6 +175,11 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
     {
       routingV2Enabled: isLlmRoutingV2Enabled(c.env?.LLM_ROUTING_V2_ENABLED),
       environment: c.env?.ENVIRONMENT ?? 'development',
+      // WI-3020 — the compliance lever is read per request (never an isolate
+      // global) for the same overlapping-request reason as the V2 flag.
+      transferEvidenceVerified: isInternationalTransferEvidenceVerified(
+        c.env?.INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED,
+      ),
       readKillSwitch: subscriptionKv
         ? () => readLlmKillSwitch(subscriptionKv)
         : undefined,
@@ -191,4 +203,7 @@ export function resetLlmMiddleware(): void {
   // WI-1505 — reset the kill switch so a test that flipped it on cannot leak
   // into the next.
   setLlmKillSwitchActive(false);
+  // WI-3020 — reset the transfer-evidence lever to its default-closed value so
+  // a test that satisfied it cannot leak into the next.
+  setLlmTransferEvidenceVerified(false);
 }
