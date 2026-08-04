@@ -727,6 +727,35 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
         where: eq(consentGrant.id, independent.id),
       }),
     ).resolves.toMatchObject({ withdrawnAt: null });
+
+    // [WI-2929] The third withdrawal path (invalidateJourneyAuthority) must
+    // mirror onto the durable receipts like stampWithdrawal and
+    // withdrawAdultSelfConsentV2 do, so no receipt asserts a live consent for a
+    // purpose that has been retired. Adjacent to AC-1 rather than required by
+    // it, but leaving one of three withdrawal paths unmirrored would be an
+    // inconsistency this change itself introduced.
+    const journeyReceipts = await db.query.consentReceipt.findMany({
+      where: inArray(
+        consentReceipt.consentGrantId,
+        journeyGrants.map((grant) => grant.id),
+      ),
+    });
+    expect(journeyReceipts).toHaveLength(journeyGrants.length);
+    expect(
+      journeyReceipts.every(
+        (receipt) => receipt.withdrawnAt?.getTime() === declinedAt.getTime(),
+      ),
+    ).toBe(true);
+    // The mirror is scoped to the grants actually retired, not to the person:
+    // no other receipt of this learner's was stamped withdrawn. (The
+    // independent grant above is inserted directly by this fixture, bypassing
+    // the service, so it legitimately has no receipt of its own.)
+    const withdrawnReceipts = (
+      await db.query.consentReceipt.findMany({
+        where: eq(consentReceipt.personId, learner.personId),
+      })
+    ).filter((receipt) => receipt.withdrawnAt !== null);
+    expect(withdrawnReceipts).toHaveLength(journeyGrants.length);
   });
 
   it('binds an alternate verified guardian to the destination and keeps supporter acceptance pending', async () => {
@@ -1111,6 +1140,33 @@ describe('startOrResumeFamilyJoinJourney (PostgreSQL)', () => {
           (grant.auditFact as Record<string, unknown>).source ===
             'family_join_destination_self_consent',
       ),
+    ).toBe(true);
+
+    // [WI-2929] writeDestinationSelfConsentSet is a production grant writer and
+    // was missed by the first pass: no grant-time receipt and no promoted
+    // policy_version (its version lived only in the destructible audit_fact).
+    // The destination grants are LIVE here — nothing has been deleted — so a
+    // receipt for them can only come from the grant-time write.
+    expect(
+      destinationGrants.every(
+        (grant) => grant.policyVersion === POLICY_VERSION,
+      ),
+    ).toBe(true);
+    const destinationReceipts = receipts.filter(
+      (receipt) => receipt.organizationId === inviter.organizationId,
+    );
+    expect(destinationReceipts).toHaveLength(CONSENT_PURPOSES.length);
+    expect(new Set(destinationReceipts.map((r) => r.consentGrantId))).toEqual(
+      new Set(destinationGrants.map((g) => g.id)),
+    );
+    expect(
+      destinationReceipts.every(
+        (receipt) => receipt.policyVersion === POLICY_VERSION,
+      ),
+    ).toBe(true);
+    expect(destinationReceipts.every((receipt) => receipt.granted)).toBe(true);
+    expect(
+      destinationReceipts.every((receipt) => receipt.withdrawnAt === null),
     ).toBe(true);
   });
 

@@ -41,6 +41,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
   consentGrant,
+  consentReceipt,
   familyJoinInvite,
   guardianship,
   login,
@@ -107,6 +108,8 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
         .delete(supportership)
         .where(eq(supportership.supporteePersonId, pid));
       await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+      // [WI-2929] grant-time receipts now exist for every seeded graph.
+      await db.delete(consentReceipt).where(eq(consentReceipt.personId, pid));
       await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));
       await db
         .delete(guardianship)
@@ -363,6 +366,71 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       ).toBeUndefined();
     },
   );
+
+  // [WI-2929] The receipt must not contradict the LIVE grant it mirrors about
+  // who owns the consent. Receipts are now written at grant time, so an
+  // accepting adult arrives holding receipts stamped with the org-of-one — and
+  // this branch re-points the surviving grants to the family org and then
+  // deletes the org-of-one. Deliberately scoped to the SURVIVING-grant branch:
+  // the archive branch (archiveSourceConsentGrants) deletes its grants, so its
+  // receipts rightly keep the source-org id forever, which
+  // family-join-journey.integration.test.ts asserts and this must not disturb.
+  it('[WI-2929] re-points the grant-time consent receipts to the family org alongside the surviving grants', async () => {
+    const family = await seedGraph({
+      birthYear: 1990,
+      displayName: 'Receipt Family Owner',
+    });
+    const adultTeen = await seedGraph({
+      birthYear: CAPABLE_BIRTH_YEAR,
+      displayName: 'Receipt Adult Teen',
+    });
+
+    // Precondition: grant-time receipts exist under the org-of-one BEFORE the
+    // join — otherwise this test would vacuously pass.
+    const preJoinReceipts = await db.query.consentReceipt.findMany({
+      where: eq(consentReceipt.personId, adultTeen.personId),
+    });
+    expect(preJoinReceipts.length).toBeGreaterThan(0);
+    for (const r of preJoinReceipts) {
+      expect(r.organizationId).toBe(adultTeen.orgId);
+    }
+
+    await acceptFamilyJoin(db, {
+      teenPersonId: adultTeen.personId,
+      ...(await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      })),
+      familyOrgId: family.orgId,
+      parentPersonId: family.personId,
+      optInSupportership: false,
+    });
+
+    const postJoinReceipts = await db.query.consentReceipt.findMany({
+      where: eq(consentReceipt.personId, adultTeen.personId),
+    });
+    // Same rows refreshed in place — the upsert must not have duplicated them.
+    expect(postJoinReceipts).toHaveLength(preJoinReceipts.length);
+    expect(postJoinReceipts.map((r) => r.id).sort()).toEqual(
+      preJoinReceipts.map((r) => r.id).sort(),
+    );
+    // Ownership followed the surviving grants; nothing is left pointing at the
+    // org-of-one, which no longer exists.
+    for (const r of postJoinReceipts) {
+      expect(r.organizationId).toBe(family.orgId);
+    }
+    expect(
+      postJoinReceipts.filter((r) => r.organizationId === adultTeen.orgId),
+    ).toHaveLength(0);
+
+    // And each receipt still mirrors its own live grant.
+    const postJoinGrants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, adultTeen.personId),
+    });
+    expect(new Set(postJoinReceipts.map((r) => r.consentGrantId))).toEqual(
+      new Set(postJoinGrants.map((g) => g.id)),
+    );
+  });
 
   // AC-3 (no auto-guardianship) + AC-4 (person_id stable).
   itGraph(

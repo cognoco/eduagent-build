@@ -12,6 +12,7 @@ import { computeAgeBracketFromDate, CONSENT_PURPOSES } from '@eduagent/schemas';
 import { calculateAgeFromParts } from '../age-utils';
 import { resolveJurisdiction } from './country-policy-loader';
 import { consentPersonLockKey } from './deletion-v2';
+import { syncConsentReceipts } from './consent-receipt-v2';
 import type { GuardianAuthorityAssertion } from './guardian-attachment-token';
 import { GUARDIAN_AUTHORITY_CLOCK_SKEW_MS } from './guardian-attachment-token';
 
@@ -410,6 +411,12 @@ export async function attachGuardianConsentForCredentialedLearner(
           assuranceMethod: authority.assuranceMethod,
           snapshotAgeAtGrant: context.chargeAge,
           snapshotJurisdictionAtGrant: authority.jurisdiction,
+          // [WI-2929] The version this attachment was authorised against, in
+          // the column no withdrawal path writes. It is also kept in
+          // `audit_fact` below (unchanged — `alreadySatisfied` above compares
+          // `audit.policyVersion`), but the JSONB copy is what `stampWithdrawal`
+          // destroys on a guardian revocation, so the column is the durable one.
+          policyVersion: authority.policyVersion,
           auditFact: {
             source: 'credentialed_learner_guardian_attachment',
             guardianPersonId: input.callerPersonId,
@@ -424,10 +431,16 @@ export async function attachGuardianConsentForCredentialedLearner(
           },
         })),
       )
-      .returning({ id: consentGrant.id, purpose: consentGrant.purpose });
+      .returning();
     if (!hasCompletePurposeSet(grants)) {
       throw new Error('guardian attachment grant purpose set was incomplete');
     }
+    // [WI-2929] This is a production grant writer, so it owes a grant-time
+    // receipt like every other one — AC-1 is about the moment consent is
+    // taken, not about which files the original change happened to touch.
+    // Same transaction as the grant insert, so a receipt without its grant is
+    // never observable.
+    await syncConsentReceipts(tx, grants);
 
     for (const request of requests) {
       const grant = grants.find(

@@ -112,6 +112,25 @@ export async function syncConsentReceipts(
         priorValue: sqlExcluded('prior_value'),
         auditFact: sqlExcluded('audit_fact'),
         policyVersion: sqlExcluded('policy_version'),
+        // [WI-2929] A receipt mirrors the grant named by `consent_grant_id`, so
+        // it must not contradict that grant about who owns the consent while
+        // the grant is still live. `acceptFamilyJoin` re-points a SURVIVING
+        // person's grants from the org-of-one to the family org
+        // (family-join-v2.ts); without this, a grant-time receipt would keep
+        // saying org-of-one for a grant that now says family-org.
+        //
+        // This is NOT a claim that the receipt tracks "current" ownership in
+        // general. Refreshing is driven by what the caller passes: the ARCHIVE
+        // path (archiveSourceConsentGrants) passes the source-org grants and
+        // then deletes them, so its receipt correctly keeps the OLD org id as
+        // the terminal record of a consent that lived and died there — which
+        // family-join-journey.integration.test.ts asserts. Only a live grant's
+        // own move is followed.
+        //
+        // The genuine at-grant snapshots — snapshot_age_at_grant,
+        // snapshot_jurisdiction_at_grant — are not copied onto the receipt at
+        // all, and are deliberately not introduced here.
+        organizationId: sqlExcluded('organization_id'),
       },
     });
 }
