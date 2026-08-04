@@ -47,7 +47,10 @@ import { computeTrialEndDate } from '../trial';
 import { getTierConfig } from '../subscription';
 import { addMonthsClamped } from '../billing/billing-shared';
 import { resolveIdentityV2, type ResolvedIdentityV2 } from './identity-resolve';
-import { checkConsentRequiredFromDate } from '../consent';
+import {
+  checkConsentRequiredFromDate,
+  isBelowMinimumAgeAtCreation,
+} from '../consent';
 import { ProfileValidationError } from '../profile';
 import {
   createPendingConsentRequest,
@@ -223,7 +226,19 @@ export async function createIdentityGraph(
     input.birthMonth,
     input.birthDay,
   );
-  if (consentCheck.belowMinimumAge) {
+  // [WI-3019] Fail-closed floor. `checkConsentRequiredFromDate` silently falls
+  // back to calendar-year math when month/day are absent, so a year-only
+  // bootstrap payload at the floor year could register a not-yet-13 owner.
+  // Only the FLOOR is made conservative — `consentCheck` still drives consent
+  // type and the `age >= 18` adult self-consent grant below on its existing
+  // semantics, so no grant record changes for the year-only cohorts.
+  if (
+    isBelowMinimumAgeAtCreation(
+      input.birthYear,
+      input.birthMonth,
+      input.birthDay,
+    )
+  ) {
     throw new ProfileValidationError(
       'CHILD_AGE_VIOLATION',
       'birthYear',

@@ -26,6 +26,7 @@ import {
   profileUpdateSchema,
   NEW_LEARNER_SESSION_THRESHOLD,
 } from './profiles.js';
+import { PROFILE_MINIMUM_AGE } from './age.js';
 import {
   interestsArraySchema,
   interestEntrySchema,
@@ -332,9 +333,12 @@ describe('[BUG-780] onboarding patch schemas mirror profileUpdateSchema', () => 
 });
 
 describe('profileCreateSchema — conversationLanguage at the create boundary (i18n Phase 1)', () => {
+  // WI-3019: a year-only payload is only accepted when the birth year is
+  // unambiguously above the age floor, so this fixture uses a clearly-adult
+  // year rather than a hardcoded one that drifts into the floor year.
   const baseValid = {
     displayName: 'Alex',
-    birthYear: 2013,
+    birthYear: new Date().getUTCFullYear() - 20,
   };
 
   it('accepts a valid conversationLanguage code at create time', () => {
@@ -361,9 +365,12 @@ describe('profileCreateSchema — conversationLanguage at the create boundary (i
 });
 
 describe('profileCreateSchema — full birth date validation (WI-367)', () => {
+  // WI-3019: these cases exercise the month/day PAIRING and calendar-validity
+  // rules, so the fixture must stay year-only-legal — a clearly-adult year
+  // keeps them independent of the floor-year full-date requirement below.
   const baseValid = {
     displayName: 'Alex',
-    birthYear: 2013,
+    birthYear: new Date().getUTCFullYear() - 20,
   };
 
   it('rejects a birth month without a birth day', () => {
@@ -413,5 +420,62 @@ describe('profileCreateSchema — full birth date validation (WI-367)', () => {
         }),
       ]),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-3019 — full birth date required server-side at the age floor.
+//
+// birthYearSchema already caps birthYear at <= currentYear - PROFILE_MINIMUM_AGE,
+// so `currentYear - PROFILE_MINIMUM_AGE` is the ONLY year-only value that is
+// ambiguous against the floor: a learner born in that year who has not yet had
+// their birthday is still 12. Every older year clears the floor even when the
+// birthday is assumed not to have happened yet. Requiring the full date for
+// exactly that year closes the under-13 registration gap at the trust boundary
+// without rejecting the year-only payloads legitimate callers still send.
+// ---------------------------------------------------------------------------
+describe('profileCreateSchema — year-only payload at the age floor (WI-3019)', () => {
+  const currentYear = new Date().getUTCFullYear();
+  const floorBirthYear = currentYear - PROFILE_MINIMUM_AGE;
+
+  it('[BREAK] rejects a year-only payload at the floor birth year (may still be 12)', () => {
+    const result = profileCreateSchema.safeParse({
+      displayName: 'Boundary Learner',
+      birthYear: floorBirthYear,
+      // no birthMonth / birthDay — the year-only fallback this closes.
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['birthMonth'],
+        }),
+      ]),
+    );
+  });
+
+  it('accepts the floor birth year when the full date is supplied', () => {
+    // The schema defers the EXACT age decision to the creation services; its
+    // job is only to guarantee they receive month/day to decide with.
+    const result = profileCreateSchema.safeParse({
+      displayName: 'Boundary Learner',
+      birthYear: floorBirthYear,
+      birthMonth: 6,
+      birthDay: 15,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('still accepts a year-only payload for an unambiguously older birth year', () => {
+    // AC-3: callers that legitimately send year-only data keep working — only
+    // the one ambiguous year now demands the full date.
+    const result = profileCreateSchema.safeParse({
+      displayName: 'Adult Owner',
+      birthYear: currentYear - PROFILE_MINIMUM_AGE - 1,
+    });
+
+    expect(result.success).toBe(true);
   });
 });

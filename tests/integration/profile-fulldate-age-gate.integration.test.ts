@@ -128,6 +128,38 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
     expect(body.profile.birthDay).toBe(isYearOnlySentinel ? null : today.day);
   });
 
+  it('[WI-3019 break-test] year-only payload at the floor birth year is rejected', async () => {
+    // The exposed variant: a direct API payload carrying birthYear =
+    // currentYear - 13 and NO month/day. Calendar-year math read that as 13
+    // and registered a learner who may still be 12. profileCreateSchema now
+    // demands the full date for exactly that year, so zValidator rejects the
+    // payload before any writer runs.
+    await cleanupAccounts({
+      emails: [USER.email],
+      clerkUserIds: [USER.userId],
+    });
+
+    const today = todayUTC();
+
+    const res = await app.request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: USER.userId, email: USER.email }),
+        body: JSON.stringify({
+          displayName: 'WI3019 YearOnlyFloor',
+          birthYear: today.year - 13,
+          // no birthMonth / birthDay — the year-only fallback under test.
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(JSON.stringify(body)).toContain('birthMonth');
+  });
+
   it('year-only path (no birthMonth/birthDay) still works for age >= 13', async () => {
     // Must clean up first since "exactly 13" test above may have created a profile for this user.
     await cleanupAccounts({

@@ -36,7 +36,11 @@ import {
 } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
 import { ProfileLimitError, ProfileValidationError } from '../profile';
-import { checkConsentRequired, checkConsentRequiredFromDate } from '../consent';
+import {
+  checkConsentRequired,
+  checkConsentRequiredFromDate,
+  isBelowMinimumAgeAtCreation,
+} from '../consent';
 import {
   canAddProfileV2,
   getSubscriptionByAccountIdV2,
@@ -147,7 +151,18 @@ export async function createChildProfileV2(
     // Enforce the v1 minimum-age floor (WI-570 / data-model.md §2A.5: 13+),
     // matching the legacy writer (services/profile.ts createProfile). Reject
     // below-minimum BEFORE inserting any rows.
-    if (consentCheck.belowMinimumAge) {
+    // [WI-3019] The floor uses the fail-closed check, not
+    // `consentCheck.belowMinimumAge`: when month/day are absent the latter
+    // falls back to calendar-year math that admits a not-yet-13 learner born
+    // late in the year. Identical to `consentCheck.belowMinimumAge` whenever
+    // the exact date is supplied; strictly more conservative when it is not.
+    if (
+      isBelowMinimumAgeAtCreation(
+        input.birthYear,
+        input.birthMonth,
+        input.birthDay,
+      )
+    ) {
       throw new ProfileValidationError(
         'CHILD_AGE_VIOLATION',
         'birthYear',

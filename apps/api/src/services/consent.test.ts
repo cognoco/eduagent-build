@@ -3,6 +3,7 @@ import {
   calculateAgeFromParts,
   checkConsentRequired,
   checkConsentRequiredFromDate,
+  isBelowMinimumAgeAtCreation,
 } from './consent';
 
 // Must mirror SUT: calculateAge() uses getUTCFullYear() so tests stay correct
@@ -186,9 +187,56 @@ describe('checkConsentRequiredFromDate', () => {
   it('falls back to year-only when month/day not supplied (WI-570: 13+ floor)', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
     // year-only: 2026 - 2013 = 13 → belowMinimumAge is NOT set (age >= MINIMUM_AGE=13)
+    // [WI-3019] This documents the calendar-year fallback of THIS function,
+    // which still drives consent-type selection. The minimum-age FLOOR no
+    // longer relies on it — see isBelowMinimumAgeAtCreation below.
     const result = checkConsentRequiredFromDate(2013);
     expect(result.belowMinimumAge).toBeUndefined();
     expect(result.required).toBe(true);
     expect(result.age).toBe(13);
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-3019] isBelowMinimumAgeAtCreation — fail-closed floor at profile creation
+// ---------------------------------------------------------------------------
+
+describe('isBelowMinimumAgeAtCreation', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[BREAK] blocks a year-only payload at the floor birth year (may still be 12)', () => {
+    // The WI-3019 exposure: 2026 - 2013 = 13 by calendar-year math, so the
+    // year-only fallback admitted this payload even though a learner born
+    // later in 2013 is still 12. Fail-closed: assume the birthday has not
+    // happened yet.
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(isBelowMinimumAgeAtCreation(2013)).toBe(true);
+  });
+
+  it('blocks the floor birth year when the exact date proves the learner is 12', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(isBelowMinimumAgeAtCreation(2013, 12, 31)).toBe(true);
+  });
+
+  it('allows the floor birth year once the exact date proves the learner is 13', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(isBelowMinimumAgeAtCreation(2013, 5, 24)).toBe(false);
+  });
+
+  it('allows a year-only payload for an unambiguously older birth year', () => {
+    // AC-3: year-only callers above the ambiguous year keep working — even
+    // assuming the birthday has not happened yet, 2026 - 2012 - 1 = 13.
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+    expect(isBelowMinimumAgeAtCreation(2012)).toBe(false);
+    expect(isBelowMinimumAgeAtCreation(1990)).toBe(false);
+  });
+
+  it.each([null, undefined, 0])(
+    '[F-029-sem] fails closed on an unknown birthYear (%s)',
+    (birthYear) => {
+      expect(isBelowMinimumAgeAtCreation(birthYear)).toBe(true);
+    },
+  );
 });
