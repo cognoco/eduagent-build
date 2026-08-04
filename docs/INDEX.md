@@ -79,8 +79,8 @@ First drained cross-cutting canon, landed ahead of the rest:
 ## L2 — All decisions (ADRs)
 
 The full ADR register and the significance gate live in
-[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0019`, `MMT-ADR-0021`, `MMT-ADR-0022`, the reconstructed `0023`–`0052` series (Proposed unless marked), `0053` (agents-file design principles, Proposed), and `0054` (mobile release policy — runtimeVersion, flag tuples, channel ownership; Accepted)
-(`0003` is unused — number gap, not a live record; `0020` is reserved for the identity-foundation cutover-plan consent-request ADR and is not yet filed; `0017` records the concept-capture additive layer; `0018` promotes the legacy `ARCH-8` LLM-orchestrator entry; `0019` records the OS-agnostic cross-platform development policy; `0021` records the freeform Library-filing threshold (five-exchange gate); `0022` records the activity-ledger narration substrate). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
+[`docs/adr/README.md`](adr/README.md). Current ADRs: `MMT-ADR-0000`–`0019`, `MMT-ADR-0021`, `MMT-ADR-0022`, the reconstructed `0023`–`0052` series (Proposed unless marked), and `0054` (mobile release policy — runtimeVersion, flag tuples, channel ownership; Accepted)
+(`0003` is unused — number gap, not a live record; `0020` is reserved for the identity-foundation cutover-plan consent-request ADR and is not yet filed; `0053` was retired unratified — the agents-file rule lives estate-side, `NEX-ADR-0000` §I.2 in `cognoco/nexus`, bound via `MMT-ADR-0000` §I.1; `0017` records the concept-capture additive layer; `0018` promotes the legacy `ARCH-8` LLM-orchestrator entry; `0019` records the OS-agnostic cross-platform development policy; `0021` records the freeform Library-filing threshold (five-exchange gate); `0022` records the activity-ledger narration substrate). The legacy `ARCH-1…ARCH-26` register (frozen; code-cited;
 draining to ADRs as Stream-2 work) is described in `MMT-ADR-0000` Part III.
 
 ## L3 — Operational

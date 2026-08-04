@@ -411,4 +411,4 @@ bash scripts/check-change-class.sh --branch     # check full branch diff vs main
 # See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-08-02 (WI-2052 restructure — operator-ruled content plan; design principle: docs/adr/MMT-ADR-0053)
+Last updated: 2026-08-04 (design principle: `NEX-ADR-0000` §I.2 — estate presence-dial rule; local binding: `MMT-ADR-0000` §I.1)
