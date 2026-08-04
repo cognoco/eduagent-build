@@ -17,7 +17,9 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Database } from '@eduagent/database';
+import { PROFILE_MINIMUM_AGE } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
+import { ProfileValidationError } from '../profile';
 import { createIdentityGraph } from './identity-graph';
 
 // ── External-boundary mocks (not internal — gc1-allow for each) ─────────
@@ -79,6 +81,23 @@ function makeRaceDb(
         findFirst: jest.fn().mockResolvedValue(raceReRead),
       },
     },
+  } as unknown as Database;
+}
+
+/**
+ * [WI-3019] A Database that refuses to be used at all. Any access is a test
+ * failure by construction, which is what makes it the right instrument for a
+ * guard that must reject BEFORE opening a transaction.
+ */
+function makeUntouchableDb(): Database {
+  const touched = () => {
+    throw new Error(
+      'database was touched: the minimum-age floor must reject before any database work',
+    );
+  };
+  return {
+    transaction: touched,
+    query: { login: { findFirst: touched } },
   } as unknown as Database;
 }
 
@@ -179,5 +198,51 @@ describe('[WI-2788] createIdentityGraph — pending Clerk erasure fence', () => 
     expect(fenceAt).toBeGreaterThanOrEqual(0);
     expect(loginInsertAt).toBeGreaterThanOrEqual(0);
     expect(fenceAt).toBeLessThan(loginInsertAt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-3019] createIdentityGraph — writer-level fail-closed minimum-age floor.
+//
+// profileCreateSchema requires birthMonth/birthDay once birthYear reaches the
+// floor year, so the ROUTE never hands a year-only floor-year payload to this
+// writer. isBelowMinimumAgeAtCreation is wired in here as defence-in-depth for
+// a caller that reaches the writer WITHOUT passing through zValidator, and the
+// attack that layer exists to stop is precisely "first layer bypassed".
+// Calling createIdentityGraph directly is that bypass.
+//
+// The floor is evaluated before db.transaction is opened, so an untouchable
+// Database is the instrument: it proves both that the payload is rejected and
+// that nothing reaches the database. Relative year, never a literal.
+//
+// Red-green-revert: restore the previous `consentCheck.belowMinimumAge` test in
+// identity-graph.ts and the BREAK case stops throwing ProfileValidationError —
+// it dies on the untouchable DB instead, i.e. an under-age owner would have
+// been written.
+// ---------------------------------------------------------------------------
+describe('[WI-3019] createIdentityGraph — minimum-age floor with the schema layer bypassed', () => {
+  const CURRENT_YEAR = new Date().getUTCFullYear();
+
+  it('[BREAK] rejects a year-only payload at the floor birth year before any database work', async () => {
+    await expect(
+      createIdentityGraph(makeUntouchableDb(), {
+        ...BASE_INPUT,
+        birthYear: CURRENT_YEAR - PROFILE_MINIMUM_AGE,
+        // No birthMonth/birthDay — calendar-year math reads this as exactly
+        // PROFILE_MINIMUM_AGE while the person may still be a year younger.
+      }),
+    ).rejects.toBeInstanceOf(ProfileValidationError);
+  });
+
+  it('still admits a year-only payload one year clear of the floor', async () => {
+    // Proves the guard is a floor and not a blanket ban on year-only input:
+    // this payload passes the age check and then dies on the untouchable DB,
+    // so the rejection is NOT a ProfileValidationError.
+    await expect(
+      createIdentityGraph(makeUntouchableDb(), {
+        ...BASE_INPUT,
+        birthYear: CURRENT_YEAR - PROFILE_MINIMUM_AGE - 1,
+      }),
+    ).rejects.not.toBeInstanceOf(ProfileValidationError);
   });
 });
