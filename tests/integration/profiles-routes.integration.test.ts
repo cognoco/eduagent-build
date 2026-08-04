@@ -108,17 +108,25 @@ describe('Integration: POST /v1/profiles', () => {
   });
 
   it('returns 201 with birthYear-only profile data', async () => {
-    // WI-570: v1 13+ floor — use 2013 (age 13, boundary valid).
+    // WI-3019: a year-only payload is accepted only when birthYear is
+    // unambiguously above the floor. The floor year itself
+    // (currentYear - PROFILE_MINIMUM_AGE) now requires birthMonth/birthDay,
+    // because year-only math cannot tell a 12-year-old from a 13-year-old
+    // there. Adding month/day here would defeat the point of THIS case — it
+    // exists to prove the year-only path still works — so use a clearly-adult
+    // year instead. Relative, not a fresh literal: a hardcoded year drifts
+    // into the floor year and re-arms the same trap.
+    const birthYear = new Date().getUTCFullYear() - 20;
     const created = await createProfileViaRoute({
       app,
       env: TEST_ENV,
       user: PROFILE_USER,
       displayName: 'Birth Year User',
-      birthYear: 2013,
+      birthYear,
     });
 
     expect(created.displayName).toBe('Birth Year User');
-    expect(created.birthYear).toBe(2013);
+    expect(created.birthYear).toBe(birthYear);
   });
 
   it('returns 400 when displayName is missing', async () => {
@@ -130,7 +138,13 @@ describe('Integration: POST /v1/profiles', () => {
           sub: PROFILE_USER.userId,
           email: PROFILE_USER.email,
         }),
-        body: JSON.stringify({ birthYear: 2013 }),
+        // WI-3019: keep the birth year clearly above the floor so the ONLY
+        // reason this 400s is the missing displayName. At the floor year the
+        // payload would also fail the full-birth-date rule, and the case would
+        // pass for the wrong reason.
+        body: JSON.stringify({
+          birthYear: new Date().getUTCFullYear() - 20,
+        }),
       },
       TEST_ENV,
     );

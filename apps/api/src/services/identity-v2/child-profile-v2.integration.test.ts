@@ -42,7 +42,7 @@ import {
   subscriptionPayers,
   type Database,
 } from '@eduagent/database';
-import { ForbiddenError } from '@eduagent/schemas';
+import { ForbiddenError, PROFILE_MINIMUM_AGE } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
 import { ProfileLimitError, ProfileValidationError } from '../profile';
 import {
@@ -417,6 +417,89 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
         where: eq(guardianship.guardianPersonId, ownerPersonId),
       });
       expect(edges).toHaveLength(0);
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // [WI-3019] Defence-in-depth: the writer-level fail-closed age floor.
+  //
+  // profileCreateSchema rejects a year-only payload at the floor year, so the
+  // ROUTE never delivers one to either writer. The attack these two cases
+  // reproduce is therefore "first layer bypassed": any caller that reaches a
+  // creation writer WITHOUT passing through zValidator — a service-to-service
+  // call, a future internal caller, a seed path wired to the real writer.
+  // Both writers are covered because isBelowMinimumAgeAtCreation is wired into
+  // both; testing one would leave the other's guard unexercised.
+  //
+  // Year-only + floor year is the exact bypass: calendar-year math reads it as
+  // PROFILE_MINIMUM_AGE while the learner may still be a year younger.
+  // Red-green-revert: swap isBelowMinimumAgeAtCreation back to the previous
+  // consentCheck.belowMinimumAge test in child-profile-v2.ts /
+  // identity-graph.ts and both cases stop throwing (an under-age person is
+  // created). Relative year, never a literal — a hardcoded one drifts into,
+  // and then out of, the floor year.
+  // -------------------------------------------------------------------------
+  itGraph(
+    '[SECURITY] rejects a year-only below-minimum-age child when the schema layer is bypassed, and writes nothing',
+    async () => {
+      const { organizationId, ownerPersonId } = await seedOwnerGraph({
+        birthYear: 1985,
+      });
+      const currentYear = new Date().getUTCFullYear();
+
+      await expect(
+        createChildProfileV2(db, {
+          organizationId,
+          input: {
+            displayName: 'YearOnlyTooYoung',
+            birthYear: currentYear - PROFILE_MINIMUM_AGE,
+            // No birthMonth/birthDay — the year-only fallback under test.
+            location: 'EU',
+            conversationLanguage: 'en',
+          },
+          adultOwnerGateEnabled: true,
+        }),
+      ).rejects.toBeInstanceOf(ProfileValidationError);
+
+      // Nothing leaked: the org still has only its owner; no guardianship edge.
+      const members = await db.query.membership.findMany({
+        where: eq(membership.organizationId, organizationId),
+      });
+      expect(members).toHaveLength(1);
+      const edges = await db.query.guardianship.findMany({
+        where: eq(guardianship.guardianPersonId, ownerPersonId),
+      });
+      expect(edges).toHaveLength(0);
+    },
+  );
+
+  itGraph(
+    '[SECURITY] rejects a year-only below-minimum-age owner bootstrap when the schema layer is bypassed, and writes nothing',
+    async () => {
+      const currentYear = new Date().getUTCFullYear();
+      const clerkUserId = `wi3019-${crypto.randomUUID()}`;
+
+      await expect(
+        createIdentityGraph(db, {
+          clerkUserId,
+          verifiedEmail: `${clerkUserId}@test.local`,
+          displayName: 'YearOnlyTooYoungOwner',
+          birthYear: currentYear - PROFILE_MINIMUM_AGE,
+          // No birthMonth/birthDay — the year-only fallback under test.
+          location: 'EU',
+          conversationLanguage: 'en',
+          pronouns: null,
+          avatarUrl: null,
+          timezone: null,
+        }),
+      ).rejects.toBeInstanceOf(ProfileValidationError);
+
+      // Nothing leaked: the bootstrap threw before opening its transaction, so
+      // no login (and therefore no org/person/subscription) exists.
+      const logins = await db.query.login.findMany({
+        where: eq(login.clerkUserId, clerkUserId),
+      });
+      expect(logins).toHaveLength(0);
     },
   );
 

@@ -166,6 +166,42 @@ export function checkConsentRequiredFromDate(
   return { required: false, consentType: null, age };
 }
 
+/**
+ * [WI-3019] Fail-closed minimum-age floor for PROFILE CREATION.
+ *
+ * The calendar-year age functions over-estimate by up to ~11 months, so a
+ * year-only payload at `currentYear - MINIMUM_AGE` reads as MINIMUM_AGE while
+ * the learner may still be a year younger. `profileCreateSchema` now rejects
+ * that payload at the API boundary; this is the service-side twin, so a caller
+ * reaching a creation writer without passing through that schema still cannot
+ * register an under-minimum learner.
+ *
+ * When month/day are present the exact age decides. When they are absent the
+ * age is computed conservatively — this year's birthday is assumed NOT to have
+ * happened yet — so the floor can only ever be cleared by a birth year that is
+ * unambiguously old enough.
+ *
+ * SCOPE: the minimum-age FLOOR only. Consent-type selection and the adult
+ * self-consent threshold keep their existing calendar-year semantics
+ * (`checkConsentRequired` / `checkConsentRequiredFromDate`) — those decide
+ * which grant records get written, and silently making them conservative would
+ * change the stored `ageAtGrant` audit value and suppress the adult
+ * self-consent grant for the year-only 18-cohort at bootstrap.
+ *
+ * [F-029-sem] Fail-closed on a null / undefined / 0 birthYear.
+ */
+export function isBelowMinimumAgeAtCreation(
+  birthYear: number | null | undefined,
+  birthMonth?: number,
+  birthDay?: number,
+): boolean {
+  if (!birthYear) return true;
+  if (birthMonth != null && birthDay != null) {
+    return calculateAgeFromParts(birthYear, birthMonth, birthDay) < MINIMUM_AGE;
+  }
+  return calculateAge(birthYear) - 1 < MINIMUM_AGE;
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------

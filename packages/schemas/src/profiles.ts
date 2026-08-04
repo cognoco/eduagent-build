@@ -73,11 +73,15 @@ const profileCreateObjectSchema = z
   .object({
     displayName: z.string().min(1).max(50),
     birthYear: birthYearSchema,
-    // WI-297 / WI-367: Optional full birth date components for exact age.
-    // Used server-side at create to compute consent requirements precisely, and
+    // WI-297 / WI-367: full birth date components for exact age. Used
+    // server-side at create to compute consent requirements precisely, and
     // (WI-367) now persisted to profiles.birth_month / birth_day so post-hoc age
     // reads (consent-revocation COPPA boundary, add-child adult gate) compute
     // exact age. Create-only/immutable — profileUpdateSchema omits them.
+    // WI-3019: optional at the type level but REQUIRED by the superRefine below
+    // once birthYear reaches the floor year, where year-only math cannot tell a
+    // 12-year-old from a 13-year-old. Keep them optional here so the pairing and
+    // calendar-validity rules stay expressible as refinements.
     birthMonth: z.number().int().min(1).max(12).optional(),
     birthDay: z.number().int().min(1).max(31).optional(),
     avatarUrl: z.string().url().optional(),
@@ -103,6 +107,38 @@ export const profileCreateSchema = profileCreateObjectSchema.superRefine(
         message: 'birthMonth and birthDay must be provided together',
       });
       return;
+    }
+
+    // WI-3019: require the full birth date whenever a year-only payload would
+    // be ambiguous against the minimum-age floor. birthYearSchema caps
+    // birthYear at <= currentYear - PROFILE_MINIMUM_AGE, so the cap year is the
+    // ambiguous one: a learner born then whose birthday has not yet passed is
+    // still PROFILE_MINIMUM_AGE-1. Year-only payloads for any older year clear
+    // the floor even when the birthday is assumed not to have happened yet, so
+    // they stay accepted. Without this, a direct API payload omitting month/day
+    // reaches the services' calendar-year fallback and registers an under-13
+    // learner.
+    //
+    // The comparison is >=, not ===, so the guard stays closed for any birth
+    // year at OR above the floor rather than only the single cap value.
+    //
+    // getFullYear (local), deliberately matching birthYearSchema's own basis
+    // above rather than getUTCFullYear: sharing one calendar-year source makes
+    // floorBirthYear identical to that cap in every timezone, so the two cannot
+    // drift apart in the hours between local and UTC New Year. The service-side
+    // twin (isBelowMinimumAgeAtCreation) stays on UTC on purpose — it is the
+    // conservative backstop, and being stricter there is the safe direction.
+    if (!hasBirthMonth && !hasBirthDay) {
+      const floorBirthYear = new Date().getFullYear() - PROFILE_MINIMUM_AGE;
+      if (data.birthYear >= floorBirthYear) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['birthMonth'],
+          message:
+            'birthMonth and birthDay are required for this birth year — the exact date is needed to confirm the minimum age',
+        });
+        return;
+      }
     }
 
     if (
