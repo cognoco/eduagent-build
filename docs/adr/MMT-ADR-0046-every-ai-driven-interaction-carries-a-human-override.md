@@ -1,6 +1,6 @@
 # MMT-ADR-0046 — Every AI-driven interaction carries a human override
 
-**Status:** Proposed · reconstructed 2026-07-30 · **Scope:** Every product surface where a model suggests, ranks, orders, or decides something the learner then acts on · **Deciders:** pending Architecture sign-off
+**Status:** Accepted · 2026-08-04 · reconstructed 2026-07-30 · **Scope:** Every product surface where a model suggests, ranks, orders, or decides something the learner then acts on · **Deciders:** drafted by Claude (reconstruction of the operator's standing instruction); **Architecture sign-off: Accepted by operator Jorn 2026-08-04 (ratification sitting)**
 
 ## Context
 
