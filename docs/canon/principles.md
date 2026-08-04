@@ -80,10 +80,9 @@ on any conflict).
 
 | ID | Principle | Established by | Enforced by |
 |---|---|---|---|
-| PRIN-21 | Every AI-driven interaction carries a human override — the user can always reach an outcome the system did not propose; never a license to route around safety, age gating, or consent | Operator ruling (OPQ-62 carry-over, 2026-07-11); formalization drafted in `MMT-ADR-0046` (**Status: Proposed**, pending Architecture sign-off — this entry confers no ADR authority) | — |
+| PRIN-21 | Every AI-driven interaction carries a human override — the user can always reach an outcome the system did not propose; never a license to route around safety, age gating, or consent | Operator ruling (OPQ-62 carry-over, 2026-07-11); `MMT-ADR-0046` (**Status: Accepted**, operator Architecture sign-off 2026-08-04 — full ADR authority) | — (surface audit tracked as WI-3091) |
 
 > PRIN-21's canon elaboration home is `ux-design-specification.md` per the D6
 > ruling (2026-07-14); that section is not yet landed, so the pointer above
-> rests on the operator ruling and the Proposed ADR draft until it is — no
-> `[PRIN-21]` marker exists yet. See the WI-2051 extraction draft § open
-> questions.
+> rests on the ratified `MMT-ADR-0046` until it is — no `[PRIN-21]` marker
+> exists yet. See the WI-2051 extraction draft § open questions.
