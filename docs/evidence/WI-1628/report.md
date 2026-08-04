@@ -17,8 +17,10 @@ This evidence covers two durable controls:
    database, and prevents Doppler's lane URL from reaching staging/production
    Workers.
 
-No migration, database-role change, secret rotation, or shared-database write
-was performed while producing this evidence.
+The initial code-evidence pass did not mutate a protected database. The later
+operator-authorized staging activation and journal repair did; those exact
+writes and their read-back receipts are recorded below. Production database
+roles, credentials, and data were not changed.
 
 ## RED → GREEN
 
@@ -106,9 +108,38 @@ The final working tree contains both restored production paths.
 - Formatting and whitespace checks are recorded against the final changed-file
   set; no protected database, role, or secret was mutated by these runs.
 
-## Two-key activation hold
+## Operator-authorized staging activation and journal repair (2026-08-04)
 
-The code path is intentionally fail-closed. Activation is ordered because the
+The operator approved a pre-MVP staging-only workaround: the Worker uses the
+separate `staging_worker` role under the protected secret path, while a launch
+gate requires replacement with the final least-privilege design before MVP.
+The protected deployment checks proved the migrator and Worker credentials
+were distinct, verified the exact staging host, and accepted only the approved
+staging role posture.
+
+The durable journal verifier then exposed two unretained staging migration
+rows, IDs 136 and 137. Their SQL bodies were not recoverable from Git history
+or local worktrees. The repair therefore used a one-time, main-only workflow
+with an exact target guard, exact row identities, an explicit unrecovered-
+effects acknowledgement, a reviewed dry-run receipt, a serializable
+transaction, an exclusive journal lock, and post-commit read-back.
+
+- Repair implementation and first safety pass: [PR #2956](https://github.com/cognoco/eduagent-build/pull/2956).
+- Live dry-run correction, full catalog-fingerprint binding, and native
+  definition-drift proof: [PR #2959](https://github.com/cognoco/eduagent-build/pull/2959).
+- Reviewed dry run: [workflow run 30865485086](https://github.com/cognoco/eduagent-build/actions/runs/30865485086) and its [durable receipt](dry-run-receipt.json) recorded exactly rows 136/137, 82 bounded public-catalog differences, 165 canonical migrations applied after repair, and migration 0167 pending.
+- Apply: [workflow run 30865793902](https://github.com/cognoco/eduagent-build/actions/runs/30865793902) and its [durable receipt](apply-receipt.json) deleted exactly rows 136/137 and completed with `committed-readback-verified`.
+- Deployment: [Deploy attempt 2, run 30865472440](https://github.com/cognoco/eduagent-build/actions/runs/30865472440) passed journal preflight, applied migration 0167, re-verified the Worker role, synced protected Worker secrets, deployed the Cloudflare Worker, and passed staging API smoke checks.
+- Post-deploy read-only verification: [workflow run 30866133674](https://github.com/cognoco/eduagent-build/actions/runs/30866133674) and its [durable receipt](post-deploy-verification-receipt.json) confirmed rows 136/137 absent, 166 migrations applied, and zero migrations pending.
+
+The one-time repair workflow was removed after the successful post-deploy
+verification. The repair scripts and native regression tests remain as the
+auditable proof of the exact transaction and its refusal paths.
+
+## Historical activation plan and remaining production hold
+
+The code path is intentionally fail-closed. The original activation plan was
+ordered because the
 pre-overlay scheduled production workflow still forwards Doppler's database
 value. An approved operator must:
 
@@ -125,11 +156,10 @@ value. An approved operator must:
 4. Only after that proof, rotate Doppler `stg` / `prd` `DATABASE_URL` to roles
    limited to connect, schema usage, and reads, and verify the lane guard.
 
-The interval between overlay landing and Doppler rotation must be bounded and
-lane execution paused. Rotating Doppler first is unsafe: the old scheduled sync
-would copy that read-only URL into the production Worker and break writes.
-Rollback after rotation leaves Doppler read-only and restores only the last
-approved Worker application credential through the protected `*_APP` secret.
+The staging half of this sequence is now complete under the temporary
+`staging_worker` workaround. Production activation remains held: no production
+role or credential was changed, and the pre-MVP launch gate still requires the
+final least-privilege replacement and production evidence.
 
 The Worker role cannot be treated as a routine non-owner role without an RLS
 decision: current migrations enable RLS before the complete policy/scoped-GUC
@@ -140,5 +170,6 @@ authenticated read/write smoke, and a negative cross-profile check are required
 before production activation.
 
 GitHub `DATABASE_URL_STAGING` / `DATABASE_URL_PRODUCTION` remain deploy-only
-migration-owner credentials. The external role and secret changes are not
-authorized by this code PR and were not attempted.
+migration-owner credentials. The staging Worker role and protected secret
+changes were performed under the operator's explicit staging-only authority;
+the corresponding production role and secret changes were not attempted.
