@@ -8,6 +8,7 @@ import {
   profileResponseSchema,
   profileListResponseSchema,
   profileSwitchResponseSchema,
+  residenceCountryListSchema,
   ERROR_CODES,
   ForbiddenError,
 } from '@eduagent/schemas';
@@ -19,6 +20,7 @@ import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
 import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
+import { listResidenceCountries } from '../services/identity-v2/country-policy-loader';
 import {
   getOwnerProfileV2,
   listProfilesV2,
@@ -377,6 +379,20 @@ export const profileRoutes = new Hono<ProfileEnv>()
         throw err;
       }
     }
+  })
+  // [WI-2743] The habitual-residence country list for the collection surfaces.
+  //
+  // ROUTE ORDER IS LOAD-BEARING: this literal path MUST stay registered before
+  // '/profiles/:id' below, or Hono matches the parameterised route first and
+  // 'residence-countries' arrives as an :id.
+  //
+  // No account or profile scope: signup needs this list BEFORE any profile
+  // exists, and the registry holds no personal data — it is the public country
+  // matrix. It is still behind the router's authentication, like every other
+  // route here.
+  .get('/profiles/residence-countries', async (c) => {
+    const countries = await listResidenceCountries(c.get('db'));
+    return c.json(residenceCountryListSchema.parse({ countries }));
   })
   .get('/profiles/:id', async (c) => {
     const db = c.get('db');

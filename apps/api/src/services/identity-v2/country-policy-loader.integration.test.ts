@@ -19,6 +19,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
+  listResidenceCountries,
   loadCountryPolicies,
   resolveJurisdiction,
 } from './country-policy-loader';
@@ -333,6 +334,32 @@ const GOOD_ASSURANCE = {
         asOf: AS_OF,
       });
       expect(decision.reasonCodes).toEqual(['COUNTRY_INVALID']);
+    });
+    // [WI-2743 AC-1] The habitual-residence picker list is mastered by the
+    // registry, not hard-coded in the client.
+    describe('[WI-2743] listResidenceCountries', () => {
+      it('offers every registry country exactly once, sorted by name', async () => {
+        const countries = await listResidenceCountries(db);
+        const codes = countries.map((c) => c.countryCode);
+
+        expect(new Set(codes).size).toBe(codes.length);
+        expect(new Set(codes)).toEqual(new Set(rows.map((r) => r.countryCode)));
+        expect(codes).toContain('GB');
+        expect(codes).toContain('US');
+
+        const names = countries.map((c) => c.countryName);
+        expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+      });
+
+      it('does NOT filter by launch status — collection is not enforcement', async () => {
+        // Every seeded row is launch_status=blocked (see the allowlist test
+        // above). A picker filtered to launchable countries would therefore be
+        // EMPTY, and a resident of a blocked country could not state where they
+        // habitually live. Admission is the resolver's call at the admission
+        // path (WI-2927), on whatever country the person actually stated.
+        expect(rows.every((r) => r.launchStatus === 'blocked')).toBe(true);
+        await expect(listResidenceCountries(db)).resolves.not.toHaveLength(0);
+      });
     });
   },
 );

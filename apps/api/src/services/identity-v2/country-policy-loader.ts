@@ -18,8 +18,10 @@ import {
 } from '@eduagent/database';
 import {
   countryPolicyRecordSchema,
+  residenceCountryOptionSchema,
   type CountryPolicyDecision,
   type CountryPolicyRecord,
+  type ResidenceCountryOption,
 } from '@eduagent/schemas';
 import { resolveCountryPolicy } from './country-policy';
 
@@ -85,6 +87,49 @@ export async function loadCountryPolicies(
       sourceProvenance: reviveSourceProvenance(row.sourceProvenance),
     }),
   );
+}
+
+/**
+ * [WI-2743] The selectable habitual-residence countries, mastered by the
+ * registry (AC-1 forbids a hard-coded picker list). One entry per country, not
+ * per registry row: the registry is effective-dated and carries several rows
+ * per country, but a picker wants the country once.
+ *
+ * `countryName` is taken from the row with the LATEST effectiveAt, so a
+ * renamed country reads with its current name rather than whichever row the
+ * database happened to return first.
+ *
+ * Unfiltered by launch status, deliberately — see residenceCountryOptionSchema.
+ * Sorted by country name so the caller does not have to, and so the order is
+ * stable across calls.
+ */
+export async function listResidenceCountries(
+  db: CountryPolicyReader,
+): Promise<ResidenceCountryOption[]> {
+  const rows = await db
+    .select({
+      countryCode: countryPolicyRegistry.countryCode,
+      countryName: countryPolicyRegistry.countryName,
+      effectiveAt: countryPolicyRegistry.effectiveAt,
+    })
+    .from(countryPolicyRegistry);
+
+  const latestByCode = new Map<string, { name: string; effectiveAt: Date }>();
+  for (const row of rows) {
+    const seen = latestByCode.get(row.countryCode);
+    if (!seen || row.effectiveAt > seen.effectiveAt) {
+      latestByCode.set(row.countryCode, {
+        name: row.countryName,
+        effectiveAt: row.effectiveAt,
+      });
+    }
+  }
+
+  return [...latestByCode.entries()]
+    .map(([countryCode, { name }]) =>
+      residenceCountryOptionSchema.parse({ countryCode, countryName: name }),
+    )
+    .sort((a, b) => a.countryName.localeCompare(b.countryName));
 }
 
 export interface ResolveJurisdictionInput {
