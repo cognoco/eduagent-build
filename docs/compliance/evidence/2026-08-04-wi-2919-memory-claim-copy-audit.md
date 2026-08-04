@@ -94,6 +94,39 @@ apps/api/src/services/curated-memory.ts:196-200
 The only gate on memory reaching the model is **per-profile consent**. There is
 no global, environment, or launch-state condition.
 
+### 2.3b The live prompt-injection path also falls back to JSONB
+
+`MEMORY_FACTS_RELEVANCE_RETRIEVAL` (`config.ts:136`) is a **sub-flag** of the read
+flag, not an independent gate — `routes/sessions.ts:521-523` computes
+`memoryFactsRelevanceEnabled = memoryFactsReadEnabled && isMemoryFactsRelevanceEnabled(...)`.
+Both being `false` does **not** withhold memory from the model. In
+`apps/api/src/services/session/session-exchange.ts:3584-3615`, the two flags only
+choose *which store and retrieval strategy* populate `memorySnapshot`:
+
+- relevance on + backfill marker → `getRelevantMemories(...)` (vector relevance over `memory_facts`);
+- else read on + backfill marker → `readMemorySnapshotFromFacts(...)` (full read of `memory_facts`);
+- **else `memorySnapshot` stays `null`.**
+
+A null snapshot is not an empty memory block. `buildMemoryBlock`
+(`session-exchange.ts:3617-3640`) falls through on every field to the
+`learning_profiles` JSONB columns:
+
+```
+interests: memorySnapshot
+  ? memorySnapshot.interests
+  : Array.isArray(learningProfile.interests)
+    ? learningProfile.interests
+    : [],
+```
+
+…and identically for `strengths`, `struggles`, and `communicationNotes`. With both
+flags off — the shipped default — the learner's persisted memory is injected into
+the live session prompt from the JSONB store. The only values `buildMemoryBlock`
+receives that can suppress it are `memoryEnabled`, `memoryInjectionEnabled`, and
+`memoryConsentStatus` (`session-exchange.ts:3641-3643`) — i.e. **per-profile
+consent**, matching §2.3. This is the most direct evidence in this audit that
+memory is live: it is the production prompt-assembly path, not a settings read.
+
 ### 2.4 The UI entry point is ungated
 
 The "Mentor memory" row in the More tab renders unconditionally — no feature
@@ -288,9 +321,12 @@ requires a ruling on the feature state, not a rewrite of the strings.
    present state satisfies neither.
 2. **If memory is to be genuinely parked**, the gate must cover all three paths —
    read (`projection.ts:290`), write (`learner-input.ts:233` and
-   `topic-probe-extract.ts:418`), and injection (`curated-memory.ts:196-200`).
-   Flipping `MEMORY_FACTS_READ_ENABLED` does none of these; it only changes which
-   store is read.
+   `topic-probe-extract.ts:418`), and prompt injection (`session-exchange.ts:3617-3643`,
+   `curated-memory.ts:196-200`). Flipping `MEMORY_FACTS_READ_ENABLED` **and**
+   `MEMORY_FACTS_RELEVANCE_RETRIEVAL` does none of these: both are
+   `memory_facts`-store selectors, and with both off the prompt-assembly path
+   falls back to the `learning_profiles` JSONB columns (§2.3b). A real park needs
+   a gate on the fallback itself, not on the store selectors.
 3. **Only after (1)** should UI copy be revisited. If the feature is parked, the
    67-key set in §4.1 needs a DPO-ruled rewrite across 7 locales, and the privacy
    policy strings in §4.2 must move in the same change-set.
