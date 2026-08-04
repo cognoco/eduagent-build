@@ -3225,6 +3225,82 @@ const COPPA = 'coppa_parental_consent';
         expect(platformGrant?.granted).toBe(true);
       });
 
+      // [WI-2929] No test exercised the receipt mirror on THIS path — the
+      // adult self-withdraw was the one writer whose grant stamp and receipt
+      // refresh ran as two independent statements. The mirror is now inside the
+      // same transaction as the stamp; this asserts the observable half of
+      // that: after the call, the durable evidence row agrees with its grant
+      // rather than still advertising a live consent.
+      it('[WI-2929] mirrors the withdrawal onto the durable receipt, purpose-scoped', async () => {
+        const orgId = await seedOrg();
+        const adultId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+        });
+        await recordAdultSelfConsentV2(db, adultId, orgId);
+
+        // Precondition: grant-time receipts exist and are LIVE, so the
+        // assertions below cannot pass vacuously.
+        const before = await db.query.consentReceipt.findMany({
+          where: eq(consentReceipt.personId, adultId),
+        });
+        expect(before).toHaveLength(CONSENT_PURPOSES.length);
+        expect(before.every((r) => r.withdrawnAt === null)).toBe(true);
+
+        const result = await withdrawAdultSelfConsentV2(
+          db,
+          adultId,
+          orgId,
+          CONSENT_PURPOSES[1],
+        );
+
+        const withdrawnGrant = await db.query.consentGrant.findFirst({
+          where: and(
+            eq(consentGrant.chargePersonId, adultId),
+            eq(consentGrant.purpose, CONSENT_PURPOSES[1]),
+          ),
+        });
+        const liveGrant = await db.query.consentGrant.findFirst({
+          where: and(
+            eq(consentGrant.chargePersonId, adultId),
+            eq(consentGrant.purpose, PURPOSE),
+          ),
+        });
+        if (!withdrawnGrant || !liveGrant) {
+          throw new Error('adult self-consent fixture did not create grants');
+        }
+
+        const after = await db.query.consentReceipt.findMany({
+          where: eq(consentReceipt.personId, adultId),
+        });
+        // Refreshed in place, not duplicated.
+        expect(after).toHaveLength(CONSENT_PURPOSES.length);
+        expect(after.map((r) => r.id).sort()).toEqual(
+          before.map((r) => r.id).sort(),
+        );
+
+        // The withdrawn purpose's receipt agrees with its grant, to the exact
+        // timestamp — it no longer asserts a live consent.
+        const withdrawnReceipt = after.find(
+          (r) => r.consentGrantId === withdrawnGrant.id,
+        );
+        expect(withdrawnReceipt?.withdrawnAt).not.toBeNull();
+        expect(withdrawnReceipt?.withdrawnAt?.getTime()).toBe(
+          withdrawnGrant.withdrawnAt?.getTime(),
+        );
+        expect(withdrawnReceipt?.withdrawnAt?.getTime()).toBe(
+          result.withdrawnAt.getTime(),
+        );
+        expect(withdrawnReceipt?.priorValue).toBe(true);
+
+        // …and the sibling purpose's receipt is untouched: the mirror is
+        // purpose-scoped, exactly as the grant stamp is (AC2).
+        const liveReceipt = after.find(
+          (r) => r.consentGrantId === liveGrant.id,
+        );
+        expect(liveReceipt?.withdrawnAt).toBeNull();
+        expect(liveReceipt?.granted).toBe(true);
+      });
+
       it('is idempotent: withdrawing an already-withdrawn purpose returns the existing withdrawnAt', async () => {
         const orgId = await seedOrg();
         const adultId = await seedPerson(orgId, {

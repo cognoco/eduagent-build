@@ -367,72 +367,97 @@ export async function withdrawAdultSelfConsentV2(
   organizationId: string,
   purpose: ConsentPurpose,
 ): Promise<RevokeConsentV2Result> {
-  const current = await db.query.consentGrant.findFirst({
-    where: and(
-      eq(consentGrant.chargePersonId, chargePersonId),
-      eq(consentGrant.purpose, purpose),
-      eq(consentGrant.organizationId, organizationId),
-      eq(consentGrant.lawfulBasis, 'art6_1_a'),
-    ),
-    orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-    columns: { id: true, withdrawnAt: true, auditFact: true },
-  });
-  if (!current) {
-    throw new ConsentRecordNotFoundError();
-  }
-  if (current.withdrawnAt) {
-    return { chargePersonId, withdrawnAt: current.withdrawnAt };
-  }
-
-  const now = new Date();
-  // [WI-1193 AC1] MERGE audit_fact rather than overwrite: the durable
-  // terms-acceptance fact (termsAcceptedAt/termsVersion) written at signup must
-  // SURVIVE the withdrawal so getConsentAccountabilityV2 can still prove consent
-  // WAS validly obtained (GDPR Art 5(2)/7(1) outlives the withdrawal). We only
-  // flip `source` to the withdrawal marker.
-  const priorAuditFact =
-    current.auditFact && typeof current.auditFact === 'object'
-      ? (current.auditFact as Record<string, unknown>)
-      : {};
-  // [WI-1193 #5] UPDATE ... RETURNING to learn whether THIS call won the
-  // isNull(withdrawnAt) race. A concurrent withdrawal of the same grant leaves
-  // exactly one winner; the loser's conditional UPDATE matches zero rows. Never
-  // return the local `now` on a lost race — it was never persisted; re-read and
-  // return the winner's stamped timestamp instead.
-  const updated = await db
-    .update(consentGrant)
-    .set({
-      withdrawnAt: now,
-      priorValue: true,
-      auditFact: { ...priorAuditFact, source: 'adult_self_withdrawal' },
-    })
-    .where(
-      and(
-        eq(consentGrant.id, current.id),
+  // [WI-2929] ONE transaction around the grant stamp and its receipt mirror.
+  // As two independent round-trips, a failure between them left
+  // `consent_receipt` asserting a LIVE consent for a purpose `consent_grant`
+  // already showed withdrawn — the exact invariant the mirror below claims to
+  // guarantee. A durable evidence row that contradicts its own grant is worse
+  // than no row at all, because a reader trusts it.
+  //
+  // `db.transaction`, NOT `withConsentPersonLock`: that helper is
+  // `db.transaction` PLUS `pg_advisory_xact_lock`, and the per-person lock is
+  // DELIBERATELY withheld from this path — see the reasoning block in
+  // acceptAdultSelfConsentV2. This function is already race-safe by its own
+  // conditional `UPDATE ... WHERE withdrawn_at IS NULL ... RETURNING`, and
+  // widening the lock would add contention to a shipped, separately-tested
+  // path without fixing a demonstrable defect. The transaction alone buys the
+  // atomicity the evidence row needs and changes nothing else.
+  //
+  // The caller keeps passing the plain request-scoped handle
+  // (`routes/consent.ts`). That is the sibling pattern, not an oversight:
+  // revokeConsentV2 hands stampWithdrawal a plain `db` too, and the service
+  // owns its own atomicity.
+  return db.transaction(async (tx) => {
+    const current = await tx.query.consentGrant.findFirst({
+      where: and(
         eq(consentGrant.chargePersonId, chargePersonId),
-        isNull(consentGrant.withdrawnAt),
+        eq(consentGrant.purpose, purpose),
+        eq(consentGrant.organizationId, organizationId),
+        eq(consentGrant.lawfulBasis, 'art6_1_a'),
       ),
-    )
-    .returning();
+      orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+      columns: { id: true, withdrawnAt: true, auditFact: true },
+    });
+    if (!current) {
+      throw new ConsentRecordNotFoundError();
+    }
+    if (current.withdrawnAt) {
+      return { chargePersonId, withdrawnAt: current.withdrawnAt };
+    }
 
-  const won = updated[0]?.withdrawnAt;
-  if (won) {
-    // [WI-2929] Mirror the withdrawal onto the durable receipt so the evidence
-    // row never asserts a live consent for a purpose that has been withdrawn.
-    // Keyed on consent_grant_id, so this REFRESHES the grant-time receipt
-    // rather than adding one. `policy_version` is untouched by the UPDATE
-    // above, so the approval-time version is carried through unchanged.
-    await syncConsentReceipts(db, updated);
-    return { chargePersonId, withdrawnAt: won };
-  }
+    const now = new Date();
+    // [WI-1193 AC1] MERGE audit_fact rather than overwrite: the durable
+    // terms-acceptance fact (termsAcceptedAt/termsVersion) written at signup must
+    // SURVIVE the withdrawal so getConsentAccountabilityV2 can still prove consent
+    // WAS validly obtained (GDPR Art 5(2)/7(1) outlives the withdrawal). We only
+    // flip `source` to the withdrawal marker.
+    const priorAuditFact =
+      current.auditFact && typeof current.auditFact === 'object'
+        ? (current.auditFact as Record<string, unknown>)
+        : {};
+    // [WI-1193 #5] UPDATE ... RETURNING to learn whether THIS call won the
+    // isNull(withdrawnAt) race. A concurrent withdrawal of the same grant leaves
+    // exactly one winner; the loser's conditional UPDATE matches zero rows. Never
+    // return the local `now` on a lost race — it was never persisted; re-read and
+    // return the winner's stamped timestamp instead.
+    const updated = await tx
+      .update(consentGrant)
+      .set({
+        withdrawnAt: now,
+        priorValue: true,
+        auditFact: { ...priorAuditFact, source: 'adult_self_withdrawal' },
+      })
+      .where(
+        and(
+          eq(consentGrant.id, current.id),
+          eq(consentGrant.chargePersonId, chargePersonId),
+          isNull(consentGrant.withdrawnAt),
+        ),
+      )
+      .returning();
 
-  // Lost the race: a concurrent caller already stamped the row. Return the
-  // PERSISTED winner's timestamp, not this call's un-persisted `now`.
-  const winner = await db.query.consentGrant.findFirst({
-    where: eq(consentGrant.id, current.id),
-    columns: { withdrawnAt: true },
+    const won = updated[0]?.withdrawnAt;
+    if (won) {
+      // [WI-2929] Mirror the withdrawal onto the durable receipt so the evidence
+      // row never asserts a live consent for a purpose that has been withdrawn.
+      // Keyed on consent_grant_id, so this REFRESHES the grant-time receipt
+      // rather than adding one. `policy_version` is untouched by the UPDATE
+      // above, so the approval-time version is carried through unchanged.
+      // Same tx as that UPDATE, so the two can no longer disagree.
+      await syncConsentReceipts(tx, updated);
+      return { chargePersonId, withdrawnAt: won };
+    }
+
+    // Lost the race: a concurrent caller already stamped the row. Return the
+    // PERSISTED winner's timestamp, not this call's un-persisted `now`. The
+    // winner committed before our conditional UPDATE matched zero rows, so this
+    // READ COMMITTED re-read inside our own transaction observes it.
+    const winner = await tx.query.consentGrant.findFirst({
+      where: eq(consentGrant.id, current.id),
+      columns: { withdrawnAt: true },
+    });
+    return { chargePersonId, withdrawnAt: winner?.withdrawnAt ?? now };
   });
-  return { chargePersonId, withdrawnAt: winner?.withdrawnAt ?? now };
 }
 
 // ---------------------------------------------------------------------------
