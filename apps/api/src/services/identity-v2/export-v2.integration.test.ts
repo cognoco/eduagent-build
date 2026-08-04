@@ -664,7 +664,10 @@ describeIfDb('generateExportV2 jurisdictionToLocation dedupe [WI-2750]', () => {
     await db.insert(membership).values({
       personId: rowPerson!.id,
       organizationId: org!.id,
-      roles: ['member'],
+      // membership.roles is a CLOSED set — only 'admin' | 'learner'
+      // (identity.ts membership_roles_valid). A non-owner here must be
+      // 'learner'; anything else is rejected at the storage layer.
+      roles: ['learner'],
     });
 
     const result = await generateExportV2(db, org!.id);
