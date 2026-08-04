@@ -202,6 +202,15 @@ routes = [
 [env.production.vars]
 ENVIRONMENT = "production"
 INNGEST_DEV = "false"
+# [WI-3020] International-routing launch-stop (privacy-policy §7). While this is
+# not exactly "true", the LLM router refuses production traffic rather than
+# routing learner data to a serving region with no verified transfer
+# safeguards. THIS LINE IS THE RELEASE LEVER: flip it to "true" only when the
+# OPQ-110 vendor-DPA / transfer-evidence pass has cleared for every provider
+# actually routed, then redeploy. Declared here (not in Doppler) so the
+# launch-stop's live state is auditable in git — it is a compliance assertion,
+# not a secret. See docs/compliance/privacy-publication-manifest.md §3.9.
+INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED = "false"
 APP_URL = "https://www.mentomate.com"
 API_ORIGIN = "https://api.mentomate.com"
 LOG_LEVEL = "info"

@@ -4,6 +4,13 @@ export interface LlmRequestContextInput {
   routingV2Enabled: boolean;
   environment: string;
   readKillSwitch: (() => Promise<boolean>) | undefined;
+  /**
+   * [WI-3020] Whether the OPQ-110 international-transfer evidence lever is
+   * explicitly satisfied for this request. Request-scoped for the same reason
+   * the V2 flag is: Workers overlap requests in one isolate, so a compliance
+   * decision must never be read from an isolate global.
+   */
+  transferEvidenceVerified: boolean;
 }
 
 interface LlmRequestContext extends LlmRequestContextInput {
@@ -27,6 +34,13 @@ export function getLlmRequestRoutingV2Enabled(fallback: boolean): boolean {
 
 export function getLlmRequestEnvironment(fallback: string): string {
   return requestContext.getStore()?.environment ?? fallback;
+}
+
+/** [WI-3020] Request-scoped transfer-evidence lever; falls back outside a request. */
+export function getLlmRequestTransferEvidenceVerified(
+  fallback: boolean,
+): boolean {
+  return requestContext.getStore()?.transferEvidenceVerified ?? fallback;
 }
 
 /**

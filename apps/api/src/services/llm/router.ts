@@ -25,8 +25,13 @@ import {
   getLlmRequestEnvironment,
   getLlmRequestKillSwitchSnapshot,
   getLlmRequestRoutingV2Enabled,
+  getLlmRequestTransferEvidenceVerified,
   readLlmRequestKillSwitch,
 } from './request-context';
+import {
+  isInternationalRoutingBlocked,
+  TRANSFER_GATE_SERVING_REGION,
+} from './transfer-evidence-gate';
 import { recordLlmFallbackRateSample } from '../llm-fallback-rate-signal';
 import { filterLearnerAuthoredMessagesForEgress } from '../learner-egress-filter';
 const logger = createLogger();
@@ -571,6 +576,57 @@ async function checkLlmKillSwitch(): Promise<void> {
     event: 'llm.kill_switch.blocked',
   });
   throw new CircuitOpenError('kill-switch', 'llm:kill-switch');
+}
+
+// ---------------------------------------------------------------------------
+// WI-3020 — International-routing launch-stop (privacy-policy §7).
+//
+// middleware/llm.ts carries the INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED lever
+// in request-local state. The module value below is an explicit
+// no-context/test fallback only, and is default-closed like the flag itself.
+// See services/llm/transfer-evidence-gate.ts for why the control is scoped by
+// environment rather than by traffic class.
+// ---------------------------------------------------------------------------
+let transferEvidenceVerified = false;
+
+export function setLlmTransferEvidenceVerified(verified: boolean): void {
+  transferEvidenceVerified = verified;
+}
+
+/** Exported for testing only — read the transfer-evidence lever. */
+export function _getLlmTransferEvidenceVerified(): boolean {
+  return getLlmRequestTransferEvidenceVerified(transferEvidenceVerified);
+}
+
+/**
+ * Checked immediately after the kill switch in both routeAndCall and
+ * routeAndStream — before any provider/model selection or network call — so a
+ * blocked request never reaches a provider in an unapproved serving region.
+ *
+ * Reuses CircuitOpenError for the same reason the kill switch does: it is the
+ * type the existing `503 LLM_UNAVAILABLE` handlers (index.ts error handler,
+ * routes/sessions.ts) already map, so every routeAndCall/routeAndStream caller
+ * degrades identically with no new per-call-site plumbing.
+ * `provider: 'transfer-evidence'` distinguishes a compliance launch-stop from
+ * an operator kill switch and from an organic provider circuit trip in
+ * Sentry/logs.
+ */
+function checkTransferEvidenceGate(): void {
+  const environment = getLlmRequestEnvironment(llmEnvironment);
+  const evidenceVerified = getLlmRequestTransferEvidenceVerified(
+    transferEvidenceVerified,
+  );
+  if (!isInternationalRoutingBlocked({ environment, evidenceVerified })) return;
+  logger.warn('llm.transfer_evidence.blocked', {
+    event: 'llm.transfer_evidence.blocked',
+    surface: 'international_routing_launch_stop',
+    environment,
+    serving_region: TRANSFER_GATE_SERVING_REGION,
+  });
+  throw new CircuitOpenError(
+    'transfer-evidence',
+    'policy:transfer-evidence-pending',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1754,6 +1810,10 @@ export async function routeAndCall(
   // WI-1505 — kill switch is the FIRST thing routeAndCall does: before the
   // i18n tripwire, before getModelConfig, before any provider is touched.
   await checkLlmKillSwitch();
+  // WI-3020 — international-routing launch-stop, immediately after the kill
+  // switch and before any provider selection: a blocked production request
+  // costs zero tokens and never reaches an unapproved serving region.
+  checkTransferEvidenceGate();
   // i18n Phase 1 — runtime tripwire. The static ratchet test is the primary
   // defence; this warn catches any call site that ships with `flow:` but
   // without `conversationLanguage:` (e.g. via a partial revert).
@@ -2295,6 +2355,10 @@ export async function routeAndStream(
   // routeAndStream is a separate entry point (does not call routeAndCall)
   // that the highest-traffic learner-facing flow (exchanges.ts) uses.
   await checkLlmKillSwitch();
+  // WI-3020 — same launch-stop as routeAndCall, duplicated here because
+  // routeAndStream is a separate entry point used by the highest-traffic
+  // learner-facing flow (exchanges.ts).
+  checkTransferEvidenceGate();
   // i18n Phase 1 — same tripwire as routeAndCall. Streaming flows go through
   // their own entry point, so the warn block has to be duplicated here to
   // cover learner-facing surfaces that stream (e.g. exchange.process) from

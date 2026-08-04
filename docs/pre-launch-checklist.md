@@ -205,6 +205,12 @@ Ref: `docs/_archive/plans/done/2026-04-19-pre-launch-ux-fixes.md`
   - Consent flow blocks data collection until accepted
   - Account deletion flow tested end-to-end
 
+- [ ] **LAUNCH-BLOCKING: international-routing launch-stop — verify the transfer-evidence lever (WI-3020)**
+  - Enforces the privacy-policy §7 commitment that production learner data is not routed internationally until transfer safeguards are verified. Control: `apps/api/src/services/llm/transfer-evidence-gate.ts`, checked at both LLM router choke points (`routeAndCall` / `routeAndStream`); refusal surfaces as the existing `503 LLM_UNAVAILABLE`. Inert outside production. Both directions proven by `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`.
+  - **The stop is armed by default and will 503 all production LLM traffic until it is released.** Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` in `apps/api/wrangler.toml` `[env.production.vars]` (ships `"false"`). Flip to `"true"` and redeploy ONLY when OPQ-110 (vendor DPAs / transfer safeguards / provider evidence) has cleared for **every provider actually routed** — not merely "in progress".
+  - GO check: read the deployed value (`wrangler.toml` production vars, and confirm no Doppler/Worker override shadows it), confirm the OPQ-110 evidence backing the flip is retained under `docs/compliance/evidence/`, then smoke-test one production LLM call end-to-end. A GO reported while the lever is `"false"` is a false GO — production LLM traffic is blocked.
+  - Cross-ref: [`compliance/privacy-publication-manifest.md`](compliance/privacy-publication-manifest.md) §3.9 and claim row #13.
+
 ---
 
 ## Nice-to-Have (Post-Launch OK)

@@ -121,6 +121,22 @@ const envSchema = z.object({
   // summary-generation pipeline has baked in production long enough.
   RETENTION_PURGE_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // [WI-3020] International-routing launch-stop — the executable enforcement of
+  // the privacy-policy §7 commitment that learner data is not routed
+  // internationally until transfer safeguards are verified. This flag IS the
+  // release lever: it asserts that the OPQ-110 vendor-DPA / transfer-evidence
+  // pass has cleared for the providers actually routed. Default 'false' and
+  // fail-closed in production — while it is anything other than 'true', the LLM
+  // router refuses production traffic (503 LLM_UNAVAILABLE) rather than routing
+  // it to a serving region with no verified safeguards. Inert outside
+  // production. Declared per-environment in wrangler.toml
+  // ([env.production.vars]) so the launch-stop's live state is auditable in
+  // git; flipping it is a reviewed config change, never a code edit in the
+  // router. See docs/compliance/privacy-publication-manifest.md §3.9.
+  INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED: z
+    .enum(['true', 'false'])
+    .default('false'),
+
   // [WI-1753] Family-join (cross-account existing-teen join) stays dark until
   // BOTH remaining gates clear: the accept-authorization security review
   // (token-possession vs. email-equality) and the invite-copy operator sign-off.
@@ -511,6 +527,19 @@ export function isAnswerEvaluationRuntimeEnabled(
  * never accidentally cuts over. See the gpt-oss-cerebras-build spec.
  */
 export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * [WI-3020] International-transfer evidence gate. Threaded into the LLM
+ * request context by middleware/llm.ts and read at the router choke points.
+ * Default-closed in the strongest sense: only the exact string 'true' counts
+ * as "OPQ-110 evidence verified", so an unset, misspelled, or partially-synced
+ * binding leaves the production launch-stop armed.
+ */
+export function isInternationalTransferEvidenceVerified(
+  value: string | undefined,
+): boolean {
   return value === 'true';
 }
 
