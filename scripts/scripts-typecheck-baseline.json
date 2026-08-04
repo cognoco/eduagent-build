@@ -1,0 +1,417 @@
+[
+  {
+    "file": "scripts/api-integration-routing.test.ts",
+    "code": 2344,
+    "count": 2
+  },
+  {
+    "file": "scripts/check-change-class.test.ts",
+    "code": 2538,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-decision-adr-link.ts",
+    "code": 2345,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-decision-adr-link.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-flow-inventory-cite-rot.test.ts",
+    "code": 2532,
+    "count": 12
+  },
+  {
+    "file": "scripts/check-flow-inventory-cite-rot.ts",
+    "code": 2322,
+    "count": 7
+  },
+  {
+    "file": "scripts/check-flow-inventory-cite-rot.ts",
+    "code": 2345,
+    "count": 19
+  },
+  {
+    "file": "scripts/check-flow-inventory-cite-rot.ts",
+    "code": 2532,
+    "count": 5
+  },
+  {
+    "file": "scripts/check-flow-inventory-cite-rot.ts",
+    "code": 18048,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-gc1-pattern-a.test.ts",
+    "code": 2532,
+    "count": 15
+  },
+  {
+    "file": "scripts/check-gc1-pattern-a.ts",
+    "code": 2322,
+    "count": 2
+  },
+  {
+    "file": "scripts/check-gc1-pattern-a.ts",
+    "code": 2345,
+    "count": 4
+  },
+  {
+    "file": "scripts/check-gc1-pattern-a.ts",
+    "code": 18048,
+    "count": 10
+  },
+  {
+    "file": "scripts/check-git-env-isolation.test.ts",
+    "code": 2532,
+    "count": 3
+  },
+  {
+    "file": "scripts/check-github-workflow-security.test.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/check-i18n-orphan-keys.test.ts",
+    "code": 2532,
+    "count": 7
+  },
+  {
+    "file": "scripts/check-i18n-orphan-keys.ts",
+    "code": 2345,
+    "count": 2
+  },
+  {
+    "file": "scripts/check-i18n-orphan-keys.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-i18n-staleness.ts",
+    "code": 2345,
+    "count": 3
+  },
+  {
+    "file": "scripts/check-merge-invariant.test.ts",
+    "code": 6133,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-migration-immutability.ts",
+    "code": 2322,
+    "count": 2
+  },
+  {
+    "file": "scripts/check-migration-immutability.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-no-clinical-copy.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-teen-consent-claims.ts",
+    "code": 2322,
+    "count": 2
+  },
+  {
+    "file": "scripts/check-teen-consent-claims.ts",
+    "code": 2345,
+    "count": 1
+  },
+  {
+    "file": "scripts/check-teen-consent-claims.ts",
+    "code": 18048,
+    "count": 2
+  },
+  {
+    "file": "scripts/ci-concurrency-contract.test.ts",
+    "code": 2322,
+    "count": 4
+  },
+  {
+    "file": "scripts/ci-concurrency-contract.test.ts",
+    "code": 2345,
+    "count": 3
+  },
+  {
+    "file": "scripts/ci-concurrency-contract.test.ts",
+    "code": 2532,
+    "count": 3
+  },
+  {
+    "file": "scripts/clean-clerk-test-users.test.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/deploy-yml-assert-guard.test.ts",
+    "code": 18048,
+    "count": 3
+  },
+  {
+    "file": "scripts/deploy-yml-smoke-routes.test.ts",
+    "code": 2345,
+    "count": 1
+  },
+  {
+    "file": "scripts/deploy-yml-smoke-routes.test.ts",
+    "code": 18048,
+    "count": 3
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 2339,
+    "count": 10
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 2345,
+    "count": 8
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 2488,
+    "count": 1
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 7006,
+    "count": 1
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 7053,
+    "count": 2
+  },
+  {
+    "file": "scripts/e2e-ci-injection-and-smoke-gate.test.ts",
+    "code": 18048,
+    "count": 19
+  },
+  {
+    "file": "scripts/mobile-ci-no-production-build.test.ts",
+    "code": 18048,
+    "count": 3
+  },
+  {
+    "file": "scripts/playwright-edge-probe.test.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/playwright-edge-probe.test.ts",
+    "code": 7016,
+    "count": 1
+  },
+  {
+    "file": "scripts/playwright-edge-probe.test.ts",
+    "code": 18048,
+    "count": 1
+  },
+  {
+    "file": "scripts/playwright-staging-gate.test.ts",
+    "code": 2322,
+    "count": 1
+  },
+  {
+    "file": "scripts/playwright-staging-gate.test.ts",
+    "code": 2345,
+    "count": 1
+  },
+  {
+    "file": "scripts/pretest-e2e-guard.test.ts",
+    "code": 18048,
+    "count": 2
+  },
+  {
+    "file": "scripts/production-secret-sync-workflow.test.ts",
+    "code": 2339,
+    "count": 1
+  },
+  {
+    "file": "scripts/reconcile-worker-secrets.test.ts",
+    "code": 2451,
+    "count": 2
+  },
+  {
+    "file": "scripts/run-smoke-failure-class-annotate.test.ts",
+    "code": 7016,
+    "count": 1
+  },
+  {
+    "file": "scripts/safe-stash-pop.test.ts",
+    "code": 2532,
+    "count": 13
+  },
+  {
+    "file": "scripts/safe-stash-pop.test.ts",
+    "code": 18048,
+    "count": 4
+  },
+  {
+    "file": "scripts/safe-stash-pop.ts",
+    "code": 2322,
+    "count": 1
+  },
+  {
+    "file": "scripts/safe-stash-pop.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/setup-env.test.ts",
+    "code": 2451,
+    "count": 2
+  },
+  {
+    "file": "scripts/setup-env.test.ts",
+    "code": 2488,
+    "count": 1
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "code": 2322,
+    "count": 5
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "code": 2345,
+    "count": 6
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "code": 2488,
+    "count": 1
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "code": 2532,
+    "count": 4
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "code": 2538,
+    "count": 4
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "code": 2769,
+    "count": 2
+  },
+  {
+    "file": "scripts/translate.ts",
+    "code": 2322,
+    "count": 1
+  },
+  {
+    "file": "scripts/translate.ts",
+    "code": 2345,
+    "count": 5
+  },
+  {
+    "file": "scripts/translate.ts",
+    "code": 2532,
+    "count": 3
+  },
+  {
+    "file": "scripts/translate.ts",
+    "code": 2538,
+    "count": 4
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c1-flow-refs.ts",
+    "code": 2345,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c1-flow-refs.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c1-flow-refs.ts",
+    "code": 6133,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c1-flow-refs.ts",
+    "code": 18048,
+    "count": 3
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c3-test-ids.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c4-seed-scenarios.ts",
+    "code": 2322,
+    "count": 1
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c4-seed-scenarios.ts",
+    "code": 2345,
+    "count": 1
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c5-launch-legacy.ts",
+    "code": 2345,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c6-optional.ts",
+    "code": 2345,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/c6-optional.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/validate-maestro-flows/checks/checks.test.ts",
+    "code": 2532,
+    "count": 7
+  },
+  {
+    "file": "scripts/validate-maestro-flows/shared.ts",
+    "code": 2345,
+    "count": 4
+  },
+  {
+    "file": "scripts/validate-maestro-flows/shared.ts",
+    "code": 2532,
+    "count": 2
+  },
+  {
+    "file": "scripts/verify-eas-managed-submit-credential.test.ts",
+    "code": 2493,
+    "count": 1
+  },
+  {
+    "file": "scripts/verify-eas-managed-submit-credential.test.ts",
+    "code": 2532,
+    "count": 1
+  },
+  {
+    "file": "scripts/verify-eas-managed-submit-credential.test.ts",
+    "code": 7016,
+    "count": 1
+  },
+  {
+    "file": "scripts/verify-eas-managed-submit-credential.test.ts",
+    "code": 18048,
+    "count": 1
+  }
+]

@@ -488,6 +488,17 @@ jobs:
           steps.scope.outputs.docs_only != 'true'
         run: pnpm typecheck:integration
 
+      # [WI-3061] scripts/ has a Jest config but was in no TypeScript target:
+      # `nx ... typecheck` stops at project boundaries and the root
+      # `tsc --build` only walks tsconfig.json's project references, so type
+      # errors in the repo's own CI guards compiled nowhere. Same gating shape
+      # as the integration checker above.
+      - name: Scripts TypeScript checker
+        if: >-
+          github.event_name == 'push' ||
+          steps.scope.outputs.docs_only != 'true'
+        run: pnpm typecheck:scripts
+
       # Run API integration tests against real PostgreSQL.
       # PRs: routed by the change-class router (WI-452) — runs whenever the
       # matrix maps any touched class to integration tests (db-schema,
