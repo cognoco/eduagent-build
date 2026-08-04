@@ -6,7 +6,7 @@
 
 The mobile app has two delivery paths of very different cost and blast radius. A **native build** goes through EAS Build and the store: slow (tens of minutes to build, store review on top), but it can change anything, including native modules and permissions. An **over-the-air (OTA) update** via EAS Update replaces only the JavaScript bundle on installed apps: minutes to publish, but a bundle that assumes native capability the installed binary lacks crashes on launch for every recipient, and there is no per-device recall.
 
-Whether an install accepts an OTA bundle is decided by its **runtime version**. The app uses the `appVersion` policy: the runtime version is derived from the exact app version (`"<version>:<versionCode>"`), so update targeting is an exact-match wall — installs on one version string never receive bundles published for another. This is crude but fail-safe: the failure mode of a forgotten link is "old installs stop receiving updates", not "old installs receive an incompatible bundle". The version value itself is held remotely by EAS (`appVersionSource: "remote"`), not by the committed config file.
+Whether an install accepts an OTA bundle is decided by its **runtime version**. The app uses the `appVersion` policy: the runtime version is the app version alone — the `version` field in the committed app config (e.g. `"1.0.1"`), nothing else. Store build numbers (`android.versionCode` / `ios.buildNumber`, managed remotely by EAS under `appVersionSource: "remote"`) are **not** part of the key; incrementing a build number changes nothing about update targeting. Matching is an exact-match wall — installs on one version string never receive bundles published for another. This is crude but fail-safe: the failure mode of a forgotten link is "old installs stop receiving updates", not "old installs receive an incompatible bundle".
 
 Navigation behaviour is controlled by three build-time flags (`EXPO_PUBLIC_ENABLE_MODE_NAV`, `…_V1`, `…_V2` — V0/V1/V2), inlined into each bundle at build or publish time. An earlier convergence audit sanctioned exactly three tuples and banned the rest (notably V2-on/V1-off, which renders navigation backed by a subscription hook that never activates); `scripts/check-mode-nav-flag-combo.ts` enforces this as a forward-only ratchet with a grandfathering baseline for pre-existing non-sanctioned sites.
 
@@ -18,19 +18,19 @@ These mechanisms all exist and are individually guarded, but the policy they imp
 
 ### 1. Runtime-version policy: `appVersion`, exact match
 
-The `runtimeVersion` policy is **`appVersion`**. The full version string is the compatibility key; there is no wildcard or range matching — a bump from `1.0.1` to `1.0.2` creates a new, disjoint update audience.
+The `runtimeVersion` policy is **`appVersion`**. The compatibility key is the app `version` string alone; there is no wildcard or range matching — a bump from `1.0.1` to `1.0.2` creates a new, disjoint update audience.
 
 Consequences made normative:
 
 - **A version bump is a release act, never cosmetic.** The app version moves only as part of a deliberate store release. Bumping it cuts all prior-version installs off from future OTA updates (they keep working but are frozen until they upgrade through the store).
-- **Every native-surface change requires a version bump and a native build.** The bump is what walls incompatible OTA bundles off from older installs; forgetting it is the one failure this policy cannot catch mechanically.
-- Because the authoritative version lives in EAS (remote app-version source), release verification reads the version from EAS, not from the committed config.
+- **Every native-surface change requires bumping the `version` field itself, plus a native build.** Incrementing only the store build number (`versionCode`/`buildNumber`) does **not** create a new runtime version — installs sharing the old `version` would still accept an OTA built against the new native code. The `version` bump is what walls incompatible bundles off; forgetting it is the one failure this policy cannot catch mechanically.
+- The committed `version` field is the source of truth for the compatibility key; EAS's remote app-version source manages only store build numbers, which are irrelevant to update targeting. Release verification reads the committed `version` and confirms the built artifact's runtime version equals it.
 
 ### 2. The OTA/native boundary
 
-A change is **native-affecting** — and therefore requires a native build, never OTA alone — when it touches any of: `apps/mobile/app.json`, `apps/mobile/package.json`, `apps/mobile/eas.json`, or anything under `apps/mobile/plugins/`, `apps/mobile/android/`, `apps/mobile/ios/`. Everything else in the mobile app is JavaScript-only and OTA-eligible within its runtime version.
+A change is **native-affecting** — and therefore requires a native build, never OTA alone — when it touches any of: `apps/mobile/app.json`, `apps/mobile/package.json`, `apps/mobile/eas.json`, anything under `apps/mobile/plugins/`, `apps/mobile/android/`, `apps/mobile/ios/`, **or any file the app config consumes at prebuild** — `apps/mobile/google-services.json` and the icon/splash/adaptive-icon image assets referenced from the app config are the current members of that class. Everything else in the mobile app is JavaScript-only and OTA-eligible within its runtime version.
 
-CI implements this boundary (native-change detection in the mobile workflows gates native builds; the OTA job publishes only when no native change is detected). The file list above is the normative rule; the workflow patterns are its implementation and must not drift from it. Where a change's classification is genuinely unclear, it is treated as native-affecting — the slow path is the safe path.
+CI implements this boundary (native-change detection in the mobile workflows gates native builds; the OTA job publishes only when no native change is detected). The file classes above are the normative rule; the workflow patterns are its implementation and must match the full rule, including the prebuild-consumed inputs — a detection pattern narrower than this rule is a defect in the pattern, not a narrowing of the rule. Where a change's classification is genuinely unclear, it is treated as native-affecting — the slow path is the safe path.
 
 ### 3. Build-time navigation flags: three sanctioned tuples, ratchet-enforced
 
@@ -40,7 +40,7 @@ The MODE_NAV flags are **build-time only** — inlined into each bundle when it 
 - **Config F** (V0 off / V1 on / V2 off) — the fallback/rollback configuration.
 - **Legacy** (V0 on / V1 off / V2 off) — transitional, sanctioned only until the migration that retires V0 completes.
 
-Every publish carries its channel's designated tuple: production builds carry Config T; the fallback channel carries Config F. The flag-combo checker ratchet is the enforcement mechanism; any tuple outside the sanctioned set fails CI unless grandfathered.
+Every publish carries its channel's designated tuple: production builds carry Config T; the fallback channel carries Config F. The flag-combo checker ratchet is the enforcement mechanism; any tuple outside the sanctioned set fails CI unless grandfathered. The checker's scan surface must cover **every site where a channel's tuple is declared** — build profiles and each workflow that publishes a bundle, the fallback publish workflow included; a declaration site outside the scan surface is guarded only by the manual verification in the recipe below, and bringing it under the scanner is owed, not optional.
 
 The grandfathered non-sanctioned sites (internal-facing build profiles and the preview OTA publish, all V0-on) are **explicitly outside this decision**. Their target disposition — migrate to a sanctioned tuple or receive a bounded temporary sanction — belongs to the navigation owner as a separate recorded ruling; this ADR neither legitimises the grandfathered tuples nor schedules their migration. One consequence is acknowledged rather than resolved here: until that ruling lands, the fallback *build profile* (V0 on, grandfathered) and the fallback *OTA publish* (Config F, V0 off) disagree on V0, so a fallback native build and the fallback OTA bundle are not flag-identical.
 
@@ -73,9 +73,9 @@ Before the first production store rollout, a **Config F bundle must have been pu
 
 Before a production rollout, the release owner produces evidence that:
 
-1. **Version and channel identity:** the EAS remote app version is read and recorded; the production build profile maps to the `production` channel and the resulting build's runtime version matches the recorded version.
-2. **Flag conformance:** the flag-combo checker passes; the production build environment classifies as Config T and the fallback publish environment as Config F.
-3. **API compatibility:** the bundle's commit identity (`EXPO_PUBLIC_GIT_SHA`) is wired so the contract-drift check can compare the mobile bundle's origin against the deployed API.
+1. **Version and channel identity:** the committed app `version` is read and recorded; the production build profile maps to the `production` channel and the built artifact's runtime version equals the recorded version.
+2. **Flag conformance:** the flag-combo checker passes; the production build environment classifies as Config T and the fallback publish environment as Config F — the fallback publish tuple verified directly at its declaration site if the checker does not yet scan it.
+3. **API compatibility:** the contract-drift check is **demonstrably active** for the artifact being shipped — the bundle's commit identity (`EXPO_PUBLIC_GIT_SHA`) is present in the built bundle's environment and the check compares it against the deployed API. A drift check that exits early because the variable is absent is not evidence; the wiring must exist on the production build path itself, not only on the OTA publish paths.
 4. **Fallback proven (per §5):** the rollback workflow's required credentials are present (its preflight passes), a rehearsal publish to the fallback channel has succeeded, and the published bundle is verified to carry Config F at the production runtime version.
 5. **Store path intact:** the store-submission pipeline's own checks (internal-track delivery before public release) are green — owned by the store-submission work, verified here only as present.
 
