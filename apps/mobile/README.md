@@ -69,11 +69,7 @@ pnpm exec nx lint mobile
 
 ## OTA Updates
 
-```bash
-# Preview channel (internal testing; CI also publishes here automatically on merge to main)
-pnpm run ota:preview
-```
+There are deliberately **no manual OTA commands** — channel ownership is defined in `docs/adr/MMT-ADR-0054` §4:
 
-The command uses Doppler for environment injection (`-c stg`).
-
-There is deliberately **no manual production OTA command**: publishes to the `production` channel/branch pair are human-gated (`docs/adr/MMT-ADR-0054` §4), and until a gated dispatch workflow exists, production changes reach installs only as store builds.
+- **Preview** (internal testing): CI publishes to the `preview` channel/branch pair automatically on merge to main, behind its green-CI and live-main-tip guards. A local publish would bypass those guards, so no local command exists.
+- **Production**: publishes are human-gated; until a gated dispatch workflow exists, production changes reach installs only as store builds.
