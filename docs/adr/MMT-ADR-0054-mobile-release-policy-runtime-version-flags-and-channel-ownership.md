@@ -57,6 +57,8 @@ Each row names a channel/branch pair sharing one name: builds listen to the chan
 
 The rollback act itself is a **server-side channel remap** — `eas channel:edit production --branch fallback` points the `production` channel at the parked branch, and every production install picks the Config F bundle up on its next update check; installed binaries keep their baked-in channel and are never repointed individually. Restoring is the reverse remap. No step of the retreat touches devices directly.
 
+One capability boundary is stated explicitly so the table above cannot be over-read: the gated deploy pipeline **builds** store artifacts and contains no OTA publish step, and no other conforming publisher targets the `production` branch. Any production-branch OTA publish — a routine JavaScript fix to store installs, or the fixed-bundle recovery named under rollback limits — requires a manually dispatched workflow carrying the `production` environment approval, of the same shape as the fallback publish. Until such a workflow exists, production OTA publishing is **unavailable rather than exercised outside the gates**, and production changes reach installs only as store builds.
+
 Two standing rules:
 
 - **No agent-initiated OTA publish, ever, without explicit operator instruction.** This restates an existing project rule as policy: automation may build and verify, but publishing a bundle to any channel that reaches a person is a human act on the gated paths above (CI's preview publish is the sanctioned, bounded exception).
