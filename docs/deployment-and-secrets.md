@@ -619,12 +619,14 @@ Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is the ap
 
 ### Update Channels
 
-| Build Profile | Channel | Purpose |
+| Build Profile | Channel / branch pair | Purpose |
 |--------------|---------|---------|
 | `development` | `development` | Dev client builds (local Metro, no OTA) |
 | `preview` | `preview` | Internal testing — primary OTA target |
 | `production` | `production` | Store releases |
-| `fallback` | `fallback` | Parked rollback bundle (navigation redesign off, Config F) — published only via the double-gated `mobile-fallback-ota.yml` workflow; goes live only by deliberately repointing production installs during an incident |
+| `fallback` | `fallback` | Parked rollback bundle (navigation redesign off, Config F) — published to the `fallback` **branch** only via the double-gated `mobile-fallback-ota.yml` workflow; reaches production installs only when the `production` **channel** is remapped to the `fallback` branch (`eas channel:edit production --branch fallback`) during an incident — installs never change channel |
+
+Channel and branch share a name in every row: a **channel** is what a build listens to (baked in at build time), a **branch** is where `eas update` publishes, and EAS links a channel to its same-named branch by default. The one deliberate exception to that default is the incident remap above — pointing the `production` channel at the `fallback` branch.
 
 **Channel ownership (`MMT-ADR-0054` §4):** `production` publishes only through the gated deploy pipeline; `fallback` only through the manual double-gated workflow; `preview` is CI's bounded automated path; no agent-initiated OTA publish, ever, without explicit operator instruction. Before the first production rollout, a Config F fallback bundle must have been rehearsal-published and verified (ADR §5 — hard gate; see the pre-launch checklist).
 
@@ -677,7 +679,7 @@ push to main (native change — rare)
 
 ### Release health & retreat limits (`MMT-ADR-0054` § Monitoring)
 
-After any production rollout — store build or OTA — watch release health via Sentry post-release triage (above) **and** the EAS Update dashboard for the affected channel; when uncertain about an update, use an EAS staged rollout and watch before full exposure. Know each retreat path's limits: an OTA rollback works **only within a runtime version** (it can never repair a bad native build); the fallback-channel retreat is scoped to the navigation redesign and requires the rehearsed Config F bundle; a native regression has no fast retreat (corrected store release + review time); no path offers per-device recall — every retreat is a forward publish devices pick up on their next check. `expo-updates`' automatic crash recovery is bounded: it only helps when a newly delivered update fails on its *first* launch and an older launchable bundle is still cached.
+After any production rollout — store build or OTA — watch release health via Sentry post-release triage (above) **and** the EAS Update dashboard for the affected channel; when uncertain about an update, use an EAS staged rollout and watch before full exposure. Know each retreat path's limits: an OTA rollback works **only within a runtime version** (it can never repair a bad native build); the fallback retreat (remap the `production` channel to the `fallback` branch: `eas channel:edit production --branch fallback`) is scoped to the navigation redesign and requires the rehearsed Config F bundle; a native regression has no fast retreat (corrected store release + review time); no path offers per-device recall — every retreat is a forward publish devices pick up on their next check. `expo-updates`' automatic crash recovery is bounded: it only helps when a newly delivered update fails on its *first* launch and an older launchable bundle is still cached.
 
 > **Restoring fingerprint policy:** Re-evaluate when `@expo/fingerprint` gains support for ignoring `type: "dir"` autolinking sources in `.fingerprintignore` (blocked in <=0.15.4). Also blocked by the ExpoConfigLoader Unicode-path error on Windows (`ZuzanaKopečná` username). Check this runtime-version section, `apps/mobile/.fingerprintignore`, and `docs/known-issues/` before re-attempting.
 
