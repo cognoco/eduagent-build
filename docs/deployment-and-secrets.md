@@ -619,12 +619,14 @@ Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is the ap
 
 ### Update Channels
 
-| Build Profile | Channel | Purpose |
+| Build Profile | Channel / branch pair | Purpose |
 |--------------|---------|---------|
 | `development` | `development` | Dev client builds (local Metro, no OTA) |
 | `preview` | `preview` | Internal testing — primary OTA target |
 | `production` | `production` | Store releases |
 | `fallback` | `fallback` | Parked rollback bundle (navigation redesign off, Config F) — published to the `fallback` **branch** only via the double-gated `mobile-fallback-ota.yml` workflow; reaches production installs only when the `production` **channel** is remapped to the `fallback` branch (`eas channel:edit production --branch fallback`) during an incident — installs never change channel |
+
+Channel and branch share a name in every row: a **channel** is what a build listens to (baked in at build time), a **branch** is where `eas update` publishes, and EAS links a channel to its same-named branch by default. The one deliberate exception to that default is the incident remap above — pointing the `production` channel at the `fallback` branch.
 
 **Channel ownership (`MMT-ADR-0054` §4):** `production` publishes only through the gated deploy pipeline; `fallback` only through the manual double-gated workflow; `preview` is CI's bounded automated path; no agent-initiated OTA publish, ever, without explicit operator instruction. Before the first production rollout, a Config F fallback bundle must have been rehearsal-published and verified (ADR §5 — hard gate; see the pre-launch checklist).
 

@@ -46,12 +46,14 @@ The grandfathered non-sanctioned sites (internal-facing build profiles and the p
 
 ### 4. Channel ownership
 
-| Channel | Publisher | Gate |
+| Channel / branch pair | Publisher | Gate |
 |---|---|---|
 | `production` | Gated deploy pipeline only | GitHub `production` environment approval (human) |
 | `fallback` | Manual rollback workflow only | Typed confirmation **and** `production` environment approval (human, twice) |
 | `preview` | CI, automatically on merge to main | Green CI + a live-main-tip guard against stale publishes |
 | `development` | Developer builds | None (no OTA path) |
+
+Each row names a channel/branch pair sharing one name: builds listen to the channel, publishes land on the branch, and EAS links same-named pairs by default. Ownership binds the **pair** — whoever may publish to the branch controls what the channel serves, except where the remap below deliberately crosses the pairing.
 
 The rollback act itself is a **server-side channel remap** — `eas channel:edit production --branch fallback` points the `production` channel at the parked branch, and every production install picks the Config F bundle up on its next update check; installed binaries keep their baked-in channel and are never repointed individually. Restoring is the reverse remap. No step of the retreat touches devices directly.
 
