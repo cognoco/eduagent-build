@@ -70,11 +70,10 @@ pnpm exec nx lint mobile
 ## OTA Updates
 
 ```bash
-# Preview channel
+# Preview channel (internal testing; CI also publishes here automatically on merge to main)
 pnpm run ota:preview
-
-# Production channel
-pnpm run ota:production
 ```
 
-Both commands use Doppler for environment injection (`-c stg` / `-c prd`).
+The command uses Doppler for environment injection (`-c stg`).
+
+There is deliberately **no manual production OTA command**: publishes to the `production` channel/branch pair are human-gated (`docs/adr/MMT-ADR-0054` §4), and until a gated dispatch workflow exists, production changes reach installs only as store builds.
