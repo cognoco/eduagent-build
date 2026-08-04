@@ -675,6 +675,10 @@ push to main (native change — rare)
 | 5-second launch delay on slow networks | Falls back to cached bundle after timeout |
 | Native dep bump without version bump | OTA clients silently receive incompatible JS — see appVersion trade-off above |
 
+### Release health & retreat limits (`MMT-ADR-0054` § Monitoring)
+
+After any production rollout — store build or OTA — watch release health via Sentry post-release triage (above) **and** the EAS Update dashboard for the affected channel; when uncertain about an update, use an EAS staged rollout and watch before full exposure. Know each retreat path's limits: an OTA rollback works **only within a runtime version** (it can never repair a bad native build); the fallback-channel retreat is scoped to the navigation redesign and requires the rehearsed Config F bundle; a native regression has no fast retreat (corrected store release + review time); no path offers per-device recall — every retreat is a forward publish devices pick up on their next check. `expo-updates`' automatic crash recovery is bounded: it only helps when a newly delivered update fails on its *first* launch and an older launchable bundle is still cached.
+
 > **Restoring fingerprint policy:** Re-evaluate when `@expo/fingerprint` gains support for ignoring `type: "dir"` autolinking sources in `.fingerprintignore` (blocked in <=0.15.4). Also blocked by the ExpoConfigLoader Unicode-path error on Windows (`ZuzanaKopečná` username). Check this runtime-version section, `apps/mobile/.fingerprintignore`, and `docs/known-issues/` before re-attempting.
 
 ---

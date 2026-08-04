@@ -81,6 +81,17 @@ Before a production rollout, the release owner produces evidence that:
 
 Evidence items 1–4 are re-established for every release that bumps the version; item 4's rehearsal is re-run whenever the fallback workflow, its credentials, or the flag scheme change.
 
+## Monitoring and rollback limits
+
+**Monitoring.** After any production rollout — store build or OTA — release health is watched through the crash/error pipeline (Sentry post-release triage, per the deployment guide) and the EAS Update dashboard for the affected channel. Where uncertainty about an update is real, it is rolled out gradually (EAS staged rollout) and watched before full exposure, rather than published to everyone at once. `expo-updates`' built-in error recovery is a best-effort backstop, not a strategy — and a bounded one: it can fall back to a previously cached bundle when a newly delivered update fails on its **first** launch, but once an update has launched successfully (or when no older launchable bundle remains cached) that automatic retreat is no longer available, and a defect that surfaces later — from persisted state or device-specific conditions — can still strand the device. Monitoring and a deliberate forward publish are the real recovery path; the backstop only narrows the window.
+
+**Rollback limits — what each retreat path can and cannot do.**
+
+- An OTA rollback (`eas update:rollback`, or publishing a fixed bundle) operates **only within a runtime version**: it can replace bad JavaScript with good JavaScript, never repair a bad native build.
+- The fallback channel retreat (§5) is scoped to the navigation redesign: it swaps production installs to the Config F bundle in minutes, provided the §5 rehearsal evidence exists and someone deliberately repoints the channel.
+- A native regression has **no fast retreat**: recovery is a corrected store release plus store review time; installed bad builds remain bad until users upgrade.
+- There is **no per-device recall** on any path — every retreat is a forward publish that devices pick up on their next update check; a device that never comes online again keeps what it has.
+
 ## Consequences
 
 - The exact-match runtime version makes update targeting fail-safe at the cost of discipline: the one unguarded failure (native change without a version bump) is mitigated by the boundary rule in §2 and the native-change detection in CI, but a change that evades both file-pattern detection and review would still ship an incompatible bundle. The recipe's flag and drift checks narrow, not eliminate, this window.
