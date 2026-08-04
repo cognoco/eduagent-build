@@ -28,6 +28,20 @@ describe('jurisdictionToLocation (profileMeta.location reverse-map)', () => {
     expect(jurisdictionToLocation('ZZ')).toBeNull();
   });
 
+  // [WI-2750] The deliberate `null` fallback, pinned for the values that make
+  // the former export-v2 copy's 'OTHER' divergence LIVE rather than latent: a
+  // real ISO 3166-1 alpha-2 code, which WI-2743 starts persisting into
+  // residence_jurisdiction. 'OTHER' here would be an affirmative false claim
+  // about the data subject in their Article 15 export. The export surface now
+  // calls THIS function (export-v2.ts imports it), so the two surfaces cannot
+  // answer differently; the surface-level assertion lives in
+  // export-v2.integration.test.ts.
+  it('maps a real ISO alpha-2 residence code to null, not the OTHER bucket [WI-2750]', () => {
+    expect(jurisdictionToLocation('DE')).toBeNull();
+    expect(jurisdictionToLocation('PL')).toBeNull();
+    expect(jurisdictionToLocation('GB')).toBeNull();
+  });
+
   it('round-trips with locationToJurisdiction for the three legacy values', async () => {
     // Importing here to avoid a circular module-load surprise at top level.
     const { locationToJurisdiction } = await import('./identity-graph');
