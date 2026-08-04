@@ -1,7 +1,21 @@
 # Do the four local pre-push harness failures share a cause?
 
-**WI-3066 spike determination.** Analysis only — no fixes were executed and none of the
-four items was modified.
+**WI-3066 (pre-push harness shared-cause spike) determination.** Analysis only — no fixes
+were executed and none of the four items was modified.
+
+The four items under examination, by ID and name, since every later reference is by ID
+alone:
+
+| ID | Name |
+|---|---|
+| **WI-1791** | Local pre-push jest failures: `jest.spyOn(global,'fetch')` in four api suites |
+| **WI-1862** | Local pre-push jest harness: gemini `clearTimeout` under fake timers + inngest worker-env 500 |
+| **WI-2806** | env-sync writes `DOPPLER_CONFIG=stg` into `.env.development.local`, breaking the test DB loader |
+| **WI-3065** | Provide a disposable local Postgres on dev hosts for the database suites |
+
+Also referenced: **WI-3058** (pre-push threshold fallback flips test-selection kind —
+merged `22c1909`), **WI-2887** (staging `DATABASE_URL` privilege finding, operator-held),
+and **WI-2232** / **WI-1556** (BID-50's items parked behind the pre-push blocker).
 
 - **Author:** `shepherd:claude:bid-58-ci-infra` (BID-58, CI and dev-infra integrity)
 - **Date:** 2026-08-05
@@ -11,9 +25,11 @@ four items was modified.
 ## Answer in one paragraph
 
 The four do **not** share one cause. They are **three** causes, and one of the four is
-misattributed. WI-1791 and WI-1862 share a single cause — **host Node major** — and
-collapse into one fix. WI-2806 is a separate cause, **config provenance**, and its close
-is valid for the surface it was scoped to. WI-3065 is filed as *missing infrastructure*,
+misattributed. WI-1791 (fetch-spy suite failures) and WI-1862 (gemini fake-timers +
+inngest worker-env) share a single cause — **host Node major** — and collapse into one
+fix. WI-2806 (env-sync stamps a stg config) is a separate cause, **config provenance**,
+and its close is valid for the surface it was scoped to. WI-3065 (disposable local
+Postgres) is filed as *missing infrastructure*,
 but on this host that claim **cannot currently be true or false**, because the provenance
 guard from WI-2806's residual refuses before any database connection is ever attempted.
 WI-3065 is therefore **not independent** — it is sequenced behind that residual, and
@@ -132,7 +148,7 @@ Correction below.
    refusing, WI-3065's premise becomes testable for the first time, and it may shrink or
    evaporate. Buying local-Postgres provisioning now would be buying infrastructure for a
    check that never executes.
-4. **Reduced urgency, for sizing:** WI-3058 landed on 2026-08-04 (`22c1909`), so the
+4. **Reduced urgency, for sizing:** WI-3058 (pre-push threshold fallback flips test-selection kind) landed on 2026-08-04 (`22c1909`), so the
    `>100`-file fallback no longer selects `@eduagent/database` at all. The *accidental*
    route into these suites is closed, which is what WI-3065's own description predicted
    would happen. What remains is the genuine case — someone really changes database
@@ -176,7 +192,7 @@ opened one.
 
 ## Correction to WI-3058's completion evidence
 
-WI-3058 (merged `22c1909`, currently in Reviewing) states in its completion summary and PR
+WI-3058 (pre-push threshold fallback flips test-selection kind; merged `22c1909`, currently in Reviewing) states in its completion summary and PR
 that the `packages/database` suites "require a live Postgres", citing that all 36 fail
 inside `jest.setup.ts` as proof. The failure is real and the citation is accurate, but the
 **mechanism is misattributed**: those suites fail at the WI-2806 provenance refusal, not
