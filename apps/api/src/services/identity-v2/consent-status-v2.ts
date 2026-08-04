@@ -1007,7 +1007,8 @@ export async function getConsentAccountabilityV2(
 ): Promise<ConsentAccountabilityRecord[]> {
   const rows = (await db.execute(sql`
     SELECT DISTINCT ON (purpose, lawful_basis)
-      purpose, lawful_basis, granted, granted_at, withdrawn_at, audit_fact
+      purpose, lawful_basis, granted, granted_at, withdrawn_at, audit_fact,
+      policy_version
     FROM consent_grant
     WHERE charge_person_id = ${chargePersonId}
       AND organization_id = ${organizationId}
@@ -1033,6 +1034,14 @@ export async function getConsentAccountabilityV2(
       // timestamps describe different events and must not substitute for it.
       termsAcceptedAt: termsFact?.termsAcceptedAt ?? null,
       termsVersion: termsFact?.termsVersion ?? null,
+      // [WI-2929] The grant-time policy version, read from the promoted column
+      // (finding C-2 / gap P3-G4). Falls back to the legacy JSONB placement for
+      // rows written before the column existed — for a PARENTAL grant that
+      // fallback is best-effort by nature: if the guardian already revoked,
+      // stampWithdrawal overwrote audit_fact and the version is simply gone.
+      // That historical loss is not recoverable; the column stops it recurring.
+      policyVersion:
+        r.policy_version ?? legacyPolicyVersionFromAuditFact(audit),
       withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
     };
   });
@@ -1045,6 +1054,31 @@ interface AccountabilityRow {
   granted_at: string | Date;
   withdrawn_at: string | Date | null;
   audit_fact: Record<string, unknown> | string | null;
+  policy_version: string | null;
+}
+
+/**
+ * [WI-2929] The pre-column placement of the grant-time version on the PARENTAL
+ * approval path — `audit_fact.policyVersion` — which is exactly the value
+ * finding C-2 was about and exactly the legacy population that needs the
+ * fallback.
+ *
+ * Deliberately does NOT also fall back to the adult paths' `termsVersion`.
+ * That key is one half of the versioned terms-ACCEPTANCE fact, which
+ * `parseVersionedTermsFact` refuses to report unless BOTH halves are present
+ * (WI-2413); surfacing it here would route around that refusal through a
+ * different field name. Legacy adult grants lose nothing — their version is
+ * already reported as `termsVersion` on the same record — and every grant
+ * written after the migration carries the column regardless of basis.
+ *
+ * Only a non-empty string counts: an absent or blank version must report as
+ * absent, never as an empty string that reads like evidence.
+ */
+function legacyPolicyVersionFromAuditFact(
+  audit: Record<string, unknown> | null,
+): string | null {
+  const value = audit?.['policyVersion'];
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 /**

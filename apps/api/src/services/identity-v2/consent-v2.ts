@@ -52,6 +52,7 @@ import {
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
+import { syncConsentReceipts } from './consent-receipt-v2';
 import { computeAgeBracketFromDate, CONSENT_PURPOSES } from '@eduagent/schemas';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
@@ -242,24 +243,43 @@ export async function createDirectConsentGrant(
   organizationId: string,
   consentType: ConsentType,
   guardianPersonId: string,
-  snapshot: { ageAtGrant?: number; jurisdictionAtGrant?: string } = {},
+  snapshot: {
+    ageAtGrant?: number;
+    jurisdictionAtGrant?: string;
+    /**
+     * [WI-2929] The server's CONSENT_POLICY_VERSION in force at grant time.
+     * This path used to record NO terms/policy version at all — neither a
+     * column nor an `audit_fact` key — leaving the parent-creates-child cohort
+     * with the weakest Art 7(1) evidence of any writer (consent-log spec §2.4,
+     * variant 3): the controller could show a parent consented, but not
+     * against WHICH wording. Optional so a caller with no version binding
+     * degrades to the old behaviour (null) rather than throwing; the
+     * production caller (routes/profiles.ts) always supplies it.
+     */
+    policyVersion?: string;
+  } = {},
 ): Promise<void> {
   const basis = consentTypeToBasis(consentType);
   const grantedAt = new Date();
-  await db.insert(consentGrant).values(
-    CONSENT_PURPOSES.map((purpose) => ({
-      chargePersonId,
-      organizationId,
-      purpose,
-      lawfulBasis: basis,
-      granted: true,
-      grantedAt,
-      priorValue: null,
-      auditFact: { source: 'parent_created_child', guardianPersonId },
-      snapshotAgeAtGrant: snapshot.ageAtGrant ?? null,
-      snapshotJurisdictionAtGrant: snapshot.jurisdictionAtGrant ?? null,
-    })),
-  );
+  const rows = await db
+    .insert(consentGrant)
+    .values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId,
+        organizationId,
+        purpose,
+        lawfulBasis: basis,
+        granted: true,
+        grantedAt,
+        priorValue: null,
+        auditFact: { source: 'parent_created_child', guardianPersonId },
+        policyVersion: snapshot.policyVersion ?? null,
+        snapshotAgeAtGrant: snapshot.ageAtGrant ?? null,
+        snapshotJurisdictionAtGrant: snapshot.jurisdictionAtGrant ?? null,
+      })),
+    )
+    .returning();
+  await syncConsentReceipts(db, rows);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,28 +318,36 @@ export async function recordAdultSelfConsentV2(
   termsVersion?: string,
 ): Promise<void> {
   const now = new Date();
-  await db.insert(consentGrant).values(
-    CONSENT_PURPOSES.map((purpose) => ({
-      chargePersonId,
-      organizationId,
-      purpose,
-      lawfulBasis: 'art6_1_a' as const,
-      granted: true,
-      grantedAt: now,
-      // [WI-1193 AC1] audit_fact carries the durable terms-acceptance fact as
-      // its OWN keys — the moment the adult accepted plus the consent-policy
-      // VERSION then in force — kept SEPARATE from the lawful basis
-      // (MMT-ADR-0011: terms acceptance is a distinct, versioned fact, never
-      // bundled into the basis). getConsentAccountabilityV2 surfaces these; the
-      // withdrawal path MERGES rather than overwrites audit_fact so they survive
-      // a withdrawal (Art 5(2)/7(1) must still prove consent WAS validly given).
-      auditFact: {
-        source: 'adult_self_signup',
-        termsAcceptedAt: now.toISOString(),
-        termsVersion: termsVersion ?? null,
-      },
-    })),
-  );
+  const rows = await db
+    .insert(consentGrant)
+    .values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId,
+        organizationId,
+        purpose,
+        lawfulBasis: 'art6_1_a' as const,
+        granted: true,
+        grantedAt: now,
+        // [WI-1193 AC1] audit_fact carries the durable terms-acceptance fact as
+        // its OWN keys — the moment the adult accepted plus the consent-policy
+        // VERSION then in force — kept SEPARATE from the lawful basis
+        // (MMT-ADR-0011: terms acceptance is a distinct, versioned fact, never
+        // bundled into the basis). getConsentAccountabilityV2 surfaces these; the
+        // withdrawal path MERGES rather than overwrites audit_fact so they survive
+        // a withdrawal (Art 5(2)/7(1) must still prove consent WAS validly given).
+        auditFact: {
+          source: 'adult_self_signup',
+          termsAcceptedAt: now.toISOString(),
+          termsVersion: termsVersion ?? null,
+        },
+        // [WI-2929] The same version, promoted to the first-class column no
+        // withdrawal path writes. The audit_fact copy stays (it is the
+        // versioned terms-ACCEPTANCE fact, a distinct thing per MMT-ADR-0011).
+        policyVersion: termsVersion ?? null,
+      })),
+    )
+    .returning();
+  await syncConsentReceipts(db, rows);
 }
 
 /**
@@ -385,10 +413,16 @@ export async function withdrawAdultSelfConsentV2(
         isNull(consentGrant.withdrawnAt),
       ),
     )
-    .returning({ withdrawnAt: consentGrant.withdrawnAt });
+    .returning();
 
   const won = updated[0]?.withdrawnAt;
   if (won) {
+    // [WI-2929] Mirror the withdrawal onto the durable receipt so the evidence
+    // row never asserts a live consent for a purpose that has been withdrawn.
+    // Keyed on consent_grant_id, so this REFRESHES the grant-time receipt
+    // rather than adding one. `policy_version` is untouched by the UPDATE
+    // above, so the approval-time version is carried through unchanged.
+    await syncConsentReceipts(db, updated);
     return { chargePersonId, withdrawnAt: won };
   }
 
@@ -616,24 +650,32 @@ export async function repairOrSignalAdultSelfConsentV2(
     if (existingLocked) return 'already_present';
 
     // (a) Repair from the captured versioned fact. Legacy purpose only.
-    await tx.insert(consentGrant).values({
-      chargePersonId,
-      organizationId,
-      // Existing-account repair can restore only the platform purpose proven
-      // by this row's versioned acceptance evidence; it must never infer the
-      // independent LLM-disclosure purpose.
-      purpose: CONSENT_PURPOSES[0],
-      lawfulBasis: 'art6_1_a',
-      granted: true,
-      grantedAt: new Date(),
-      auditFact: {
-        source: 'adult_self_consent_repair',
-        termsAcceptedAt: fact.termsAcceptedAt,
-        termsVersion: fact.termsVersion,
-        // Provenance: the ORIGINAL terms-acceptance event this record derives from.
-        repairedFromEventAt: fact.termsAcceptedAt,
-      },
-    });
+    const repaired = await tx
+      .insert(consentGrant)
+      .values({
+        chargePersonId,
+        organizationId,
+        // Existing-account repair can restore only the platform purpose proven
+        // by this row's versioned acceptance evidence; it must never infer the
+        // independent LLM-disclosure purpose.
+        purpose: CONSENT_PURPOSES[0],
+        lawfulBasis: 'art6_1_a',
+        granted: true,
+        grantedAt: new Date(),
+        auditFact: {
+          source: 'adult_self_consent_repair',
+          termsAcceptedAt: fact.termsAcceptedAt,
+          termsVersion: fact.termsVersion,
+          // Provenance: the ORIGINAL terms-acceptance event this record derives from.
+          repairedFromEventAt: fact.termsAcceptedAt,
+        },
+        // [WI-2929] The repair derives from a GENUINELY versioned acceptance
+        // (parseVersionedTermsFact rejects a null/empty version), so the
+        // promoted column carries that same proven version — never a guess.
+        policyVersion: fact.termsVersion,
+      })
+      .returning();
+    await syncConsentReceipts(tx, repaired);
     return 'repaired'; // (a)
   });
 }
@@ -742,22 +784,28 @@ export async function acceptAdultSelfConsentV2(
       // Already live → leave untouched (never duplicate or weaken a valid grant).
       if (current?.granted && !current.withdrawnAt) continue;
 
-      await tx.insert(consentGrant).values({
-        chargePersonId,
-        organizationId,
-        purpose,
-        lawfulBasis: 'art6_1_a' as const,
-        granted: true,
-        grantedAt: now,
-        auditFact: {
-          // Distinct from 'adult_self_signup' / 'adult_self_consent_repair' so
-          // getConsentAccountabilityV2 can tell an in-app re-consent acceptance
-          // from bootstrap or derived-repair provenance.
-          source: 'adult_self_acceptance',
-          termsAcceptedAt: now.toISOString(),
-          termsVersion,
-        },
-      });
+      const accepted = await tx
+        .insert(consentGrant)
+        .values({
+          chargePersonId,
+          organizationId,
+          purpose,
+          lawfulBasis: 'art6_1_a' as const,
+          granted: true,
+          grantedAt: now,
+          auditFact: {
+            // Distinct from 'adult_self_signup' / 'adult_self_consent_repair' so
+            // getConsentAccountabilityV2 can tell an in-app re-consent acceptance
+            // from bootstrap or derived-repair provenance.
+            source: 'adult_self_acceptance',
+            termsAcceptedAt: now.toISOString(),
+            termsVersion,
+          },
+          // [WI-2929] Same version, promoted column.
+          policyVersion: termsVersion,
+        })
+        .returning();
+      await syncConsentReceipts(tx, accepted);
       granted.push(purpose);
     }
 
@@ -1157,13 +1205,21 @@ export async function processConsentResponseV2(
               source: 'consent_response_approved',
               policyVersion: audit?.policyVersion ?? request.policyVersion,
             },
+            // [WI-2929] Finding C-2 / gap P3-G4. The audit_fact copy above is
+            // what `stampWithdrawal` used to destroy on a guardian revocation,
+            // taking with it the only proof of WHICH wording the parent
+            // approved. This column is written once, here, and by no
+            // withdrawal path — so the approval-time version is now
+            // structurally immutable rather than merge-discipline-dependent.
+            policyVersion: audit?.policyVersion ?? request.policyVersion,
             withdrawalTokenId,
           })),
         )
-        .returning({ id: consentGrant.id, purpose: consentGrant.purpose });
+        .returning();
       if (!hasCompletePurposeSet(grants)) {
         throw new Error('consent grant purpose-set insert was incomplete');
       }
+      await syncConsentReceipts(tx, grants);
 
       for (const purpose of CONSENT_PURPOSES) {
         const grant = grants.find((row) => row.purpose === purpose);
@@ -1509,6 +1565,12 @@ async function stampWithdrawal(
     }
 
     const now = new Date();
+    // [WI-2929] `auditFact` is still assigned wholesale here — the callers pass
+    // a withdrawal-provenance fact and that IS the right content for the JSONB.
+    // What used to make that assignment destructive was the policy version
+    // riding inside it; the version now lives in `consent_grant.policy_version`
+    // and this UPDATE does not touch that column, so the grant-time version
+    // survives every withdrawal by construction (finding C-2 / gap P3-G4).
     const updated = await tx
       .update(consentGrant)
       .set({ withdrawnAt: now, priorValue: true, auditFact })
@@ -1521,10 +1583,13 @@ async function stampWithdrawal(
           isNull(consentGrant.withdrawnAt),
         ),
       )
-      .returning({ id: consentGrant.id });
+      .returning();
     if (updated.length !== current.length) {
       throw new ConsentRecordNotFoundError();
     }
+    // Refresh the durable receipts so the evidence tier reflects the
+    // withdrawal too (upsert on consent_grant_id — no duplicate rows).
+    await syncConsentReceipts(tx, updated);
 
     await tx
       .update(nudges)
@@ -1625,19 +1690,27 @@ async function appendRestoreGrant(
       throw new ConsentGracePeriodExpiredError();
     }
 
-    await tx.insert(consentGrant).values(
-      current.map((grant) => ({
-        chargePersonId,
-        organizationId,
-        purpose: grant.purpose,
-        lawfulBasis: basis,
-        granted: true,
-        grantedAt: now,
-        priorValue: false,
-        auditFact,
-        withdrawalTokenId: grant.withdrawalTokenId,
-      })),
-    );
+    const restored = await tx
+      .insert(consentGrant)
+      .values(
+        current.map((grant) => ({
+          chargePersonId,
+          organizationId,
+          purpose: grant.purpose,
+          lawfulBasis: basis,
+          granted: true,
+          grantedAt: now,
+          priorValue: false,
+          auditFact,
+          // [WI-2929] Carry the withdrawn grant's version forward: a restore is
+          // a re-grant of the SAME wording the guardian originally approved, not
+          // a fresh consent event against whatever version is in force today.
+          policyVersion: grant.policyVersion,
+          withdrawalTokenId: grant.withdrawalTokenId,
+        })),
+      )
+      .returning();
+    await syncConsentReceipts(tx, restored);
     await tx
       .update(person)
       .set({ archivedAt: null, updatedAt: now })
@@ -2198,6 +2271,7 @@ async function currentGrant(
   purpose: ConsentPurpose;
   withdrawnAt: Date | null;
   withdrawalTokenId: string | null;
+  policyVersion: string | null;
 } | null> {
   const row = await db.query.consentGrant.findFirst({
     where: and(
@@ -2212,6 +2286,9 @@ async function currentGrant(
       purpose: true,
       withdrawnAt: true,
       withdrawalTokenId: true,
+      // [WI-2929] appendRestoreGrant carries the withdrawn grant's version
+      // forward onto the restore row.
+      policyVersion: true,
     },
   });
   return row ? { ...row, purpose: row.purpose as ConsentPurpose } : null;

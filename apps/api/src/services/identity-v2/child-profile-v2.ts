@@ -69,6 +69,16 @@ export interface CreateChildProfileV2Input {
    * the route reads `(c.env?.ADULT_OWNER_GATE_ENABLED) !== 'false'`.
    */
   adultOwnerGateEnabled: boolean;
+  /**
+   * [WI-2929] The server's `CONSENT_POLICY_VERSION` binding, stamped onto the
+   * parent-creates-child consent grant. Before this, the direct-grant path
+   * recorded no terms/policy version anywhere, giving the child cohort the
+   * weakest Art 7(1) evidence of any consent writer. Optional so a caller
+   * without the binding degrades to null rather than failing a profile
+   * creation; the production route (`routes/profiles.ts`) always supplies it,
+   * exactly as the owner-bootstrap path already does.
+   */
+  consentPolicyVersion?: string;
 }
 
 /**
@@ -78,7 +88,12 @@ export interface CreateChildProfileV2Input {
  */
 export async function createChildProfileV2(
   db: Database,
-  { organizationId, input, adultOwnerGateEnabled }: CreateChildProfileV2Input,
+  {
+    organizationId,
+    input,
+    adultOwnerGateEnabled,
+    consentPolicyVersion,
+  }: CreateChildProfileV2Input,
 ): Promise<Profile> {
   return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
@@ -216,6 +231,8 @@ export async function createChildProfileV2(
         {
           ageAtGrant: consentCheck.age,
           jurisdictionAtGrant: childRow.residenceJurisdiction ?? undefined,
+          // [WI-2929] The wording in force when the parent consented.
+          policyVersion: consentPolicyVersion,
         },
       );
       consented = true;

@@ -42,7 +42,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   consentGrant,
-  consentReceipt,
   membership,
   organization,
   person,
@@ -64,6 +63,7 @@ import {
   getSubscriptionStoreTeardownTargetsV2,
 } from './deletion-v2';
 import { getChargePersonIds, getGuardianPersonIds } from './guardianship';
+import { syncConsentReceipts } from './consent-receipt-v2';
 import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
 import {
   findActiveLinkContract,
@@ -513,20 +513,9 @@ async function archiveSourceConsentGrants(
     ),
   });
   if (grants.length === 0) return;
-  await db.insert(consentReceipt).values(
-    grants.map((grant) => ({
-      personId: grant.chargePersonId,
-      organizationId: grant.organizationId,
-      purpose: grant.purpose,
-      lawfulBasis: grant.lawfulBasis,
-      granted: grant.granted,
-      grantedAt: grant.grantedAt,
-      withdrawnAt: grant.withdrawnAt,
-      priorValue: grant.priorValue,
-      auditFact: grant.auditFact,
-      retentionPeriod: null,
-    })),
-  );
+  // [WI-2929] Upsert — the grant-time receipt already exists; this refreshes it
+  // (keyed on consent_grant_id) instead of writing a duplicate.
+  await syncConsentReceipts(db, grants);
   await db
     .delete(consentGrant)
     .where(

@@ -540,6 +540,25 @@ export const consentGrant = pgTable(
     priorValue: boolean('prior_value'),
     /** The audit fact for direction-aware protection-lowering. */
     auditFact: jsonb('audit_fact'),
+    /**
+     * [WI-2929] The consent-policy version in force when THIS grant was taken —
+     * promoted out of `audit_fact` to a first-class column (consent-log spec
+     * §2.5 "Recommendation", finding C-2 / gap P3-G4).
+     *
+     * Why a column and not a JSONB key: `stampWithdrawal` assigns `audit_fact`
+     * wholesale, so a version living inside the JSONB was destroyed the moment
+     * a guardian revoked — leaving the child cohort unable to prove WHICH
+     * wording the parent approved (Art 5(2)/7(1) must outlive the withdrawal).
+     * No withdrawal path writes this column, so grant-time immutability is
+     * STRUCTURAL rather than dependent on every future writer remembering to
+     * merge. Sibling tables already model it this way
+     * (`consent_request.policy_version`, `country_policy_registry.policy_version`).
+     *
+     * Nullable: grants written before this column carry the version (if any) in
+     * `audit_fact.policyVersion` / `audit_fact.termsVersion`, and the
+     * accountability read falls back to those for legacy rows.
+     */
+    policyVersion: text('policy_version'),
     /** VPC tokenised pass/fail — dropped at re-home time. */
     assuranceToken: text('assurance_token'),
     assuranceMethod: text('assurance_method'),
@@ -598,6 +617,26 @@ export const consentReceipt = pgTable(
     withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
     priorValue: boolean('prior_value'),
     auditFact: jsonb('audit_fact'),
+    /**
+     * [WI-2929] Mirror of `consent_grant.policy_version` — the receipt is the
+     * evidence that outlives the person, so it must carry the version the
+     * grant was taken against or the promotion in §2.5 buys nothing past
+     * erasure.
+     */
+    policyVersion: text('policy_version'),
+    /**
+     * [WI-2929] The `consent_grant.id` this receipt evidences. NOT a foreign
+     * key — the receipt outlives the grant row (and the person), same reason
+     * `person_id` carries none.
+     *
+     * This is the upsert key that lets the receipt be written at GRANT time
+     * (fail-safe: the evidence exists from the moment consent is taken, not
+     * from whenever some future deletion path remembers to archive) and then
+     * REFRESHED in place on withdrawal and at re-home, instead of inserting a
+     * duplicate. Nullable + a partial unique index: receipts written before
+     * this column have no grant id and must not collide with each other.
+     */
+    consentGrantId: uuid('consent_grant_id'),
     retainedAt: timestamp('retained_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -606,6 +645,9 @@ export const consentReceipt = pgTable(
   (table) => [
     index('consent_receipt_person_id_idx').on(table.personId),
     index('consent_receipt_organization_id_idx').on(table.organizationId),
+    uniqueIndex('consent_receipt_consent_grant_id_idx')
+      .on(table.consentGrantId)
+      .where(sql`${table.consentGrantId} IS NOT NULL`),
   ],
 );
 

@@ -246,6 +246,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
               // [OPT-C] Default 'true' when binding missing (matches legacy).
               adultOwnerGateEnabled:
                 c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
+              // [WI-2929] Stamp the parent-creates-child grant with the policy
+              // version in force — the same server binding the owner-bootstrap
+              // path below already passes as `consentPolicyVersion`.
+              consentPolicyVersion: c.env?.CONSENT_POLICY_VERSION,
             });
             return c.json(
               profileResponseSchema.parse({

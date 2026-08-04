@@ -75,7 +75,6 @@ import {
 import {
   byokWaitlist,
   consentGrant,
-  consentReceipt,
   consentRequest,
   deletionAudit,
   financialRecord,
@@ -103,6 +102,7 @@ import type {
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
 import { captureException } from '../sentry';
+import { syncConsentReceipts } from './consent-receipt-v2';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -691,20 +691,11 @@ export async function executeDeletionV2(
         where: eq(consentGrant.chargePersonId, personId),
       });
       if (grants.length > 0) {
-        await tx.insert(consentReceipt).values(
-          grants.map((g) => ({
-            personId: g.chargePersonId,
-            organizationId: g.organizationId,
-            purpose: g.purpose,
-            lawfulBasis: g.lawfulBasis,
-            granted: g.granted,
-            grantedAt: g.grantedAt,
-            withdrawnAt: g.withdrawnAt,
-            priorValue: g.priorValue,
-            auditFact: g.auditFact,
-            retentionPeriod: null,
-          })),
-        );
+        // [WI-2929] Upsert, not insert. Every grant already carries a receipt
+        // written at grant time; this is the FINAL refresh before the live rows
+        // go, keyed on consent_grant_id so a re-homed person ends with exactly
+        // one receipt per grant rather than two.
+        await syncConsentReceipts(tx, grants);
         // Step 3 — remove the live grants now the receipt exists (RESTRICT
         // satisfied). Re-home + delete are in one tx: a receipt without a
         // delete, or a delete without a receipt, is never observable.
@@ -1127,20 +1118,9 @@ async function rehomeGrantsTx(
     where: eq(consentGrant.chargePersonId, personId),
   });
   if (grants.length === 0) return;
-  await tx.insert(consentReceipt).values(
-    grants.map((g) => ({
-      personId: g.chargePersonId,
-      organizationId: g.organizationId,
-      purpose: g.purpose,
-      lawfulBasis: g.lawfulBasis,
-      granted: g.granted,
-      grantedAt: g.grantedAt,
-      withdrawnAt: g.withdrawnAt,
-      priorValue: g.priorValue,
-      auditFact: g.auditFact,
-      retentionPeriod: null,
-    })),
-  );
+  // [WI-2929] Upsert — the grant-time receipt already exists; this refreshes it
+  // (keyed on consent_grant_id) instead of writing a duplicate.
+  await syncConsentReceipts(tx, grants);
   await tx
     .delete(consentGrant)
     .where(eq(consentGrant.chargePersonId, personId));

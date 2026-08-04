@@ -1513,6 +1513,7 @@ describe('consent routes', () => {
             granted: true,
             termsAcceptedAt: null,
             termsVersion: null,
+            policyVersion: null,
             withdrawnAt: '2026-07-24T07:00:00.000Z',
           },
         ],
@@ -1549,6 +1550,11 @@ describe('consent routes', () => {
             granted: true,
             termsAcceptedAt: '2026-07-23T10:00:00.000Z',
             termsVersion: '2026-07-23',
+            // [WI-2929] The adult acceptance fact carries no audit_fact
+            // .policyVersion and this legacy row predates the column, so the
+            // promoted field is absent — the version is still reported, as
+            // termsVersion. The two are deliberately distinct facts.
+            policyVersion: null,
             withdrawnAt: null,
           },
         ],
@@ -1605,7 +1611,57 @@ describe('consent routes', () => {
               granted: true,
               termsAcceptedAt: null,
               termsVersion: null,
+              // [WI-2929] A partial acceptance fact must not leak its version
+              // back through policyVersion either — the fallback reads only
+              // audit_fact.policyVersion, never termsVersion.
+              policyVersion: null,
               withdrawnAt: null,
+            },
+          ],
+        });
+      },
+    );
+
+    // [WI-2929] The promoted `consent_grant.policy_version` column, and the
+    // legacy `audit_fact.policyVersion` fallback for parental grants written
+    // before it. Both are the guardian-approval case finding C-2 was about —
+    // the population whose version the old withdrawal path destroyed.
+    it.each([
+      ['the promoted column', 'policy-2026-07-30', null],
+      ['the legacy audit_fact key', null, { policyVersion: 'policy-legacy' }],
+    ])(
+      'reports the parental grant policy version from %s',
+      async (_case, policyVersion, auditFact) => {
+        execute.mockResolvedValueOnce([
+          {
+            purpose: 'platform_use',
+            lawful_basis: 'gdpr_parental_consent',
+            granted: true,
+            granted_at: '2026-07-24T06:00:00.000Z',
+            // Withdrawn, which is the whole point: the version must outlive it.
+            withdrawn_at: '2026-07-24T07:00:00.000Z',
+            audit_fact: auditFact ?? { source: 'guardian_revocation' },
+            policy_version: policyVersion,
+          },
+        ]);
+
+        const res = await app.request(
+          '/v1/consent/self/accountability',
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        await expect(res.json()).resolves.toEqual({
+          records: [
+            {
+              purpose: 'platform_use',
+              lawfulBasis: 'gdpr_parental_consent',
+              granted: true,
+              termsAcceptedAt: null,
+              termsVersion: null,
+              policyVersion: policyVersion ?? 'policy-legacy',
+              withdrawnAt: '2026-07-24T07:00:00.000Z',
             },
           ],
         });

@@ -896,6 +896,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           granted: r.granted,
           termsAcceptedAt: r.termsAcceptedAt,
           termsVersion: r.termsVersion,
+          policyVersion: r.policyVersion,
           withdrawnAt: r.withdrawnAt,
         })),
       }),
