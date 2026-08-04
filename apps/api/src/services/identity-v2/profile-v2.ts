@@ -51,6 +51,27 @@ export interface PersonProfileScope {
  * ('US' | 'EU' | 'ROW' | …) → the legacy location enum ('US' | 'EU' | 'OTHER')
  * | null. The inverse of locationToJurisdiction; UNKNOWN/anything-else → null
  * (matching the reseed's 'UNKNOWN' sentinel and the legacy nullable location).
+ *
+ * [WI-2750] THE SOLE IMPLEMENTATION. export-v2.ts previously declared a private
+ * second copy that returned 'OTHER' for an unrecognised jurisdiction, so the
+ * same person could read as null in the profile API and 'OTHER' in their GDPR
+ * data export. That copy is deleted; export-v2.ts imports this one.
+ *
+ * THE `null` FALLBACK IS DELIBERATE, not inherited by surviving. Once
+ * residence_jurisdiction holds an ISO 3166-1 alpha-2 code (WI-2743), 'OTHER' is
+ * an affirmative and FALSE claim about a data subject inside an Article 15
+ * export they download: a person resident in 'DE' is not in the legacy
+ * catch-all bucket, and the system does not actually hold a legacy-bucket value
+ * for them. `null` states the truth — no legacy bucket applies — and the export
+ * contract already permits it (publicProfileSchema.location is
+ * locationSchema.nullable()). The competing argument for 'OTHER', mirroring
+ * locationToJurisdiction's OTHER↔ROW symmetry, only holds for values that have
+ * a forward pre-image; 'DE' has none. The three legacy buckets both copies
+ * always agreed on ('US' | 'EU' | 'ROW') are unchanged.
+ *
+ * This default is compliance-visible: it decides what a data subject sees in an
+ * Art-15 export. It is an engineering choice made on the reasoning above, and
+ * it is cheap to reverse (one switch arm) if the operator rules otherwise.
  */
 export function jurisdictionToLocation(
   jurisdiction: string | null | undefined,
