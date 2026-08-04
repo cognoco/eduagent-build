@@ -142,6 +142,7 @@ export function validateReviewedDryRunReceipt({
   reviewedDryRunId,
   currentHeadSha,
   databaseUrl,
+  currentCatalogReport,
 }) {
   if (
     receipt?.schema !== 'zdx.wi1628.staging-journal-repair.v1' ||
@@ -170,6 +171,30 @@ export function validateReviewedDryRunReceipt({
     actual.some((identity, index) => identity !== expected[index])
   ) {
     throw new Error('Reviewed dry-run receipt has the wrong exact-row set');
+  }
+  const catalog = receipt.catalogInventory;
+  if (
+    !catalog ||
+    !Number.isInteger(catalog.baselineObjects) ||
+    !Number.isInteger(catalog.stagingObjects) ||
+    !Number.isInteger(catalog.differences) ||
+    !/^[a-f0-9]{64}$/.test(catalog.fingerprint ?? '') ||
+    !Array.isArray(catalog.preview)
+  ) {
+    throw new Error(
+      'Reviewed dry-run receipt has an invalid catalog inventory report',
+    );
+  }
+  if (
+    !currentCatalogReport ||
+    catalog.baselineObjects !== currentCatalogReport.baselineObjects ||
+    catalog.stagingObjects !== currentCatalogReport.stagingObjects ||
+    catalog.differences !== currentCatalogReport.differences ||
+    catalog.fingerprint !== currentCatalogReport.fingerprint
+  ) {
+    throw new Error(
+      'Staging catalog inventory changed since the reviewed dry run',
+    );
   }
 }
 
@@ -304,31 +329,55 @@ function inventoryMap(rows) {
   return result;
 }
 
-export function assertCatalogInventoriesMatch({ baseline, staging }) {
+export function catalogInventoryReport({ baseline, staging }) {
   const expected = inventoryMap(baseline);
   const actual = inventoryMap(staging);
   const differences = [];
 
   for (const [key, definition] of expected) {
     if (!actual.has(key)) {
-      differences.push(`missing: ${key}`);
+      differences.push({
+        key,
+        state: 'missing',
+        baselineDefinition: definition,
+        stagingDefinition: null,
+      });
     } else if (actual.get(key) !== definition) {
-      differences.push(`changed: ${key}`);
+      differences.push({
+        key,
+        state: 'changed',
+        baselineDefinition: definition,
+        stagingDefinition: actual.get(key),
+      });
     }
   }
   for (const key of actual.keys()) {
     if (!expected.has(key)) {
-      differences.push(`unexpected: ${key}`);
+      differences.push({
+        key,
+        state: 'unexpected',
+        baselineDefinition: null,
+        stagingDefinition: actual.get(key),
+      });
     }
   }
 
-  if (differences.length > 0) {
-    const preview = differences.sort().slice(0, 30);
-    const remainder = differences.length - preview.length;
-    throw new Error(
-      'Staging catalog inventory differs from migration 0166; refusing journal ' +
-        `repair:\n- ${preview.join('\n- ')}` +
-        (remainder > 0 ? `\n- …and ${remainder} more` : ''),
-    );
-  }
+  differences.sort((left, right) =>
+    Buffer.compare(
+      Buffer.from(`${left.state}\0${left.key}`, 'utf8'),
+      Buffer.from(`${right.state}\0${right.key}`, 'utf8'),
+    ),
+  );
+  return {
+    baselineObjects: expected.size,
+    stagingObjects: actual.size,
+    differences: differences.length,
+    fingerprint: crypto
+      .createHash('sha256')
+      .update(JSON.stringify(differences))
+      .digest('hex'),
+    preview: differences
+      .slice(0, 30)
+      .map(({ state, key }) => `${state}: ${key}`),
+  };
 }
