@@ -333,6 +333,9 @@ export const profileRoutes = new Hono<ProfileEnv>()
           birthMonth: input.birthMonth,
           birthDay: input.birthDay,
           location: input.location ?? null,
+          // [WI-2743] The collected ISO habitual-residence country; persisted
+          // verbatim by the writer. `location` above is superseded and unread.
+          habitualResidenceCountry: input.habitualResidenceCountry ?? null,
           conversationLanguage: input.conversationLanguage,
           pronouns: input.pronouns ?? null,
           avatarUrl: input.avatarUrl ?? null,

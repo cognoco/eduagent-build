@@ -44,7 +44,7 @@ import {
 } from '../billing/billing-v2';
 import {
   buildValidatedBirthDate,
-  locationToJurisdiction,
+  residenceJurisdictionForCreate,
 } from './identity-graph';
 import {
   birthMonthDayFromDate,
@@ -171,7 +171,9 @@ export async function createChildProfileV2(
       .values({
         displayName: input.displayName,
         birthDate,
-        residenceJurisdiction: locationToJurisdiction(input.location ?? null),
+        residenceJurisdiction: residenceJurisdictionForCreate(
+          input.habitualResidenceCountry,
+        ),
         ...(input.conversationLanguage !== undefined
           ? { conversationLanguage: input.conversationLanguage }
           : {}),
