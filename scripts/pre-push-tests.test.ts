@@ -77,3 +77,41 @@ describe('pre-push Jest launcher', () => {
     }
   });
 });
+
+// WI-3058: crossing the >100-TS-file threshold must change the VOLUME of test
+// selection, not its KIND. The fallback selects by project rather than by
+// changed file, so excluding only `mobile` pulled @eduagent/database — every
+// suite of which needs a live Postgres — into any delta big enough to trip the
+// threshold, which merging origin/main does on its own.
+describe('pre-push fallback test-selection scope', () => {
+  it('excludes @eduagent/database from the nx affected fallback', () => {
+    const script = readFileSync(PRE_PUSH_SCRIPT, 'utf8');
+
+    expect(script).toContain('NX_EXCLUDE="mobile,@eduagent/database"');
+  });
+
+  it('drives the nx affected fallback from the exclude list', () => {
+    const script = readFileSync(PRE_PUSH_SCRIPT, 'utf8');
+    const fallbackCall = script
+      .split('\n')
+      .find((line) => line.includes('nx affected -t test'));
+
+    expect(fallbackCall).toBeDefined();
+    expect(fallbackCall).toContain('--exclude="$NX_EXCLUDE"');
+    expect(fallbackCall).not.toContain('--exclude=mobile');
+  });
+
+  it('states where the excluded database suites still run', () => {
+    const script = readFileSync(PRE_PUSH_SCRIPT, 'utf8');
+
+    expect(script).toContain('nx affected -t lint test typecheck');
+    expect(script).toContain('nx run-many -t test');
+  });
+
+  it('leaves the surgical path routing database files to jest', () => {
+    const script = readFileSync(PRE_PUSH_SCRIPT, 'utf8');
+
+    expect(script).toContain('run_jest packages/database $DATABASE_FILES');
+    expect(script).toContain('packages/database/src/*)   DATABASE_FILES=');
+  });
+});

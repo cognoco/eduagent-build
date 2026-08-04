@@ -154,9 +154,24 @@ else
 
   # >100 files: fall back to nx affected (same threshold as pre-commit)
   if [[ "$TS_COUNT" -gt 100 ]]; then
+    # [WI-3058] The surgical path below selects tests by changed FILE; this
+    # fallback selects by PROJECT. Excluding only `mobile` therefore made
+    # crossing the threshold change the KIND of selection, not just its volume:
+    # it pulled @eduagent/database, every suite of which needs a live Postgres
+    # (packages/database/jest.setup.ts loads the database env before any test
+    # runs). Merging origin/main into a long-lived branch inflates the delta
+    # past 100 and carries database sources along with it, so such a branch was
+    # blocked on any host without a local Postgres by a scope change it had not
+    # authored — while the env guard correctly refused to fake a shared staging
+    # database. Exclude the project here and let CI enforce it (see below).
+    NX_EXCLUDE="mobile,@eduagent/database"
     echo ""
-    echo "pre-push: >100 TS files in delta, falling back to nx affected --exclude=mobile"
-    if ! NX_DAEMON=false pnpm exec nx affected -t test --base="$AFFECTED_BASE" --head="$AFFECTED_HEAD" --exclude=mobile; then
+    echo "pre-push: >100 TS files in delta, falling back to nx affected --exclude=$NX_EXCLUDE"
+    echo "pre-push: @eduagent/database is excluded from this path — its suites require a"
+    echo "pre-push:   live Postgres. They are NOT dropped from the pipeline: CI runs them on"
+    echo "pre-push:   every PR via 'nx affected -t lint test typecheck' and on main via"
+    echo "pre-push:   'nx run-many -t test', against a provisioned database (ci.yml)."
+    if ! NX_DAEMON=false pnpm exec nx affected -t test --base="$AFFECTED_BASE" --head="$AFFECTED_HEAD" --exclude="$NX_EXCLUDE"; then
       echo ""
       echo "pre-push: FAILED — nx affected tests failed"
       exit 1
