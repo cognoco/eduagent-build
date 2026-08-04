@@ -155,6 +155,12 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
       TEST_ENV,
     );
 
+    // NOTE: this rejection comes from zValidator, NOT the validationError()
+    // helper the service-path cases above assert. `@hono/zod-validator` is
+    // mounted without an error hook, so it answers `c.json(safeParseResult, 400)`
+    // — a `{ success: false, error: { name: 'ZodError', message: <issues JSON> } }`
+    // body with no `code` / `details` fields. Assert on the serialized body
+    // rather than `body.code === 'VALIDATION_ERROR'`, which would never match.
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(JSON.stringify(body)).toContain('birthMonth');
