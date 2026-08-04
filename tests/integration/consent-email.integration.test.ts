@@ -26,7 +26,21 @@ import { app } from '../../apps/api/src/index';
 const CONSENT_USER_ID = 'integration-consent-email';
 const CONSENT_EMAIL = 'consent-email@integration.test';
 const PARENT_EMAIL = 'parent@integration.test';
-const CHILD_BIRTH_YEAR = 2013; // Age 13 in 2026 — minimum v1 age; still requires GDPR parental consent under 16 (WI-570)
+// A minor who still requires GDPR parental consent (WI-570), expressed
+// relative to the current year so it cannot drift.
+//
+// [WI-3019] The window is narrow and both edges matter:
+//   - consent is required only while the year-only age is <= 16, so the year
+//     must be >= currentYear - 16, or these tests stop producing a consent
+//     request at all and assert nothing;
+//   - profileCreateSchema now requires birthMonth/birthDay at the age floor
+//     (currentYear - PROFILE_MINIMUM_AGE), because year-only math cannot tell
+//     a 12-year-old from a 13-year-old there, so a year-only payload must be
+//     <= currentYear - 14.
+// currentYear - 15 sits in the middle of that window with a year of margin on
+// each side. Never a hardcoded literal: the previous value (2013) was written
+// as "age 13 in 2026" and silently became the floor year.
+const CHILD_BIRTH_YEAR = new Date().getUTCFullYear() - 15;
 const FAKE_RESEND_KEY = 're_test_integration_consent';
 
 async function createChildProfile(): Promise<string> {
