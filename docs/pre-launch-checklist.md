@@ -178,6 +178,11 @@ Ref: `docs/_archive/plans/done/2026-04-19-pre-launch-ux-fixes.md`
   - Verify `SENTRY_DSN` is set in Doppler `prd`
   - Confirm error events flow to Sentry after a test error
 
+- [ ] **LAUNCH-BLOCKING: fallback OTA rehearsal (MMT-ADR-0054 §5 — hard gate, ruled 2026-08-04)**
+  - Provision the `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PRODUCTION` GitHub Actions secret (sourced from the production Clerk key already in EAS env vars — see the known-gap note in `.github/workflows/mobile-fallback-ota.yml`), then dispatch that workflow once (`confirm: publish` + production environment approval).
+  - Verify: workflow preflight passes, the publish succeeds, and the published bundle on the `fallback` channel carries Config F (V0 off / V1 on / V2 off) at the production runtime version.
+  - The rehearsal reaches zero users — no production install listens to the fallback channel until deliberately repointed. Re-run whenever the fallback workflow, its credentials, or the flag scheme change.
+
 - [ ] **LAUNCH-BLOCKING: end-to-end deploy-time verification of activation instrumentation + LLM kill-switch** (tracked as **WI-1588**)
   - Verify activation instrumentation (WI-1504) + LLM kill-switch (WI-1505) end-to-end against a **real migrated Neon DB + KV binding** in a staging/prod-profile build: real `activation_events` rows land; the kill-switch actually flips learner-facing LLM traffic.
   - Sequenced **after** migration-apply (deploy step) + WI-1570 (mobile client dispatch of the six client-observed event types) + ideally WI-1503 dogfood. Public launch cannot proceed without it — activation telemetry is DPIA-adjacent.

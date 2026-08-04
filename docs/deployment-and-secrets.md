@@ -611,7 +611,7 @@ JS-only changes can be deployed in ~5 minutes via EAS Update instead of a full n
 
 ### Runtime Version Strategy
 
-Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is `"<version>:<versionCode>"` (e.g. `"1.0.0:1"`), derived from `version`/`android.versionCode` in app.json.
+Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is `"<version>:<versionCode>"` (e.g. `"1.0.0:1"`), derived from `version`/`android.versionCode` in app.json. Matching is **exact** — a version bump creates a new, disjoint OTA audience, so bumping the version is a release act, never cosmetic. Ratified as policy (with the OTA/native boundary, flag tuples, and channel-ownership rules) by [`MMT-ADR-0054`](adr/MMT-ADR-0054-mobile-release-policy-runtime-version-flags-and-channel-ownership.md).
 
 **Why not fingerprint?** Expo's fingerprint policy was originally specified but fails in this pnpm monorepo: `@expo/fingerprint` hashes `node_modules/.pnpm/` virtual-store paths that differ between Windows (local) and Linux (EAS) even when the actual packages are identical. This causes spurious runtime-version divergence and "Configure expo-updates" build errors. A `.fingerprintignore` ignores most file-type sources but cannot ignore the 76 `type: "dir"` autolinking entries — an upstream limitation in `@expo/fingerprint` ≤0.15.4.
 
@@ -624,6 +624,9 @@ Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is `"<ver
 | `development` | `development` | Dev client builds (local Metro, no OTA) |
 | `preview` | `preview` | Internal testing — primary OTA target |
 | `production` | `production` | Store releases |
+| `fallback` | `fallback` | Parked rollback bundle (navigation redesign off, Config F) — published only via the double-gated `mobile-fallback-ota.yml` workflow; goes live only by deliberately repointing production installs during an incident |
+
+**Channel ownership (`MMT-ADR-0054` §4):** `production` publishes only through the gated deploy pipeline; `fallback` only through the manual double-gated workflow; `preview` is CI's bounded automated path; no agent-initiated OTA publish, ever, without explicit operator instruction. Before the first production rollout, a Config F fallback bundle must have been rehearsal-published and verified (ADR §5 — hard gate; see the pre-launch checklist).
 
 ### CI Integration
 
