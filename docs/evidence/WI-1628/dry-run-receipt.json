@@ -1,0 +1,67 @@
+{
+  "schema": "zdx.wi1628.staging-journal-repair.v1",
+  "mode": "dry-run",
+  "status": "preflight-passed",
+  "databaseRole": "neondb_owner",
+  "journalRowsBefore": 167,
+  "exactRows": [
+    {
+      "id": 136,
+      "hash": "b6a276ed19c7bd42c38c770cbf06b527a4898e5d1e6a46dbbe55111e1ae49502",
+      "created_at": 1783727368926
+    },
+    {
+      "id": 137,
+      "hash": "da0c1cc26bc36d266a01eece64242855a3b4e070df232f899904a495fcc49c33",
+      "created_at": 1783727429477
+    }
+  ],
+  "appliedMigrationsAfterRepair": 165,
+  "pendingMigrationsAfterRepair": [
+    "0167_wi2534_resumable_family_join"
+  ],
+  "catalogInventory": {
+    "baselineObjects": 2234,
+    "stagingObjects": 2219,
+    "differences": 82,
+    "fingerprint": "2983fd69b9284e0bbca36c97596267b584e1680a67a40a4eaa204f81d0d28574",
+    "preview": [
+      "changed: column:public.person.conversation_language_confirmed_at",
+      "changed: column:public.person.migration_pending_at",
+      "changed: column:public.support_messages.id",
+      "changed: enum:public.notification_type.consent_archived",
+      "changed: enum:public.notification_type.dictation_review",
+      "changed: enum:public.notification_type.interview_ready",
+      "changed: enum:public.notification_type.monthly_report",
+      "changed: enum:public.notification_type.notice_recheck",
+      "changed: enum:public.notification_type.progress_refresh",
+      "changed: enum:public.notification_type.recall_nudge",
+      "changed: enum:public.notification_type.session_filing_failed",
+      "changed: enum:public.notification_type.struggle_flagged",
+      "changed: enum:public.notification_type.struggle_noticed",
+      "changed: enum:public.notification_type.struggle_resolved",
+      "changed: enum:public.notification_type.subscribe_request",
+      "changed: enum:public.notification_type.weekly_progress",
+      "changed: relation:public.assessments",
+      "changed: relation:public.bookmarks",
+      "changed: relation:public.celebration_events",
+      "changed: relation:public.child_cap_notifications",
+      "changed: relation:public.coaching_card_cache",
+      "changed: relation:public.concept_mastery",
+      "changed: relation:public.concepts",
+      "changed: relation:public.curriculum_adaptations",
+      "changed: relation:public.dictation_results",
+      "changed: relation:public.family_preferences",
+      "changed: relation:public.learning_modes",
+      "changed: relation:public.learning_profiles",
+      "changed: relation:public.learning_sessions",
+      "changed: relation:public.memory_dedup_decisions"
+    ]
+  },
+  "githubRunId": "30865485086",
+  "headSha": "446404624bcd2c9058b6157eb27a1965e7946847",
+  "targetFingerprint": "d6803665de7f217e68de233646c4b16d7b72b00046e165d5baf7ae105dfebd01",
+  "reviewedDryRunRunId": null,
+  "unrecoveredEffectsResidual": "The SQL bodies for journal rows 136/137 were not retained in Git or local worktrees. The receipt fingerprints the observed bounded public-schema catalog drift but cannot recover it or exclude historical DML, grants/default privileges, role changes, comments, non-public-schema effects, or provider metadata changes.",
+  "unrecoveredEffectsAccepted": false
+}

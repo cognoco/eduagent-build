@@ -1,0 +1,21 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The deploy preflight reconciles the live journal and pending DDL effects before migrate.",
+      "pointer": "packages/database/scripts/verify-migration-journal.test.mjs"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Protected deployment verifies the separate staging Worker role and complete application privilege posture.",
+      "pointer": "packages/database/scripts/verify-worker-db-role.test.mjs"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The exact staging repair, deploy, and post-deploy verification receipts are recorded in the WI-specific report.",
+      "pointer": "docs/evidence/WI-1628/report.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-04",
+  "redGreenPointer": "packages/database/scripts/repair-migration-journal.pg.integration.test.mjs"
+}
