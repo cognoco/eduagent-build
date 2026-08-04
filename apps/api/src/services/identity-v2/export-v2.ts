@@ -53,11 +53,7 @@ import {
   resolveLatestConsentSetStatusAnyBasis,
   type ConsentBasis,
 } from './consent-status-v2';
-import {
-  birthMonthDayFromDate,
-  birthYearFromDate,
-  jurisdictionToLocation,
-} from './profile-v2';
+import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
 
 /**
  * v2 `generateExport` — the GDPR Art-15 access/portability export over the
@@ -315,6 +311,26 @@ export async function generateExportV2(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * [WI-2750 RED-GREEN REVERT — TEMPORARY, RESTORED IN THE NEXT COMMIT]
+ *
+ * This is the deleted second implementation, put back for exactly one CI run so
+ * the regression guard can be observed FAILING. Do not treat this commit as the
+ * intended state of the branch: the very next commit removes it again.
+ *
+ * Map a residence jurisdiction back to the legacy `location` export value.
+ */
+function jurisdictionToLocation(jurisdiction: string): Profile['location'] {
+  switch (jurisdiction) {
+    case 'US':
+      return 'US';
+    case 'EU':
+      return 'EU';
+    default:
+      return 'OTHER';
+  }
+}
 
 /** Map the v2 basis back to the legacy ConsentType for the export row. */
 function basisToConsentType(basis: string): 'GDPR' | 'COPPA' {
