@@ -435,7 +435,10 @@ describe('profileCreateSchema — full birth date validation (WI-367)', () => {
 // without rejecting the year-only payloads legitimate callers still send.
 // ---------------------------------------------------------------------------
 describe('profileCreateSchema — year-only payload at the age floor (WI-3019)', () => {
-  const currentYear = new Date().getUTCFullYear();
+  // getFullYear (local), matching the basis birthYearSchema and the floor
+  // refine both use. Asserting on a different calendar-year source than the
+  // code under test would encode a mismatch these assertions exist to rule out.
+  const currentYear = new Date().getFullYear();
   const floorBirthYear = currentYear - PROFILE_MINIMUM_AGE;
 
   it('[BREAK] rejects a year-only payload at the floor birth year (may still be 12)', () => {

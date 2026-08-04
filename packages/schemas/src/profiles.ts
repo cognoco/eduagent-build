@@ -110,16 +110,26 @@ export const profileCreateSchema = profileCreateObjectSchema.superRefine(
     }
 
     // WI-3019: require the full birth date whenever a year-only payload would
-    // be ambiguous against the minimum-age floor. birthYearSchema already caps
-    // birthYear at <= currentYear - PROFILE_MINIMUM_AGE, so exactly one
-    // year-only value is ambiguous: currentYear - PROFILE_MINIMUM_AGE, where a
-    // learner whose birthday has not yet passed is still PROFILE_MINIMUM_AGE-1.
-    // Year-only payloads for any older year clear the floor even when the
-    // birthday is assumed not to have happened yet, so they stay accepted.
-    // Without this, a direct API payload omitting month/day reaches the
-    // services' calendar-year fallback and registers an under-13 learner.
+    // be ambiguous against the minimum-age floor. birthYearSchema caps
+    // birthYear at <= currentYear - PROFILE_MINIMUM_AGE, so the cap year is the
+    // ambiguous one: a learner born then whose birthday has not yet passed is
+    // still PROFILE_MINIMUM_AGE-1. Year-only payloads for any older year clear
+    // the floor even when the birthday is assumed not to have happened yet, so
+    // they stay accepted. Without this, a direct API payload omitting month/day
+    // reaches the services' calendar-year fallback and registers an under-13
+    // learner.
+    //
+    // The comparison is >=, not ===, so the guard stays closed for any birth
+    // year at OR above the floor rather than only the single cap value.
+    //
+    // getFullYear (local), deliberately matching birthYearSchema's own basis
+    // above rather than getUTCFullYear: sharing one calendar-year source makes
+    // floorBirthYear identical to that cap in every timezone, so the two cannot
+    // drift apart in the hours between local and UTC New Year. The service-side
+    // twin (isBelowMinimumAgeAtCreation) stays on UTC on purpose — it is the
+    // conservative backstop, and being stricter there is the safe direction.
     if (!hasBirthMonth && !hasBirthDay) {
-      const floorBirthYear = new Date().getUTCFullYear() - PROFILE_MINIMUM_AGE;
+      const floorBirthYear = new Date().getFullYear() - PROFILE_MINIMUM_AGE;
       if (data.birthYear >= floorBirthYear) {
         ctx.addIssue({
           code: 'custom',

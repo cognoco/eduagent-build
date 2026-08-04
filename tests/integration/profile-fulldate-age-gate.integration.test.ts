@@ -139,7 +139,11 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
       clerkUserIds: [USER.userId],
     });
 
-    const today = todayUTC();
+    // Local calendar year, NOT todayUTC(): this case asserts the SCHEMA floor,
+    // and birthYearSchema plus the floor refine both derive their year from
+    // getFullYear. The sibling cases above stay on todayUTC() because they
+    // assert the SERVICE's exact-date math, which is deliberately UTC.
+    const floorBirthYear = new Date().getFullYear() - 13;
 
     const res = await app.request(
       '/v1/profiles',
@@ -148,7 +152,7 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
         headers: buildAuthHeaders({ sub: USER.userId, email: USER.email }),
         body: JSON.stringify({
           displayName: 'WI3019 YearOnlyFloor',
-          birthYear: today.year - 13,
+          birthYear: floorBirthYear,
           // no birthMonth / birthDay — the year-only fallback under test.
         }),
       },
