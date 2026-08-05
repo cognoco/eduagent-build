@@ -128,6 +128,25 @@ function main() {
     readBaseline(),
   );
 
+  // Repaid debt is a NOTICE, never a failure — matching this repo's
+  // established ratchet, scripts/check-i18n-jsx-literals.ts, whose gate is
+  // "no new violations" and which prints stale baseline entries to stdout for
+  // cleanup with --accept. Failing here would red another lane's PR for
+  // INCIDENTALLY IMPROVING the tree: a gate failing for a reason its pusher
+  // did not cause, which is the exact failure family this work removes.
+  //
+  // Printed BEFORE the gate (as the precedent does) so a run that both repaid
+  // debt and introduced an error reports both, rather than hiding the cleanup
+  // hint behind the failure.
+  if (improvements.length > 0) {
+    console.log(
+      `scripts typecheck: ${improvements.length} baseline entr${
+        improvements.length === 1 ? 'y is' : 'ies are'
+      } no longer present (clean up with --accept):`,
+    );
+    for (const line of improvements) console.log(`  ${line}`);
+  }
+
   if (regressions.length > 0) {
     const offending = filesFromViolations(regressions);
     console.error(
@@ -149,21 +168,6 @@ function main() {
     );
     process.exitCode = 1;
     return;
-  }
-
-  // Repaid debt is a NOTICE, never a failure — matching this repo's
-  // established ratchet, scripts/check-i18n-jsx-literals.ts, whose gate is
-  // "no new violations" and which prints stale baseline entries to stdout for
-  // cleanup with --accept. Failing here would red another lane's PR for
-  // INCIDENTALLY IMPROVING the tree: a gate failing for a reason its pusher
-  // did not cause, which is the exact failure family this work removes.
-  if (improvements.length > 0) {
-    console.log(
-      `scripts typecheck: ${improvements.length} baseline entr${
-        improvements.length === 1 ? 'y is' : 'ies are'
-      } no longer present (clean up with --accept):`,
-    );
-    for (const line of improvements) console.log(`  ${line}`);
   }
 
   console.log(
