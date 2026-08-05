@@ -99,9 +99,14 @@ function makeDb(opts: {
       purpose,
     })),
   );
-  const insertValues = jest
-    .fn()
-    .mockReturnValue({ returning: insertReturning });
+  const insertValues = jest.fn().mockReturnValue({
+    returning: insertReturning,
+    // [WI-2929] processConsentResponseV2 now also upserts the durable
+    // consent_receipt rows (syncConsentReceipts) inside the same tx —
+    // insert(...).values(...).onConflictDoUpdate(...), which terminates the
+    // chain rather than calling .returning().
+    onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
+  });
   const insertChain = { values: insertValues };
   // Update path: tx.update(X).set(...).where(...).returning({id})
   let approvedUpdateIndex = 0;

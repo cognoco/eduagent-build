@@ -113,6 +113,23 @@ export interface ConsentAccountabilityRecord {
    * null for grants written before the version was captured.
    */
   termsVersion: string | null;
+  /**
+   * [WI-2929] The consent-policy version in force when THIS grant was taken,
+   * read from the first-class `consent_grant.policy_version` column (falling
+   * back to the legacy `audit_fact` placement for pre-column rows).
+   *
+   * Deliberately NOT folded into `termsVersion`: they are different facts.
+   * `termsVersion` is the adult's own versioned terms ACCEPTANCE (paired with
+   * `termsAcceptedAt`, MMT-ADR-0011). `policyVersion` is the wording a grant of
+   * any basis was taken against — including the guardian-on-behalf-of-child
+   * grants that have no terms-acceptance fact at all, and which are exactly the
+   * population finding C-2 left unable to prove what was approved.
+   *
+   * Null for grants that genuinely carry no version — including parental grants
+   * withdrawn before the column existed, whose version `stampWithdrawal`
+   * already destroyed.
+   */
+  policyVersion: string | null;
   withdrawnAt: Date | null;
 }
 
@@ -127,6 +144,7 @@ export const consentAccountabilityRecordSchema = z.object({
   granted: z.boolean(),
   termsAcceptedAt: isoDateField.nullable(),
   termsVersion: z.string().nullable(),
+  policyVersion: z.string().nullable(),
   withdrawnAt: isoDateField.nullable(),
 });
 export const consentAccountabilityReportSchema = z.object({

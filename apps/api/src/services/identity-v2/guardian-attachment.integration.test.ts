@@ -4,6 +4,7 @@ import { and, eq, or, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   consentGrant,
+  consentReceipt,
   consentRequest,
   countryPolicyRegistry,
   createDatabase,
@@ -1614,6 +1615,58 @@ function assertion(
 
       expect(initiation.status).toBe(503);
       expect(attachment.status).toBe(503);
+    });
+
+    // [WI-2929] AC-1 is about the moment consent is TAKEN, not about the files
+    // the original change happened to edit. This writer creates a production
+    // consent_grant and was missed by the first pass: it wrote neither a
+    // grant-time consent_receipt nor the promoted policy_version column, so a
+    // guardian revocation would still have destroyed its version (which lived
+    // only in the destructible audit_fact JSONB).
+    it('[WI-2929] writes a grant-time receipt and the promoted policy_version for the credentialed attachment', async () => {
+      const adult = await seedIdentity('adult-wi2929', 40);
+      const learner = await seedIdentity('learner-wi2929', 14);
+
+      await attachGuardianConsentForCredentialedLearner(db, {
+        callerPersonId: adult.personId,
+        chargePersonId: learner.personId,
+        authority: assertion(
+          adult.personId,
+          learner.personId,
+          learner.organizationId,
+        ),
+        asOf: AS_OF,
+      });
+
+      const grants = await db.query.consentGrant.findMany({
+        where: and(
+          eq(consentGrant.chargePersonId, learner.personId),
+          eq(consentGrant.organizationId, learner.organizationId),
+        ),
+      });
+      expect(grants).toHaveLength(2);
+      // The promoted column, not just the audit_fact copy.
+      expect(grants.every((g) => g.policyVersion === POLICY_VERSION)).toBe(
+        true,
+      );
+
+      // The receipt exists NOW, while the grants are live — no deletion has
+      // happened, so nothing has re-homed anything.
+      const receipts = await db.query.consentReceipt.findMany({
+        where: eq(consentReceipt.personId, learner.personId),
+      });
+      expect(receipts).toHaveLength(2);
+      expect(new Set(receipts.map((r) => r.consentGrantId))).toEqual(
+        new Set(grants.map((g) => g.id)),
+      );
+      expect(receipts.every((r) => r.granted)).toBe(true);
+      expect(receipts.every((r) => r.withdrawnAt === null)).toBe(true);
+      expect(receipts.every((r) => r.policyVersion === POLICY_VERSION)).toBe(
+        true,
+      );
+      expect(
+        receipts.every((r) => r.organizationId === learner.organizationId),
+      ).toBe(true);
     });
   },
 );

@@ -1007,7 +1007,8 @@ export async function getConsentAccountabilityV2(
 ): Promise<ConsentAccountabilityRecord[]> {
   const rows = (await db.execute(sql`
     SELECT DISTINCT ON (purpose, lawful_basis)
-      purpose, lawful_basis, granted, granted_at, withdrawn_at, audit_fact
+      purpose, lawful_basis, granted, granted_at, withdrawn_at, audit_fact,
+      policy_version
     FROM consent_grant
     WHERE charge_person_id = ${chargePersonId}
       AND organization_id = ${organizationId}
@@ -1033,6 +1034,24 @@ export async function getConsentAccountabilityV2(
       // timestamps describe different events and must not substitute for it.
       termsAcceptedAt: termsFact?.termsAcceptedAt ?? null,
       termsVersion: termsFact?.termsVersion ?? null,
+      // [WI-2929] The grant-time policy version, read from the promoted column
+      // (finding C-2 / gap P3-G4). Falls back to the legacy JSONB placement for
+      // rows written before the column existed — for a PARENTAL grant that
+      // fallback is best-effort by nature: if the guardian already revoked,
+      // stampWithdrawal overwrote audit_fact and the version is simply gone.
+      // That historical loss is not recoverable; the column stops it recurring.
+      //
+      // Both sources go through the SAME presence test, so a blank promoted
+      // column falls through to a real legacy value instead of suppressing it.
+      // Deliberately does NOT also fall back to the adult paths' `termsVersion`:
+      // that key is one half of the versioned terms-ACCEPTANCE fact, which
+      // `parseVersionedTermsFact` refuses to report unless BOTH halves are
+      // present (WI-2413), and reaching it here would route around that refusal
+      // under a different field name. Legacy adult grants lose nothing — their
+      // version is already reported as `termsVersion` on the same record.
+      policyVersion:
+        nonBlankPolicyVersion(r.policy_version) ??
+        nonBlankPolicyVersion(audit?.['policyVersion']),
       withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
     };
   });
@@ -1045,6 +1064,32 @@ interface AccountabilityRow {
   granted_at: string | Date;
   withdrawn_at: string | Date | null;
   audit_fact: Record<string, unknown> | string | null;
+  policy_version: string | null;
+}
+
+/**
+ * [WI-2929] The ONE presence test for a grant-time policy version, applied to
+ * BOTH sources the accountability read consults — the promoted
+ * `consent_grant.policy_version` column and the pre-column
+ * `audit_fact.policyVersion` placement (the PARENTAL approval path, exactly
+ * the value finding C-2 was about and exactly the legacy population that needs
+ * the fallback).
+ *
+ * Shared deliberately so the two cannot drift. When they had separate tests,
+ * `??` treated a blank promoted column as PRESENT and suppressed a real legacy
+ * value, returning blank evidence — the failure mode this whole work item
+ * exists to prevent, since a reader cannot tell "no version recorded" from
+ * "version recorded but not surfaced".
+ *
+ * Blank means blank: absent, empty, or whitespace-only reports as absent,
+ * never as a string that reads like evidence. The trimmed value is what gets
+ * reported, matching the write side, which already trims
+ * `CONSENT_POLICY_VERSION` before stamping it (`routes/consent.ts`).
+ */
+function nonBlankPolicyVersion(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**

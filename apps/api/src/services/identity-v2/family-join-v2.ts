@@ -42,7 +42,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   consentGrant,
-  consentReceipt,
   membership,
   organization,
   person,
@@ -64,6 +63,7 @@ import {
   getSubscriptionStoreTeardownTargetsV2,
 } from './deletion-v2';
 import { getChargePersonIds, getGuardianPersonIds } from './guardianship';
+import { syncConsentReceipts } from './consent-receipt-v2';
 import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
 import {
   findActiveLinkContract,
@@ -428,7 +428,7 @@ export async function acceptFamilyJoin(
       if (journeyContext?.archiveSourceConsentGrants) {
         await archiveSourceConsentGrants(tx, teenPersonId, orgOfOneId);
       } else {
-        await tx
+        const repointed = await tx
           .update(consentGrant)
           .set({ organizationId: familyOrgId })
           .where(
@@ -436,7 +436,22 @@ export async function acceptFamilyJoin(
               eq(consentGrant.organizationId, orgOfOneId),
               eq(consentGrant.chargePersonId, teenPersonId),
             ),
-          );
+          )
+          .returning();
+        // [WI-2929] Carry the re-point through to the durable receipts. These
+        // grants SURVIVE (that is what distinguishes this branch from the
+        // archive branch above, where the grants are re-homed and deleted and
+        // their receipts rightly keep the source-org id forever). Since
+        // receipts are now written at GRANT time, the accepting adult/teen
+        // already holds receipts stamped org-of-one; leaving them would make
+        // the receipt contradict the live grant it mirrors about who owns the
+        // consent — and the org-of-one row is deleted a few lines below.
+        //
+        // No point-in-time fact is lost: before grant-time receipts, no receipt
+        // existed on this branch at all until the person's eventual deletion
+        // re-home, which copied the THEN-current organization_id — the family
+        // org. Refreshing restores exactly that value.
+        await syncConsentReceipts(tx, repointed);
       }
       // DELETE the org-of-one subscription (satisfies its payer + org RESTRICT;
       // subscription_payers + profile_quota_usage + quota_pools cascade off it).
@@ -513,20 +528,9 @@ async function archiveSourceConsentGrants(
     ),
   });
   if (grants.length === 0) return;
-  await db.insert(consentReceipt).values(
-    grants.map((grant) => ({
-      personId: grant.chargePersonId,
-      organizationId: grant.organizationId,
-      purpose: grant.purpose,
-      lawfulBasis: grant.lawfulBasis,
-      granted: grant.granted,
-      grantedAt: grant.grantedAt,
-      withdrawnAt: grant.withdrawnAt,
-      priorValue: grant.priorValue,
-      auditFact: grant.auditFact,
-      retentionPeriod: null,
-    })),
-  );
+  // [WI-2929] Upsert — the grant-time receipt already exists; this refreshes it
+  // (keyed on consent_grant_id) instead of writing a duplicate.
+  await syncConsentReceipts(db, grants);
   await db
     .delete(consentGrant)
     .where(

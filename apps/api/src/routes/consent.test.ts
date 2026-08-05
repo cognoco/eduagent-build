@@ -1513,6 +1513,7 @@ describe('consent routes', () => {
             granted: true,
             termsAcceptedAt: null,
             termsVersion: null,
+            policyVersion: null,
             withdrawnAt: '2026-07-24T07:00:00.000Z',
           },
         ],
@@ -1549,6 +1550,11 @@ describe('consent routes', () => {
             granted: true,
             termsAcceptedAt: '2026-07-23T10:00:00.000Z',
             termsVersion: '2026-07-23',
+            // [WI-2929] The adult acceptance fact carries no audit_fact
+            // .policyVersion and this legacy row predates the column, so the
+            // promoted field is absent — the version is still reported, as
+            // termsVersion. The two are deliberately distinct facts.
+            policyVersion: null,
             withdrawnAt: null,
           },
         ],
@@ -1605,12 +1611,143 @@ describe('consent routes', () => {
               granted: true,
               termsAcceptedAt: null,
               termsVersion: null,
+              // [WI-2929] A partial acceptance fact must not leak its version
+              // back through policyVersion either — the fallback reads only
+              // audit_fact.policyVersion, never termsVersion.
+              policyVersion: null,
               withdrawnAt: null,
             },
           ],
         });
       },
     );
+
+    // [WI-2929] The promoted `consent_grant.policy_version` column, and the
+    // legacy `audit_fact.policyVersion` fallback for parental grants written
+    // before it. Both are the guardian-approval case finding C-2 was about —
+    // the population whose version the old withdrawal path destroyed.
+    it.each([
+      ['the promoted column', 'policy-2026-07-30', null],
+      ['the legacy audit_fact key', null, { policyVersion: 'policy-legacy' }],
+    ])(
+      'reports the parental grant policy version from %s',
+      async (_case, policyVersion, auditFact) => {
+        execute.mockResolvedValueOnce([
+          {
+            purpose: 'platform_use',
+            lawful_basis: 'gdpr_parental_consent',
+            granted: true,
+            granted_at: '2026-07-24T06:00:00.000Z',
+            // Withdrawn, which is the whole point: the version must outlive it.
+            withdrawn_at: '2026-07-24T07:00:00.000Z',
+            audit_fact: auditFact ?? { source: 'guardian_revocation' },
+            policy_version: policyVersion,
+          },
+        ]);
+
+        const res = await app.request(
+          '/v1/consent/self/accountability',
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        await expect(res.json()).resolves.toEqual({
+          records: [
+            {
+              purpose: 'platform_use',
+              lawfulBasis: 'gdpr_parental_consent',
+              granted: true,
+              termsAcceptedAt: null,
+              termsVersion: null,
+              policyVersion: policyVersion ?? 'policy-legacy',
+              withdrawnAt: '2026-07-24T07:00:00.000Z',
+            },
+          ],
+        });
+      },
+    );
+
+    // [WI-2929] Both policy-version sources share ONE presence test, so a BLANK
+    // promoted column must not count as present and suppress a real legacy
+    // value — returning blank evidence is the failure this work item exists to
+    // prevent, because a reader cannot tell "no version recorded" from "version
+    // recorded but not surfaced". Blank means absent, empty, or whitespace-only,
+    // on either source.
+    it.each([
+      [
+        'an empty promoted column falls through to the legacy value',
+        '',
+        'policy-legacy',
+      ],
+      [
+        'a whitespace-only promoted column falls through to the legacy value',
+        '   ',
+        'policy-legacy',
+      ],
+      [
+        'a promoted column still wins when it is non-blank',
+        'policy-column',
+        'policy-column',
+      ],
+      [
+        'a padded promoted column is reported trimmed',
+        '  policy-column  ',
+        'policy-column',
+      ],
+    ])('%s', async (_case, promoted, expected) => {
+      execute.mockResolvedValueOnce([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'gdpr_parental_consent',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: { policyVersion: 'policy-legacy' },
+          policy_version: promoted,
+        },
+      ]);
+
+      const res = await app.request(
+        '/v1/consent/self/accountability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        records: [{ policyVersion: expected }],
+      });
+    });
+
+    it.each([
+      ['an empty legacy value', ''],
+      ['a whitespace-only legacy value', '   '],
+      ['a non-string legacy value', 42],
+    ])('reports null for %s with no promoted column', async (_case, legacy) => {
+      execute.mockResolvedValueOnce([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'gdpr_parental_consent',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: { policyVersion: legacy },
+          policy_version: null,
+        },
+      ]);
+
+      const res = await app.request(
+        '/v1/consent/self/accountability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        records: [{ policyVersion: null }],
+      });
+    });
   });
 });
 

@@ -28,7 +28,7 @@ compliance documents do conflate them.
 | **Storage** | `consent_grant` table (event rows) + `consent_receipt` (survives person deletion) | One column: `learning_profiles.memory_consent_status` |
 | **Shape** | Row per (charge person × purpose × organization × lawful basis), timestamped | Mutable enum on the learner's profile row: `pending` / `granted` / `declined` |
 | **Purposes covered** | `platform_use`, `llm_disclosure` | Persistent memory and profiling (**P3 / P4**) |
-| **Versioning** | Policy version stamped into `audit_fact` at grant time | **None** |
+| **Versioning** | `consent_grant.policy_version` column, stamped at grant time and immutable across withdrawal (WI-2929; was an `audit_fact` key, §2.5) | **None** |
 | **History** | Grant rows retained; restore appends new rows | **None — the previous value is overwritten** |
 | **Grant timestamp** | `granted_at`, `withdrawn_at` | **None** — only `consent_prompt_dismissed_at` |
 | **Guardian vs self distinction** | Yes — encoded in `lawful_basis` | **No** |
@@ -63,7 +63,8 @@ consent event log (inv 12/27)"* (`:15`, `:475-476`) — a description §2.4 show
 | `granted_at` | timestamptz NOT NULL, default now | `:497-499` |
 | `withdrawn_at` | timestamptz NULL | `:500` |
 | `prior_value` | boolean NULL | `:502` — the consent value before this record; supports direction-aware protection-lowering gating |
-| `audit_fact` | jsonb NULL | `:504` — **where the policy version actually lives**; see §2.5 |
+| `audit_fact` | jsonb NULL | `:504` — provenance (`source`, `guardianPersonId`) plus the adult paths' versioned terms-**acceptance** fact `{ termsAcceptedAt, termsVersion }`. It was also where the policy version lived until WI-2929 promoted it to the column below; the pre-column copies are retained and still read as a fallback. See §2.5 |
+| `policy_version` | text NULL | **WI-2929** (`apps/api/drizzle/0168_wi2929_consent_evidence_durability.sql`) — the consent-policy version in force at grant time, promoted out of `audit_fact` so no withdrawal path can destroy it. Nullable: grants written before the migration carry their version (if any) in `audit_fact`. Mirrored on `consent_receipt`. See §2.5 |
 | `assurance_token` | text NULL | `:506` — verifiable-parental-consent pass/fail token, dropped at re-home time |
 | `assurance_method` | text NULL | `:507` |
 | `snapshot_age_at_grant` | smallint NULL | `:508` — the learner's age **as known at grant time** |
@@ -112,7 +113,7 @@ separate "consenting actor" column.
 
 | Operation | Function | Row behaviour |
 |---|---|---|
-| Parent creates a child, grant recorded directly | `createDirectConsentGrant` (`consent-v2.ts:239`) | INSERT; `audit_fact = { source: 'parent_created_child', guardianPersonId }` (`:258`) |
+| Parent creates a child, grant recorded directly | `createDirectConsentGrant` (`consent-v2.ts:239`) | INSERT; `audit_fact = { source: 'parent_created_child', guardianPersonId }`. **WI-2929:** also stamps `policy_version` from the server's `CONSENT_POLICY_VERSION`, threaded through `createChildProfileV2` from `routes/profiles.ts`. This path previously recorded **no** terms/policy version at all — the weakest Art 7(1) evidence of any writer. |
 | Email-parent approves a consent request | `processConsentResponseV2` (`:1086`) | INSERT one row **per purpose** in `CONSENT_PURPOSES` (`:1144-1162`); `audit_fact = { source: 'consent_response_approved', policyVersion }` (`:1155-1158`) |
 | Adult accepts at signup | `acceptAdultSelfConsentV2` (`:676`) | INSERT one `art6_1_a` row per purpose (`:749-757`), terms fact stamped into `audit_fact` |
 | Adult self-consent recorded on first use | `recordAdultSelfConsentV2` (`:294`) | INSERT per purpose, `lawfulBasis: 'art6_1_a'` (`:306`) |
@@ -128,8 +129,18 @@ sequence of events is still reconstructable. But the table does not behave as it
 (`identity.ts:475`) describes, and the DPO should not be told it is an append-only log without this
 qualification.
 
-**Finding C-2 — the guardian withdrawal path destroys the policy version recorded at grant time.** This is
-the more serious of the two, and it is a straightforward asymmetry:
+**Finding C-2 — the guardian withdrawal path destroys the policy version recorded at grant time.**
+**FIXED — WI-2929, `apps/api/drizzle/0168_wi2929_consent_evidence_durability.sql`.** The version now lives in
+a first-class `consent_grant.policy_version` column (`identity.ts`, the §2.5 recommendation) that no
+withdrawal path writes, so the destruction described below is **structurally impossible** rather than
+dependent on every writer remembering to merge. `stampWithdrawal` still replaces `audit_fact` — that is the
+right content for the JSONB — but the version no longer rides in it. Regression:
+`consent-v2.integration.test.ts` → *"[variant 2] a guardian withdrawal preserves the approval-time policy
+version"*, which also asserts the accountability endpoint reports it post-withdrawal. **Historical rows are
+not recovered**: a parental grant withdrawn before this migration already had its version overwritten and it
+is gone. The original finding, retained as the record of what was wrong:
+
+This is the more serious of the two, and it is a straightforward asymmetry:
 
 - The **adult** path deliberately merges, with the reason stated in the code: *"MERGE audit_fact rather than
   overwrite: the durable terms-acceptance fact (termsAcceptedAt/termsVersion) written at signup must SURVIVE
@@ -143,19 +154,32 @@ the more serious of the two, and it is a straightforward asymmetry:
 The result is that ZWIZZLY AS can prove *which version of the consent wording an adult accepted* after they
 withdraw, but **cannot prove the same for a child whose parent has withdrawn** — the population where Art 8
 makes the proof most important. The reasoning that produced the adult fix applies identically to the
-parental path; it appears simply not to have been carried across. **This should be fixed before launch, and
-the fix is small: merge instead of replace, exactly as `withdrawAdultSelfConsentV2` does.**
+parental path; it appears simply not to have been carried across. ~~**This should be fixed before launch, and
+the fix is small: merge instead of replace, exactly as `withdrawAdultSelfConsentV2` does.**~~ — WI-2929 took
+the **structural** option in §2.5 instead of the merge, so no future writer can reintroduce the defect.
 
 ### 2.5 Versioning — where it lives, and what it is not
 
-There is **no `policy_version` column on `consent_grant`.** The version is carried inside the `audit_fact`
+**RESOLVED — WI-2929 implemented the recommendation below.** `consent_grant.policy_version` and
+`consent_receipt.policy_version` are now first-class columns
+(`apps/api/drizzle/0168_wi2929_consent_evidence_durability.sql`), written by every grant writer — all
+eight: `createDirectConsentGrant`, `recordAdultSelfConsentV2`, `acceptAdultSelfConsentV2`,
+`repairOrSignalAdultSelfConsentV2`, `processConsentResponseV2`,
+`attachGuardianConsentForCredentialedLearner` (`guardian-attachment.ts`),
+`writeDestinationSelfConsentSet` (`family-join-journey.ts`), and carried forward by
+`appendRestoreGrant` — read by `getConsentAccountabilityV2`, and written by **no** withdrawal path. The
+`audit_fact` copies are retained — `{ termsAcceptedAt, termsVersion }` is the adult's versioned terms
+*acceptance*, a distinct fact per MMT-ADR-0011 — and the accountability read falls back to the JSONB for
+rows written before the column existed. The as-was description, retained as the record:
+
+There *was* **no `policy_version` column on `consent_grant`.** The version was carried inside the `audit_fact`
 JSONB as `{ termsAcceptedAt, termsVersion }` (adult path) or `{ policyVersion }` (parental path), stamped
 from the server-side `CONSENT_POLICY_VERSION` (`consent-v2.ts:672`, parsed back by
 `parseVersionedTermsFact`, `:475-497`).
 
 Sibling tables *do* have first-class columns — `consent_request.policy_version`
 (`identity.ts:975`) and `country_policy_registry.policy_version` (`:746`) — so the JSONB placement on
-`consent_grant` is an inconsistency rather than a considered choice. Practically it means the version is
+`consent_grant` was an inconsistency rather than a considered choice. Practically it meant the version was
 un-indexed, un-constrained, and (per Finding C-2) deletable by an unrelated write. **Recommendation: promote
 it to a column.** That would also make Finding C-2 structurally impossible rather than dependent on every
 future writer remembering to merge.
@@ -185,6 +209,22 @@ landed as the `withdrawal_token_id` column.
 
 ### 2.7 Survival of erasure
 
+**WI-2929 moved the receipt write EARLIER.** A `consent_receipt` row is now written **at grant time**, in
+the same statement sequence as the grant, keyed to it by the new nullable, partial-unique
+`consent_receipt.consent_grant_id` (still no FK — the receipt outlives the grant row). The evidence
+therefore exists from the moment consent is taken rather than from whenever a teardown path gets around to
+archiving. Withdrawal and re-home then **refresh** that row through the single writer
+`syncConsentReceipts` (`apps/api/src/services/identity-v2/consent-receipt-v2.ts`) instead of inserting a
+second one, so a deleted person still ends with exactly one receipt per grant. Regression:
+`consent-v2.integration.test.ts` → *"[variant 1] writes the durable receipt at GRANT time, and it survives
+the person delete"*.
+
+Why that mattered: the three archive sites (`executeDeletionV2`, `rehomeGrantsTx`,
+`archiveSourceConsentGrants`) *did* each write a receipt before deleting grants, so no consent history was
+being lost today — but only because all three remembered to. The receipt's existence was a convention, not a
+constraint, and the next grant-deleting path would have lost it silently. Writing at grant time makes the
+evidence unconditional.
+
 On person deletion the live grant is **re-homed** to `consent_receipt`
 (`identity.ts:547-572`) inside the same transaction that deletes the person
 (`apps/api/src/services/identity-v2/deletion-v2.ts:484-531`). `ON DELETE RESTRICT` on
@@ -204,7 +244,7 @@ standard:
 | That consent was given | **Met** — `granted` + `granted_at` per purpose |
 | By whom | **Met** — `charge_person_id` plus `lawful_basis` distinguishing self from guardian; `guardianPersonId` in `audit_fact` at grant time |
 | For what purpose | **Met, at the granularity that exists** — two purposes, independently recorded and independently withdrawable |
-| Against what wording | **Met for adults; BROKEN for children after a parental withdrawal** — Finding C-2 |
+| Against what wording | **Met** — `consent_grant.policy_version`, written at grant time by every writer and by no withdrawal path (WI-2929). Was *"met for adults; BROKEN for children after a parental withdrawal"* under Finding C-2. Null for pre-migration grants whose version the old withdrawal path already destroyed. |
 | Under what age/jurisdiction rules | **Met** — `snapshot_age_at_grant`, `snapshot_jurisdiction_at_grant` |
 | That it was as easy to withdraw as to give (Art 7(3)) | **Met in mechanism** — self-service endpoint for adults, one-click emailed link for parents |
 | That the proof outlives the data | **Met in structure**, pending the retention value — `consent_receipt`, gap G-2 |
@@ -320,7 +360,7 @@ Verified absent, with the searches named so the DPO can see the claim is a findi
 |---|---|
 | A `personalization_memory` or profiling purpose in the consent log | `CONSENT_PURPOSES` has exactly two members (`packages/schemas/src/consent.ts:20`) |
 | Any `consent_grant` row written by the memory-consent path | `grantMemoryConsent` (`learner-profile.ts:1709-1732`) touches only `learning_profiles` |
-| A first-class `policy_version` column on `consent_grant` | Schema read in full, `identity.ts:480-536`; sibling tables have one (`:975`, `:746`) |
+| ~~A first-class `policy_version` column on `consent_grant`~~ — **now present (WI-2929)**, on `consent_grant` and `consent_receipt` | Was: schema read in full, `identity.ts:480-536`; sibling tables have one (`:975`, `:746`). Added by `0168_wi2929_consent_evidence_durability.sql`. |
 | Any versioning at all on memory consent | `learning-profiles.ts:35-49` — no version, no timestamp of grant |
 | A guardian/child variant for memory consent | No `lawful_basis` equivalent on the flag; nothing distinguishes who set it |
 | A global server-side switch disabling memory | `apps/api/src/config.ts` sweep found only architecture-phase flags (`MEMORY_FACTS_READ_ENABLED`, `MEMORY_FACTS_RELEVANCE_RETRIEVAL`, `MEMORY_FACTS_DEDUP_ENABLED`, `:125-128`) |
@@ -349,7 +389,7 @@ persistent memory; none is large, and together they are the difference between a
 | **P3-G1** | **Memory consent is not in the consent log.** It is a mutable column, with no grant timestamp, no version, no history, and no survival past erasure. | Art 7(1) requires the controller to *demonstrate* consent. A field that can be overwritten with no trace cannot demonstrate anything. If P3 launches on this mechanism, ZWIZZLY AS has a working control and no evidence. | **Blocking** |
 | **P3-G2** | **No `personalization_memory` purpose exists** in `CONSENT_PURPOSES`. | P3 consent has nowhere to live in Mechanism A. Adding the purpose is the natural fix and would inherit versioning, the at-grant snapshots, withdrawal, receipt survival, and the accountability endpoint for free. | **Blocking** |
 | **P3-G3** | **No guardian/child variant for memory consent.** Mechanism A encodes this in `lawful_basis`; Mechanism B has no equivalent. | For a learner below the self-consent age, P3 consent must come from the guardian, and the record must show it did. Today nothing distinguishes a 13-year-old tapping the prompt from a parent doing so. | **Blocking for minors** |
-| **P3-G4** | **Finding C-2** — the guardian withdrawal path overwrites `audit_fact`, destroying the grant-time policy version. | Pre-existing defect in Mechanism A. If P3 moves into Mechanism A (P3-G2), it inherits the defect. Fix first. | **High** |
+| **P3-G4** | ~~**Finding C-2** — the guardian withdrawal path overwrites `audit_fact`, destroying the grant-time policy version.~~ **CLOSED — WI-2929.** `policy_version` is a first-class `consent_grant` column that no withdrawal path writes (§2.5), so a P3 purpose moving into Mechanism A no longer inherits the defect. | Was: pre-existing defect in Mechanism A that P3-G2 would inherit. Now: nothing to fix first — the structural guarantee is in place. Historical rows already stripped of their version are not recovered. | ~~High~~ **Closed** |
 | **P3-G5** | **Finding C-3** — `toggleMemoryCollection` implicitly grants consent as a side effect of a settings toggle. | Consent must be an affirmative, informed act. A settings switch that silently records consent is not obviously that. Depends on the surface wording — see the screen inventory. | **High, pending screen evidence** |
 | **P3-G6** | **The three memory booleans default permissive** (`memory_enabled` and `memory_injection_enabled` both default `true`); off-by-default holds only because the status flag is checked separately everywhere. | The DPO is being asked to rely on a default. It should be robust, not emergent from a conjunction. | **Medium** |
 | **P3-G7** | **No enforcement of the interim parking condition** — no server-side switch prevents a grant being accepted today. | If the DPO requires the condition enforced rather than defaulted, this must be built before launch. | **Medium — DPO ruling needed** |
@@ -361,8 +401,11 @@ Move P3 consent into Mechanism A: add `personalization_memory` to `CONSENT_PURPO
 `memory_consent_status` as the fast-path enforcement cache it already effectively is, and derive it from the
 consent log rather than letting it be the source of truth. That single change closes P3-G1, P3-G2, and
 P3-G3 together, because the consent log already has versioning, at-grant age and jurisdiction snapshots,
-guardian-versus-self encoding via `lawful_basis`, purpose-granular withdrawal, and receipt survival. Fix
-P3-G4 first so the new purpose does not inherit a defect.
+guardian-versus-self encoding via `lawful_basis`, purpose-granular withdrawal, and receipt survival.
+~~Fix P3-G4 first so the new purpose does not inherit a defect.~~ **That prerequisite is satisfied** —
+P3-G4 was closed by WI-2929 (§2.5), so a `personalization_memory` purpose entering Mechanism A inherits
+the structural guarantee rather than the defect. The sequencing reason is recorded here because it is why
+the order mattered, not because anything remains to do first.
 
 ---
 
@@ -372,7 +415,7 @@ P3-G4 first so the new purpose does not inherit a defect.
 |---|---|---|---|
 | **CL-X1** | [`edpb_dpia_filled_2026_v1.md:190`](../edpb_dpia_filled_2026_v1.md): *"no `lawful_basis`/`legalBasis`/`termsAccepted` field recorded for adult self-processing anywhere in the live schema"* and *"only one purpose value is ever written (`'app_usage'`)"* | `art6_1_a` grants exist and are written by four separate paths; `CONSENT_PURPOSES` has two members and neither is `'app_usage'`; the terms fact is stamped and merge-protected | **The EDPB fill is stale.** [`dpia.md:126`](../dpia.md) already flags it as carrying v0.1 framing and owing a sync. The DPO must not read it as current on this point. |
 | **CL-X2** | `identity.ts:475` describes `consent_grant` as an append-only event log | Withdrawal is an in-place UPDATE (`consent-v2.ts:1513`, `:374-388`) | Finding C-1. Accurate for restore only. |
-| **CL-X3** | [`dpia.md:62`](../dpia.md): the versioned terms-acceptance fact *"survives a withdrawal, satisfying Art 5(2)/7(1)"* | True for the **adult** path (`consent-v2.ts:360-379`). **False for the parental path** — `stampWithdrawal` replaces `audit_fact` (`:1513`) | Finding C-2. The DPIA's claim needs qualifying, or the code needs fixing. **Fixing the code is the better answer.** |
+| **CL-X3** | [`dpia.md:62`](../dpia.md): the versioned terms-acceptance fact *"survives a withdrawal, satisfying Art 5(2)/7(1)"* | **RESOLVED — WI-2929.** Was true for the adult path only; `stampWithdrawal` replaced `audit_fact` on the parental path. The grant-time version now lives in `consent_grant.policy_version`, which no withdrawal path writes, so the DPIA's claim holds on both paths going forward. | Finding C-2, closed by fixing the code (the answer this row recommended). The DPIA claim needs **no** qualification for grants written after the migration; it remains false for parental grants already withdrawn before it. |
 | **CL-X4** | [`ropa.md:39`](../ropa.md) describes `consent_grant.lawful_basis` as covering *"a minor's learning data / profiling"* | The consent log covers `platform_use` and `llm_disclosure`. **Profiling consent lives entirely outside it**, on `learning_profiles.memory_consent_status` | The ROPA overstates the log's coverage. P3-G1/G2. |
 | **CL-X5** | [`dpia.md:62`](../dpia.md): downstream enforcement gating processing on a withdrawn purpose *"is tracked separately as WI-2372 and blocks the launch gate"* | Enforcement **exists on both legs**. The memory/profiling write path is gated at eight call sites (§3.3). The **LLM dispatch** is gated too, at the route level: `assertLlmConsent` runs before `parseLearnerInput` at `apps/api/src/routes/learner-profile.ts:353,375` (WI-2396), resolving through `isLlmExchangeConsentAllowed`, which denies on a withdrawn `llm_disclosure` purpose (`consent-status-v2.ts:863-872`) | **WI-2372 appears substantially closed by WI-2396** and should be re-read against the code rather than assumed open. The residual issue is not a missing gate but a **fail-open** one — Finding C-4. |
 
@@ -382,8 +425,8 @@ P3-G4 first so the new purpose does not inherit a defect.
 
 | ID | Open item | Owner |
 |---|---|---|
-| CL-O1 | Fix Finding C-2 — merge `audit_fact` in `stampWithdrawal` as the adult path does | Engineering (small) |
-| CL-O2 | Promote `policy_version` to a first-class `consent_grant` column | Engineering |
+| ~~CL-O1~~ | ~~Fix Finding C-2 — merge `audit_fact` in `stampWithdrawal` as the adult path does~~ **DONE — WI-2929**, via the structural option (CL-O2) rather than the merge | Engineering — closed |
+| ~~CL-O2~~ | ~~Promote `policy_version` to a first-class `consent_grant` column~~ **DONE — WI-2929** (`consent_grant` + `consent_receipt`, read by `getConsentAccountabilityV2`) | Engineering — closed |
 | CL-O3 | Decide the P3 consent shape — §6.1 proposes moving it into the consent log | DPO + engineering |
 | CL-O4 | Resolve Finding C-3 — is the collection toggle's implicit grant backed by consent wording? | Depends on the screen inventory |
 | CL-O5 | Sync or retire the stale EDPB template fill (CL-X1) | Zuzana |

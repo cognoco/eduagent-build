@@ -26,6 +26,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../../errors';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
 import { createPendingConsentRequest } from './consent-v2';
+import { syncConsentReceipts } from './consent-receipt-v2';
 import { resolveJurisdiction } from './country-policy-loader';
 import { consentPersonLockKey } from './deletion-v2';
 import { acceptFamilyJoin } from './family-join-v2';
@@ -1088,7 +1089,7 @@ async function invalidateJourneyAuthority(
     ),
   ];
   if (guardianGrantIds.length > 0) {
-    await db
+    const withdrawn = await db
       .update(consentGrant)
       .set({ withdrawnAt: asOf, priorValue: true })
       .where(
@@ -1096,7 +1097,15 @@ async function invalidateJourneyAuthority(
           inArray(consentGrant.id, guardianGrantIds),
           isNull(consentGrant.withdrawnAt),
         ),
-      );
+      )
+      .returning();
+    // [WI-2929] Mirror the withdrawal onto the durable receipts, matching the
+    // two other withdrawal paths (stampWithdrawal, withdrawAdultSelfConsentV2)
+    // so no receipt asserts a live consent for a withdrawn purpose. Adjacent to
+    // AC-1 rather than required by it — AC-1 is about grant time — but leaving
+    // one of three withdrawal paths unmirrored would be an inconsistency this
+    // change itself created.
+    await syncConsentReceipts(db, withdrawn);
   }
 
   if (!journey.visibilityContractId) return;
@@ -1236,27 +1245,38 @@ async function writeDestinationSelfConsentSet(
     asOf: Date;
   },
 ): Promise<void> {
-  await db.insert(consentGrant).values(
-    CONSENT_PURPOSES.map((purpose) => ({
-      chargePersonId: input.chargePersonId,
-      organizationId: input.familyOrgId,
-      purpose,
-      lawfulBasis: 'art6_1_a',
-      granted: true,
-      grantedAt: input.asOf,
-      priorValue: null,
-      snapshotJurisdictionAtGrant: input.journey.jurisdiction,
-      auditFact: {
-        source: 'family_join_destination_self_consent',
-        policyVersion: input.journey.policyVersion,
-        jurisdiction: input.journey.jurisdiction,
+  const grants = await db
+    .insert(consentGrant)
+    .values(
+      CONSENT_PURPOSES.map((purpose) => ({
+        chargePersonId: input.chargePersonId,
         organizationId: input.familyOrgId,
-        authorizationForm: 'self',
-        destinationProcessingAssentAt:
-          input.journey.learnerAssentedAt?.toISOString() ?? null,
-      },
-    })),
-  );
+        purpose,
+        lawfulBasis: 'art6_1_a',
+        granted: true,
+        grantedAt: input.asOf,
+        priorValue: null,
+        snapshotJurisdictionAtGrant: input.journey.jurisdiction,
+        // [WI-2929] The journey's policy version in the column no withdrawal
+        // path writes. Retained in `audit_fact` too — assertDestinationConsent
+        // compares `audit.policyVersion` — but the JSONB copy is destroyable.
+        policyVersion: input.journey.policyVersion,
+        auditFact: {
+          source: 'family_join_destination_self_consent',
+          policyVersion: input.journey.policyVersion,
+          jurisdiction: input.journey.jurisdiction,
+          organizationId: input.familyOrgId,
+          authorizationForm: 'self',
+          destinationProcessingAssentAt:
+            input.journey.learnerAssentedAt?.toISOString() ?? null,
+        },
+      })),
+    )
+    .returning();
+  // [WI-2929] Grant-time receipt — this is a production grant writer like any
+  // other. `db` here is the journey transaction handle, so the receipt and the
+  // grant commit together.
+  await syncConsentReceipts(db, grants);
 }
 
 async function loadJourneyVisibilityContract(
