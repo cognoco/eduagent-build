@@ -1,6 +1,9 @@
 # WI-2919 — Memory-claim copy audit (launch/store + in-app)
 
 **Status:** Audit complete, 2026-08-04. Agent-executed under WI-2919.
+**Disposition:** §7 open item 1 answered by a **provisional** operator ruling of
+2026-08-05 — **provisional pending DPO ratification (OPQ-169)**, not final, not
+ratified, not a compliance sign-off. See §0 before reading §1.
 **Purpose:** Audit user-facing copy for cross-session memory / "remembers you" /
 personalization claims while persistent memory is parked under the DPO interim
 condition, so the launch screen record can cite a surface-by-surface result.
@@ -17,7 +20,36 @@ determine whether each string can render and whether the claim it makes is true.
 
 ---
 
+## 0. Provisional operator ruling of 2026-08-05 — read before §1
+
+> **PROVISIONAL, NOT RATIFIED.** On 2026-08-05, after this audit was completed, the
+> operator ruled **provisionally** that the DPO interim persistent-memory-parked
+> condition is **satisfied by the per-profile fail-closed consent gating as built** —
+> the gating described in §2.3 and §2.3b — and that no global kill-switch is required
+> at this time. The operator explicitly accepted the rework risk if the ruling is
+> later overturned.
+>
+> **This ruling is provisional pending DPO ratification, which is in flight as
+> OPQ-169.** It is an operator decision, not a DPO determination, not counsel review,
+> and not a compliance sign-off. Until OPQ-169 concludes, nothing in this document
+> may be cited by the launch-screen record as a settled compliance position.
+>
+> **What the ruling does and does not change.** It answers §7 open item 1 —
+> provisionally. It changes **nothing** in the code findings below: §2 remains an
+> accurate description of what the runtime does, and `MEMORY_FACTS_READ_ENABLED`
+> remains a storage-backend selector rather than a kill-switch. What changed is the
+> **disposition** of that state, not the state. §7 items 2–3 are therefore retained
+> in full: they state what a genuine park would require, and they become live again
+> if the DPO overturns the ruling.
+
+---
+
 ## 1. Two headline findings
+
+> _Read with §0._ Finding 1 records that no global gate exists in code — which is
+> still true. Under the provisional operator ruling of 2026-08-05, that absence is
+> provisionally accepted rather than treated as an open defect, pending DPO
+> ratification (OPQ-169).
 
 **Finding 1 — the parked state is not implemented in code.**
 `MEMORY_FACTS_READ_ENABLED` is a **storage-backend selector**, not a feature
@@ -315,10 +347,16 @@ requires a ruling on the feature state, not a rewrite of the strings.
 
 ## 7. Open items for the DPO / launch screen
 
-1. **Rule the actual feature state.** Either implement a real kill-switch honoring
-   the interim condition (no gate exists today — §2), or record a decision that
-   persistent memory ships consent-gated and lift the interim condition. The
-   present state satisfies neither.
+1. ~~**Rule the actual feature state.**~~ **ANSWERED PROVISIONALLY — operator ruling
+   of 2026-08-05 (see §0).** The original item read: *either implement a real
+   kill-switch honoring the interim condition (no gate exists today — §2), or record
+   a decision that persistent memory ships consent-gated and lift the interim
+   condition; the present state satisfies neither.* The operator took the second
+   branch **provisionally**: persistent memory ships consent-gated, and the interim
+   parked condition is provisionally ruled satisfied by that per-profile fail-closed
+   consent gating. **This is provisional pending DPO ratification (OPQ-169)** and is
+   not a ratified or final position; the rework risk was explicitly accepted at
+   operator level. Item 2 below states what must happen if the DPO overturns it.
 2. **If memory is to be genuinely parked**, the gate must cover all three paths —
    read (`projection.ts:290`), write (`learner-input.ts:233` and
    `topic-probe-extract.ts:418`), and prompt injection (`session-exchange.ts:3617-3643`,
