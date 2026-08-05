@@ -78,9 +78,12 @@ claim below is a direct code read.
 
 ### 2.1 The flag selects a storage backend; it does not disable memory
 
-`apps/api/src/config.ts:135-137` declares `MEMORY_FACTS_READ_ENABLED`,
-`MEMORY_FACTS_RELEVANCE_RETRIEVAL`, `MEMORY_FACTS_DEDUP_ENABLED`, all defaulting
-`'false'`. What `false` actually does:
+`apps/api/src/config.ts` declares `MEMORY_FACTS_READ_ENABLED`,
+`MEMORY_FACTS_RELEVANCE_RETRIEVAL`, `MEMORY_FACTS_DEDUP_ENABLED` in its env schema,
+all defaulting `'false'`. (Cited by symbol rather than line: these sat at 135-137
+when this audit was run and had drifted to 151-153 within a day, so a line range
+here would go stale faster than the finding it supports.) What `false` actually
+does:
 
 ```
 apps/api/src/services/memory/projection.ts:290-293
@@ -128,7 +131,7 @@ no global, environment, or launch-state condition.
 
 ### 2.3b The live prompt-injection path also falls back to JSONB
 
-`MEMORY_FACTS_RELEVANCE_RETRIEVAL` (`config.ts:136`) is a **sub-flag** of the read
+`MEMORY_FACTS_RELEVANCE_RETRIEVAL` (`config.ts`, §2.1) is a **sub-flag** of the read
 flag, not an independent gate — `routes/sessions.ts:521-523` computes
 `memoryFactsRelevanceEnabled = memoryFactsReadEnabled && isMemoryFactsRelevanceEnabled(...)`.
 Both being `false` does **not** withhold memory from the model. In
