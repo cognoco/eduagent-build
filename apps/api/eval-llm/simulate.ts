@@ -65,6 +65,10 @@ import {
 } from './fixtures/challenge-personas';
 import type { EvalProfile } from './fixtures/profiles';
 import { setOpenRouterModelOverride } from './runner/llm-client';
+import {
+  MASTERY_REQUALIFICATION_ROUNDS,
+  requalificationRoundsFor,
+} from './runner/requalification-policy';
 import { evaluateMainGridCompleteness } from './runner/sim-grid-gate';
 import {
   assertSufficientMasteryBudget,
@@ -102,8 +106,11 @@ const BASELINE_PATH = path.resolve(__dirname, 'simulation-baseline.json');
  */
 const DRIFT_TOLERANCE_PP = 0.15;
 /** Re-run an over-credit breach this many times before failing CI (kills the
- *  one-off-LLM-slip false positive; only a reproducing breach reds). */
-const REPRODUCE_N = 3;
+ *  one-off-LLM-slip false positive; only a reproducing breach reds). Ratified
+ *  policy [WI-3043] — fixed per offender, deliberately NOT derived from budget
+ *  slack. Rationale and the rejected adaptive alternative live in
+ *  runner/requalification-policy.ts; the value is pinned by its test. */
+const REPRODUCE_N = MASTERY_REQUALIFICATION_ROUNDS;
 
 interface SimCliArgs {
   learnerModel: string | null;
@@ -569,7 +576,7 @@ async function main(): Promise<void> {
       // we cannot requalify EVERY offender REPRODUCE_N× within the remaining
       // budget, fail CLOSED — a detected breach is never silently dropped for
       // lack of budget.
-      const neededRounds = ids.length * REPRODUCE_N;
+      const neededRounds = requalificationRoundsFor(ids.length);
       const reproduceCapacity = deriveMasteryReproduceCapacity(
         budget,
         effectiveMaxCalls,
