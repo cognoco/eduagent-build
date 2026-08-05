@@ -182,7 +182,13 @@ outside this repository's authority.
    - **Inngest (durable-work substrate, `apps/api/src/inngest/`)** — event
      payloads are identifier-only by convention, but Inngest also memoizes
      **step return values** in its third-party state store, which is a wider
-     surface than the events. *Excluded because* it is the substrate every
+     surface than the events. Read this against the reachability paragraph
+     above, which is about a different direction of travel: a model call made
+     *inside* an Inngest-served route still passes the gated router boundary
+     (that is what `api.use('*', llmMiddleware)` over `/v1/inngest` buys); what
+     is ungated here is the **transport out to Inngest Cloud** — the events the
+     Worker sends and the step state Inngest stores. *Excluded because* it is
+     the substrate every
      background flow in the application runs on; gating it would not degrade a
      feature, it would stop durable work altogether. Separately, and **not** as
      a safeguard that narrows this exclusion: `scrubStepOutput` /
