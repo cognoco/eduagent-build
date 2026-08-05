@@ -3014,7 +3014,12 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
   //     mixed safe+unsafe payload across `interests`, `interestTimestamps`,
   //     `strengths[].topics`, `struggles` and `communicationNotes`, then asserts
   //     per family that the persisted row holds the safe entry and not the
-  //     unsafe one.
+  //     unsafe one. A second describe covers the sixth family,
+  //     `recentlyResolvedTopics`, which needs a different fixture shape: it is
+  //     derived from `struggle_resolved` notifications rather than supplied as
+  //     analysis text, so it is reached through a pre-seeded struggle that the
+  //     run's `resolvedTopics` resolves. All six families the sanitiser filters
+  //     are therefore covered.
   //
   // This block previously recorded WI-2971 as SUPERSEDED by the WI-2952 suite.
   // That was wrong, and the correction is empirical rather than argued.

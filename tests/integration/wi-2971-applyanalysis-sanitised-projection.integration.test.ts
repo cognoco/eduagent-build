@@ -24,16 +24,13 @@
  * safe entry and NOT the unsafe one. The unit of evidence is "the projection
  * that landed is the sanitised projection", not "some text was dropped".
  *
- * SCOPE — FIVE of the sanitiser's SIX families, stated rather than implied:
- * `interests`, `interestTimestamps`, `strengths[].topics`, `struggles` and
- * `communicationNotes`. The sixth, `recentlyResolvedTopics`, is NOT covered
- * here. It is not a direct analysis field — `applyAnalysis` derives it from
- * `struggle_resolved` notifications, so reaching it needs a pre-seeded struggle
- * that a later `resolvedTopics` entry resolves, which is a different fixture
- * shape from the mixed payload above. The property this item exists to prove —
- * that the write persists `safeProjection` and not the raw merged state — is
- * established by the other five, and the mutation pair below measures it.
- * Extending to the sixth family is worth doing and is not done here.
+ * SCOPE — all SIX families the sanitiser filters, stated rather than implied.
+ * The first describe covers five from one mixed payload: `interests`,
+ * `interestTimestamps`, `strengths[].topics`, `struggles` and
+ * `communicationNotes`. The sixth, `recentlyResolvedTopics`, has its own
+ * describe at the foot of this file because it needs a different fixture shape
+ * — it is not a direct analysis field, so it is reached through a pre-seeded
+ * struggle that this run's `resolvedTopics` resolves.
  *
  * WHY INTEGRATION, NOT UNIT
  * -------------------------
@@ -110,7 +107,10 @@ type PersistedProjection = {
   communicationNotes: string[];
 };
 
-async function seedProfile(label: string): Promise<string> {
+async function seedProfile(
+  label: string,
+  seedStruggles: FocusAreaEntry[] = [],
+): Promise<string> {
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
   accountIds.push(accountId);
@@ -136,6 +136,7 @@ async function seedProfile(label: string): Promise<string> {
     profileId,
     memoryConsentStatus: 'granted',
     memoryCollectionEnabled: true,
+    ...(seedStruggles.length > 0 ? { struggles: seedStruggles } : {}),
   });
 
   return profileId;
@@ -194,10 +195,6 @@ function mixedAnalysis(): SessionAnalysisOutput {
 }
 
 describe('WI-2971 — applyAnalysis persists the SANITISED projection, real database', () => {
-  afterAll(async () => {
-    await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
-  });
-
   // A single write, then one read-back that every family-level expectation
   // shares. Splitting the families across separate `applyAnalysis` calls would
   // let a family pass because a LATER call rewrote the column; asserting them
@@ -260,5 +257,97 @@ describe('WI-2971 — applyAnalysis persists the SANITISED projection, real data
   it('filters communicationNotes', () => {
     expect(persisted.communicationNotes).toContain(SAFE_NOTE);
     expect(persisted.communicationNotes).not.toContain(UNSAFE_NOTE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The sixth family. Separated because it needs a different fixture shape:
+// `recentlyResolvedTopics` is not a direct analysis field. `applyAnalysis`
+// OVERWRITES it from the `struggle_resolved` notifications each run, and a
+// notification only fires for a struggle that was ALREADY on the row and is
+// named by this run's `resolvedTopics`. So the unsafe label arrives on the
+// persisted column by a different route from every case above: it is derived
+// from the raw merged state, never supplied as analysis text.
+// ---------------------------------------------------------------------------
+
+const SAFE_RESOLVED_TOPIC = 'Fractions';
+const UNSAFE_RESOLVED_TOPIC = 'The learner has autism.';
+
+function seededStruggle(topic: string): FocusAreaEntry {
+  return {
+    subject: SUBJECT,
+    topic,
+    lastSeen: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+    attempts: 2,
+    confidence: 'high',
+  };
+}
+
+describe('WI-2971 — applyAnalysis sanitises recentlyResolvedTopics too', () => {
+  let resolvedTopics: Array<{ topic: string; subject: string | null }>;
+
+  beforeAll(async () => {
+    // Both struggles pre-exist on the row, so resolving both produces two
+    // `struggle_resolved` notifications and `updates.recentlyResolvedTopics`
+    // carries BOTH labels into the write. Only the projection sanitiser stands
+    // between the unsafe label and the persisted column.
+    const profileId = await seedProfile('resolved', [
+      seededStruggle(SAFE_RESOLVED_TOPIC),
+      seededStruggle(UNSAFE_RESOLVED_TOPIC),
+    ]);
+
+    const result = await applyAnalysis(
+      db,
+      profileId,
+      {
+        explanationEffectiveness: null,
+        interests: null,
+        strengths: null,
+        struggles: null,
+        resolvedTopics: [
+          { topic: SAFE_RESOLVED_TOPIC, subject: SUBJECT },
+          { topic: UNSAFE_RESOLVED_TOPIC, subject: SUBJECT },
+        ],
+        communicationNotes: null,
+        engagementLevel: null,
+        confidence: 'high',
+      },
+      SUBJECT,
+    );
+
+    // Same anti-vacuity guard as above: the resolution must actually have
+    // happened, or the assertions below pass on an empty column.
+    expect(result.fieldsUpdated).toContain('struggles');
+
+    const [row] = await db
+      .select({
+        recentlyResolvedTopics: learningProfiles.recentlyResolvedTopics,
+      })
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId));
+
+    resolvedTopics =
+      (row?.recentlyResolvedTopics as Array<{
+        topic: string;
+        subject: string | null;
+      }> | null) ?? [];
+  });
+
+  it('keeps the safe resolved topic and drops the person-attributed one', () => {
+    const topics = resolvedTopics.map((entry) => entry.topic);
+    expect(topics).toContain(SAFE_RESOLVED_TOPIC);
+    expect(topics).not.toContain(UNSAFE_RESOLVED_TOPIC);
+  });
+
+  // Teardown for BOTH describes, and it has to live here rather than at file
+  // scope. `tests/integration/setup.ts` registers a file-scope `afterAll` that
+  // ends the pg pool (setup.ts:85), and because setupFilesAfterEach runs first
+  // its hook is registered first and therefore runs first — a file-scope
+  // cleanup here would fire against a closed pool and fail the suite. A
+  // describe-scoped hook runs before any file-scope one, and this is the LAST
+  // describe, so by now both blocks have pushed their ids into the shared
+  // `accountIds` / `profileIds` and this tears down every one of them.
+  afterAll(async () => {
+    await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
   });
 });
