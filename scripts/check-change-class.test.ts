@@ -1047,9 +1047,11 @@ describe('removeTempRepo (test-harness teardown)', () => {
       // non-EBUSY class as the ENOTEMPTY race, without having to win one.
       expect(() => removeTempRepo(join(notADirectory, 'child'))).not.toThrow();
     } finally {
-      rmSync(sandbox, { recursive: true, force: true });
+      // Use the helper here too: AC-1 is a property of the FILE, not of one
+      // call site, and a bare rmSync in a finally is exactly the pattern this
+      // change removes everywhere else — including in the guard that proves it.
+      removeTempRepo(sandbox);
     }
-  }, // Exercises the full retry budget (20 attempts x 250ms) before giving up,
-  // which overruns Jest's 5s default.
+  }, // which overruns Jest's 5s default. // Exercises the full retry budget (20 attempts x 250ms) before giving up,
   20_000);
 });
