@@ -330,7 +330,7 @@ RevenueCat subscription target and the key is missing, the Inngest teardown
 worker retries and then escalates instead of silently skipping provider erasure.
 
 Production also requires the `IDEMPOTENCY_KV` binding unless Doppler `prd`
-explicitly sets `ALLOW_MISSING_IDEMPOTENCY_KV=true` as a temporary prelaunch
+explicitly sets `ALLOW_MISSING_IDEMPOTENCY_KV=true` as a temporary pre-launch
 override. Without the binding or override, env validation returns a 500 before
 serving traffic.
 
@@ -634,7 +634,7 @@ Channel and branch share a name in every row: a **channel** is what a build list
 
 The `ci.yml` workflow has an `ota-update` job that runs after the main CI job passes:
 - Only triggers on push to main (not PRs)
-- Publishes `eas update --branch preview` with the commit message — **only when no native-affecting files changed** (the publish steps require `native_changed != true`; a native change must ship as a native build, never OTA alone, per `MMT-ADR-0054` §2)
+- Publishes `eas update --branch preview` with the commit message — **skipped when the workflow detects a native change** (the publish steps require `native_changed != true`; a native change must ship as a native build, never OTA alone, per `MMT-ADR-0054` §2). The detection currently matches only `apps/mobile/{app.json,package.json,eas.json}` and `apps/mobile/{plugins,android,ios}/` — narrower than the ADR §2 boundary (prebuild-consumed assets, root `package.json`, `pnpm-lock.yaml`, `patches/` are not yet detected); closing that classifier gap is tracked on WI-3088
 - Takes ~3 min after CI passes
 - The installed preview APK receives the new bundle on next launch
 
