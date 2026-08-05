@@ -26,7 +26,8 @@ Identity of the External DPO is recorded in [`DPO exchanges/2026-07-31-formal-de
 
 | Channel | Published to users? | Reaches | First action | Source |
 |---|---|---|---|---|
-| **In-app** — More → Privacy & Data → *Export my data* / *Delete account* | Yes | The product directly (self-service) | Self-service completes the access/erasure right without a manual workflow. Only enters the register if the user also raises a request in writing, or if self-service fails or is unavailable to them (see §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; privacy policy [§9](privacy-policy.html) |
+| **In-app — *Delete account*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. Recorded by the scheduled-deletion record (`scheduleDeletionV2`), which carries the date and the grace-period end. Enters the register only if the user also raises a request in writing, or if self-service fails or is unavailable to them (§2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`POST /account/delete`); privacy policy [§9](privacy-policy.html) |
+| **In-app — *Export my data*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. **It is recorded nowhere: `GET /account/export` performs no write and no log** (`export-v2.ts` is read-only). That is an open accountability gap, not a settled position — §4.2. Enters the register if the user also raises a request in writing, or if self-service fails or is unavailable (§2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`GET /account/export`); privacy policy [§9](privacy-policy.html) |
 | **`support@mentomate.com`** | Yes | Controller | Recognise it as a rights request, open a register row the same working day, start the Art 12(3) clock at the date of receipt. | Privacy policy [§9 and §11](privacy-policy.html) |
 | **Postal address** (ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo) | Yes | Controller | As for `support@`. Clock starts on receipt of the letter. | Privacy policy [§11](privacy-policy.html) |
 | **`dpo@zwizzly.com`** | **No — not a published rights channel. See §5.** | External DPO, as a confidential forward | **Relay to the controller** under §3. Clock started at the data subject's send/receipt date, not at relay. | [`evidence/2026-07-31-dpo-mailbox-setup-memo.md`](evidence/2026-07-31-dpo-mailbox-setup-memo.md); register P1 |
@@ -55,7 +56,7 @@ The relay duty is therefore the DPO's, and it runs as follows.
 
 ## 4. The rights-request register
 
-Every rights request goes into a **rights-request register**, per the External DPO's Q1 answer of 2026-07-31 (register correspondence log, entry of that date).
+Every rights request **made to the controller** goes into a **rights-request register**, per the External DPO's Q1 answer of 2026-07-31 (register correspondence log, entry of that date). Direct self-service exercise of a right is a different act and is treated in **§4.2** — read it before applying the word "every" here.
 
 ### 4.1 It is a separate record from the delivery log
 
@@ -65,12 +66,60 @@ This is the load-bearing distinction, and it is the DPO's ruling rather than our
 |---|---|---|
 | Records | **That** mail arrived at `dpo@` — timestamp, delivery status, unique message-id, sender only where necessary | **What was requested and what we did about it** — the substance and the handling |
 | Subject line | **Excluded**, deliberately — a subject line may carry substantive or special-category content | n/a — the register records the request on its merits, in a record built to hold that content |
-| Scope | Every message delivered to `dpo@`, rights request or not | Every rights request, **whichever channel it arrived at** — not only `dpo@` |
+| Scope | Every message delivered to `dpo@`, rights request or not | Every rights request **made to the controller**, whichever channel it arrived at — not only `dpo@`. Direct self-service exercise is out of scope and separately treated (§4.2) |
 | Purpose | Proving delivery and detecting failure | Art 5(2) / Art 12 accountability: proving requests were answered, and when |
 
 A rights request that arrives at `dpo@` therefore produces **two records**: the standard metadata row in the delivery log — and **nothing more there** — plus a full row in this register. The mailbox memo states the same boundary from the other side: *"if a data subject rights request arrives at `dpo@`, it does not get logged here beyond the standard metadata row… It goes into a separate rights-request register"* ([`evidence/2026-07-31-dpo-mailbox-setup-memo.md`](evidence/2026-07-31-dpo-mailbox-setup-memo.md) §2). The same wording is carried into the DPO Services Agreement ([`DPO exchanges/2026-07-31-services-agreement-clean.md`](DPO%20exchanges/2026-07-31-services-agreement-clean.md)).
 
 Do not merge the two records, and do not copy request substance into the delivery log.
+
+### 4.2 Direct self-service exercise — why it is not a register row, and where the position is weak
+
+This subsection exists because an earlier version of this document said in one place that self-service
+exercises do not enter the register and in two others that **every** rights request does. Both could not
+be true. The exception was the unauthorised statement; these are the terms on which it now stands.
+
+**The position.** A self-service *Delete account* or *Export my data* is the data subject **exercising**
+a right directly through a facility the controller built for that purpose. It is not a **request made to
+the controller** that someone must recognise, answer and date. The distinction is not cosmetic:
+
+- **Art 12(3)'s one-month deadline attaches to a request the controller must answer.** Where the subject
+  acts directly there is nothing to answer, no recipient, and no clock — which is why a self-service
+  action cannot be late.
+- **Recital 63 expressly contemplates direct remote access** as a means of satisfying the right of
+  access: *"where possible, the controller should be able to provide remote access to a secure system
+  which would provide the data subject with direct access to his or her personal data."* Building that
+  facility is the controller satisfying Art 15, not deferring it.
+- **The register's own stated purpose (§4.1) is proving requests were answered, and when.** A row
+  recording that a subject served themselves proves nothing about controller responsiveness, because
+  responsiveness was not engaged.
+
+**Where the accountability actually sits, verified in code rather than assumed:**
+
+| Self-service action | Identified record | Verified at |
+|---|---|---|
+| *Delete account* | The scheduled-deletion record — dated, per-account, carrying the grace-period end — written by `scheduleDeletionV2` before the durable erasure job is dispatched. | `apps/api/src/routes/account.ts` (`POST /account/delete`); `apps/api/src/services/identity-v2/deletion-v2.ts` |
+| *Export my data* | **NONE.** The route generates and returns the export and performs **no write and no log**; the export service is read-only end to end. | `apps/api/src/routes/account.ts` (`GET /account/export`); `apps/api/src/services/identity-v2/export-v2.ts` |
+
+**So the position holds for deletion and is INCOMPLETE for export, and this document does not paper over
+the difference.** Under Art 5(2) the controller must be able to demonstrate compliance. For deletion it
+can: the record exists and is dated. For export it currently cannot — there is no artifact showing that
+an access right was exercised, by whom, or when.
+
+**Open — do not read this subsection as closing it.**
+`[Self-service export leaves no accountability record — TODO. Either the product records the exercise
+(the smaller change: one dated audit row on GET /account/export), or the controller registers
+self-service exports, which needs a mechanism that does not exist today. This is a product/legal call,
+not a documentation one, and it is NOT resolved by this document. Owner: controller, with the External
+DPO.]`
+
+Requiring a register row here without that mechanism would state a control the system does not have —
+which is the failure this document exists to avoid, not one to commit in the act of closing it.
+
+> **Drafting status.** The reasoning in this subsection is a **drafted legal position, not counsel- or
+> DPO-reviewed.** It is recorded so it can be contested on its merits. If the DPO or counsel reads
+> self-service exercise as within the register's scope, the fix is the mechanism named above, and this
+> subsection is what should be shown to them to get that answer.
 
 ### 4.2 Minimal shape — fields
 
@@ -174,6 +223,7 @@ Action 11 therefore remains **partial-exists**. This document must not be read a
 | `dpo@` forwarding-only; not published; not registered | [Action register P1](DPO%20exchanges/2026-07-26-action-register-tracker.md); mailbox memo §1; [`DPO exchanges/2026-07-31-services-agreement-clean.md`](DPO%20exchanges/2026-07-31-services-agreement-clean.md) | 2026-08-05 |
 | Published rights channels = in-app settings + `support@mentomate.com` + postal | [`privacy-policy.html`](privacy-policy.html) §9, §11 | 2026-08-05 |
 | Export/delete are owner-gated; non-owner learners have no in-app route | `apps/mobile/src/app/(app)/more/privacy.tsx` (`showOwnerPrivacyGates` guards both rows) | 2026-08-05 |
+| Self-service *delete* leaves a dated record; self-service *export* leaves none — the export route and service perform no write and no log | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/deletion-v2.ts`; `apps/api/src/services/identity-v2/export-v2.ts` | 2026-08-05 |
 | Appointment effective date = `dpo@` activation + external test + signatures → notify Datatilsynet | [Action register P3](DPO%20exchanges/2026-07-26-action-register-tracker.md); DPO reply 2026-07-31 | 2026-08-05 |
 | OPQ-102 Closed (2026-07-24); OPQ-167 Open; OPQ-106 Open; OPQ-24 Delegated | Cosmo Operator Queue, direct read | 2026-08-05 |
 | Action 11 scope and recorded gap | [Action register, action 11](DPO%20exchanges/2026-07-26-action-register-tracker.md) | 2026-08-05 |
