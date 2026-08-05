@@ -36,7 +36,7 @@ Identity of the External DPO is recorded in [`DPO exchanges/2026-07-31-formal-de
 
 The in-app *Export my data* and *Delete account* rows are **owner-gated** — both render only when `showOwnerPrivacyGates` is true (`apps/mobile/src/app/(app)/more/privacy.tsx`, the two `SettingsRow` blocks following the Terms row). A learner who is a **non-owner profile on a parent's account** therefore sees no in-app export or deletion control at all.
 
-Consequence for this workflow: for that person, **"use the in-app settings" is not an available route**, and `support@mentomate.com` is their only channel. Such a request is a normal Art 15/17 request that the controller answers on the same one-month clock; it is not refused, and not deferred to the account owner, merely because the learner cannot self-serve in the app.
+Consequence for this workflow: for that person, **"use the in-app settings" is not an available route** — they have **no in-app self-service route**. Every other intake channel in §2 remains fully available to them: `support@mentomate.com`, the **postal address**, and **any other route** by which the request happens to arrive. What is missing is self-service, not standing. An operator must **not** treat a letter or a request arriving through another valid route from a non-owner learner as outside the documented path, and must not ask them to resubmit by email — Art 12 attaches no form requirement, and the clock dates from the original arrival either way (§2). Such a request is a normal Art 15/17 request that the controller answers on the same one-month clock; it is not refused, and not deferred to the account owner, merely because the learner cannot self-serve in the app.
 
 **Unverified / open:** whether, and on what basis, the account owner or guardian must be involved before the controller acts on such a request is an **authority-verification question that this document does not settle** — see §7. Until those rules are drafted and reviewed, treat any request from a non-owner learner as requiring a documented authority decision recorded in the register row, and escalate to the controller rather than deciding it ad hoc.
 
@@ -128,7 +128,14 @@ Until all three close, the DPO's contact details are not published anywhere, and
 
 **Two accuracy notes, recorded rather than acted on:**
 
-- **OPQ-102** — *Engage an outsourced DPO* — is **Closed**, ruled 2026-07-24: *"Stefan has been retained as the outsourced DPO; the appointment is complete."* That closure records the **engagement decision**. It does **not** record the appointment's *effective date*, which is condition 2 above and remains outstanding. Two existing documents still cite "OPQ-102 DPO appointment (Operator Queue, pending)" as a live gate ([`breach-response-plan.md`](breach-response-plan.md), [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md)); those references are stale as to OPQ-102's status. They are **not corrected here** — flagged for their owning lane.
+- **OPQ-102** — *Engage an outsourced DPO* — is **Closed**, ruled 2026-07-24: *"Stefan has been retained as the outsourced DPO; the appointment is complete."* That closure records the **engagement decision**. It does **not** record the appointment's *effective date*, which is condition 2 above and remains outstanding. **Four** documents under `docs/compliance/` still cite OPQ-102 as a live or pending gate; those references are stale as to OPQ-102's status. Enumerated from a repository-wide search for the identifier rather than from recollection, so this list is the search result and not a sample:
+
+  - [`breach-response-plan.md`](breach-response-plan.md) — two `TODO` placeholders for the Breach Lead's name and address;
+  - [`child-readable-privacy-summary-draft.md`](child-readable-privacy-summary-draft.md) — the pre-publication blocker list and the "choices and rights" section;
+  - [`privacy-policy.html`](privacy-policy.html) — a `PRE-PUBLISH TODO` on the DPO contact line;
+  - [`privacy-publication-manifest.md`](privacy-publication-manifest.md) — the DPO-contact claim row and the publication gate that still routes DPO-contact insertion through OPQ-102.
+
+They are **not corrected here** — that is a deliberate scope decision, not an oversight, and it is the reason this list is stated in full: the publication pass must be able to see every stale gate it will hit, or it will keep chasing a closed OPQ instead of running the real check, which is the appointment's **effective date** (condition 2 above) and carries no Operator Queue row of its own.
 - Condition 2 has **no Operator Queue ID**. It is tracked only as action-register prerequisite P3. That absence is recorded here deliberately: the gate exists, it is simply not in the Operator Queue.
 
 ## 6. Handling a request end to end
