@@ -44,7 +44,7 @@ code-verified is explicitly *not* established by this repository.
 | 10 | Unambiguously adult owner's display name may be sent for personalisation (§5) | code-verified | Same two gates (`isUnambiguouslyAdult` path) |
 | 11 | Providers do not train general-purpose models on customer content (§5, §8; summary "learning memory") | contract-dependent | Stated as a launch *requirement*, not a fact, in both documents; evidence → OPQ-110 vendor DPAs (ledger 2026-07-25) |
 | 12 | Processor list: Clerk, AI/embedding providers, Neon, Cloudflare, Resend, Sentry, Inngest, Expo/APNs/FCM, Apple/Google/RevenueCat (§6) | code-verified (inventory); contract-dependent (terms) | Matches live-recipient inventory in [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) (Inngest added to the notice 2026-08-01 — was a repo-owned omission); DPAs/terms → OPQ-110 |
-| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | code-verified (enforcement); contract-dependent (safeguards) | Honest future-tense claim, now **runtime-enforced at every learner-data egress boundary**: the WI-3020 launch-stop refuses production traffic while the transfer-evidence lever is unsatisfied — one predicate and one lever in `apps/api/src/services/llm/transfer-evidence-gate.ts`, asserted at (a) both LLM router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`; refusal → 503 `LLM_UNAVAILABLE`) and (b) the Voyage AI embedding choke point (`generateEmbedding`, `apps/api/src/services/embeddings.ts`; refusal → `InternationalTransferBlockedError` before the request body is built). Boundary (b) was added by the WI-3020 rework: `generateEmbedding` posts learner message text to `api.voyageai.com` with its own `fetch`, so the router-only first cut left the ordinary session-message path (`prepareExchangeContext`) and every background embedding flow ungated. Test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts` — the embedding rows assert that NO outbound call occurs, not merely that an error is thrown. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)) — which is precisely why the stop is armed. Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
+| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | code-verified (enforcement); contract-dependent (safeguards) | Honest future-tense claim, now **runtime-enforced at both model-provider egress boundaries — and deliberately not at three others (Resend email, Expo push, Inngest), named with rationale in §3 item 9 → "Deliberately not gated"**: the WI-3020 launch-stop refuses production traffic while the transfer-evidence lever is unsatisfied — one predicate and one lever in `apps/api/src/services/llm/transfer-evidence-gate.ts`, asserted at (a) both LLM router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`; refusal → 503 `LLM_UNAVAILABLE`) and (b) the Voyage AI embedding choke point (`generateEmbedding`, `apps/api/src/services/embeddings.ts`; refusal → `InternationalTransferBlockedError` before the request body is built). Boundary (b) was added by the WI-3020 rework: `generateEmbedding` posts learner message text to `api.voyageai.com` with its own `fetch`, so the router-only first cut left the ordinary session-message path (`prepareExchangeContext`) and every background embedding flow ungated. Test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts` — the embedding rows assert that NO outbound call occurs, not merely that an error is thrown. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)) — which is precisely why the stop is armed. Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
 | 14 | Age/residence data kept while account active; assertion-history retention period pending approval (§8) | code-verified (behaviour); external/legal (period) | Retention period → OPQ-24 counsel-approved retention schedule |
 | 15 | Chat transcripts deleted ~30 days after summary generation; delayed cases detected and alerted from day 37 (§8; summary "How long") | code-verified + config-dependent | `apps/api/src/inngest/functions/transcript-purge-cron.ts` (30-day cutoff; day-37 delayed detection + alert); flag `RETENTION_PURGE_ENABLED` (`apps/api/src/config.ts`, `apps/api/src/inngest/helpers.ts`); production run evidence [`2026-07-24-wi-1194-production-transcript-purge-evidence.md`](2026-07-24-wi-1194-production-transcript-purge-evidence.md) — re-verify at publication gate |
 | 16 | Learning memory persists while account active; may contain short learner quotations; not used for advertising (§8; summary) | code-verified | [`ropa.md`](ropa.md) learning-model record; quotation guard in `apps/api/src/services/challenge-round/note-draft.ts`; no ad SDK (worksheet Advertising row). Dormancy retention remains an open DPO item |
@@ -108,8 +108,12 @@ outside this repository's authority.
    armed, and the underlying safeguards are still pending)*: the §7 commitment
    is enforced by the runtime, not by prose. `apps/api/src/services/llm/
    transfer-evidence-gate.ts` holds ONE predicate and ONE lever, asserted at
-   every outbound boundary that carries learner data to an international
-   provider — there is deliberately not a second control that could drift:
+   both outbound boundaries that carry learner data to an international
+   **model provider** — one predicate, not a second control that could drift.
+   The gate's scope is those two boundaries and no others; three further egress
+   paths carry learner data internationally and are deliberately **not** gated
+   (named, with what each carries and why, under "Deliberately not gated"
+   below). The two gated boundaries are:
    - the two LLM router choke points (`routeAndCall` / `routeAndStream`,
      `apps/api/src/services/llm/router.ts`), surfacing as the already-handled
      `503 LLM_UNAVAILABLE` degradation. Every prompt-bearing provider (
@@ -138,6 +142,55 @@ outside this repository's authority.
    data" would key on optional router options, so an omitting call site would
    fail open. Both directions are proven by
    `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`.
+
+   **Deliberately not gated** — three egress paths carry learner data to
+   international processors and the launch-stop does not touch them. Each is a
+   deliberate trade, not an absence of risk; a reviewer who thinks one of these
+   is wrong should be able to point at it here and say so:
+   - **Resend (transactional email, `api.resend.com`,
+     `apps/api/src/services/notifications/email.ts`)** — carries the child's
+     display name in consent-flow subjects and bodies
+     (`formatConsentRequestEmail`, `formatConsentApprovedEmail`,
+     `formatConsentReminderEmail`) and, in the weekly and monthly parent
+     digests, the child's display name paired with topic names drawn from
+     `learning_profiles.struggles`
+     (`formatWeeklyProgressEmail`, `formatMonthlyProgressEmail`). *Excluded
+     because* gating the transport would suppress the parental-consent capture
+     that is itself the legal basis for processing a child's data, and the
+     account-security notices (login-email change, password added or changed,
+     account recovery) the controller is obliged to send — the stop would break
+     the mechanism that makes the processing lawful. The exclusion is at
+     **transport** granularity, so the consequence is broader than that reason:
+     every other message on the same channel — the progress digests above,
+     billing and payment-failure notices, family-join invites — is ungated too.
+   - **Expo push (`https://exp.host/--/api/v2/push/send`,
+     `apps/api/src/services/notifications.ts`)** — push `title`/`body` carry the
+     child's display name and topic titles (`formatRecallNudge` puts
+     `childName` in the guardian body and `topTopicTitle` in the self-learner
+     title; `notifyParentToSubscribe` puts the child's name in both the title
+     and the body). Delivery is via Expo's service to APNs/FCM, then APNs/FCM
+     to the device. *Excluded because* the same
+     transport carries the consent-lifecycle notices — the consent warning,
+     expiry, archive and deletion pushes in
+     `apps/api/src/inngest/functions/consent-email-revocation.ts` and
+     `consent-revocation.ts`, each of which names the child — and gating it
+     would silence the notices that make the consent mechanism operable. Same
+     transport-granularity consequence: the recall nudges, daily and review
+     reminders, weekly progress pushes and re-subscribe prompts ride the
+     ungated channel as a side effect of that reason, not because anyone judged
+     them low-risk.
+   - **Inngest (durable-work substrate, `apps/api/src/inngest/`)** — event
+     payloads are identifier-only by convention, but Inngest also memoizes
+     **step return values** in its third-party state store, which is a wider
+     surface than the events. *Excluded because* it is the substrate every
+     background flow in the application runs on; gating it would not degrade a
+     feature, it would stop durable work altogether. Separately, and **not** as
+     a safeguard that narrows this exclusion: `scrubStepOutput` /
+     `scrubOutgoingEventPayloads` (`apps/api/src/inngest/client.ts`) strip the
+     `INNGEST_PII_STEP_KEYS` denylist and escalate to Sentry when they fire.
+     That is a denylist regression alarm, not a boundary — an unlisted field
+     leaves as-is.
+
    **Release lever** (flip only when OPQ-110 clears for every provider actually
    routed, then redeploy): `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` in
    `apps/api/wrangler.toml` `[env.production.vars]` — currently `"false"`. It
