@@ -44,6 +44,19 @@ export function getLlmRequestTransferEvidenceVerified(
 }
 
 /**
+ * [WI-3020 rework] Whether an LLM request context is established at all.
+ *
+ * The getters above fall back per-value, which is right for routing knobs but
+ * wrong for a compliance decision: the environment fallback is
+ * `'development'`, so "no context" would silently read as "not production" and
+ * open the launch-stop. Egress gates ask this question separately so an
+ * unwired path fails closed instead of failing open.
+ */
+export function hasLlmRequestContext(): boolean {
+  return requestContext.getStore() !== undefined;
+}
+
+/**
  * Read the operator kill switch only when an LLM choke point is reached.
  * The Promise is cached in request-local state so overlapping calls in one
  * request share one KV read without leaking the result to another request.

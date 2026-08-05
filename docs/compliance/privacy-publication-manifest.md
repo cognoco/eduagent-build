@@ -44,7 +44,7 @@ code-verified is explicitly *not* established by this repository.
 | 10 | Unambiguously adult owner's display name may be sent for personalisation (§5) | code-verified | Same two gates (`isUnambiguouslyAdult` path) |
 | 11 | Providers do not train general-purpose models on customer content (§5, §8; summary "learning memory") | contract-dependent | Stated as a launch *requirement*, not a fact, in both documents; evidence → OPQ-110 vendor DPAs (ledger 2026-07-25) |
 | 12 | Processor list: Clerk, AI/embedding providers, Neon, Cloudflare, Resend, Sentry, Inngest, Expo/APNs/FCM, Apple/Google/RevenueCat (§6) | code-verified (inventory); contract-dependent (terms) | Matches live-recipient inventory in [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) (Inngest added to the notice 2026-08-01 — was a repo-owned omission); DPAs/terms → OPQ-110 |
-| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | code-verified (enforcement); contract-dependent (safeguards) | Honest future-tense claim, now **runtime-enforced**: the WI-3020 launch-stop refuses production LLM routing (503 `LLM_UNAVAILABLE`) while the transfer-evidence lever is unsatisfied — `apps/api/src/services/llm/transfer-evidence-gate.ts`, checked at both router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`), test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)) — which is precisely why the stop is armed. Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
+| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | code-verified (enforcement); contract-dependent (safeguards) | Honest future-tense claim, now **runtime-enforced at every learner-data egress boundary**: the WI-3020 launch-stop refuses production traffic while the transfer-evidence lever is unsatisfied — one predicate and one lever in `apps/api/src/services/llm/transfer-evidence-gate.ts`, asserted at (a) both LLM router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`; refusal → 503 `LLM_UNAVAILABLE`) and (b) the Voyage AI embedding choke point (`generateEmbedding`, `apps/api/src/services/embeddings.ts`; refusal → `InternationalTransferBlockedError` before the request body is built). Boundary (b) was added by the WI-3020 rework: `generateEmbedding` posts learner message text to `api.voyageai.com` with its own `fetch`, so the router-only first cut left the ordinary session-message path (`prepareExchangeContext`) and every background embedding flow ungated. Test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts` — the embedding rows assert that NO outbound call occurs, not merely that an error is thrown. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)) — which is precisely why the stop is armed. Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
 | 14 | Age/residence data kept while account active; assertion-history retention period pending approval (§8) | code-verified (behaviour); external/legal (period) | Retention period → OPQ-24 counsel-approved retention schedule |
 | 15 | Chat transcripts deleted ~30 days after summary generation; delayed cases detected and alerted from day 37 (§8; summary "How long") | code-verified + config-dependent | `apps/api/src/inngest/functions/transcript-purge-cron.ts` (30-day cutoff; day-37 delayed detection + alert); flag `RETENTION_PURGE_ENABLED` (`apps/api/src/config.ts`, `apps/api/src/inngest/helpers.ts`); production run evidence [`2026-07-24-wi-1194-production-transcript-purge-evidence.md`](2026-07-24-wi-1194-production-transcript-purge-evidence.md) — re-verify at publication gate |
 | 16 | Learning memory persists while account active; may contain short learner quotations; not used for advertising (§8; summary) | code-verified | [`ropa.md`](ropa.md) learning-model record; quotation guard in `apps/api/src/services/challenge-round/note-draft.ts`; no ad SDK (worksheet Advertising row). Dormancy retention remains an open DPO item |
@@ -107,11 +107,28 @@ outside this repository's authority.
 9. **International-routing launch-stop** *(implemented WI-3020; the control is
    armed, and the underlying safeguards are still pending)*: the §7 commitment
    is enforced by the runtime, not by prose. `apps/api/src/services/llm/
-   transfer-evidence-gate.ts` refuses production LLM routing at both router
-   choke points (`routeAndCall` / `routeAndStream`,
-   `apps/api/src/services/llm/router.ts`) unless the OPQ-110 transfer-evidence
-   lever is explicitly satisfied, surfacing as the already-handled `503
-   LLM_UNAVAILABLE` degradation. Fail-closed on absence (an unset or
+   transfer-evidence-gate.ts` holds ONE predicate and ONE lever, asserted at
+   every outbound boundary that carries learner data to an international
+   provider — there is deliberately not a second control that could drift:
+   - the two LLM router choke points (`routeAndCall` / `routeAndStream`,
+     `apps/api/src/services/llm/router.ts`), surfacing as the already-handled
+     `503 LLM_UNAVAILABLE` degradation. Every prompt-bearing provider (
+     Cerebras, Mistral, OpenAI, Anthropic) and OCR reach the network only
+     through these, so gating them covers all of them;
+   - the Voyage AI embedding choke point (`generateEmbedding`,
+     `apps/api/src/services/embeddings.ts`), which posts learner message text
+     to `api.voyageai.com` with its own `fetch` and never touches the router.
+     Gated at the provider-egress function rather than at its call sites, so
+     the session-message path and all four background embedding flows inherit
+     it. Refusal raises `InternationalTransferBlockedError` before the request
+     body is serialised (a distinct type only because `CircuitOpenError` lives
+     in router.ts and reusing it would close an import cycle).
+
+   Neither boundary is reachable without the Hono app — `api.use('*',
+   llmMiddleware)` wraps every route including `/v1/inngest`, and the Worker
+   exports no `scheduled`/queue handler — and the embedding boundary
+   additionally fails closed if the request context is ever absent. Fail-closed
+   on absence (an unset or
    partially-synced binding leaves the stop armed) and inert outside
    production, so dev/staging are unaffected. The serving-region seam is still
    `V2_SERVING_REGION_PLACEHOLDER` pinned to `'global'` (claim row #13) — the
