@@ -234,10 +234,21 @@ describe('resolveCountryPolicy', () => {
     expect(decision.reasonCodes).toContain('COUNTRY_BLOCKED');
   });
 
+  // [WI-2743 AC-7] The three legacy bucket values that rows written before ISO
+  // collection still carry. Once residence_jurisdiction holds real country
+  // codes these are the ONLY residual values, and every one of them must
+  // produce a fail-closed DECISION rather than a throw — a throw at the
+  // admission path would be an outage for pre-existing rows, not a refusal.
+  // The reason code differs by shape and that is fine: 'EU' and 'ROW' are not
+  // valid country codes at all ('EU' is a reserved non-country alpha-2, 'ROW'
+  // is three letters), while 'US' is a real alpha-2 that simply has no registry
+  // row in this fixture.
   it.each([
     ['missing residence', null, 'COUNTRY_UNKNOWN'],
     ['invalid residence', 'EU', 'COUNTRY_INVALID'],
     ['unsupported residence', 'CH', 'COUNTRY_UNSUPPORTED'],
+    ['legacy bucket US', 'US', 'COUNTRY_UNSUPPORTED'],
+    ['legacy bucket ROW', 'ROW', 'COUNTRY_INVALID'],
   ])('fails closed for %s', (_label, habitualResidence, reasonCode) => {
     const decision = resolveCountryPolicy({
       policies,

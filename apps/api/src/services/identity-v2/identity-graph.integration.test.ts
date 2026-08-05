@@ -192,7 +192,10 @@ async function cleanupByClerk(
       birthYear: 1990,
       birthMonth: 6,
       birthDay: 15,
-      location: 'US',
+      // [WI-2743] The ISO habitual-residence country is what the writer
+      // persists now. `location` is superseded and no longer read — see the
+      // residenceJurisdiction expectation below.
+      habitualResidenceCountry: 'US',
       timezone: 'America/New_York',
     });
 
@@ -206,6 +209,13 @@ async function cleanupByClerk(
       where: eq(person.id, graph.personId),
     });
     expect(personRow?.birthDate).toBe('1990-06-15');
+    // [WI-2743 AC-4 sweep] Previously this passed location:'US' and asserted
+    // 'US' arrived via locationToJurisdiction. The writer now persists the
+    // collected ISO habitual-residence country VERBATIM, so the assertion is
+    // the same string for a different — and now literal — reason. Safe to
+    // change: createIdentityGraph has exactly ONE production caller
+    // (routes/profiles.ts), and no client populates the legacy `location`
+    // field, so no shipped path regressed.
     expect(personRow?.residenceJurisdiction).toBe('US');
     expect(personRow?.loginId).toBeTruthy(); // reverse circular wire
     expect(personRow?.hasOwnAccount).toBe(true);

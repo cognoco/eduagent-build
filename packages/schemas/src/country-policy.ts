@@ -268,6 +268,33 @@ export const launchDecisionSchema = z.enum(['allowed', 'blocked']);
 export type LaunchDecision = z.infer<typeof launchDecisionSchema>;
 
 /**
+ * [WI-2743] One selectable habitual-residence country, as offered to the
+ * collection surfaces (signup, add-child, save-wizard). Mastered by
+ * `country_policy_registry` — AC-1 forbids a hard-coded picker list.
+ *
+ * DELIBERATELY CARRIES NO LAUNCH STATUS. The picker asks where the learner
+ * habitually LIVES, which is a fact about them and is true regardless of
+ * whether we may serve them there. Filtering the list to launchable countries
+ * would (a) make a resident of a blocked country unable to answer truthfully,
+ * turning a collection surface into a silent enforcement surface, and (b) be
+ * empty today, since every registry row currently reads launch_status=blocked.
+ * Admission is decided by the resolver at the admission path (WI-2927), on the
+ * country the person actually stated.
+ */
+export const residenceCountryOptionSchema = z.object({
+  countryCode: countryCodeSchema,
+  countryName: z.string().min(1),
+});
+export type ResidenceCountryOption = z.infer<
+  typeof residenceCountryOptionSchema
+>;
+
+export const residenceCountryListSchema = z.object({
+  countries: z.array(residenceCountryOptionSchema),
+});
+export type ResidenceCountryList = z.infer<typeof residenceCountryListSchema>;
+
+/**
  * The single typed result every consumer reads. Nullable fields are null
  * exactly when no registry row could be resolved — a fail-closed decision
  * still carries its reason codes.

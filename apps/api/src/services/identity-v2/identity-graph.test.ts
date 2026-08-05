@@ -20,7 +20,11 @@ import type { Database } from '@eduagent/database';
 import { PROFILE_MINIMUM_AGE } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
 import { ProfileValidationError } from '../profile';
-import { createIdentityGraph } from './identity-graph';
+import {
+  createIdentityGraph,
+  residenceJurisdictionForCreate,
+  LEGACY_UNKNOWN_RESIDENCE_BUCKET,
+} from './identity-graph';
 
 // ── External-boundary mocks (not internal — gc1-allow for each) ─────────
 
@@ -244,5 +248,47 @@ describe('[WI-3019] createIdentityGraph — minimum-age floor with the schema la
         birthYear: CURRENT_YEAR - PROFILE_MINIMUM_AGE - 1,
       }),
     ).rejects.not.toBeInstanceOf(ProfileValidationError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2743] residenceJurisdictionForCreate — the single create-time mapping
+// from the collected ISO habitual-residence country to
+// person.residence_jurisdiction. Pure; no DB. The DB-backed proof that both
+// writers actually persist what this returns lives in the integration suite.
+//
+// This is the function that ends the "every person row reads 'ROW'" state that
+// made the WI-2690 country registry inert: resolveJurisdiction requires a real
+// ISO alpha-2, so while the column only ever held the three legacy buckets, no
+// country could ever be enabled.
+// ---------------------------------------------------------------------------
+describe('[WI-2743] residenceJurisdictionForCreate', () => {
+  it('persists a collected ISO alpha-2 country VERBATIM, not collapsed into a bucket', () => {
+    expect(residenceJurisdictionForCreate('DE')).toBe('DE');
+    expect(residenceJurisdictionForCreate('PL')).toBe('PL');
+    expect(residenceJurisdictionForCreate('GB')).toBe('GB');
+    // The pre-WI-2743 writers collapsed every one of these to 'ROW' via
+    // locationToJurisdiction, which is precisely why the registry resolved
+    // nothing for anybody.
+    expect(residenceJurisdictionForCreate('NO')).not.toBe(
+      LEGACY_UNKNOWN_RESIDENCE_BUCKET,
+    );
+  });
+
+  it('writes the legacy unknown bucket when no country was collected', () => {
+    // Deliberate and non-gating: this item collects residence, it does not
+    // refuse admission without it. 'ROW' has no registry row keyed to it, so
+    // resolveCountryPolicy fails closed on these rows (country-policy.test.ts
+    // "fails closed for legacy bucket ROW") and WI-2927 owns turning that
+    // fail-closed decision into an actual refusal.
+    expect(residenceJurisdictionForCreate(undefined)).toBe(
+      LEGACY_UNKNOWN_RESIDENCE_BUCKET,
+    );
+    expect(residenceJurisdictionForCreate(null)).toBe(
+      LEGACY_UNKNOWN_RESIDENCE_BUCKET,
+    );
+    expect(residenceJurisdictionForCreate('')).toBe(
+      LEGACY_UNKNOWN_RESIDENCE_BUCKET,
+    );
   });
 });
