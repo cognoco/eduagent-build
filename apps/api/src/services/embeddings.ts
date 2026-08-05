@@ -15,6 +15,8 @@ import {
 
 import { projectAiResponseContent } from './llm/project-response';
 import { filterLearnerAuthoredTextForEgress } from './learner-egress-filter';
+import { assertLearnerDataEgressAllowed } from './llm/transfer-evidence-gate';
+import { isNodeTestEnv } from '../config';
 
 export interface EmbeddingResult {
   vector: number[];
@@ -145,11 +147,25 @@ interface VoyageEmbeddingResponse {
  * Calls the Voyage AI REST API with the configured model. The API key
  * is passed as a parameter so the service layer stays decoupled from
  * Hono env bindings.
+ *
+ * [WI-3020 rework] THE Voyage egress choke point. Every embedding caller —
+ * the session-message path (`prepareExchangeContext`), semantic memory
+ * retrieval, memory-fact embedding and its backfill, session-completed, and
+ * transcript purge — reaches Voyage through this one function, so the
+ * launch-stop is asserted here rather than at each call site. `text` here is
+ * raw learner-authored content, so the assert runs FIRST: before the egress
+ * filter, before the request body is serialised, before any network call.
  */
 export async function generateEmbedding(
   text: string,
   apiKey: string,
 ): Promise<EmbeddingResult> {
+  assertLearnerDataEgressAllowed({
+    surface: 'voyage_embeddings',
+    destination: VOYAGE_API_URL,
+    nodeTestEnv: isNodeTestEnv(),
+  });
+
   const config = getEmbeddingConfig();
   const filteredText = filterLearnerAuthoredTextForEgress(text);
 

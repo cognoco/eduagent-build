@@ -26,7 +26,12 @@ import {
 import { createMockProvider } from '../services/llm/test-utils';
 // Real production constant — asserted against, never re-hardcoded, so a change
 // to the documented seam forces this test to track it.
-import { TRANSFER_GATE_SERVING_REGION } from '../services/llm/transfer-evidence-gate';
+import {
+  TRANSFER_GATE_SERVING_REGION,
+  InternationalTransferBlockedError,
+  assertLearnerDataEgressAllowed,
+} from '../services/llm/transfer-evidence-gate';
+import { generateEmbedding } from '../services/embeddings';
 
 function createMockContext(env: Record<string, unknown>) {
   return { env } as unknown as Parameters<typeof llmMiddleware>[0];
@@ -217,6 +222,159 @@ describe('international-routing launch-stop (WI-3020)', () => {
       );
 
       expect(result.provider).toBe('openai');
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-3020 rework] The Voyage embedding boundary.
+//
+// The first cut of this launch-stop guarded routeAndCall/routeAndStream only,
+// and `services/embeddings.ts` reaches Voyage AI with its own `fetch` — so
+// production learner message text still egressed while the evidence was
+// pending. These rows exist to make that regression impossible to reintroduce.
+//
+// They assert on the ABSENCE of the outbound call, not merely on a thrown
+// error: an error raised AFTER the fetch would still have leaked the learner's
+// text to an international provider, and would satisfy a rejects-toThrow test.
+// `globalThis.fetch` is a true external boundary, so spying on it is GC1-clean
+// — no internal module is mocked here.
+// ---------------------------------------------------------------------------
+
+const LEARNER_TEXT = 'my name is Ada and I live on Baker Street';
+
+describe('international-routing launch-stop — Voyage embedding egress (WI-3020 rework)', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    resetLlmMiddleware();
+    fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          data: [{ embedding: new Array(1024).fill(0.1) }],
+          model: 'voyage-3.5',
+          usage: { total_tokens: 42 },
+        }),
+    } as unknown as Response);
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  describe('production + OPQ-110 evidence pending → NO request reaches Voyage', () => {
+    it.each(['unset', 'false'] as const)(
+      'makes no outbound call at all when the lever is %s',
+      async (lever) => {
+        const caught = await captureError(() =>
+          simulateRequest(productionEnv(lever), () =>
+            generateEmbedding(LEARNER_TEXT, 'pa-test-key'),
+          ),
+        );
+
+        // The load-bearing assertion: the learner's text never left.
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(caught).toBeInstanceOf(InternationalTransferBlockedError);
+        expect((caught as InternationalTransferBlockedError).surface).toBe(
+          'voyage_embeddings',
+        );
+      },
+    );
+
+    it('emits the same structured block line as the router choke point', async () => {
+      const warnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
+      try {
+        await captureError(() =>
+          simulateRequest(productionEnv('false'), () =>
+            generateEmbedding(LEARNER_TEXT, 'pa-test-key'),
+          ),
+        );
+
+        const line = warnSpy.mock.calls.find((call) =>
+          String(call[0]).includes('llm.transfer_evidence.blocked'),
+        );
+        expect(line).toBeDefined();
+        expect(JSON.parse(String(line![0])).context).toMatchObject({
+          event: 'llm.transfer_evidence.blocked',
+          surface: 'voyage_embeddings',
+          destination: 'https://api.voyageai.com/v1/embeddings',
+          environment: 'production',
+          serving_region: TRANSFER_GATE_SERVING_REGION,
+        });
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('the release lever and the inert states behave as for the router', () => {
+    it('reaches Voyage once the lever is flipped to true (OPQ-110 release path)', async () => {
+      const result = await simulateRequest(productionEnv('true'), () =>
+        generateEmbedding(LEARNER_TEXT, 'pa-test-key'),
+      );
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+        'https://api.voyageai.com/v1/embeddings',
+      );
+      expect(result.dimensions).toBe(1024);
+    });
+
+    it.each(['development', 'staging'])(
+      'is inert in %s with the evidence still pending',
+      async (environment) => {
+        await simulateRequest({ ENVIRONMENT: environment }, () =>
+          generateEmbedding(LEARNER_TEXT, 'pa-test-key'),
+        );
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('blocks again when the lever goes back to false — no isolate-sticky state', async () => {
+      await simulateRequest(productionEnv('true'), () =>
+        generateEmbedding(LEARNER_TEXT, 'pa-test-key'),
+      );
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      const caught = await captureError(() =>
+        simulateRequest(productionEnv('false'), () =>
+          generateEmbedding(LEARNER_TEXT, 'pa-test-key'),
+        ),
+      );
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // still the one released call
+      expect(caught).toBeInstanceOf(InternationalTransferBlockedError);
+    });
+  });
+
+  // The no-request-context posture cannot be driven through generateEmbedding
+  // under Jest — NODE_ENV=test is exactly the exemption that keeps unit tests
+  // runnable — so it is asserted on the shared gate function directly, which is
+  // the same code path production takes with nodeTestEnv false.
+  describe('a MISSING request context fails closed, not open', () => {
+    it('blocks when no LLM request context is established outside a Node test env', () => {
+      expect(() =>
+        assertLearnerDataEgressAllowed({
+          surface: 'voyage_embeddings',
+          destination: 'https://api.voyageai.com/v1/embeddings',
+          nodeTestEnv: false,
+        }),
+      ).toThrow(InternationalTransferBlockedError);
+    });
+
+    it('permits the same call inside a Node test env, so unit tests stay runnable', () => {
+      expect(() =>
+        assertLearnerDataEgressAllowed({
+          surface: 'voyage_embeddings',
+          destination: 'https://api.voyageai.com/v1/embeddings',
+          nodeTestEnv: true,
+        }),
+      ).not.toThrow();
     });
   });
 });
