@@ -3000,14 +3000,32 @@ describe('[WI-2952] applyAnalysis threads caller provenance to the gate', () => 
   });
 
   // AC-6 write-path coverage for the `learner-profile.ts` boundary IS NOW
-  // CLOSED, end to end, in
-  // `tests/integration/wi-2952-analysis-provenance.integration.test.ts`: it
-  // drives `applyAnalysis` against a real database with both operator strings,
-  // asserts the persisted `interests` CONTAINS the text under
-  // `{provenance:'user'}` and does NOT contain it under the pre-fix
-  // `{provenance:'llm', producerVendor:''}`, and was proven red against the
-  // reverted implementation. WI-2971, filed while the gap was open, is
-  // superseded by that test.
+  // CLOSED, end to end, by TWO integration suites that assert different
+  // properties. Neither subsumes the other:
+  //
+  //   - `tests/integration/wi-2952-analysis-provenance.integration.test.ts`
+  //     (PROVENANCE THREADING) drives `applyAnalysis` against a real database
+  //     with both operator strings, asserts the persisted `interests` CONTAINS
+  //     the text under `{provenance:'user'}` and does NOT contain it under the
+  //     pre-fix `{provenance:'llm', producerVendor:''}`, and was proven red
+  //     against the reverted implementation.
+  //   - `tests/integration/wi-2971-applyanalysis-sanitised-projection.integration.test.ts`
+  //     (THE SANITISED PROJECTION) drives ONE `applyAnalysis` call carrying a
+  //     mixed safe+unsafe payload across `interests`, `interestTimestamps`,
+  //     `strengths[].topics`, `struggles` and `communicationNotes`, then asserts
+  //     per family that the persisted row holds the safe entry and not the
+  //     unsafe one.
+  //
+  // This block previously recorded WI-2971 as SUPERSEDED by the WI-2952 suite.
+  // That was wrong, and the correction is empirical rather than argued.
+  // `sanitizeAnalysisProfileProjection` is a per-entry filter over six field
+  // families, applied as an override on the write
+  // (`set({ ...updates, ...safeProjection })`), so each family can be
+  // un-sanitised on its own. Neutering ONLY the nested `strengths[].topics`
+  // filter was measured on 2026-08-04: the WI-2971 suite goes red on exactly
+  // that assertion (exit 1) while the WI-2952 suite stays fully green (exit 0),
+  // because the latter writes a single-element `interests` array and cannot
+  // observe the other five families at all.
   //
   // Two earlier unit-level attempts failed to discriminate, which is why the
   // evidence had to move to an integration test:
