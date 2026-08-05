@@ -20,10 +20,20 @@
  * string, so it cannot see the other five families at all.
  *
  * This suite therefore drives ONE `applyAnalysis` call carrying a MIXED
- * safe+unsafe payload in every reachable family and asserts, per family, that
- * the persisted row holds the safe entry and NOT the unsafe one. The unit of
- * evidence is "the projection that landed is the sanitised projection", not
- * "some text was dropped".
+ * safe+unsafe payload and asserts, per family, that the persisted row holds the
+ * safe entry and NOT the unsafe one. The unit of evidence is "the projection
+ * that landed is the sanitised projection", not "some text was dropped".
+ *
+ * SCOPE — FIVE of the sanitiser's SIX families, stated rather than implied:
+ * `interests`, `interestTimestamps`, `strengths[].topics`, `struggles` and
+ * `communicationNotes`. The sixth, `recentlyResolvedTopics`, is NOT covered
+ * here. It is not a direct analysis field — `applyAnalysis` derives it from
+ * `struggle_resolved` notifications, so reaching it needs a pre-seeded struggle
+ * that a later `resolvedTopics` entry resolves, which is a different fixture
+ * shape from the mixed payload above. The property this item exists to prove —
+ * that the write persists `safeProjection` and not the raw merged state — is
+ * established by the other five, and the mutation pair below measures it.
+ * Extending to the sixth family is worth doing and is not done here.
  *
  * WHY INTEGRATION, NOT UNIT
  * -------------------------
@@ -157,7 +167,9 @@ async function readProjection(profileId: string): Promise<PersistedProjection> {
 }
 
 /**
- * One analysis carrying a safe AND an unsafe entry in every reachable family.
+ * One analysis carrying a safe AND an unsafe entry in each of the five families
+ * this suite covers (see SCOPE in the header — `recentlyResolvedTopics` is the
+ * sixth and is not among them; `resolvedTopics` is left null here deliberately).
  * Both strengths signals share a subject so they merge into ONE strength entry
  * with two topics — which is what puts the nested `strengths[].topics` filter
  * under test rather than the outer per-entry filter.
