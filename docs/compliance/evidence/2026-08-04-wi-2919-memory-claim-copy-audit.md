@@ -9,9 +9,11 @@ personalization claims while persistent memory is parked under the DPO interim
 condition, so the launch screen record can cite a surface-by-surface result.
 **Exposure driving the audit:** NY GBL Art 47 prong (i) — a launch-visible claim
 that the product remembers the user across sessions.
-**Method:** direct read of every named surface; `jq` key-set enumeration across all
-7 shipped UI locales; code-path trace of the read, write, and injection paths that
-determine whether each string can render and whether the claim it makes is true.
+**Method:** direct read of every named surface; `jq` enumeration across all 7 shipped
+UI locales — **by string value over every scalar**, after a namespace-scoped first
+pass proved incomplete (§3 coverage correction, §4.1b); code-path trace of the read,
+write, and injection paths that determine whether each string can render and whether
+the claim it makes is true.
 
 > **Supersedes the premise of** [`2026-07-30-memory-disclosure-copy-inventory.md`](2026-07-30-memory-disclosure-copy-inventory.md).
 > That inventory stated the feature is "inert because the server never returns
@@ -85,7 +87,7 @@ when this audit was run and had drifted to 151-153 within a day, so a line range
 here would go stale faster than the finding it supports.) What `false` actually
 does:
 
-```
+```text
 apps/api/src/services/memory/projection.ts:290-293
   const useFacts = options?.memoryFactsReadEnabled && hasMemoryFactsMarker(row);
   if (!useFacts) {
@@ -117,7 +119,7 @@ The flag chooses *which store to read from*. Neither branch returns empty.
 
 ### 2.3 LLM injection is gated on user consent only
 
-```
+```text
 apps/api/src/services/curated-memory.ts:196-200
   // [F-PV-09] Gate injection on consent — if consent is not granted,
   // injection must be off regardless of the DB flag.
@@ -146,7 +148,7 @@ A null snapshot is not an empty memory block. `buildMemoryBlock`
 (`session-exchange.ts:3617-3640`) falls through on every field to the
 `learning_profiles` JSONB columns:
 
-```
+```ts
 interests: memorySnapshot
   ? memorySnapshot.interests
   : Array.isArray(learningProfile.interests)
@@ -167,7 +169,7 @@ memory is live: it is the production prompt-assembly path, not a settings read.
 The "Mentor memory" row in the More tab renders unconditionally — no feature
 flag, no conditional wrapper:
 
-```
+```text
 apps/mobile/src/app/(app)/more/index.tsx:135-141
   <SettingsRow
     label={t('more.mentorMemory.sectionHeader')}
@@ -194,14 +196,31 @@ consent is still pending, i.e. **every new user at launch**:
 | # | Surface (as named in AC) | Exists? | Hits | Result |
 |---|---|---|---|---|
 | 1a | `docs/screenshots_and_store_info/store description.md` | Yes | 3 | **Not launch-visible** — superseded |
-| 1b | `docs/screenshots_and_store_info/google-play/*` | Yes | 2 docs | listing-copy clean; data-safety declares personalisation |
-| 1c | `app-privacy-data-safety-worksheet.md` | Yes | 2 | Declares personalisation — see §5 |
+| 1b | `docs/screenshots_and_store_info/google-play/*` | Yes | 2 docs | listing-copy clean; data-safety declares personalization |
+| 1c | `app-privacy-data-safety-worksheet.md` | Yes | 2 | Declares personalization — see §5 |
 | 1d | `reviewer-notes-draft.md` | Yes | 0 | **Checked, clean** |
 | 1e | `store-compliance-checklist.md` | Yes | 0 product hits | **Checked, clean** (one false positive, §4.3) |
-| 2 | `apps/mobile/src/i18n/locales/*.json` | Yes — 7 locales | 67 keys × 7 | **Live, renderable, accurate** — §4.1 |
+| 2 | `apps/mobile/src/i18n/locales/*.json` | Yes — 7 locales | 67 keys × 7 in the three memory namespaces (§4.1) **plus 62 keys × 7 in ten further namespaces (§4.1b)** | **Live, renderable, accurate** |
 | 3 | Repo-wide sweep for memory/remember/personalize phrasing | — | see §4 | Legal/policy copy + screened set |
 
-Every surface named in the AC exists. None was skipped.
+Every surface named in the AC exists, and each was read.
+
+> **Coverage correction, 2026-08-05.** This section previously read "None was
+> skipped." That was **wrong as recorded**, and the correction is the substance of
+> §4.1b. The locale sweep behind row 2 was **namespace-scoped** — it enumerated keys
+> under the three `mentorMemory` / `tellMentor` namespaces and reported the result as
+> if it were exhaustive. Independent review named four live memory-claim keys outside
+> those namespaces; re-running the sweep **by string value across every scalar in the
+> locale files**, rather than by namespace, found ten further namespaces carrying
+> user-visible memory copy that this audit had not dispositioned. They are
+> dispositioned in §4.1b.
+>
+> The dispositions did not change — every one of them lands where §4.1 landed, for
+> the reason §6 gives. What changed is the **coverage claim**, and in a document the
+> launch-screen record cites, a coverage claim that overstates its own reach is the
+> defect regardless of whether the conclusion survives. A namespace-scoped sweep
+> reported as complete is a universal quantifier asserted over a set nobody
+> enumerated.
 
 ---
 
@@ -241,6 +260,53 @@ The strongest claims, all in `apps/mobile/src/i18n/locales/en.json`:
 make cross-session memory claims that the system genuinely performs (§2.2, §2.3),
 so they are accurate disclosures. Rewording them is contraindicated (§6).
 
+### 4.1b Memory claims OUTSIDE the three namespaces — **added 2026-08-05, LIVE, ACCURATE, RETAINED**
+
+Added after independent review found the §4.1 sweep was namespace-scoped and had
+recorded itself as complete. The sweep was re-run **by string value over every
+scalar in the locale files** — matching `remember`, `memory`, `personali[sz]`,
+`picks up where`, `knows about you` — which is the enumeration that licenses a
+coverage claim; a namespace list is not.
+
+Ten further namespaces carry user-visible memory copy. **62 keys per locale**,
+counted the same way as §4.1. Every render site below was opened, not inferred:
+
+| Namespace | Strongest claim (en) | Renders from |
+|---|---|---|
+| `welcomeIntro.*` | **"Remembers you, picks up where you left off"** and "Create a free account so your mentor can remember your subjects, notes, and progress." | `components/welcome/WelcomeIntro.tsx` and `app/(auth)/welcome.tsx` |
+| `parentView.mentorMemory.*` | "Allow the mentor to build a memory of your child's strengths and focus areas"; "Saved — the mentor will remember this" | `app/(app)/child/[profileId]/mentor-memory.tsx` |
+| `parentView.index.*` | "Manage what the mentor remembers about {{name}}" | same parent surface |
+| `memoryConsent.*` | "This lets the mentor remember what kinds of explanations work, what is still tricky, and which examples feel relevant." | `components/memory-consent-prompt.tsx` |
+| `journal.*` (memory + sections + trust) | "Review, edit, hide, export, or clear what your mentor remembers from the full memory screen."; "Your private learning trail: saved moments, notes, reports, and mentor memory." | `components/journal/JournalTabView.tsx`, `JournalSegmentedControl.tsx` |
+| `tabs.previewSampleCoaching.*` | "Your mentor remembers what you know and adjusts to your pace" | `app/(app)/_components/PreviewSampleCoaching.tsx` |
+| `sessionSummary.mentorMemoryCue.*` | "What your mentor knows about you." | `app/session-summary/[sessionId].tsx` |
+| `mentorHome.coldStart.*` | "I'll remember what you write here so the next step starts closer to you." | `app/(app)/session/index.tsx` |
+| `supportHub.journal.*` | "Private chats, notes, and mentor memory are not shown here." | `components/support/SupportHubJournalTab.tsx`, `PersonScopeJournalPlaceholder.tsx` |
+| `guardian.*` | "Could not enable memory" | parent mentor-memory surface |
+
+**The welcome-intro headline is the one that matters most for the exposure this
+audit was commissioned to find.** "Remembers you, picks up where you left off" is a
+cross-session memory claim on one of the earliest screens a user sees, and the
+account-bridge line makes the same promise **before an account exists**. Both are
+squarely inside the NY GBL Art 47 prong (i) surface named at the head of this
+document, and neither had a disposition until now.
+
+**Disposition: RETAINED, unmodified — identical to §4.1 and for the same reason.**
+The system genuinely performs cross-session memory (§2.2, §2.3, §2.3b), so these are
+accurate disclosures; rewording them would understate real processing (§6). Nothing
+here changes the conclusion. What it changes is that the conclusion now rests on an
+enumeration instead of a namespace filter.
+
+**Locale parity, measured rather than asserted.** Six of the seven locales carry all
+62 keys. Polish carries 64. The two extra are `_few` and `_many` plural forms on an
+attempt-count string — ordinary Polish pluralization, **not** an orphaned memory
+claim that escaped the other locales. Recorded as measured; parity is intact.
+
+**Not re-screened here.** The learner-recall class (§4.4) and the legal/policy class
+(§4.2) both reappear in a value-matched sweep and are unchanged — the exclusions in
+§4.4 remain correct, because they concern the learner recalling material rather than
+the product remembering the person.
+
 ### 4.2 Legal / policy copy — **ACCURATE, RETAINED**
 
 In `en.json`, describing persistent memory as active processing:
@@ -253,7 +319,7 @@ In `en.json`, describing persistent memory as active processing:
   is not used for advertising, marketing profiles, or training third-party AI models."
 - `legal.privacy.s3Body` — "We use your data to provide personalised AI tutoring…
   This profiling is used only to personalise your teaching."
-- `legal.privacy.s5Body` — display-name personalisation for adult owners.
+- `legal.privacy.s5Body` — display-name personalization for adult owners.
 - `legal.privacy.s6Body2` — providers "for learning responses and learning memory".
 - `legal.terms.s2Body` — "personalised learning".
 
@@ -369,7 +435,8 @@ requires a ruling on the feature state, not a rewrite of the strings.
    falls back to the `learning_profiles` JSONB columns (§2.3b). A real park needs
    a gate on the fallback itself, not on the store selectors.
 3. **Only after (1)** should UI copy be revisited. If the feature is parked, the
-   67-key set in §4.1 needs a DPO-ruled rewrite across 7 locales, and the privacy
+   67-key set in §4.1 **and the 62-key set in §4.1b** need a DPO-ruled rewrite
+   across 7 locales — 129 keys per locale, not 67 — and the privacy
    policy strings in §4.2 must move in the same change-set.
 4. **`store description.md`** is superseded but still in-tree with unapproved
    claims. Consider archiving it to remove the footgun; not done here as it is
