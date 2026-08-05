@@ -628,13 +628,13 @@ Uses **`appVersion` policy** for `runtimeVersion`. The runtime version is the ap
 
 Channel and branch share a name in every row: a **channel** is what a build listens to (baked in at build time), a **branch** is where `eas update` publishes, and EAS links a channel to its same-named branch by default. The one deliberate exception to that default is the incident remap above — pointing the `production` channel at the `fallback` branch.
 
-**Channel ownership (`MMT-ADR-0054` §4):** `production` publishes only through the gated deploy pipeline; `fallback` only through the manual double-gated workflow; `preview` is CI's bounded automated path; no agent-initiated OTA publish, ever, without explicit operator instruction. Before the first production rollout, a Config F fallback bundle must have been rehearsal-published and verified (ADR §5 — hard gate; see the pre-launch checklist).
+**Channel ownership (`MMT-ADR-0054` §4):** the `production` pair currently has **no OTA publisher at all** — the gated deploy pipeline (`deploy.yml`) builds store artifacts and contains no OTA publish step, so production OTA publishing is unavailable until a conforming gated dispatch workflow exists, and production changes reach installs only as store builds (ADR §4 capability note); `fallback` publishes only through the manual double-gated workflow; `preview` is CI's bounded automated path; no agent-initiated OTA publish, ever, without explicit operator instruction. Before the first production rollout, a Config F fallback bundle must have been rehearsal-published and verified (ADR §5 — hard gate; see the pre-launch checklist).
 
 ### CI Integration
 
 The `ci.yml` workflow has an `ota-update` job that runs after the main CI job passes:
 - Only triggers on push to main (not PRs)
-- Publishes `eas update --branch preview` with the commit message
+- Publishes `eas update --branch preview` with the commit message — **only when no native-affecting files changed** (the publish steps require `native_changed != true`; a native change must ship as a native build, never OTA alone, per `MMT-ADR-0054` §2)
 - Takes ~3 min after CI passes
 - The installed preview APK receives the new bundle on next launch
 
@@ -650,8 +650,8 @@ push to main (JS-only — 95% of merges)
 
 push to main (native change — rare)
   ├── ci.yml: main job                            ~2 min
-  ├── ci.yml: ota-update (after main)             ~3 min
-  └── mobile-ci.yml: build-preview (after tests)  ~30 min
+  ├── ci.yml: ota-update                          publish SKIPPED (native_changed=true)
+  └── mobile-ci.yml: build-preview (after tests)  ~30 min  ← bundle ships in the build
 ```
 
 ### App config
