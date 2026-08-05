@@ -56,8 +56,9 @@ function stagedHuskyEntries(): Array<{ mode: string; path: string }> {
     .filter((line) => line.trim() !== '')
     .map((line) => {
       // `<mode> <sha> <stage>\t<path>`
-      const [meta, path] = line.split('\t');
-      return { mode: meta.split(' ')[0], path };
+      const [meta = '', path = ''] = line.split('\t');
+      const [mode = ''] = meta.split(' ');
+      return { mode, path };
     });
 }
 

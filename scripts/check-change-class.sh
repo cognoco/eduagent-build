@@ -358,6 +358,15 @@ if hit '(^tests/integration/|^scripts/check-integration-typecheck(\.test)?\.ts$|
   add_cmd slow "pnpm test:integration" "Cross-package integration tests"
 fi
 
+# ── scripts/ test-surface typecheck (WI-3061) ─────────────────────────────
+# The scripts/ suites import broadly across apps/api and packages/, so their
+# type program is sensitive to changes well outside scripts/ itself — hence the
+# shared-source triggers alongside the checker's own inputs.
+if hit '(^scripts/.*\.ts$|^scripts/jest\.config\.cjs$|^scripts/tsconfig\.typecheck\.json$|^scripts/scripts-typecheck-baseline\.json$|^apps/api/(src|eval-llm)/|^packages/[^/]+/src/|^package\.json$|^pnpm-lock\.yaml$|^tsconfig\.base\.json$)'; then
+  CLASSES+=("scripts-typecheck")
+  add_cmd fast "pnpm typecheck:scripts" "Jest-selected scripts/ TypeScript checker"
+fi
+
 # ── LLM Prompts ──────────────────────────────────────────────────────────
 # services/llm/ is matched recursively (providers/ subdirectory included) so
 # the CI eval gate that routes on this class covers provider-level prompt

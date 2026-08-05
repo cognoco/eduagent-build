@@ -1,0 +1,47 @@
+// [WI-3061] Semantic TypeScript program for the scripts/ Jest test surface.
+//
+// Why this file is NOT named `tsconfig.json`: `scripts/jest.config.cjs`
+// configures ts-jest with no explicit `tsconfig` option and no `rootDir`, so
+// ts-jest discovers its compiler options by searching the Jest rootDir
+// (`scripts/`) and walking up — today it lands on the repo-root
+// `tsconfig.json`. A file literally named `scripts/tsconfig.json` would be
+// picked up at RUNTIME by ts-jest and silently change how all 76 suites
+// execute (module/noEmit/extension resolution). The integration precedent
+// (`tests/integration/tsconfig.json`) can use the plain name only because
+// `tests/integration/jest.config.cjs` pins `tsconfig` explicitly.
+//
+// Divergences from `tsconfig.base.json`, each deliberate:
+//   - `lib: es2023` (base: es2022) — these scripts run on Node 22 (see
+//     `.github/workflows/ci.yml` node-version: 22), which implements the
+//     ES2023 array methods (`findLast`, `toSorted`, …). Compiling them
+//     against an es2022 lib produced 65 TS2550 "change your lib" reports for
+//     methods that exist at runtime. Declaring the real runtime lib removes
+//     false positives; it does not relax any check.
+//   - `types: ["jest", "node"]` — the scripts surface is Node + Jest only. It
+//     deliberately omits `@cloudflare/workers-types` (which
+//     `tests/integration/tsconfig.json` needs); pulling Workers globals in
+//     here would shadow Node's DOM-ish globals for no benefit.
+//   - `noEmit` + `allowImportingTsExtensions` — check-only program; several
+//     suites import siblings by explicit `.ts` specifier.
+//   - `composite`/`declarationMap`/`emitDeclarationOnly` off — this is not a
+//     referenced build project; it is never built, only diagnosed.
+//
+// File selection lives in `scripts/check-scripts-typecheck.ts`, which derives
+// the roots from `scripts/jest.config.cjs` so the typechecked set cannot drift
+// from the executed set. `include` is intentionally empty.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "composite": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "lib": ["es2023"],
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": ["jest", "node"]
+  },
+  // Intentionally empty: scripts/check-scripts-typecheck.ts owns
+  // Jest-aligned file selection.
+  "include": []
+}

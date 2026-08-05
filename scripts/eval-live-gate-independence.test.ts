@@ -200,10 +200,10 @@ describe('eval-live.yml — three independent live gates (WI-2461)', () => {
       providerDemand.internalProviderCalls,
     );
     expect(Number(providerEvidence![3])).toBe(
-      providerDemand.flows['safety-probes'].internalProviderCalls,
+      providerDemand.flows['safety-probes']!.internalProviderCalls,
     );
     expect(Number(providerEvidence![4])).toBe(
-      providerDemand.flows['language-quality'].internalProviderCalls,
+      providerDemand.flows['language-quality']!.internalProviderCalls,
     );
     expect(Number(providerEvidence![5])).toBe(providerDemand.providerCalls);
     const totalEvidence = workflowComments.match(
