@@ -247,6 +247,20 @@ see the seeding note) anchors three verbs:
   `compareSimulationBaseline` vs the committed baseline. The over-credit ceiling
   is **reproduce-gated**: a first-pass over-credit is re-tested `REPRODUCE_N=3`×
   and exits 1 only if it **reproduces** — so a one-off LLM slip does not red CI.
+  Those 3 rounds are a **ratified policy, fixed per offender** — `MASTERY_REQUALIFICATION_ROUNDS`
+  in `runner/requalification-policy.ts`, pinned by its test [WI-3043]. Every
+  offender gets the full count no matter how many a run turns up, so N offenders
+  cost N×3 rounds. The rejected alternative was *adaptive* rounds — fewer for a
+  single isolated offender, on the theory that one offender is likelier a flake
+  than a real regression. It was rejected because it **requires** that
+  isolated-flake assumption, and the assumption can only be justified by observed
+  reproduce statistics, of which there are none: over-credit is a hard pass/fail
+  ceiling rather than a tracked rate, so nothing records it, and the weekly gate
+  that would produce such data had 8 scheduled runs and 0 successes at ruling
+  time. Under the fail-closed posture below, an unvalidated assumption that
+  weakens evidence is not available. The round count is deliberately **not** a
+  function of remaining budget: the budget derivation may *consume* the policy's
+  cost, never *define* its rounds.
   It **fails closed**, never open: if the re-test can't fully requalify every
   offender within the `--max-live-calls` budget, or any re-test round is skipped,
   the detected breach stands (exit 1) — a breach is never exonerated by missing
