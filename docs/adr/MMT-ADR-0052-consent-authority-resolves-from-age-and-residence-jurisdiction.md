@@ -1,6 +1,6 @@
 # MMT-ADR-0052 — Consent authority resolves from age and residence jurisdiction, never from age alone
 
-**Status:** Proposed · reconstructed 2026-07-30 · **Scope:** Minimum age for product access, and the derivation of who holds consent authority for a minor learner · **Deciders:** pending Architecture sign-off
+**Status:** Accepted · operator-ratified 2026-08-05 · reconstructed 2026-07-30 · **Scope:** Minimum age for product access, and the derivation of who holds consent authority for a minor learner · **Deciders:** Architecture sign-off: Accepted by operator Jorn 2026-08-05 (decision sitting, ADR read in full)
 
 ## Context
 
