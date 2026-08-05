@@ -158,10 +158,13 @@ function makeApp(overrides?: {
   profileId?: string;
   user?: AuthUser & { factorVerificationAge?: [number, number] };
   callerPersonId?: string | null;
+  // [WI-2743] Routes whose handler reads a table directly need a db shaped for
+  // that read; the default stub only serves the scoped `.where().limit()` path.
+  db?: Database;
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('db', createUncredentialedDb());
+    c.set('db', overrides?.db ?? createUncredentialedDb());
     c.set(
       'user',
       overrides?.user ?? {
@@ -945,6 +948,88 @@ describe('POST /v1/profiles', () => {
     expect(await res.json()).toMatchObject({
       code: ERROR_CODES.VALIDATION_ERROR,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/profiles/residence-countries
+//
+// [WI-2743] This block exists because the route's registration order is
+// load-bearing and NOTHING else proves it. Hono matches in registration order,
+// so the literal path must be registered before `/profiles/:id`; swap them and
+// "residence-countries" is swallowed as an `:id`. The service-level coverage
+// for listResidenceCountries never goes through the router, so it cannot see
+// that regression at all — which is precisely why asserting the property in a
+// comment was not enough.
+//
+// The REAL listResidenceCountries runs here; only the Database is stubbed. So
+// effective-dating, latest-name-wins and sort order are exercised through the
+// router rather than asserted a second time against a mock.
+// ---------------------------------------------------------------------------
+
+describe('GET /v1/profiles/residence-countries', () => {
+  /**
+   * listResidenceCountries awaits `select().from()` and iterates the result
+   * directly, unlike the scoped reads the default stub serves, which end in
+   * `.where().limit()`. So `from` must resolve to the rows themselves.
+   */
+  function makeRegistryDb(
+    rows: Array<{
+      countryCode: string;
+      countryName: string;
+      effectiveAt: Date;
+    }>,
+  ): Database {
+    return {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockResolvedValue(rows),
+      }),
+    } as unknown as Database;
+  }
+
+  it('returns one entry per country, carrying the latest name, sorted by name', async () => {
+    const res = await makeApp({
+      db: makeRegistryDb([
+        // Two effective-dated rows for one country: the later name must win,
+        // and the country must still appear exactly once.
+        {
+          countryCode: 'DE',
+          countryName: 'Federal Republic of Germany',
+          effectiveAt: new Date('1970-01-01T00:00:00Z'),
+        },
+        {
+          countryCode: 'DE',
+          countryName: 'Germany',
+          effectiveAt: new Date('1990-10-03T00:00:00Z'),
+        },
+        {
+          countryCode: 'AT',
+          countryName: 'Austria',
+          effectiveAt: new Date('1995-01-01T00:00:00Z'),
+        },
+      ]),
+    }).request('/v1/profiles/residence-countries');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      countries: [
+        { countryCode: 'AT', countryName: 'Austria' },
+        { countryCode: 'DE', countryName: 'Germany' },
+      ],
+    });
+  });
+
+  it('[BREAK] resolves the literal path rather than being shadowed by /profiles/:id', async () => {
+    const res = await makeApp({ db: makeRegistryDb([]) }).request(
+      '/v1/profiles/residence-countries',
+    );
+
+    // The decisive assertion is NOT the 200 — it is that the `:id` handler
+    // never ran. getPersonScope is the first thing that handler reaches for, so
+    // a reordering that lets "residence-countries" be captured as an `:id`
+    // shows up here as a call that should have been impossible.
+    expect(getPersonScopeMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
   });
 });
 
