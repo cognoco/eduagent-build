@@ -47,7 +47,19 @@ import * as ts from 'typescript';
 //   cache side-effect in queryFn: use-dashboard.useDashboard;
 //   NotFoundError catch returning null: use-subscription.useFamilySubscription;
 //   custom retry fn: use-sessions.useSessionTranscript/useSession (counted above).
-const BASELINE = 43;
+// 43 → 44 (2026-08-05, WI-2743): useResidenceCountries. Non-migratable under
+// TWO of the blocker types already enumerated above — "isSignedIn gate (not
+// activeProfile)", the same blocker as use-profiles.useProfiles, and a
+// staleTime the wrapper does not forward. The habitual-residence country list
+// is read DURING SIGNUP, before any profile exists; useApiQuery ends its
+// `enabled` with `&& !!activeProfile` (use-api-query.ts:84), so routed through
+// the wrapper this query would sit permanently disabled on the exact screen
+// that needs it — and fail silently, because a disabled query is not an error
+// state, it is an empty picker. Verified by substitution rather than asserted:
+// the useApiQuery variant was written and run, and the signup case fails with
+// isSuccess still false after the waitFor timeout. See
+// use-residence-countries.test.ts, which records that check in-line.
+const BASELINE = 44;
 
 const EXCLUDED = new Set([
   'apps/mobile/src/hooks/use-api-query.ts',
