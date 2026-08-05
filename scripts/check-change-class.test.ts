@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
 const BASH =
@@ -528,6 +528,37 @@ describe('check-change-class.sh', () => {
     expect(output).toContain('pnpm test:integration');
     expect(runRouter(repo).integration).toBe('true');
   });
+
+  // WI-3061: the scripts-typecheck class is the broadest-matching entry in the
+  // router, so a regex typo or a scoping change here would silently stop routing
+  // with nothing failing. These pin the class name and its command for a
+  // representative path in each arm it claims.
+  it.each([
+    join('scripts', 'some-check.ts'),
+    join('apps', 'api', 'src', 'thing.ts'),
+    join('apps', 'api', 'eval-llm', 'thing.ts'),
+    join('packages', 'example', 'src', 'thing.ts'),
+  ])('routes %s through the scripts typecheck gate', (relative) => {
+    mkdirSync(join(repo, dirname(relative)), { recursive: true });
+    writeFileSync(join(repo, relative), 'export const a = 1;\n');
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('scripts-typecheck');
+    expect(output).toContain('pnpm typecheck:scripts');
+  });
+
+  it.each(['package.json', 'pnpm-lock.yaml', 'tsconfig.base.json'])(
+    'routes shared compiler input %s through the scripts typecheck gate',
+    (path) => {
+      writeFileSync(join(repo, path), '{}\n');
+      git(repo, ['add', '.']);
+
+      const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+      expect(output).toContain('scripts-typecheck');
+      expect(output).toContain('pnpm typecheck:scripts');
+    },
+  );
 
   it.each(['pnpm-lock.yaml', 'tsconfig.base.json'])(
     'routes shared compiler input %s through the integration checker',
@@ -1052,6 +1083,5 @@ describe('removeTempRepo (test-harness teardown)', () => {
       // change removes everywhere else — including in the guard that proves it.
       removeTempRepo(sandbox);
     }
-  }, // which overruns Jest's 5s default. // Exercises the full retry budget (20 attempts x 250ms) before giving up,
-  20_000);
+  }, 20_000); // which overruns Jest's 5s default. // Exercises the full retry budget (20 attempts x 250ms) before giving up,
 });
