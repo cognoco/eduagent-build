@@ -27,7 +27,7 @@ Identity of the External DPO is recorded in [`DPO exchanges/2026-07-31-formal-de
 | Channel | Published to users? | Reaches | First action | Source |
 |---|---|---|---|---|
 | **In-app — *Delete account*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. The durable record is the `deletion_audit` row; the schedule stamp it starts from is **transient** — §4.2 states exactly what each one does and does not carry. A register row is opened only if the person **makes a controller-directed request** through any valid channel in this table (which they may of course do after self-service fails or is unavailable to them — §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`POST /account/delete`); privacy policy [§9](privacy-policy.html) |
-| **In-app — *Export my data*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. **It is recorded nowhere: `GET /account/export` performs no write and no log** (`export-v2.ts` is read-only). That is an open accountability gap, not a settled position — §4.2. A register row is opened only if the person **makes a controller-directed request** through any valid channel in this table (including after self-service fails or is unavailable — §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`GET /account/export`); privacy policy [§9](privacy-policy.html) |
+| **In-app — *Export my data*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. **No durable record is created: `GET /account/export` performs no write, and `export-v2.ts` is read-only end to end.** The only trace is the generic request log (§4.2), which is an operational log rather than accountability evidence. That is an open gap, not a settled position — §4.2. A register row is opened only if the person **makes a controller-directed request** through any valid channel in this table (including after self-service fails or is unavailable — §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`GET /account/export`); privacy policy [§9](privacy-policy.html) |
 | **`support@mentomate.com`** | Yes | Controller | Recognise it as a rights request, open a register row the same working day, start the Art 12(3) clock at the date of receipt. | Privacy policy [§9 and §11](privacy-policy.html) |
 | **Postal address** (ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo) | Yes | Controller | As for `support@`. Clock starts on receipt of the letter. | Privacy policy [§11](privacy-policy.html) |
 | **`dpo@zwizzly.com`** | **No — not a published rights channel. See §5.** | External DPO, as a confidential forward | **Relay to the controller** under §3. Clock started at the data subject's send/receipt date, not at relay. | [`evidence/2026-07-31-dpo-mailbox-setup-memo.md`](evidence/2026-07-31-dpo-mailbox-setup-memo.md); register P1 |
@@ -99,27 +99,42 @@ the controller** that someone must recognise, answer and date. The distinction i
 | Self-service action | Identified record | Verified at |
 |---|---|---|
 | *Delete account* — **during the grace period** | `organization.deletion_scheduled_at`, set by `scheduleDeletionV2`. **TRANSIENT BY DESIGN** — it is a column on the organization row, and `executeDeletionV2` deletes that row when the erasure runs. It does not survive the thing it records. | `apps/api/src/routes/account.ts` (`POST /account/delete`); `deletion-v2.ts` (`tryScheduleDeletionV2`; `delete(organization)` in the execute path) |
-| *Delete account* — **after erasure** | The `deletion_audit` row, written before the organization row is dropped and explicitly built to outlive the person. It carries `person_id`, `deleted_by`, `reason`, `retained_at`, `retention_period`. **It does NOT carry the exercise date or the grace-period end** — so it proves *that* an erasure happened, by whom and when it was executed, but not when the subject exercised the right. | `packages/database/src/schema/identity.ts` (`deletion_audit`); `deletion-v2.ts` (`executeDeletionV2`) |
-| *Export my data* | **NONE.** The route generates and returns the export and performs **no write and no log**; the export service is read-only end to end. | `apps/api/src/routes/account.ts` (`GET /account/export`); `apps/api/src/services/identity-v2/export-v2.ts` |
+| *Delete account* — **after erasure** | The `deletion_audit` row, written before the organization row is dropped and explicitly built to outlive the person. On **this** path it carries `person_id`, `reason` = `user_initiated`, `retained_at` and `retention_period`. **`deleted_by` is NULL on this path** — both the initial and the retry call pass `deletedBy: null`, and they are the only production callers — and the row carries **neither the exercise date nor the grace-period end**. So it proves *that* an erasure happened, that it was **subject-initiated rather than system-initiated**, and *when it executed*: **not which person initiated it**, and not when the right was exercised. | `packages/database/src/schema/identity.ts` (`deletion_audit`); `apps/api/src/inngest/functions/account-deletion.ts` (both `executeDeletionV2` calls) |
+| *Export my data* | **No durable record.** The route generates and returns the export and performs **no write**; the export service is read-only end to end. The **only** trace is the generic structured request log applied to every route (`api.use('*', requestLogger)`), which emits method, path, status, latency and the caller's `profileId`. That is an **operational log, not accountability evidence**: it is not purpose-built, not queryable as a register, and its retention is the log sink's rather than a compliance retention period. | `apps/api/src/routes/account.ts` (`GET /account/export`); `apps/api/src/services/identity-v2/export-v2.ts`; `apps/api/src/middleware/request-logger.ts`; `apps/api/src/index.ts` |
 
 **So the position is PARTIAL for deletion and ABSENT for export, and this document does not paper over
 either.** Under Art 5(2) the controller must be able to demonstrate compliance:
 
-- **Deletion:** demonstrable *that it happened*, by whom, and when it executed — from `deletion_audit`.
-  **Not** demonstrable *when the subject exercised the right*, because the only artifact carrying that
-  date is deleted by the erasure it triggered. An earlier draft of this subsection named the schedule
-  stamp as the durable record; independent review established that it is not, and that correction is
-  the reason this table now has two deletion rows instead of one.
-- **Export:** not demonstrable at all — no artifact shows that an access right was exercised, by whom,
-  or when.
+- **Deletion:** demonstrable *that it happened*, that it was **subject-initiated rather than
+  system-initiated** (`reason` = `user_initiated`), and *when it executed* — from `deletion_audit`.
+  **Not** demonstrable *which person initiated it*, because this path writes `deleted_by` as NULL, and
+  **not** demonstrable *when the subject exercised the right*, because the only artifact carrying that
+  date is deleted by the erasure it triggered.
+
+  > **This row has now been narrowed twice by independent review, and the pattern is the point.** The
+  > first draft named the schedule stamp as the durable record — it is a column on a row the erasure
+  > deletes. The second named `deletion_audit` as proving the erasure "by whom" — the column exists in
+  > the schema but this path never populates it. Both times the check performed was *does the field
+  > exist*, and the claim made was *the field is evidence*. **A column's presence in a schema says
+  > nothing about whether any writer fills it**, and neither does a passing test that asserts the call
+  > shape. Read the call site, not the table definition.
+- **Export:** not demonstrable from any purpose-built artifact. The generic request log does record
+  that the route was called, by which `profileId`, and when — but an operational log kept on the log
+  sink's retention, not designed as evidence and not queryable as a register, is not an Art 5(2)
+  demonstration. Treating it as one would be the same substitution this subsection has already made
+  twice: taking the cheap check for the expensive one.
 
 **Open — do not read this subsection as closing either gap.**
-`[1. Self-service export leaves no accountability record. 2. Self-service deletion leaves no durable
-record of the EXERCISE date (deletion_audit carries execution, not exercise). TODO for both: either the
-product records the exercise (the smaller change: one dated audit row on GET /account/export, and the
-schedule/grace dates carried into deletion_audit), or the controller registers self-service exercises,
-which needs a mechanism that does not exist today. This is a product/legal call, not a documentation
-one, and it is NOT resolved by this document. Owner: controller, with the External DPO.]`
+`[1. Self-service export leaves no accountability record at all. 2. Self-service deletion leaves no
+durable record of the EXERCISE date — deletion_audit carries execution, not exercise. 3. Self-service
+deletion leaves no durable record of the INITIATING ACTOR — deletion_audit.deleted_by is NULL on this
+path; the surviving reason field distinguishes subject-initiated from system-initiated, and that is
+all. TODO for all three: either the product records them (the smaller change: one dated audit row on
+GET /account/export identifying the subject who exercised the right, and the exercise date - i.e. the
+schedule timestamp - plus the grace-period end and the initiating person carried into deletion_audit),
+or the controller registers self-service exercises, which needs a mechanism that does
+not exist today. This is a product/legal call, not a documentation one, and it is NOT resolved by this
+document. Owner: controller, with the External DPO.]`
 
 Requiring a register row here without that mechanism would state a control the system does not have —
 which is the failure this document exists to avoid, not one to commit in the act of closing it.
@@ -231,7 +246,8 @@ Action 11 therefore remains **partial-exists**. This document must not be read a
 | `dpo@` forwarding-only; not published; not registered | [Action register P1](DPO%20exchanges/2026-07-26-action-register-tracker.md); mailbox memo §1; [`DPO exchanges/2026-07-31-services-agreement-clean.md`](DPO%20exchanges/2026-07-31-services-agreement-clean.md) | 2026-08-05 |
 | Published rights channels = in-app settings + `support@mentomate.com` + postal | [`privacy-policy.html`](privacy-policy.html) §9, §11 | 2026-08-05 |
 | Export/delete are owner-gated; non-owner learners have no in-app route | `apps/mobile/src/app/(app)/more/privacy.tsx` (`showOwnerPrivacyGates` guards both rows) | 2026-08-05 |
-| Self-service *delete*: the schedule stamp is a column on the organization row that the erasure deletes; `deletion_audit` survives but carries no exercise date or grace-period end. Self-service *export*: no record at all — route and service perform no write and no log | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/deletion-v2.ts`; `apps/api/src/services/identity-v2/export-v2.ts`; `packages/database/src/schema/identity.ts` | 2026-08-05 |
+| Self-service *delete*: the schedule stamp is a column on the organization row that the erasure deletes; `deletion_audit` survives but carries no exercise date, no grace-period end, and **`deleted_by` NULL** — both production callers pass `deletedBy: null` | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/deletion-v2.ts`; `apps/api/src/inngest/functions/account-deletion.ts` (both `executeDeletionV2` calls); `packages/database/src/schema/identity.ts` | 2026-08-05 |
+| Self-service *export*: no durable record — route and service perform no write; the only trace is the generic request log (method, path, status, latency, `profileId`), which is operational rather than accountability evidence | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/export-v2.ts`; `apps/api/src/middleware/request-logger.ts` | 2026-08-05 |
 | Appointment effective date = `dpo@` activation + external test + signatures → notify Datatilsynet | [Action register P3](DPO%20exchanges/2026-07-26-action-register-tracker.md); DPO reply 2026-07-31 | 2026-08-05 |
 | OPQ-102 Closed (2026-07-24); OPQ-167 Open; OPQ-106 Open; OPQ-24 Delegated | Cosmo Operator Queue, direct read | 2026-08-05 |
 | Action 11 scope and recorded gap | [Action register, action 11](DPO%20exchanges/2026-07-26-action-register-tracker.md) | 2026-08-05 |
