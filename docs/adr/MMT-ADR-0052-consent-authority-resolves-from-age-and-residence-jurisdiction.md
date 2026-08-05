@@ -58,3 +58,7 @@ A related conflation is broader. Whether a learner has their own login, whether 
 - `docs/canon/identity/ontology.md` — the canonical model of consent-requirement resolution, residence as a time-versioned attribute, and the jurisdiction-relativity invariants; named as the authority for those shapes rather than restated.
 - `docs/adr/MMT-ADR-0014-router-runtime-vetting-split.md` and `docs/registers/llm-models/master.md` — the owners of model-provider eligibility referred to in Consequences.
 - `docs/adr/MMT-ADR-0008-guardianship-global-edge-derived-operation.md` — Guardianship as a derived edge, one of the six facts clause 9 keeps distinct from consent authority.
+
+## Provenance
+
+- Architecture sign-off (human-typed, operator Jorn): <https://github.com/cognoco/eduagent-build/pull/2990#issuecomment-5190081859> — ratification comment on the acceptance pull request, 2026-08-05.
