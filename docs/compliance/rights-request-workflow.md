@@ -27,7 +27,7 @@ Identity of the External DPO is recorded in [`DPO exchanges/2026-07-31-formal-de
 | Channel | Published to users? | Reaches | First action | Source |
 |---|---|---|---|---|
 | **In-app — *Delete account*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. The durable record is the `deletion_audit` row; the schedule stamp it starts from is **transient** — §4.2 states exactly what each one does and does not carry. A register row is opened only if the person **makes a controller-directed request** through any valid channel in this table (which they may of course do after self-service fails or is unavailable to them — §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`POST /account/delete`); privacy policy [§9](privacy-policy.html) |
-| **In-app — *Export my data*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. **No durable record is created: `GET /account/export` performs no write, and `export-v2.ts` is read-only end to end.** The only trace is the generic request log (§4.2), which is an operational log rather than accountability evidence. That is an open gap, not a settled position — §4.2. A register row is opened only if the person **makes a controller-directed request** through any valid channel in this table (including after self-service fails or is unavailable — §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`GET /account/export`); privacy policy [§9](privacy-policy.html) |
+| **In-app — *Export my data*** | Yes | The product directly (self-service) | Direct exercise, **not** a request to the controller — see §4.2. **No durable record is created: `GET /account/export` performs no write, and `export-v2.ts` is read-only end to end.** **At the application layer** the only trace is the generic request log (§4.2), which is an operational log rather than accountability evidence; platform-level logging was not examined and is not claimed either way. That is an open gap, not a settled position — §4.2. A register row is opened only if the person **makes a controller-directed request** through any valid channel in this table (including after self-service fails or is unavailable — §2.1). | `apps/mobile/src/app/(app)/more/privacy.tsx`; `apps/api/src/routes/account.ts` (`GET /account/export`); privacy policy [§9](privacy-policy.html) |
 | **`support@mentomate.com`** | Yes | Controller | Recognise it as a rights request, open a register row the same working day, start the Art 12(3) clock at the date of receipt. | Privacy policy [§9 and §11](privacy-policy.html) |
 | **Postal address** (ZWIZZLY AS, Fiskekroken 3B, 0139 Oslo) | Yes | Controller | As for `support@`. Clock starts on receipt of the letter. | Privacy policy [§11](privacy-policy.html) |
 | **`dpo@zwizzly.com`** | **No — not a published rights channel. See §5.** | External DPO, as a confidential forward | **Relay to the controller** under §3. Clock started at the data subject's send/receipt date, not at relay. | [`evidence/2026-07-31-dpo-mailbox-setup-memo.md`](evidence/2026-07-31-dpo-mailbox-setup-memo.md); register P1 |
@@ -117,20 +117,29 @@ either.** Under Art 5(2) the controller must be able to demonstrate compliance:
   > the schema but this path never populates it. Both times the check performed was *does the field
   > exist*, and the claim made was *the field is evidence*. The third narrowing was the same again one
   > level out: the request logger contains code that writes a profile identifier, and production auth
-  > never puts one on the object it reads. **A field's presence in a schema — or a write in a
-  > consumer — says nothing about whether any producer populates it**, and a passing test can *confirm*
-  > the absence rather than contradict it (`request-logger.test.ts` asserts the omission). Trace the
-  > value from its producer to its consumer; do not read the consumer and infer the producer.
-- **Export:** not demonstrable at all. The generic request log records that the route was called and
+  > never puts one on the object it reads. The fourth and fifth were the same again, further out still:
+  > absolutes — *the only trace*, *not demonstrable at all*, *no record at all* — asserted over a scope
+  > wider than the one inspected, and then a claim to have narrowed *all* of them when three occurrences
+  > had been missed because the search pattern was built from the strings already written rather than
+  > from the **class** of claim.
+  >
+  > **A field's presence in a schema — or a write in a consumer — says nothing about whether any
+  > producer populates it**, and a passing test can *confirm* the absence rather than contradict it
+  > (`request-logger.test.ts` asserts the omission). Trace the value from its producer to its consumer;
+  > do not read the consumer and infer the producer. And when narrowing an absolute, search for the
+  > **kind** of statement, not for the sentence you remember writing.
+- **Export:** not demonstrable from anything this audit inspected. The generic request log records that the route was called and
   when, and **carries no data subject** — production auth never puts a profile identifier on the object
   the logger reads. So it cannot even distinguish which person exercised the right, which is the one
-  fact an access-accountability record has to carry. An earlier draft of this line claimed the log
+  fact an access-accountability record has to carry. **Scope:** this covers the application layer only —
+  whatever the hosting platform records independently was not examined, so "no evidence found" here is
+  not the same as "no evidence exists". An earlier draft of this line claimed the log
   records the caller's profile; independent review established it does not, and that correction is the
   third time this subsection has had to be narrowed. See the callout above — the failure each time was
   reading the consumer of a value instead of tracing it from its producer.
 
 **Open — do not read this subsection as closing either gap.**
-`[1. Self-service export leaves no accountability record at all. 2. Self-service deletion leaves no
+`[1. Self-service export leaves no accountability record at the application layer (the platform layer was not examined). 2. Self-service deletion leaves no
 durable record of the EXERCISE date — deletion_audit carries execution, not exercise. 3. Self-service
 deletion leaves no durable record of the INITIATING ACTOR — deletion_audit.deleted_by is NULL on this
 path; the surviving reason field distinguishes subject-initiated from system-initiated, and that is
