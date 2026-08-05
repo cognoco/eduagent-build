@@ -63,7 +63,8 @@ consent event log (inv 12/27)"* (`:15`, `:475-476`) — a description §2.4 show
 | `granted_at` | timestamptz NOT NULL, default now | `:497-499` |
 | `withdrawn_at` | timestamptz NULL | `:500` |
 | `prior_value` | boolean NULL | `:502` — the consent value before this record; supports direction-aware protection-lowering gating |
-| `audit_fact` | jsonb NULL | `:504` — **where the policy version actually lives**; see §2.5 |
+| `audit_fact` | jsonb NULL | `:504` — provenance (`source`, `guardianPersonId`) plus the adult paths' versioned terms-**acceptance** fact `{ termsAcceptedAt, termsVersion }`. It was also where the policy version lived until WI-2929 promoted it to the column below; the pre-column copies are retained and still read as a fallback. See §2.5 |
+| `policy_version` | text NULL | **WI-2929** (`apps/api/drizzle/0168_wi2929_consent_evidence_durability.sql`) — the consent-policy version in force at grant time, promoted out of `audit_fact` so no withdrawal path can destroy it. Nullable: grants written before the migration carry their version (if any) in `audit_fact`. Mirrored on `consent_receipt`. See §2.5 |
 | `assurance_token` | text NULL | `:506` — verifiable-parental-consent pass/fail token, dropped at re-home time |
 | `assurance_method` | text NULL | `:507` |
 | `snapshot_age_at_grant` | smallint NULL | `:508` — the learner's age **as known at grant time** |
@@ -161,10 +162,12 @@ the **structural** option in §2.5 instead of the merge, so no future writer can
 
 **RESOLVED — WI-2929 implemented the recommendation below.** `consent_grant.policy_version` and
 `consent_receipt.policy_version` are now first-class columns
-(`apps/api/drizzle/0168_wi2929_consent_evidence_durability.sql`), written by every grant writer
-(`createDirectConsentGrant`, `recordAdultSelfConsentV2`, `acceptAdultSelfConsentV2`,
-`repairOrSignalAdultSelfConsentV2`, `processConsentResponseV2`, and carried forward by
-`appendRestoreGrant`), read by `getConsentAccountabilityV2`, and written by **no** withdrawal path. The
+(`apps/api/drizzle/0168_wi2929_consent_evidence_durability.sql`), written by every grant writer — all
+eight: `createDirectConsentGrant`, `recordAdultSelfConsentV2`, `acceptAdultSelfConsentV2`,
+`repairOrSignalAdultSelfConsentV2`, `processConsentResponseV2`,
+`attachGuardianConsentForCredentialedLearner` (`guardian-attachment.ts`),
+`writeDestinationSelfConsentSet` (`family-join-journey.ts`), and carried forward by
+`appendRestoreGrant` — read by `getConsentAccountabilityV2`, and written by **no** withdrawal path. The
 `audit_fact` copies are retained — `{ termsAcceptedAt, termsVersion }` is the adult's versioned terms
 *acceptance*, a distinct fact per MMT-ADR-0011 — and the accountability read falls back to the JSONB for
 rows written before the column existed. The as-was description, retained as the record:
@@ -398,8 +401,11 @@ Move P3 consent into Mechanism A: add `personalization_memory` to `CONSENT_PURPO
 `memory_consent_status` as the fast-path enforcement cache it already effectively is, and derive it from the
 consent log rather than letting it be the source of truth. That single change closes P3-G1, P3-G2, and
 P3-G3 together, because the consent log already has versioning, at-grant age and jurisdiction snapshots,
-guardian-versus-self encoding via `lawful_basis`, purpose-granular withdrawal, and receipt survival. Fix
-P3-G4 first so the new purpose does not inherit a defect.
+guardian-versus-self encoding via `lawful_basis`, purpose-granular withdrawal, and receipt survival.
+~~Fix P3-G4 first so the new purpose does not inherit a defect.~~ **That prerequisite is satisfied** —
+P3-G4 was closed by WI-2929 (§2.5), so a `personalization_memory` purpose entering Mechanism A inherits
+the structural guarantee rather than the defect. The sequencing reason is recorded here because it is why
+the order mattered, not because anything remains to do first.
 
 ---
 

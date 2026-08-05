@@ -1040,8 +1040,18 @@ export async function getConsentAccountabilityV2(
       // fallback is best-effort by nature: if the guardian already revoked,
       // stampWithdrawal overwrote audit_fact and the version is simply gone.
       // That historical loss is not recoverable; the column stops it recurring.
+      //
+      // Both sources go through the SAME presence test, so a blank promoted
+      // column falls through to a real legacy value instead of suppressing it.
+      // Deliberately does NOT also fall back to the adult paths' `termsVersion`:
+      // that key is one half of the versioned terms-ACCEPTANCE fact, which
+      // `parseVersionedTermsFact` refuses to report unless BOTH halves are
+      // present (WI-2413), and reaching it here would route around that refusal
+      // under a different field name. Legacy adult grants lose nothing — their
+      // version is already reported as `termsVersion` on the same record.
       policyVersion:
-        r.policy_version ?? legacyPolicyVersionFromAuditFact(audit),
+        nonBlankPolicyVersion(r.policy_version) ??
+        nonBlankPolicyVersion(audit?.['policyVersion']),
       withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
     };
   });
@@ -1058,27 +1068,28 @@ interface AccountabilityRow {
 }
 
 /**
- * [WI-2929] The pre-column placement of the grant-time version on the PARENTAL
- * approval path — `audit_fact.policyVersion` — which is exactly the value
- * finding C-2 was about and exactly the legacy population that needs the
- * fallback.
+ * [WI-2929] The ONE presence test for a grant-time policy version, applied to
+ * BOTH sources the accountability read consults — the promoted
+ * `consent_grant.policy_version` column and the pre-column
+ * `audit_fact.policyVersion` placement (the PARENTAL approval path, exactly
+ * the value finding C-2 was about and exactly the legacy population that needs
+ * the fallback).
  *
- * Deliberately does NOT also fall back to the adult paths' `termsVersion`.
- * That key is one half of the versioned terms-ACCEPTANCE fact, which
- * `parseVersionedTermsFact` refuses to report unless BOTH halves are present
- * (WI-2413); surfacing it here would route around that refusal through a
- * different field name. Legacy adult grants lose nothing — their version is
- * already reported as `termsVersion` on the same record — and every grant
- * written after the migration carries the column regardless of basis.
+ * Shared deliberately so the two cannot drift. When they had separate tests,
+ * `??` treated a blank promoted column as PRESENT and suppressed a real legacy
+ * value, returning blank evidence — the failure mode this whole work item
+ * exists to prevent, since a reader cannot tell "no version recorded" from
+ * "version recorded but not surfaced".
  *
- * Only a non-empty string counts: an absent or blank version must report as
- * absent, never as an empty string that reads like evidence.
+ * Blank means blank: absent, empty, or whitespace-only reports as absent,
+ * never as a string that reads like evidence. The trimmed value is what gets
+ * reported, matching the write side, which already trims
+ * `CONSENT_POLICY_VERSION` before stamping it (`routes/consent.ts`).
  */
-function legacyPolicyVersionFromAuditFact(
-  audit: Record<string, unknown> | null,
-): string | null {
-  const value = audit?.['policyVersion'];
-  return typeof value === 'string' && value.length > 0 ? value : null;
+function nonBlankPolicyVersion(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 /**

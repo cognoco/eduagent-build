@@ -1667,6 +1667,87 @@ describe('consent routes', () => {
         });
       },
     );
+
+    // [WI-2929] Both policy-version sources share ONE presence test, so a BLANK
+    // promoted column must not count as present and suppress a real legacy
+    // value — returning blank evidence is the failure this work item exists to
+    // prevent, because a reader cannot tell "no version recorded" from "version
+    // recorded but not surfaced". Blank means absent, empty, or whitespace-only,
+    // on either source.
+    it.each([
+      [
+        'an empty promoted column falls through to the legacy value',
+        '',
+        'policy-legacy',
+      ],
+      [
+        'a whitespace-only promoted column falls through to the legacy value',
+        '   ',
+        'policy-legacy',
+      ],
+      [
+        'a promoted column still wins when it is non-blank',
+        'policy-column',
+        'policy-column',
+      ],
+      [
+        'a padded promoted column is reported trimmed',
+        '  policy-column  ',
+        'policy-column',
+      ],
+    ])('%s', async (_case, promoted, expected) => {
+      execute.mockResolvedValueOnce([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'gdpr_parental_consent',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: { policyVersion: 'policy-legacy' },
+          policy_version: promoted,
+        },
+      ]);
+
+      const res = await app.request(
+        '/v1/consent/self/accountability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        records: [{ policyVersion: expected }],
+      });
+    });
+
+    it.each([
+      ['an empty legacy value', ''],
+      ['a whitespace-only legacy value', '   '],
+      ['a non-string legacy value', 42],
+    ])('reports null for %s with no promoted column', async (_case, legacy) => {
+      execute.mockResolvedValueOnce([
+        {
+          purpose: 'platform_use',
+          lawful_basis: 'gdpr_parental_consent',
+          granted: true,
+          granted_at: '2026-07-24T06:00:00.000Z',
+          withdrawn_at: null,
+          audit_fact: { policyVersion: legacy },
+          policy_version: null,
+        },
+      ]);
+
+      const res = await app.request(
+        '/v1/consent/self/accountability',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        records: [{ policyVersion: null }],
+      });
+    });
   });
 });
 
