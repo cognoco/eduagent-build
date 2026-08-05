@@ -100,7 +100,7 @@ the controller** that someone must recognise, answer and date. The distinction i
 |---|---|---|
 | *Delete account* — **during the grace period** | `organization.deletion_scheduled_at`, set by `scheduleDeletionV2`. **TRANSIENT BY DESIGN** — it is a column on the organization row, and `executeDeletionV2` deletes that row when the erasure runs. It does not survive the thing it records. | `apps/api/src/routes/account.ts` (`POST /account/delete`); `deletion-v2.ts` (`tryScheduleDeletionV2`; `delete(organization)` in the execute path) |
 | *Delete account* — **after erasure** | The `deletion_audit` row, written before the organization row is dropped and explicitly built to outlive the person. On **this** path it carries `person_id`, `reason` = `user_initiated`, `retained_at` and `retention_period`. **`deleted_by` is NULL on this path** — both the initial and the retry call pass `deletedBy: null`, and they are the only production callers — and the row carries **neither the exercise date nor the grace-period end**. So it proves *that* an erasure happened, that it was **subject-initiated rather than system-initiated**, and *when it executed*: **not which person initiated it**, and not when the right was exercised. | `packages/database/src/schema/identity.ts` (`deletion_audit`); `apps/api/src/inngest/functions/account-deletion.ts` (both `executeDeletionV2` calls) |
-| *Export my data* | **No durable record.** The route generates and returns the export and performs **no write**; the export service is read-only end to end. The **only** trace is the generic structured request log applied to every route (`api.use('*', requestLogger)`), which emits method, path, status, latency and the caller's `profileId`. That is an **operational log, not accountability evidence**: it is not purpose-built, not queryable as a register, and its retention is the log sink's rather than a compliance retention period. | `apps/api/src/routes/account.ts` (`GET /account/export`); `apps/api/src/services/identity-v2/export-v2.ts`; `apps/api/src/middleware/request-logger.ts`; `apps/api/src/index.ts` |
+| *Export my data* | **No durable record.** The route generates and returns the export and performs **no write**; the export service is read-only end to end. **At the application layer**, the only trace is the generic structured request log applied to every route (`api.use('*', requestLogger)`), and it emits **method, path, status and latency — and no subject identifier at all**. This audit covers the application layer only: whatever the hosting platform may record independently was **not** examined and is not claimed either way. The logger reads `user.profileId`, but production auth sets `user` with `userId`, `email`, `emailVerified` and an optional factor age and **never a `profileId`**; the profile scope is stored on a separate context key and nothing copies it onto `user`, so that field is always absent in production (`request-logger.test.ts` asserts the omission for exactly this shape). The trace therefore shows *that an export succeeded and when* — **not whose**. It is an **operational log, not accountability evidence**: not purpose-built, not queryable as a register, and carrying no data subject. Its retention was **not** established here — no compliance retention period is defined for it, and none should be assumed in either direction. | `apps/api/src/routes/account.ts` (`GET /account/export`); `apps/api/src/services/identity-v2/export-v2.ts`; `apps/api/src/middleware/request-logger.ts`; `apps/api/src/index.ts` |
 
 **So the position is PARTIAL for deletion and ABSENT for export, and this document does not paper over
 either.** Under Art 5(2) the controller must be able to demonstrate compliance:
@@ -115,14 +115,19 @@ either.** Under Art 5(2) the controller must be able to demonstrate compliance:
   > first draft named the schedule stamp as the durable record — it is a column on a row the erasure
   > deletes. The second named `deletion_audit` as proving the erasure "by whom" — the column exists in
   > the schema but this path never populates it. Both times the check performed was *does the field
-  > exist*, and the claim made was *the field is evidence*. **A column's presence in a schema says
-  > nothing about whether any writer fills it**, and neither does a passing test that asserts the call
-  > shape. Read the call site, not the table definition.
-- **Export:** not demonstrable from any purpose-built artifact. The generic request log does record
-  that the route was called, by which `profileId`, and when — but an operational log kept on the log
-  sink's retention, not designed as evidence and not queryable as a register, is not an Art 5(2)
-  demonstration. Treating it as one would be the same substitution this subsection has already made
-  twice: taking the cheap check for the expensive one.
+  > exist*, and the claim made was *the field is evidence*. The third narrowing was the same again one
+  > level out: the request logger contains code that writes a profile identifier, and production auth
+  > never puts one on the object it reads. **A field's presence in a schema — or a write in a
+  > consumer — says nothing about whether any producer populates it**, and a passing test can *confirm*
+  > the absence rather than contradict it (`request-logger.test.ts` asserts the omission). Trace the
+  > value from its producer to its consumer; do not read the consumer and infer the producer.
+- **Export:** not demonstrable at all. The generic request log records that the route was called and
+  when, and **carries no data subject** — production auth never puts a profile identifier on the object
+  the logger reads. So it cannot even distinguish which person exercised the right, which is the one
+  fact an access-accountability record has to carry. An earlier draft of this line claimed the log
+  records the caller's profile; independent review established it does not, and that correction is the
+  third time this subsection has had to be narrowed. See the callout above — the failure each time was
+  reading the consumer of a value instead of tracing it from its producer.
 
 **Open — do not read this subsection as closing either gap.**
 `[1. Self-service export leaves no accountability record at all. 2. Self-service deletion leaves no
@@ -247,7 +252,7 @@ Action 11 therefore remains **partial-exists**. This document must not be read a
 | Published rights channels = in-app settings + `support@mentomate.com` + postal | [`privacy-policy.html`](privacy-policy.html) §9, §11 | 2026-08-05 |
 | Export/delete are owner-gated; non-owner learners have no in-app route | `apps/mobile/src/app/(app)/more/privacy.tsx` (`showOwnerPrivacyGates` guards both rows) | 2026-08-05 |
 | Self-service *delete*: the schedule stamp is a column on the organization row that the erasure deletes; `deletion_audit` survives but carries no exercise date, no grace-period end, and **`deleted_by` NULL** — both production callers pass `deletedBy: null` | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/deletion-v2.ts`; `apps/api/src/inngest/functions/account-deletion.ts` (both `executeDeletionV2` calls); `packages/database/src/schema/identity.ts` | 2026-08-05 |
-| Self-service *export*: no durable record — route and service perform no write; the only trace is the generic request log (method, path, status, latency, `profileId`), which is operational rather than accountability evidence | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/export-v2.ts`; `apps/api/src/middleware/request-logger.ts` | 2026-08-05 |
+| Self-service *export*: no durable application-layer record — route and service perform no write; the only application-layer trace is `requestLogger`, carrying method, path, status and latency and **no subject identifier** (production auth never sets `profileId` on the `user` object it reads). Platform-level logging and log retention were not examined and are not claimed | `apps/api/src/routes/account.ts`; `apps/api/src/services/identity-v2/export-v2.ts`; `apps/api/src/middleware/request-logger.ts`; `apps/api/src/middleware/auth.ts`; `apps/api/src/middleware/profile-scope.ts` | 2026-08-05 |
 | Appointment effective date = `dpo@` activation + external test + signatures → notify Datatilsynet | [Action register P3](DPO%20exchanges/2026-07-26-action-register-tracker.md); DPO reply 2026-07-31 | 2026-08-05 |
 | OPQ-102 Closed (2026-07-24); OPQ-167 Open; OPQ-106 Open; OPQ-24 Delegated | Cosmo Operator Queue, direct read | 2026-08-05 |
 | Action 11 scope and recorded gap | [Action register, action 11](DPO%20exchanges/2026-07-26-action-register-tracker.md) | 2026-08-05 |
