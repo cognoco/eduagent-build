@@ -33,7 +33,7 @@ code-verified is explicitly *not* established by this repository.
 | # | Claim (policy § / summary section) | Status | Evidence pointer or gate |
 |---|---|---|---|
 | 1 | Controller is ZWIZZLY AS, org.nr 811 696 072, Fiskekroken 3B, 0139 Oslo (§1, §11; summary intro) | external/legal | Consistent across [`breach-register.md`](breach-register.md), [`ropa.md`](ropa.md); corporate registration proof (Brønnøysund extract) is external — controller/DPO |
-| 2 | Minimum age 13; under-13 cannot register (§1, §4; summary intro) | code-verified **with a named implementation gap** | `packages/schemas/src/age.ts` (`PROFILE_MINIMUM_AGE = 13`). The exact-date floor check in `apps/api/src/services/identity-v2/child-profile-v2.ts` runs only when `birthMonth`/`birthDay` are supplied; `profileCreateSchema` (`packages/schemas/src/profiles.ts`) permits a year-only payload, which falls back to a calendar-year age check that can admit a not-yet-13 user via a direct API call. **Publication blocker — see §4** |
+| 2 | Minimum age 13; under-13 cannot register (§1, §4; summary intro) | code-verified | `packages/schemas/src/age.ts` (`PROFILE_MINIMUM_AGE = 13`). **Gap closed by WI-3019** (was: year-only payloads reached a calendar-year fallback that could admit a not-yet-13 user via a direct API call). `profileCreateSchema` (`packages/schemas/src/profiles.ts`) now requires `birthMonth`/`birthDay` whenever `birthYear` reaches the floor year (`currentYear - PROFILE_MINIMUM_AGE`) — the only year-only value ambiguous against the floor — and both creation writers (`apps/api/src/services/identity-v2/child-profile-v2.ts`, `identity-graph.ts`) enforce the same floor fail-closed via `isBelowMinimumAgeAtCreation` (`apps/api/src/services/consent.ts`), which assumes the birthday has not yet occurred when month/day are absent. Regression guard: `packages/schemas/src/profiles.test.ts` ("year-only payload at the age floor (WI-3019)"), `apps/api/src/services/consent.test.ts` (`isBelowMinimumAgeAtCreation`), `tests/integration/profile-fulldate-age-gate.integration.test.ts`. Residual `YYYY-01-01` sentinel behaviour is retained but cannot admit an under-13 — see §4 |
 | 3 | Availability limited to an allowlist: EEA threshold-13 countries + individually screened non-EEA; US provisionally screened, not finally admitted; UK/CH/higher-threshold EEA out at launch (§4; summary intro) | external/legal + config-dependent | Ruling: [`2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md`](2026-07-26-launch-perimeter-ruling-screen-based-allowlist.md); US screen: [`2026-07-26-us-launch-screen-record.md`](2026-07-26-us-launch-screen-record.md). Store-distribution config + residence gating are launch gates verified at the launch check, not here |
 | 4 | Account data: email, display name, date of birth, residence, language, pronouns (§2) | code-verified | `packages/database/src/schema/identity.ts` (`person.display_name`, `person.birth_date`, `person.residence_jurisdiction`; `login.email`); consent use of birth date in `apps/api/src/services/identity-v2/consent-v2.ts` |
 | 5 | Voice: device speech service converts to text; MentoMate receives/retains no audio (§2; summary "What we know") | code-verified (app side) | `apps/mobile/src/hooks/use-speech-recognition.ts` — native module invoked with config only; app receives transcript events, no audio upload path exists. Whether the OS speech service itself is purely on-device is platform-controlled and NOT claimed (wording softened 2026-08-01; see [`../screenshots_and_store_info/app-privacy-data-safety-worksheet.md`](../screenshots_and_store_info/app-privacy-data-safety-worksheet.md) Audio row) |
@@ -44,7 +44,7 @@ code-verified is explicitly *not* established by this repository.
 | 10 | Unambiguously adult owner's display name may be sent for personalisation (§5) | code-verified | Same two gates (`isUnambiguouslyAdult` path) |
 | 11 | Providers do not train general-purpose models on customer content (§5, §8; summary "learning memory") | contract-dependent | Stated as a launch *requirement*, not a fact, in both documents; evidence → OPQ-110 vendor DPAs (ledger 2026-07-25) |
 | 12 | Processor list: Clerk, AI/embedding providers, Neon, Cloudflare, Resend, Sentry, Inngest, Expo/APNs/FCM, Apple/Google/RevenueCat (§6) | code-verified (inventory); contract-dependent (terms) | Matches live-recipient inventory in [`assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md`](assessments/providers/2026-07-25-processor-transfer-evidence-ledger.md) (Inngest added to the notice 2026-08-01 — was a repo-owned omission); DPAs/terms → OPQ-110 |
-| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | code-verified (enforcement); contract-dependent (safeguards) | Honest future-tense claim, now **runtime-enforced**: the WI-3020 launch-stop refuses production LLM routing (503 `LLM_UNAVAILABLE`) while the transfer-evidence lever is unsatisfied — `apps/api/src/services/llm/transfer-evidence-gate.ts`, checked at both router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`), test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)) — which is precisely why the stop is armed. Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
+| 13 | International transfers: safeguards will be established and verified before learner data is routed internationally (§7; summary) | **PARTIAL — not established for this claim** (enforcement covers LLM routing only); contract-dependent (safeguards) | **This claim is NOT currently satisfied and must not be cited as if it were.** What IS verified: the WI-3020 launch-stop refuses production LLM routing (503 `LLM_UNAVAILABLE`) while the transfer-evidence lever is unsatisfied — `apps/api/src/services/llm/transfer-evidence-gate.ts`, checked at both router choke points (`routeAndCall`/`routeAndStream`, `apps/api/src/services/llm/router.ts`), test `apps/api/src/middleware/llm-transfer-evidence-gate.test.ts`. **What is NOT gated:** the embedding provider boundary. `generateEmbedding` (`apps/api/src/services/embeddings.ts`) issues a direct request to Voyage AI and never reads the lever; the normal session path passes the learner's message text to it (`apps/api/src/services/session/session-exchange.ts:2747`), and background embedding flows use the same boundary. So with transfer evidence pending, learner data can still leave for an international provider. Found by independent review of WI-3020 (rejected 2026-08-04, rework in progress); this row is annotated ahead of that fix so the manifest does not assert a safeguard that does not exist. Runtime still pins a global serving-region placeholder (`V2_SERVING_REGION_PLACEHOLDER`; region axis "not built" per [`../registers/llm-models/master.md`](../registers/llm-models/master.md)). Release lever: `INTERNATIONAL_TRANSFER_EVIDENCE_VERIFIED` (`apps/api/wrangler.toml` `[env.production.vars]`, currently `"false"`). SCCs/TIAs → OPQ-110 |
 | 14 | Age/residence data kept while account active; assertion-history retention period pending approval (§8) | code-verified (behaviour); external/legal (period) | Retention period → OPQ-24 counsel-approved retention schedule |
 | 15 | Chat transcripts deleted ~30 days after summary generation; delayed cases detected and alerted from day 37 (§8; summary "How long") | code-verified + config-dependent | `apps/api/src/inngest/functions/transcript-purge-cron.ts` (30-day cutoff; day-37 delayed detection + alert); flag `RETENTION_PURGE_ENABLED` (`apps/api/src/config.ts`, `apps/api/src/inngest/helpers.ts`); production run evidence [`2026-07-24-wi-1194-production-transcript-purge-evidence.md`](2026-07-24-wi-1194-production-transcript-purge-evidence.md) — re-verify at publication gate |
 | 16 | Learning memory persists while account active; may contain short learner quotations; not used for advertising (§8; summary) | code-verified | [`ropa.md`](ropa.md) learning-model record; quotation guard in `apps/api/src/services/challenge-round/note-draft.ts`; no ad SDK (worksheet Advertising row). Dormancy retention remains an open DPO item |
@@ -104,9 +104,19 @@ outside this repository's authority.
    under `docs/compliance/evidence/` (or the controller's records system) with
    a source date and integrity hash, per the evidence rules in
    [`README.md`](README.md).
-9. **International-routing launch-stop** *(implemented WI-3020; the control is
-   armed, and the underlying safeguards are still pending)*: the §7 commitment
-   is enforced by the runtime, not by prose. `apps/api/src/services/llm/
+9. **International-routing launch-stop** *(WI-3020 — **PARTIAL, do not treat
+   this item as satisfied**: LLM routing is gated, the embedding provider
+   boundary is NOT, and the underlying safeguards are still pending)*: the §7
+   commitment is **not yet** enforced by the runtime for all learner-data
+   egress. **Gap, ahead of the fix:** `generateEmbedding`
+   (`apps/api/src/services/embeddings.ts`) issues a direct request to Voyage AI
+   and never reads the lever; the normal session path passes the learner's
+   message text to it (`apps/api/src/services/session/session-exchange.ts:2747`),
+   and background embedding flows share that boundary — so learner data can
+   still leave for an international provider while evidence is pending. Found by
+   independent review of WI-3020 (rejected 2026-08-04); rework in progress, and
+   this entry is annotated now rather than after it so nothing cites a safeguard
+   that does not exist. **What is verified today:** `apps/api/src/services/llm/
    transfer-evidence-gate.ts` refuses production LLM routing at both router
    choke points (`routeAndCall` / `routeAndStream`,
    `apps/api/src/services/llm/router.ts`) unless the OPQ-110 transfer-evidence
@@ -141,28 +151,48 @@ outside this repository's authority.
 Found during the 2026-08-01 reconciliation; deliberately **not** fixed in this
 docs-only change because they live in application code or mobile app copy
 (7 locales + tests). They must be resolved before or in the release that
-accompanies publication:
+accompanies publication.
 
-- **PUBLICATION BLOCKER — under-13 registration gap (year-only DOB
-  fallback).** `profileCreateSchema`
-  (`packages/schemas/src/profiles.ts:81-82`) accepts a payload carrying
-  `birthYear` without `birthMonth`/`birthDay`; the create-child service
-  (`apps/api/src/services/identity-v2/child-profile-v2.ts:138-145`) then falls
-  back to the calendar-year check (`checkConsentRequired`,
-  `apps/api/src/services/consent.ts:201`), which over-estimates age by up to
-  ~11 months, and stores the `YYYY-01-01` sentinel birth date
-  (`child-profile-v2.ts:166`) — so a direct API call can register a
-  not-yet-13 user born late in the calendar year, and later exact-date reads
-  inherit the sentinel. The shipped mobile client always sends the full date
-  (`apps/mobile/src/app/create-profile.tsx:348-349`), so the exposure is the
-  API trust boundary, not the app UI flow — but the notice claim
-  "unavailable to users under 13" must not be published while the gap holds
-  (claim row #2). Route to the OPQ-106 checklist as a blocker. Bounded fix
-  (engineering Work Item for capture, not this docs item): require
-  `birthMonth`/`birthDay` server-side on profile create (schema + service),
-  or make the service reject year-only payloads at the age floor instead of
-  falling back to calendar-year math — then restore claim row #2 to
-  code-verified.
+The under-13 registration gap — the only item here that was a publication
+blocker — has since been **resolved in code by WI-3019**; its entry is retained
+below (struck through) as the audit trail for claim row #2. The remaining
+entries are copy divergences still awaiting the OPQ-106 pass:
+
+- **~~PUBLICATION BLOCKER~~ — under-13 registration gap (year-only DOB
+  fallback). RESOLVED by WI-3019; no longer blocks OPQ-106.** As found:
+  `profileCreateSchema` accepted a payload carrying `birthYear` without
+  `birthMonth`/`birthDay`; the create-child service then fell back to the
+  calendar-year check (`checkConsentRequired`), which over-estimates age by up
+  to ~11 months, so a direct API call could register a not-yet-13 user born
+  late in the calendar year. The shipped mobile client always sends the full
+  date (`apps/mobile/src/app/create-profile.tsx:347-349`), so the exposure was
+  the API trust boundary, not the app UI flow.
+
+  **Fix (WI-3019), both halves of the bounded option named at intake:**
+  `profileCreateSchema` (`packages/schemas/src/profiles.ts`) now rejects a
+  year-only payload once `birthYear` reaches `currentYear - PROFILE_MINIMUM_AGE`.
+  `birthYearSchema` already caps `birthYear` at that value, so it is the **only**
+  year-only input ambiguous against the floor; every older year clears 13 even
+  when the birthday is assumed not to have happened yet, which is why
+  legitimate year-only callers are unaffected. Both creation writers —
+  `child-profile-v2.ts` (add-child) and `identity-graph.ts` (owner bootstrap) —
+  additionally enforce the floor through `isBelowMinimumAgeAtCreation`
+  (`apps/api/src/services/consent.ts`), which computes the age conservatively
+  when month/day are absent. That check is deliberately scoped to the age
+  **floor**: consent-type selection and the `age >= 18` adult self-consent
+  grant keep their existing calendar-year semantics, so no stored `ageAtGrant`
+  audit value or grant record changes.
+
+  **Residual, deliberately not fixed here (not a blocker for claim row #2):**
+  a year-only payload still persists the `YYYY-01-01` sentinel birth date, and
+  later `computeAgeBracketFromDate` reads treat it as a 1 January birthday,
+  over-estimating age by up to ~11 months. This can no longer admit an
+  under-13: year-only creation is now only reachable for
+  `birthYear <= currentYear - 14`, whose true age is at least 13 on every day
+  of the year, so the "unavailable to users under 13" claim holds regardless of
+  the sentinel. The sentinel does remain an over-estimate at the **18+**
+  adult-owner and minor-PII gates, which is a separate concern from this claim
+  row and is left for its own Work Item rather than widened into this fix.
 - `legal.privacy.s7Body` (in-app, all locales) asserts present-tense transfer
   safeguards including the UK Addendum; the repository policy uses the honest
   future-tense formulation (safeguards established **before** transfer, no UK

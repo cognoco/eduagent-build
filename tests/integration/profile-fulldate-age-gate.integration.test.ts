@@ -128,6 +128,48 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
     expect(body.profile.birthDay).toBe(isYearOnlySentinel ? null : today.day);
   });
 
+  it('[WI-3019 break-test] year-only payload at the floor birth year is rejected', async () => {
+    // The exposed variant: a direct API payload carrying birthYear =
+    // currentYear - 13 and NO month/day. Calendar-year math read that as 13
+    // and registered a learner who may still be 12. profileCreateSchema now
+    // demands the full date for exactly that year, so zValidator rejects the
+    // payload before any writer runs.
+    await cleanupAccounts({
+      emails: [USER.email],
+      clerkUserIds: [USER.userId],
+    });
+
+    // Local calendar year, NOT todayUTC(): this case asserts the SCHEMA floor,
+    // and birthYearSchema plus the floor refine both derive their year from
+    // getFullYear. The sibling cases above stay on todayUTC() because they
+    // assert the SERVICE's exact-date math, which is deliberately UTC.
+    const floorBirthYear = new Date().getFullYear() - 13;
+
+    const res = await app.request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({ sub: USER.userId, email: USER.email }),
+        body: JSON.stringify({
+          displayName: 'WI3019 YearOnlyFloor',
+          birthYear: floorBirthYear,
+          // no birthMonth / birthDay — the year-only fallback under test.
+        }),
+      },
+      TEST_ENV,
+    );
+
+    // NOTE: this rejection comes from zValidator, NOT the validationError()
+    // helper the service-path cases above assert. `@hono/zod-validator` is
+    // mounted without an error hook, so it answers `c.json(safeParseResult, 400)`
+    // — a `{ success: false, error: { name: 'ZodError', message: <issues JSON> } }`
+    // body with no `code` / `details` fields. Assert on the serialized body
+    // rather than `body.code === 'VALIDATION_ERROR'`, which would never match.
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(JSON.stringify(body)).toContain('birthMonth');
+  });
+
   it('year-only path (no birthMonth/birthDay) still works for age >= 13', async () => {
     // Must clean up first since "exactly 13" test above may have created a profile for this user.
     await cleanupAccounts({

@@ -363,7 +363,12 @@ describe('Integration: POST /v1/consent/self/accept (WI-2547)', () => {
       env: TEST_ENV,
       user: MINOR_USER,
       displayName: 'Minor Owner',
-      birthYear: new Date().getUTCFullYear() - 13,
+      // WI-3019: this case needs a MINOR owner, so a clearly-adult year is not
+      // an option here. The floor year (currentYear - PROFILE_MINIMUM_AGE) now
+      // requires birthMonth/birthDay, so step one year clear of it: 15 is
+      // unambiguously both a minor and above the age floor, which keeps this a
+      // year-only payload and leaves the 403 attributable to minority alone.
+      birthYear: new Date().getUTCFullYear() - 15,
     });
     await clearArt6Grants(minorOwner.id);
 

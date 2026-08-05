@@ -91,21 +91,21 @@ function toBashPath(path: string): string {
     .replace(/\\/g, '/');
 }
 
+/**
+ * Best-effort teardown of a mkdtemp fixture. Retries transient removal
+ * failures (Windows EBUSY file locks, the CI ENOTEMPTY race while clearing
+ * .git/objects), then gives up silently: every path here is per-run unique, so
+ * a leaked directory is bounded, while a thrown cleanup error fails an
+ * otherwise-passing run and reddens a required check (WI-2889). Swallowing
+ * also hides a genuine wrong-path bug — an accepted trade, since the only
+ * paths passed in are freshly-minted mkdtemp fixtures.
+ */
 function removeTempRepo(path: string): void {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
       rmSync(path, { recursive: true, force: true });
       return;
-    } catch (error) {
-      if (
-        !(
-          error instanceof Error &&
-          'code' in error &&
-          (error as NodeJS.ErrnoException).code === 'EBUSY'
-        )
-      ) {
-        throw error;
-      }
+    } catch {
       if (attempt === 19) {
         return;
       }
@@ -1026,7 +1026,32 @@ describe('check-change-class.sh', () => {
       expect(headAfter).toBe(headBefore);
       expect(configAfter).toBe(configBefore);
     } finally {
-      rmSync(ambientRepo, { recursive: true, force: true });
+      removeTempRepo(ambientRepo);
     }
   });
+});
+
+// ── WI-2889: teardown must never redden the suite ──────────────────────────
+// removeTempRepo's retry loop used to rethrow anything that was not EBUSY, so
+// an ENOTEMPTY race while clearing a temp repo's .git/objects on CI turned an
+// otherwise-passing run red (observed: PR #2668 required-check red, cleared
+// only by a rerun). Teardown is now best-effort.
+describe('removeTempRepo (test-harness teardown)', () => {
+  it('swallows a non-EBUSY removal failure instead of failing the run', () => {
+    const sandbox = mkdtempSync(join(tmpdir(), 'ccc-teardown-guard-'));
+    try {
+      const notADirectory = join(sandbox, 'file');
+      writeFileSync(notADirectory, 'x');
+      // A path whose parent component is a regular file: on POSIX rmSync
+      // raises ENOTDIR deterministically, whatever the uid — the same
+      // non-EBUSY class as the ENOTEMPTY race, without having to win one.
+      expect(() => removeTempRepo(join(notADirectory, 'child'))).not.toThrow();
+    } finally {
+      // Use the helper here too: AC-1 is a property of the FILE, not of one
+      // call site, and a bare rmSync in a finally is exactly the pattern this
+      // change removes everywhere else — including in the guard that proves it.
+      removeTempRepo(sandbox);
+    }
+  }, // which overruns Jest's 5s default. // Exercises the full retry budget (20 attempts x 250ms) before giving up,
+  20_000);
 });
