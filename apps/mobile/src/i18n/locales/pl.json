@@ -4938,5 +4938,13 @@
       "completeDecisions": "Wprowadź kod rodziny i przejrzyj wszystkie trzy opcje przed kontynuacją.",
       "guardianNotReady": "Wymagany jest kod rodziny, potwierdzenie od dostawcy i wybór widoczności przez opiekuna."
     }
+  },
+  "residenceCountryPicker": {
+    "label": "Kraj zamieszkania",
+    "hint": "Miejsce, w którym zazwyczaj mieszkasz. To nie Twoja narodowość, kraj rozliczenia ani kraj sklepu App Store.",
+    "childHint": "Miejsce, w którym zazwyczaj mieszka Twoje dziecko. To nie jego narodowość, Twój kraj rozliczenia ani kraj sklepu App Store.",
+    "errorTitle": "Nie udało się wczytać listy krajów",
+    "errorBody": "Sprawdź połączenie i spróbuj ponownie.",
+    "empty": "Żadne kraje nie są jeszcze dostępne."
   }
 }

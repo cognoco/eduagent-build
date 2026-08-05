@@ -4750,5 +4750,13 @@
       "completeDecisions": "Skriv inn familiekoden og gå gjennom alle tre valgene før du fortsetter.",
       "guardianNotReady": "Familiekoden, retur fra leverandør og valg av synlighet for foresatt er påkrevd."
     }
+  },
+  "residenceCountryPicker": {
+    "label": "Bostedsland",
+    "hint": "Hvor du vanligvis bor. Ikke din nasjonalitet, ikke faktureringslandet ditt og ikke App Store-landet ditt.",
+    "childHint": "Hvor barnet ditt vanligvis bor. Ikke deres nasjonalitet, ikke faktureringslandet ditt og ikke App Store-landet ditt.",
+    "errorTitle": "Kunne ikke laste landelisten",
+    "errorBody": "Sjekk tilkoblingen din og prøv igjen.",
+    "empty": "Ingen land er tilgjengelige ennå."
   }
 }
