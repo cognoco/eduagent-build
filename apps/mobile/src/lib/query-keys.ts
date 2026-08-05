@@ -577,6 +577,12 @@ export const queryKeys = {
     profileId: string | undefined,
   ) => ['subject-sessions', subjectId, profileId] as const,
 
+  // [WI-2743] Deliberately UNSCOPED — no profile id, no account id. The
+  // habitual-residence country list is the public regulatory matrix, read at
+  // signup BEFORE any profile exists, and it is identical for every caller.
+  // Scoping it would fragment one shared cache per profile for no benefit.
+  residenceCountries: () => ['residence-countries'] as const,
+
   historySessionsMatch:
     (profileId: string | undefined) => (queryKey: readonly unknown[]) =>
       ((queryKey[0] === 'topic-sessions' || queryKey[0] === 'book-sessions') &&
