@@ -13,6 +13,9 @@
 // code-keyed ratchet; see `lib/scripts-typecheck-core.ts` for why the key
 // includes the diagnostic code and not just the file.
 //
+// The gate is NEW or RISING diagnostics only. Repaid debt prints a cleanup
+// notice and still passes — see the comment at its check in main().
+//
 // Usage:
 //   pnpm typecheck:scripts             # gate
 //   pnpm typecheck:scripts --accept    # re-record the baseline after repaying debt
@@ -148,15 +151,19 @@ function main() {
     return;
   }
 
+  // Repaid debt is a NOTICE, never a failure — matching this repo's
+  // established ratchet, scripts/check-i18n-jsx-literals.ts, whose gate is
+  // "no new violations" and which prints stale baseline entries to stdout for
+  // cleanup with --accept. Failing here would red another lane's PR for
+  // INCIDENTALLY IMPROVING the tree: a gate failing for a reason its pusher
+  // did not cause, which is the exact failure family this work removes.
   if (improvements.length > 0) {
-    console.error('scripts typecheck: baseline is stale (debt was repaid)\n');
-    for (const line of improvements) console.error(`  ${line}`);
-    console.error(
-      '\nRe-record it so the ratchet cannot drift back up:\n' +
-        '  pnpm typecheck:scripts --accept',
+    console.log(
+      `scripts typecheck: ${improvements.length} baseline entr${
+        improvements.length === 1 ? 'y is' : 'ies are'
+      } no longer present (clean up with --accept):`,
     );
-    process.exitCode = 1;
-    return;
+    for (const line of improvements) console.log(`  ${line}`);
   }
 
   console.log(

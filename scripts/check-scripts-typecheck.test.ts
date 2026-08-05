@@ -161,7 +161,11 @@ describe('compareToBaseline — the ratchet', () => {
     ).toContain('scripts/fresh.ts');
   });
 
-  test('repaid debt is reported so the ratchet cannot drift back up', () => {
+  // Repaid debt is a NOTICE, not a regression: it must never red a PR that
+  // improved the tree incidentally. Matches scripts/check-i18n-jsx-literals.ts,
+  // whose gate is new-violations-only. The entries are still surfaced so the
+  // baseline can be cleaned up with --accept.
+  test('repaid debt is reported but is NOT a regression', () => {
     const falling = compareToBaseline(
       [{ file: 'scripts/dirty.ts', code: 2532, count: 1 }],
       baseline,
@@ -169,9 +173,24 @@ describe('compareToBaseline — the ratchet', () => {
     expect(falling.regressions).toEqual([]);
     expect(falling.improvements[0]).toContain('fell 3 -> 1');
 
-    expect(compareToBaseline([], baseline).improvements[0]).toContain(
-      'no longer reported',
+    const gone = compareToBaseline([], baseline);
+    expect(gone.regressions).toEqual([]);
+    expect(gone.improvements[0]).toContain('no longer reported');
+  });
+
+  // A tree that both repaid one debt and introduced a new error must still
+  // fail — the notice must not mask the regression.
+  test('repaid debt alongside a new error still fails closed', () => {
+    const { regressions, improvements } = compareToBaseline(
+      [
+        { file: 'scripts/dirty.ts', code: 2532, count: 1 },
+        { file: 'scripts/dirty.ts', code: 2554, count: 1 },
+      ],
+      baseline,
     );
+    expect(improvements[0]).toContain('fell 3 -> 1');
+    expect(regressions).toHaveLength(1);
+    expect(regressions[0]).toContain('TS2554');
   });
 });
 

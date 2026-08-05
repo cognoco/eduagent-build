@@ -95,15 +95,18 @@ export function tallyDiagnostics(
 }
 
 /**
- * Ratchet comparison. `regressions` non-empty ⇒ fail closed.
+ * Ratchet comparison. Only `regressions` gate: non-empty ⇒ fail closed.
  *
  * Entries are keyed on (file, CODE, count) rather than file alone. That is the
  * property that keeps the gate closed: a diagnostic code absent from a file's
  * baseline entry fails even inside an otherwise-baselined file, so a new
  * wrong-arity TS2554 cannot hide behind unrelated pre-existing TS2532 debt.
  *
- * Falling counts are reported too — an unrecorded improvement would leave slack
- * the ratchet could silently drift back up into.
+ * `improvements` (repaid debt) are returned for reporting only and must NOT be
+ * treated as a failure by callers — failing on them would red a PR that merely
+ * improved the tree incidentally. This mirrors the repo's established ratchet,
+ * scripts/check-i18n-jsx-literals.ts, which prints stale baseline entries as a
+ * stdout notice and gates solely on new violations.
  */
 export function compareToBaseline(
   actual: BaselineEntry[],
