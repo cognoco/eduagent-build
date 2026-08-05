@@ -1133,6 +1133,30 @@ describe('PATCH /v1/profiles/:id', () => {
     expect(updateProfileV2Mock).not.toHaveBeenCalled();
   });
 
+  it('[BREAK][WI-2743] REJECTS habitualResidenceCountry rather than accepting and dropping it', async () => {
+    // Before this guard the field validated, returned 200, and vanished:
+    // updateProfileV2 never reads it, so the caller was told the residence
+    // changed while the stored country and the resolved jurisdiction both
+    // stayed put. A silent no-op at a write boundary is worse than a refusal.
+    // Residence CHANGE re-resolves jurisdiction and belongs to WI-2744.
+    //
+    // The service is mocked to SUCCEED deliberately. Without it the revert
+    // check fails with 404 (an unconfigured mock) instead of 200, which would
+    // prove only that validation passed and would quietly misrepresent the
+    // defect this guard exists for.
+    updateProfileV2Mock.mockResolvedValue(makeProfileRow({ id: PROFILE_ID_A }));
+
+    const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_A}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ habitualResidenceCountry: 'DE' }),
+    });
+
+    expect(res.status).toBe(400);
+    // The decisive half: it must never reach the service to be dropped there.
+    expect(updateProfileV2Mock).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the profile does not exist or belongs to another account', async () => {
     updateProfileV2Mock.mockResolvedValue(null);
 

@@ -207,6 +207,14 @@ export const profileUpdateSchema = profileCreateObjectSchema
     birthDay: true,
     // WI-811: `kind` is create-only (owner-vs-child at creation), never patched.
     kind: true,
+    // [WI-2743] Create-only, and deliberately NOT "not implemented yet".
+    // Changing habitual residence must RE-RESOLVE jurisdiction — that is
+    // WI-2744's whole subject. A bare PATCH would move the country while
+    // leaving the resolved jurisdiction stale, which is worse than refusing:
+    // it is a launch-perimeter decision silently made from an outdated axis.
+    // Left in the schema it would validate, return 200 and be dropped, since
+    // updateProfileV2 never reads it.
+    habitualResidenceCountry: true,
   })
   .strict();
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
