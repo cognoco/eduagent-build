@@ -1,0 +1,63 @@
+# MMT-ADR-0055 — Jurisdiction-aware consent completes by wiring the resolver into the live gate, sequenced behind residence capture
+
+**Status:** Accepted · operator-ratified 2026-08-05 · **Scope:** How the jurisdiction-aware consent-authority rule (MMT-ADR-0052) becomes the behavior of the live consent gate, and whether the country-availability gate ships independently of it · **Deciders:** Architecture sign-off: Accepted by operator Jorn 2026-08-05 (decision sitting, draft read in full)
+
+## Context
+
+Two systems answer the consent question today, and only one of them runs.
+
+The **rule** is settled: MMT-ADR-0013 ratified a jurisdiction-aware, regime-keyed policy engine; MMT-ADR-0052 ratified the derivation — consent authority is computed from age and habitual-residence jurisdiction, never from age alone, failing closed to *blocked* where residence cannot be positively resolved. The **mechanism** exists: a pure, fail-closed country-policy resolver over an effective-dated registry, which returns the permitted outcome and the required authorisation form for an age–jurisdiction pair.
+
+The **live general gate** implements neither. As of 2026-08-07 (verified against the repository): the consent middleware mounted on every API route computes guardian-required from birth year alone, and the v2 consent services that run the grant state machine make the general consent-authority decision without consulting jurisdiction. Two narrow ceremonies are the exception, not the rule: the credentialed guardian-attachment ceremony resolves jurisdiction (age band and authorisation form) for its own flow on a live, unflagged route, and a family-join posture decision does the same behind a default-off flag. The resolver family therefore already has production consumers for specific ceremonies; what nothing does is consult jurisdiction for the **general** consent-authority decision — the gate this ADR is about. The data model carries the jurisdiction attributes the rule needs (habitual-residence jurisdiction on the person record; a jurisdiction-at-grant snapshot field on grants), but the general decision path reads none of it.
+
+One premise from earlier discussion of this area is explicitly retired: there is **no future identity rebuild that delivers jurisdiction-aware consent as a by-product**. The identity re-platform completed (as of 2026-08-05: the v2 model is the only path — its enabling flag is absent from production code — and the legacy-drop work item is closed). What remains is exactly and only the wiring: if this decision does not mandate it, it never happens.
+
+The current age-only gate errs in one direction: it demands guardian authorisation from every learner under the most conservative threshold in scope, including those whose own consent is legally sufficient in their jurisdiction. It is over-strict and never under-compliant. That property is what makes an interim tolerable and what removes any urgency argument for wiring under pressure.
+
+One input the rule requires is not yet collected: habitual residence is not captured at signup or add-child (capture work is in build as of 2026-08-05). A resolver wired before its governing input exists would, under MMT-ADR-0052 clause 6, fail closed on every learner — the strict direction, but a uselessly strict product.
+
+Finally, this area conflates two different gates unless forcibly separated. *"May this person be here at all"* — is their country open for business — is a pure allow/block decision over launch and legal-verification status, with no interaction with any per-person consent state. *"Who consents for this person"* is the person-level state machine. They share vocabulary ("country", "gate") and nothing else.
+
+## Decision
+
+1. **The country-policy resolver becomes the live consent policy.** The age-only computation in the consent gate is replaced by resolution over the effective-dated registry, per MMT-ADR-0052. This is a mandate with a sequence, not an aspiration: the interim below is bounded by a named trigger, and reaching the trigger obligates the wiring work.
+
+2. **The country-availability gate ships first and independently.** The allow/block decision over a country's launch status may go live on the resolver and registry as designed, with a call site in onboarding, without touching the person-level consent machinery. Nothing in the consent state machine is a prerequisite for it, and nothing in it alters a consent grant. Its input discipline is inherited, not invented: the gate evaluates the **captured ISO habitual residence** and nothing else — storefront, app-store country, network-derived location, and interface language are non-inputs (MMT-ADR-0052 clause 4) — and where residence is unknown or unverified the outcome is blocked (clause 6). "Independently" means independent of the consent machinery, not of residence capture: before capture lands, the person record carries only a legacy coarse region bucket the resolver rightly rejects, so the gate's earliest ship point is the moment a captured country value exists at its call site.
+
+3. **Person-level wiring waits for residence capture.** The consent gate adopts the resolver only once habitual-residence capture at signup and add-child is live end-to-end — collected, persisted to the person record, and available to the gate at decision time. That event is the trigger; when it fires, the wiring is the next scheduled work in this area, not a reopened question. The wiring's definition of done is wider than its trigger: it is complete only when a **residence change** also re-evaluates consent capability (MMT-ADR-0052 clause 7) — versioned residence updates with re-evaluation of standing grants are part of the wiring work, not a later phase — and when every grant writer populates the jurisdiction-at-grant snapshot, which as of 2026-08-07 is inconsistently written (some grant paths record null).
+
+4. **Until the trigger, the age-only gate stays — as a recorded, bounded interim.** Its over-strict direction is the accepted cost. This clause is the interim's charter and its only legitimacy: the age-only computation is not the policy, it is the placeholder for the policy, and no new behavior may be built against its age-only shape.
+
+5. **The wiring is a replacement in place, not a parallel path — scoped to the general consent gate.** For the general consent-authority decision, one computation decides before the change and one after: no flag selects between age-only and jurisdiction-aware resolution for different users, and no transitional state exists in which both computations are reachable in production. This is conformance with the no-parallel-run posture of MMT-ADR-0012, which this decision inherits rather than re-argues. The existing narrow ceremonies that already consult jurisdiction (guardian attachment; the flag-gated family-join posture) are consumers of the same resolver family for their own decisions, not a second policy for the same decision — the rule this clause protects is that **no single consent-authority question is ever computed two ways**, and the wiring must converge the ceremonies and the general gate on the one resolver rather than leave the age-only shape alive anywhere.
+
+6. **Once wired, unresolved residence blocks.** Per MMT-ADR-0052 clause 6, a learner whose jurisdiction cannot be positively resolved is told the product is unavailable — not routed into a guardian flow. This is stricter than the interim for that slice of learners, and it is the ratified direction; the guardian flow is not a fallback for missing policy inputs.
+
+7. **The two gates stay distinct in code, copy, and canon.** The availability gate answers presence; the consent gate answers authority. Neither may be inferred from, implemented inside, or described as part of the other. Product copy that tells a blocked learner "ask a parent" when the true state is "your country is not open" is a defect of this clause.
+
+## Consequences
+
+- What a learner between 13 and their country's threshold experiences, by stage: under the interim, a guardian-consent flow regardless of country; after clause 2 ships, the same — plus onboarding is blocked entirely where the country is not launch-enabled; after clause 3's wiring, self-consent where their jurisdiction's threshold permits it, the jurisdiction's required authorisation form where it does not, and blocked where residence cannot be resolved.
+- The trigger in clause 3 is an event, not a date. Recording it here as a date would rot; the work system tracks the capture work and the wiring work that queues behind it.
+- Clause 4 forbids new consumers of the age-only shape. Code review gains a concrete question for any change touching consent: does this build against the placeholder or against the resolver's contract?
+- The availability gate (clause 2) needs a call site in onboarding that does not exist yet; building it is in scope of this decision's execution, not a separate ruling.
+- A known stale comment is corrected in execution rather than left to mislead: the consent service's docblock still describes an under-11 rejection threshold from a superseded product rule, while the enforced floor is thirteen (verified 2026-08-05 against the service and the shared age schema). The docblock is brought to the current floor when the gate is next touched.
+- This decision implies no schema migration: the grant schema already carries the jurisdiction-at-grant snapshot field and the registry is already effective-dated. It does imply **data-writing work**: snapshot population is inconsistent across grant writers (as of 2026-08-07, some paths record null), and clause 3 makes completing it part of the wiring's definition of done — a field existing in the schema is not the same as every writer populating it.
+
+## Alternatives considered
+
+- **Wire the resolver into the gate now, before residence capture is live.** Rejected: under the ratified fail-closed rule every learner would resolve to blocked, because the governing input does not exist yet. Strictness without function.
+- **Keep the age-only gate indefinitely, without a bounding trigger.** Rejected: it leaves an Accepted decision (MMT-ADR-0052) permanently unimplemented while appearing compliant, and the over-strict friction it imposes on legally self-consenting teenagers becomes a standing product cost with no owner and no end.
+- **Defer to a future identity or consent rebuild.** Rejected on the retired premise named in Context: the rebuild happened; no remaining program delivers this wiring as a by-product. Deferral here is indefinite deferral wearing a schedule.
+- **Ship the availability gate and the consent wiring together as one change.** Rejected: the availability gate has no dependency on residence capture or the consent machinery, and holding it hostage to the consent sequence surrenders the one lever — opening countries as counsel clears them — that is available now.
+- **Fall back to the guardian flow where residence is unresolved.** Rejected by MMT-ADR-0052 clause 6 and not re-litigated here: completing a guardian authorisation under no verified policy is a permissive outcome in strict clothing.
+
+## Links
+
+- `docs/adr/MMT-ADR-0052-consent-authority-resolves-from-age-and-residence-jurisdiction.md` — the derivation rule this decision operationalizes.
+- `docs/adr/MMT-ADR-0013` · `docs/adr/MMT-ADR-0012` · `docs/adr/MMT-ADR-0011` — the jurisdiction-aware policy engine ruling, the no-parallel-run posture, and the identity-foundation frame this decision inherits.
+- `docs/canon/identity/ontology.md` — the canonical model of consent-requirement resolution and residence as a time-versioned attribute.
+- Tracking (work system, not authority): residence capture and the queued wiring work; the enforcement-gap follow-ups this decision's execution feeds.
+
+## Provenance
+
+- Architecture sign-off (human-typed, operator Jorn): <https://github.com/cognoco/eduagent-build/pull/2996#issuecomment-5207213508> — ratification comment on the acceptance pull request, 2026-08-05, following the decision sitting in which the draft was read in full.

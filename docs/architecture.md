@@ -65,7 +65,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 | Uptime | 99.5% | Multi-provider LLM fallback, circuit breaker with defined thresholds |
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery |
 | GDPR compliance | Full | Consent state machine, deletion orchestrator, data residency |
-| Minor consent & age | 13+ access floor; consent authority from age × habitual-residence jurisdiction, fail-closed on unresolved residence (MMT-ADR-0052; sub-13 built, gated off) | Append-only consent log keyed (charge × purpose × org); three-axis age model; floor backend-enforced. See § Identity Foundation (MMT-ADR-0015). |
+| Minor consent & age | 13+ access floor; consent authority from age × habitual-residence jurisdiction, fail-closed on unresolved residence (MMT-ADR-0052; sub-13 built, gated off). Live general consent gate: age-only over-strict interim (as of 2026-08-07) until residence capture lands, then resolver wiring; the guardian-attachment ceremony is already jurisdiction-aware; country-availability gate ships independently (MMT-ADR-0055) | Append-only consent log keyed (charge × purpose × org); three-axis age model; floor backend-enforced. See § Identity Foundation (MMT-ADR-0015). |
 
 **UX Specification Implications:**
 
@@ -1764,7 +1764,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Data durability | 99.99% | Neon managed backups, point-in-time recovery | Covered |
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
-| Minor consent & age | 13+ access floor; consent authority from age × habitual-residence jurisdiction, fail-closed on unresolved residence (MMT-ADR-0052; sub-13 built, gated) | Append-only consent log; three-axis age model; backend-enforced floor — see § Identity Foundation (MMT-ADR-0015) | Defined — § Identity Foundation |
+| Minor consent & age | 13+ access floor; consent authority from age × habitual-residence jurisdiction, fail-closed on unresolved residence (MMT-ADR-0052; sub-13 built, gated). Live general consent gate: age-only over-strict interim (as of 2026-08-07) until residence capture lands, then resolver wiring; guardian-attachment ceremony already jurisdiction-aware (MMT-ADR-0055) | Append-only consent log; three-axis age model; backend-enforced floor — see § Identity Foundation (MMT-ADR-0015) | Defined — § Identity Foundation |
 | i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
 | Accessibility | WCAG 2.1 AA | Tiered by release maturity: free-tier MVP support first, then broader operational hardening. NativeWind supports accessibility props. | Tiered |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
