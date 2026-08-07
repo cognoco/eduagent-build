@@ -1,0 +1,35 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Adult output-check coverage extended via the EXISTING runSuitabilityJudge/suitability-gate mechanism, with the HOW recorded as an explicit written decision rather than a default: operator ruling 2026-08-04 chose async + sampled (option c), and the sampling rate is now a config value rather than a hard-coded constant so coverage ratchets by configuration, not redesign. resolveSuitabilityProfile/shouldJudge take the adult rate as a parameter; minors are structurally excluded from it.",
+      "pointer": "apps/api/src/services/policy-engine/judge-profile.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Fail-open-with-Inngest-escalation is EXTENDED to the adult path: a degraded judge raises emitSuitabilityJudgeUnavailableEvent and a blocking-grade verdict raises emitSuitabilityBlockedEvent (mode 'observed'), both via safeSend, both memoized in their own Inngest steps so a retry cannot duplicate a safety alarm. Never a raw learner-facing error and never silent recovery. Documented interpretation: fail-CLOSED is unavailable on a post-display path (the reply is already displayed), so for adults AC-2 is discharged as the escalation half; the minor synchronous fail-closed gate is untouched, which tests assert directly.",
+      "pointer": "apps/api/src/inngest/functions/judge-suitability.test.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Latency budget met by construction and documented: the adult path is post-display and dispatched through Inngest after the reply is persisted, so it adds zero latency to the learner stream — there is no perceptible stream delay because nothing on the adult path runs before display. The register row records that adults are post-display detect-and-escalate rather than a synchronous check, which is the latency-relevant fact.",
+      "pointer": "docs/registers/llm-models/master.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "JUDGE_ENFORCEMENT_ENABLED and JUDGE_FRAMEWORK_ENABLED actual values READ FROM DOPPLER 2026-08-07, not assumed from capture text: prd 'true', stg UNSET, dev UNSET for both. Unset resolves to 'false' via the config schema default, so neither judge runs in staging or dev — recorded on the register row rather than left implicit, including the consequence that no pre-prod environment can exercise this gate.",
+      "pointer": "docs/registers/llm-models/master.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Adult-path eval coverage added. The harness previously had NO adult profile at all (shared fixtures are ages 11/12/13/15/17), so toAgeBracket could never return 'adult' and the adult rubric branch was unreachable. Scenario JSE02-adult-reply-is-judged passes ageBracket explicitly; its reply is unsuitable on non-age-gated dimensions (dismisses a distressed adult learner, discourages help-seeking, fosters dependency) so it proves the rubric applies to adult traffic. Negative-path proof that a flagged adult output is caught is in the unit suite: the adult violation raises the alarm, while minors, an over_blocking-only violation, and a 'concern' verdict all correctly do not.",
+      "pointer": "apps/api/eval-llm/flows/judge-suitability.ts"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "master.md H5 row updated to CLOSED with mechanism and date, citing the WI-1365 minor-path implementation plus this item's adult-path extension, and linking the adult acceptance evidence. The row states the two real caveats rather than declaring victory: adult coverage is detect-and-escalate not block (fail-closed impossible post-display), and ~90% of adult replies are unjudged at the default 0.1 rate. WI-1900 is expanded on first mention for a cold reader.",
+      "pointer": "docs/registers/llm-models/master.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-07-local-deterministic"
+}
