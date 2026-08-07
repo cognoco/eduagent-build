@@ -125,3 +125,48 @@ Angry Birds = timing artifact (find empty shelves on new surfaces). SimCity-clas
 ### Updated lean (2026-06-06)
 
 Revenue lean unchanged: **professional cert prep, narrow** — sharpened by §3: the open flank is non-English markets. Passion lean is now specifically the **crime/deduction one-case prototype** (a concrete form of the interactive-fiction lean above). **Sales role-play is off the menu.** Deadlock is the highest-ceiling architectural match if appetite for a longer runway appears.
+
+## Addendum — 2026-08-07: Compliance Copilot (founder-originated)
+
+**Origin.** Mid-way through MentoMate's DPO/AI-Act workstream, the founder observed: "if I were to repeat
+it from the start tomorrow, I would not know where to start… it would be very nice to have an app that
+would walk me through it step by step." Captured here as a menu option, not a commitment.
+
+**Concept** *(sharpened by the founder same day)*: not a process guide — **the app IS the counselor**. It
+walks a non-legal founder through the loop MentoMate is living — processing inventory → expert appointment
+→ AI Act classification → action register → evidence packages → rulings-and-remediation — and itself
+produces the advice, the drafts, and the reasoned positions a retained expert would otherwise bill for.
+A human expert-of-record enters only at the end of each phase to review and **sign off** ("of course some
+sign off will be necessary at the end" — founder). The economics: expert hours collapse from a retainer
+plus dozens of drafting hours to a bounded signing review (reference point: our own three-document review
+pass is 6 expert hours at EUR 450 — the app's job is to make every engagement look like that). Value
+claim per customer: four figures saved vs. traditional counsel, plus knowing *what to do next* at every
+step.
+
+**Content provenance caution.** The founder's instinct — "now we have his answers that we can incorporate
+into the app" — is right about the *patterns* and wrong to apply literally: Stephan's rulings are
+client-specific paid work product, and shipping them verbatim as product content raises confidentiality
+and IP questions. What is safely reusable: the process structure, the document *shapes* (register,
+evidence package, trigger card), the questions an expert asks, the public sources (the Act itself, EDPB
+guidance, Commission guidelines), and our own agent-drafted artifacts. Expert-authored rulings inform the
+design; they don't become the corpus without his agreement.
+
+**Why it might work.** (1) The Vanta/Drata pattern proved "walk me through certification" is a large
+business; (2) AI Act compliance tooling is a young category — the Act entered force 2026-07-27, Art 50
+binds from 2026-08-02, and the two-person-company end of the market is unserved; (3) unfair advantage:
+a complete real artifact trail exists in this repo (action-register tracker, evidence-package patterns
+in `compliance/memory-unlock-package/`, trigger card, playbook) — the corpus IS the product spec; the
+agent-driven workflow that produced it is the engine. Architectural reuse from the FINISHER thesis
+(§8 meta-finding): compliance is a multi-round state machine with deadlines and an expert gate — closer
+to Deadlock's shape than to a one-shot document generator.
+
+**Honest drags.** Second product before the first has users (the standing focus rule); the expert supply
+side is a real marketplace-building cost; regulatory content rots (per-jurisdiction maintenance forever —
+same drag flagged for Deadlock's ADR graph); "compliance advice" liability perimeter needs the same
+care Stephan applies to us (advice vs. records).
+
+**Seed spec.** `docs/compliance/compliance-playbook.md` (2026-08-07) — the six-step loop written for a
+non-legal founder, with pointers to every reusable template in this repo.
+
+**Timing trigger.** Revisit **after MentoMate launch** — earliest at the first post-launch strategy pass.
+Nothing before that; this entry exists so the idea survives, not so it gets built.
