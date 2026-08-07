@@ -563,7 +563,10 @@ function assertion(
       });
       await db
         .update(consentGrant)
-        .set({ withdrawnAt: AS_OF })
+        // Withdrawal time is compared against the real clock by
+        // restoreConsentV2's grace-period check, so it must stay recent —
+        // the pinned AS_OF would fall outside the window as it ages.
+        .set({ withdrawnAt: new Date(Date.now() - 60_000) })
         .where(eq(consentGrant.chargePersonId, learner.personId));
 
       await expect(
