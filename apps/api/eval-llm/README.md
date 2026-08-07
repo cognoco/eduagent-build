@@ -423,16 +423,21 @@ call failed to execute (`summary.liveCallsFailed > 0`, enforced in
 mapping; `assertScenarioProfilesResolve(PROFILES)` runs at import time so a
 mistyped `profileId` fails loud rather than silently dropping a scenario.
 
-> **⚠️ BAND SCOPE — `SCENARIO_BAND_LABEL`:** the 5 scenarios are
-> **PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo)** — `12yo-dinosaurs`,
+> **⚠️ BAND SCOPE — `SCENARIO_BAND_LABEL`:** 6 scenarios. Five are
+> **PRE-SCREEN ONLY across 11–17yo** — `12yo-dinosaurs`,
 > `15yo-football-gaming`, `13yo-spanish-beginner`, `17yo-french-advanced`, and
-> `11yo-czech-animals` (the last gives non-English tutor-prose coverage). They say
-> **nothing** about teaching quality for **under-10s** (on a parent's account) or
-> **adults** — the two bands with no `EvalProfile` yet. A green run is **not**
-> all-ages teaching quality. Authoring under-10 + adult scenarios is a tracked
-> follow-up (plan **T13**), not silently in-scope. The label is surfaced in the
-> flow snapshot header, here, and the weekly issue body so a non-coder reader
-> cannot misread the gate's reach.
+> `11yo-czech-animals` (the last gives non-English tutor-prose coverage). One
+> (`TS06-base-rate-screening` / `34yo-adult-statistics`) covers **adults**, so
+> the entire adult claim rests on a **single case**. A green run is **not**
+> all-ages teaching quality. Coverage below the 11–17 band remains unauthored
+> and is **blocked on an operator ruling** — see the fixture-floor note in
+> `fixtures/profiles.ts`; it is not silently in-scope. The label is surfaced in
+> the flow snapshot header, here, and the weekly issue body so a non-coder
+> reader cannot misread the gate's reach.
+>
+> The adult profile is `scenarioOnly` — it runs only in flows that declare
+> `pinsProfilesById`, so it does not fan out across the whole envelope matrix.
+> See `EvalProfile.scenarioOnly` and `FlowDefinition.pinsProfilesById`.
 
 > **Judge temperature (M8/F3) — known limitation.** The plan calls for a pinned
 > `temperature: 0` judge, but `callLlm` exposes no temperature parameter, so the

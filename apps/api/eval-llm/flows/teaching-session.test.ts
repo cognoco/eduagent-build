@@ -493,14 +493,15 @@ describe('assertScenarioProfilesResolve', () => {
     }
   });
 
-  it('all 5 scenarios are present in TEACHING_SCENARIOS', () => {
+  it('all 6 scenarios are present in TEACHING_SCENARIOS', () => {
     const ids = TEACHING_SCENARIOS.map((s) => s.id);
     expect(ids).toContain('TS01-moon-phases');
     expect(ids).toContain('TS02-fractions-of-fractions');
     expect(ids).toContain('TS03-past-tense-trigger');
     expect(ids).toContain('TS04-supply-demand');
     expect(ids).toContain('TS05-water-cycle');
-    expect(ids).toHaveLength(5);
+    expect(ids).toContain('TS06-base-rate-screening');
+    expect(ids).toHaveLength(6);
   });
 
   it('all 5 scenarios have distinct profileIds covering the expected profiles', () => {

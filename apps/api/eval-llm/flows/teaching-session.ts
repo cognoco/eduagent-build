@@ -60,8 +60,8 @@ assertScenarioProfilesResolve(PROFILES);
 // AND the transfer probe. It only advances on a concept the mentor explicitly
 // taught — never from the model's own pretraining (HIGH-4 / F2).
 //
-// AUDIENCE SCOPE: PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — see
-// SCENARIO_BAND_LABEL. Says nothing about under-10 or adult teaching quality.
+// AUDIENCE SCOPE: PRE-SCREEN ONLY — 11–17yo plus a single 34yo adult case; see
+// SCENARIO_BAND_LABEL. Adult teaching quality rests on that one scenario.
 //
 // Cost note: each scenario makes up to (8 mentor + 7 learner + 1 probe +
 // 1 judge) ≈ 17 internal calls. The runner's --max-live-calls counts runLive
@@ -635,6 +635,10 @@ export async function runTeachingSession(
 
 export const teachingSessionFlow: FlowDefinition<TeachingSessionInput> = {
   id: 'teaching-session',
+  // [WI-2462] This flow selects its own profiles: enumerateScenarios below
+  // matches spec.profileId against the profile and returns null otherwise. It
+  // is therefore the one flow a scenarioOnly profile may run in.
+  pinsProfilesById: true,
   name: 'Teaching Session (multi-turn, transfer probe, LLM-judged)',
   sourceFile: 'apps/api/src/services/exchanges.ts:buildSystemPrompt',
 

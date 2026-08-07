@@ -33,6 +33,26 @@ export interface EvalProfile {
   /** Human-readable one-liner shown at the top of every snapshot. */
   description: string;
 
+  /**
+   * WI-2462 — opt out of the global flow × profile cross-product.
+   *
+   * The runner fans EVERY flow across EVERY profile in PROFILES, so adding one
+   * profile silently adds one sample to every flow that builds a default
+   * prompt — expanding the weekly live gate's matrix and cost for flows the
+   * new profile was never meant to exercise.
+   *
+   * When true, this profile participates ONLY where a scenario pins it by
+   * profileId (a flow's `enumerateScenarios`). Flows that would otherwise
+   * build one anonymous sample per profile skip it, exactly as if their
+   * `buildPromptInput` had returned null for it. That is what lets a profile
+   * be added for targeted scenario coverage without moving any other flow's
+   * scenario or snapshot counts.
+   *
+   * Omit it (the default) for a profile that SHOULD appear across the whole
+   * matrix — this is a narrowing flag, never a performance tweak.
+   */
+  scenarioOnly?: boolean;
+
   // Demographics ----------------------------------------------------------
   ageYears: number;
   birthYear: number;
@@ -294,8 +314,74 @@ export const PROFILES: EvalProfile[] = [
     pacePreference: 'thorough',
     analogyDomain: 'music',
   },
+  {
+    // WI-2462 — adult (18+) teaching-quality coverage. Every other profile is
+    // an adolescent (13–17 per age.ts), so before this one the suite said
+    // nothing about how the mentor teaches an adult: no coverage of an adult's
+    // faster pace, prior domain knowledge, or blunter pushback. Adults are a
+    // real product persona — PARENT_ACCOUNT_MINIMUM_AGE is 18 and computeAge
+    // Bracket's 'adult' arm is live — and sit ABOVE the PROFILE_MINIMUM_AGE
+    // floor, unlike the sub-13 end of the range.
+    id: '34yo-adult-statistics',
+    // Scenario-only: pinned by TS06 alone. Without this the adult would join
+    // every envelope flow's matrix, moving other flows' sample counts — the
+    // exact side effect WI-2462's AC-3 forbids.
+    scenarioOnly: true,
+    description:
+      '34-year-old EU adult, English native, career-switching into data analysis, brings real-world experience and pushes back on hand-waving',
+    ageYears: 34,
+    birthYear: 1992,
+    nativeLanguage: 'en',
+    conversationLanguage: 'en',
+    location: 'EU',
+    pronouns: 'she/her',
+    interests: [
+      { label: 'data analysis', context: 'both' },
+      { label: 'public health reporting', context: 'both' },
+      { label: 'long-distance running', context: 'free_time' },
+      { label: 'cooking', context: 'free_time' },
+    ],
+    libraryTopics: [
+      'descriptive statistics',
+      'probability basics',
+      'spreadsheet modelling',
+      'reading medical studies',
+    ],
+    cefrLevel: undefined,
+    targetLanguage: undefined,
+    struggles: [
+      { topic: 'conditional probability', subject: 'statistics' },
+      { topic: 'interpreting p-values', subject: 'statistics' },
+    ],
+    strengths: [
+      { topic: 'spreadsheet formulas', subject: 'statistics' },
+      { topic: 'summarising findings in writing', subject: 'writing' },
+    ],
+    recentQuizAnswers: { capitals: [], vocabulary: [], guessWho: [] },
+    preferredExplanations: ['examples', 'step-by-step'],
+    pacePreference: 'quick',
+    analogyDomain: 'cooking',
+  },
 ];
 
 export function getProfile(id: string): EvalProfile | undefined {
   return PROFILES.find((p) => p.id === id);
+}
+
+/**
+ * True when a profile opts out of the global flow × profile cross-product
+ * (see EvalProfile.scenarioOnly).
+ *
+ * Takes `unknown` because the budget estimator types its profile list that way
+ * — and it MUST be the same predicate the runner uses. The estimator and the
+ * runtime each decide independently whether a flow applies to a profile, so if
+ * they disagree the preflight demand estimate and the actual run disagree, and
+ * the live gate either truncates itself or reports a coverage shortfall.
+ */
+export function isScenarioOnlyProfile(profile: unknown): boolean {
+  return (
+    typeof profile === 'object' &&
+    profile !== null &&
+    (profile as { scenarioOnly?: unknown }).scenarioOnly === true
+  );
 }

@@ -242,6 +242,6 @@ I thought prices were basically cost to produce plus whatever margin the seller 
 - Teaching-session scenario: TS04-supply-demand
 - Topic: Supply, Demand, and Price Determination
 - Starting gap: You believe a product's price is set by its production cost plus a profit margin the seller decides. You think sellers control price independently, and that external events like a drought only change the price if they change production costs. You don't yet grasp that prices emerge from supply meeting demand.
-- Audience scope: PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — says nothing about under-10 or adult teaching
+- Audience scope: PRE-SCREEN ONLY — 5 scenarios across ages 11–17 plus a single 34yo adult (1 scenario); adult teaching quality rests on that one case
 - Tier 1 shows only the OPENING mentor turn. Tier 2 runs up to 8 mentor turns against a stuck-unless-taught simulated learner, then an unaided transfer probe, then an LLM judge.
 - Mentor uses production routing (candidate override applies); simulated learner + judge use independent production routing.

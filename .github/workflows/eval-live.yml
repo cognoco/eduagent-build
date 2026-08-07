@@ -46,10 +46,11 @@ jobs:
     # baseline=305 and required=329 samples; its 10% headroom configures 362.
     # Envelope provider demand: 329 outer runLive invocations + 37 internal judge
     # calls (31 legitimate_sensitive safety probes + 6 language-quality samples)
-    # = 366 provider calls. Teaching remains 5 runLive invocations (≈85
-    # internal calls). Mastery is an 8-scenario × 3-run grid: 216 governed
+    # = 366 provider calls. Teaching is 6 runLive invocations (≈102
+    # internal calls) since WI-2462 added the adult scenario TS06.
+    # Mastery is an 8-scenario × 3-run grid: 216 governed
     # configured units and 192 expected provider calls. The comparable estimated
-    # provider demand is 366 + 85 + 192 = 643; configured caps remain
+    # provider demand is 366 + 102 + 192 = 660; configured caps remain
     # gate-specific because these units are heterogeneous and must not be added
     # across gates.
     #
@@ -81,11 +82,12 @@ jobs:
     # includes internal judge calls the retained run's outer-invocation
     # denominator never separately counted — a conservative scaling
     # comparison against that denominator, not a like-for-like measured
-    # provider-call rate) + teaching 271s x 5/5 (current TEACHING_SCENARIOS
-    # count over the retained run's cap of 5 — unscaled today only because
-    # both equal 5; stays correct if the scenario count changes) + mastery
+    # provider-call rate) + teaching 271s x 6/5 (current TEACHING_SCENARIOS
+    # count over the retained run's cap of 5 — genuinely scaled since
+    # WI-2462 took the count to 6; the ratio tracks the count, so a further
+    # scenario change moves it again) + mastery
     # 710s x 24/21 (the full 24-round grid over the 21 rounds that actually
-    # ran) = ~35.1 min, leaving ~5.1× headroom under the live-evals job's
+    # ran) = ~36.0 min, leaving ~5.0× headroom under the live-evals job's
     # 180-minute timeout-minutes.
     #
     # Uncertainty, explicit: this is a single retained run on an older head,
@@ -163,10 +165,10 @@ jobs:
       # runs at all, which is exactly the blind spot that let the core
       # tutoring-quality flow go unwatched. Budget: --max-live-calls counts
       # runLive invocations, one per scenario × pinned profile, and the fixture
-      # set is 5 scenarios (TS01–TS05, apps/api/eval-llm/fixtures/
-      # teaching-scenarios.ts) → budget 5. Each runLive internally makes up to
+      # set is 6 scenarios (TS01–TS06, apps/api/eval-llm/fixtures/
+      # teaching-scenarios.ts) → budget 6. Each runLive internally makes up to
       # ~17 real LLM calls (8 mentor + 7 learner + 1 transfer probe + 1 judge)
-      # ≈ 85 calls total. A scenario-count change must retune this number in
+      # ≈ 102 calls total. A scenario-count change must retune this number in
       # the same PR — enforced by scripts/eval-live-gate-independence.test.ts.
       # A transfer-failed verdict is a qualityError → exit 1 → this step fails.
       # The gate also fails CLOSED (WI-2461 AC-3): an absent/unusable judge
@@ -176,13 +178,15 @@ jobs:
       # outage or provider failure can never read as a green teaching run.
       # Runs even if the envelope gate failed (`!cancelled()`), but not when
       # setup itself broke (`steps.doppler.outcome`). Scope caveat: the
-      # scenario set is PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo).
+      # scenario set covers ages 11–17 plus ONE adult (TS06); adult teaching
+      # quality rests on that single case, and there is no under-13 coverage —
+      # under-13 is below PROFILE_MINIMUM_AGE and cannot register (WI-2462).
       - name: Teaching-session live gate (transfer + teaching quality)
         id: teaching-gate
         if: ${{ !cancelled() && steps.doppler.outcome == 'success' }}
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
-        run: doppler run -- pnpm eval:llm -- --live --flow teaching-session --max-live-calls 5
+        run: doppler run -- pnpm eval:llm -- --live --flow teaching-session --max-live-calls 6
 
       # Mastery-SIMULATION gate (over-credit ceiling + drift). Tutor pinned to
       # gpt-oss-120b (MENTOR_MODEL, via OpenRouter) + production judge (the
