@@ -4,7 +4,7 @@
 **Status:** Draft v0.1 — for DPO review
 **Author:** agent-drafted for management review
 **Company:** ZWIZZLY AS, organisation number 811 696 072, Oslo, Norway
-**Owner:** Zuzana Kopecna, Chair, ZWIZZLY AS
+**Owner:** Zuzana Kopečná, Founder, ZWIZZLY AS
 **Parent record:** [`2026-07-30-eu-ai-act-classification-record.md`](2026-07-30-eu-ai-act-classification-record.md) §10
 **Scope of the check:** MentoMate application version **1.0.1**, family-only MVP, model set as recorded in the classification record §2.2
 
@@ -270,7 +270,7 @@ compliance decisions at the moment they are proposed, rather than after they shi
 
 | Field | Value |
 |---|---|
-| Owner | Zuzana Kopecna, Chair |
+| Owner | Zuzana Kopečná, Founder |
 | Next review | With the classification record — proposed annually, next due **2027-07-30** |
 | Mandatory re-check | Before any institutional channel opens; before any biometric, voice-analysis, affect-related, or age-assurance-by-biometrics feature enters design; on any material change to the model set |
 
@@ -279,3 +279,4 @@ compliance decisions at the moment they are proposed, rather than after they shi
 | Version | Date | Change | Author |
 |---|---|---|---|
 | v0.1 | 2026-07-30 | Initial Article 5 prohibited-practices check, responding to the DPO's requirement of 2026-07-30. Incorporates the prior layered Article 5(1)(f) emotion-inference position of 2026-06-03. | agent-drafted for management review |
+| v0.1.1 | 2026-08-07 | Cosmetic only: owner name/title aligned to the operator ruling of 2026-08-01 (Zuzana Kopečná, Founder — was "Kopecna, Chair"). No change to any assessment, fact, or constraint. | agent-drafted for management review |

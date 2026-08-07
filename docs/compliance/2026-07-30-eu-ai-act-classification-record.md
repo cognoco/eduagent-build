@@ -9,7 +9,7 @@ this record are done — it does **not** mean the record has been legally review
 compliant (§11).
 **Author:** agent-drafted for management review
 **Company:** ZWIZZLY AS, organisation number 811 696 072, Fiskekroken 3B, 0139 Oslo, Norway
-**Approval owner:** Zuzana Kopecna, Chair, ZWIZZLY AS (see §9)
+**Approval owner:** Zuzana Kopečná, Founder, ZWIZZLY AS (see §9)
 **Classification:** **Not high-risk** under Annex III, point 3, for the intended purpose described in §3 — DPO-confirmed 2026-07-30
 
 > **This is the classification record.** It supersedes the working classification memo of 2026-07-24
@@ -388,7 +388,7 @@ this needs a firm answer before launch, it goes to the DPO or to qualified couns
 
 | Field | Value |
 |---|---|
-| **Approval owner** | Zuzana Kopecna, Chair, ZWIZZLY AS |
+| **Approval owner** | Zuzana Kopečná, Founder, ZWIZZLY AS |
 | **Reviewer (compliance advice)** | Stephan Hartmann, external DPO — providing AI Act input as separate compliance advice, outside the statutory DPO function (§11) |
 | **Approved on** | **OPEN — BLOCKED ON THE OPERATOR. Not forgotten, not deferrable to an agent.** See §9.1 for the route. This record is v0.2, verification-complete and approval-ready; it is **not approved**, and nothing in it may be read or cited as approved until this field carries a date. |
 | **Mandatory review — pre-launch** | Re-verify §2 (product and model version), §3 (intended purpose), §4 (prohibited uses in force), §5 (perimeter), and **§8 (territorial position — including the EEA-incorporation and Norwegian-implementing-law status left open and dated at §8.1)** before the system is placed on the market. The classification depends on facts that must be true *at placing on the market*, not merely at drafting. §8 is listed explicitly because §8.1 routes its open item here: a route into a checklist that does not name the item is not a route. |
@@ -408,7 +408,7 @@ without it. It was deliberately left open when this record was finalized to v0.2
 | Field | Value |
 |---|---|
 | Decision required | Management approval of this classification record, and confirmation of the periodic-review cadence |
-| Decision owner | Zuzana Kopecna, Chair, ZWIZZLY AS (the approval owner named above) |
+| Decision owner | Zuzana Kopečná, Founder, ZWIZZLY AS (the approval owner named above) |
 | Route | **Cosmo Operator Queue** — the estate's queue for human approvals and operator-only actions (database `3948bce91f7c810096d9d78f2351a442`, as configured at [`../../zdx-config.yaml`](../../zdx-config.yaml) → `zdx.operator-queue.database_id`) |
 | Queue item | **To be filed.** No Operator Queue item number is cited here because none had been raised for this approval at the time of writing; citing one would be an invented reference. The escalation was raised on 2026-08-05 when the record reached approval-ready. |
 | What the approver receives | This record at v0.2, verification-complete: the seven additions verified against the source memo (§1.1), the seven triggers carrying the DPO's final wording (§7), legislative status corrected (§12) |
@@ -645,6 +645,7 @@ reading is therefore that Regulation (EU) 2026/1744 is the amending regulation a
 |---|---|---|---|
 | v0.1 | 2026-07-30 | Initial classification record. Supersedes the 2026-07-24 working memo. Incorporates the DPO's consolidated response of 2026-07-30: the not-high-risk conclusion and its reasoning, the seven required additions, the seven mandatory reassessment triggers, the corrected legislative status, and the separate-record instruction. | agent-drafted for management review |
 | **v0.2** | **2026-08-05** | **Finalized out of draft to verification-complete and approval-ready.** (1) §1.1 coverage table **verified** against `30.07.Answer.docx` by text-extracting the DOCX and comparing all seven quoted cells to the DPO's enumerated list — one-to-one and in his order; two wording corrections applied (a management gloss sat inside a column labelled as his wording; the verb "required" was attributed to him where he wrote "recommend" and made his no-referral position conditional on completion). (2) §7 **T2 replaced with the DPO's final 2026-07-31 wording** — it previously sat in §7.1 as resolved while the operative table still carried the superseded formulation and a stale "pending" pointer; T1 and T3–T7 re-diffed against the memo and unchanged. A **provenance limitation** is now disclosed on §7.1: no verbatim copy of the 2026-07-31 reply is held in-repo, so that quotation rests on the operator's attestation (tracker log + commit `f42b2e719`) rather than on a source diff. (3) §12 Article 50 row re-stated so the unavailability of the transitional period to MentoMate is unmissable; publication (24.07.2026) and entry into force (27.07.2026) re-verified against the memo; §12.1 relationship note retained. (4) OPEN placeholders resolved or routed: §11.2 **resolved** from the 2026-07-31 Q3 answer; §2.3, §10.3 and §12.1 routed to the separately-commissioned DPO review pass; §11.1 routed to the DPIA's own cycle (deliberately not performed here); §8 rewritten as §8.1 — checked 2026-08-05, **dated pending**, and an **unsupported claim removed** (the "Norwegian implementation expected around summer 2026" statement had no internal source); §9 approval and review cadence routed to the Cosmo Operator Queue via new §9.1. (5) Separation from the DPIA preserved — cross-references only, no DPIA content imported and no DPIA file edited. **Per the change-control rule in §9, this trigger-wording change requires re-approval by the approval owner; that approval is the one field left open.** **(6) Four corrections applied during independent review of this version, before approval and therefore inside v0.2 rather than as a new version — all four narrowing a claim rather than changing a position: §9's mandatory pre-launch review now names §8 explicitly, because §8.1 routed its open territorial item to a checklist that did not contain it; §1.1's verification note now states that the no-divergence finding covers the seven compared cells and not the table as a whole; the §7 T2 cell is now labelled a partial quotation pointing at §7.1 for the full operative text, since it carries the first of two paragraphs under a column headed as authoritative wording; and §7.1's provenance limitation no longer calls the two operator records "independent attestations", because both were authored by the operator in the same commit and are two records of one assertion.** | agent-drafted for management review |
+| v0.2.1 | 2026-08-07 | Cosmetic only: approval-owner name/title aligned to the operator ruling of 2026-08-01 (Zuzana Kopečná, Founder — was "Kopecna, Chair") in the header, §9, and §9.1. No change to the classification, triggers, or obligations mapping, so §9 change-control re-approval is not engaged by this edit. | agent-drafted for management review |
 
 ---
 

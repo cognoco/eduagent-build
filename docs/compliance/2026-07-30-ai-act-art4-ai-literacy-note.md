@@ -4,7 +4,7 @@
 **Status:** Draft v0.1 — for DPO review
 **Author:** agent-drafted for management review
 **Company:** ZWIZZLY AS, organisation number 811 696 072, Oslo, Norway
-**Owner:** Zuzana Kopecna, Chair, ZWIZZLY AS
+**Owner:** Zuzana Kopečná, Founder, ZWIZZLY AS
 **Parent record:** [`2026-07-30-eu-ai-act-classification-record.md`](2026-07-30-eu-ai-act-classification-record.md) §10
 
 ---
@@ -46,8 +46,8 @@ This note is written to be honest about both.
 
 | Person / actor | Role in relation to the AI system | Literacy level required |
 |---|---|---|
-| **Zuzana Kopecna** — Chair, ZWIZZLY AS | Owns the intended purpose, the prohibited-use boundaries, marketing claims, launch-perimeter decisions, and the approval of the classification record. Sets what the system is for and what it must never do. **Non-technical.** | **Highest in the organisation.** Every decision that could move MentoMate into Annex III (a customer type, a partnership, a marketing claim, a new feature category) is hers. She does not need to understand model internals; she must reliably recognise a reassessment trigger when it appears in a commercial conversation. |
-| **Second founder** — *[OPEN — needs input: name and role]* | *[OPEN — needs input: confirm whether this founder holds technical/engineering oversight, commercial responsibility, or both.]* | To be set once the role is confirmed. |
+| **Zuzana Kopečná** — Founder, ZWIZZLY AS | Owns the intended purpose, the prohibited-use boundaries, marketing claims, launch-perimeter decisions, and the approval of the classification record. Sets what the system is for and what it must never do. **Non-technical.** | **Highest in the organisation.** Every decision that could move MentoMate into Annex III (a customer type, a partnership, a marketing claim, a new feature category) is hers. She does not need to understand model internals; she must reliably recognise a reassessment trigger when it appears in a commercial conversation. |
+| **Jørn** — Founder, ZWIZZLY AS *(confirmed by the operator 2026-08-07; full legal name to be added at signature time)* | Holds technical and engineering oversight: ratifies architecture decision records (e.g. MMT-ADR-0052/0055, accepted 2026-08-05), implements operational infrastructure (e.g. the DPO contact mailbox, WI-2916), and directs and reviews agent-executed engineering work. | L3, L6, and L7 at implementation depth (per §3); L1–L2 at awareness depth, since engineering choices (a new model, a new integration) can themselves be reassessment triggers. |
 | **AI coding agents** (under human direction) | Perform the bulk of engineering execution — implementation, tests, refactors — against written repository rules, with human review and CI gates before anything ships. | Not persons; not subjects of Article 4. Their behaviour is governed by the written constraints in §4.3, and the accountable humans remain those above. |
 | **External DPO** — Stephan Hartmann | Provides GDPR advice under Articles 38–39 and, separately, AI Act compliance advice outside the statutory function. | Independent professional; his competence is a given, not something ZWIZZLY provides. |
 | **Third-party model providers** (Cerebras, Mistral, OpenAI, Anthropic) | Supply the underlying models via API. Their staff do not operate MentoMate. | Out of scope for our Article 4 duty. |
@@ -79,7 +79,7 @@ Each item below maps to a concrete failure this company could plausibly commit.
 | L7 | That the **model set is a compliance object** — a material model change is itself a reassessment trigger | Swapping a provider as a routine engineering decision |
 | L8 | **Where the records live** and that they are version-controlled artefacts, not background documents | Making a decision that contradicts an approved record without noticing |
 
-Depth is calibrated per person: the Chair needs L1–L5 and L8 at decision-making depth and L6–L7 at
+Depth is calibrated per person: the founder owning product and commercial decisions needs L1–L5 and L8 at decision-making depth and L6–L7 at
 awareness depth; anyone holding engineering oversight needs L3, L6, and L7 at implementation depth.
 
 ---
@@ -104,12 +104,12 @@ These exist today and are cited so the DPO can verify them rather than take them
 
 | # | Measure | Owner | Proposed timing |
 |---|---|---|---|
-| M1 | **Documented read-and-acknowledge.** Each founder reads the classification record, the Article 5 check, and the tripwire document, and records a dated acknowledgement in a single-table log in this repository. No LMS, no quiz — a dated line each, kept as the Article 4 evidence. | Chair | Before launch |
-| M2 | **Trigger card.** A one-page plain-language card listing the seven reassessment triggers and the blocked marketing vocabulary, written for use during a sales or partnership conversation rather than at a desk. | Chair | Before first external commercial conversation about institutional use |
-| M3 | **Refresh on trigger.** Whenever a reassessment trigger fires or the classification record is revised, both founders re-read the changed record and re-acknowledge. Ties literacy to the same events that drive reassessment, so it cannot silently go stale. | Chair | Standing |
-| M4 | **Periodic refresh.** Re-read and re-acknowledge at each periodic review of the classification record (proposed annually). | Chair | Annual, with the classification review |
-| M5 | **Onboarding gate.** Any new employee, contractor, or advisor who will deal with the operation of the AI system completes M1 before being given the access their role requires. Written now, while the answer is trivially small, so that it exists before the company grows past the point where it is obvious. | Chair | On first hire or engagement |
-| M6 | **Founder-level model-limitations briefing.** A short written explanation, aimed at a non-technical reader, of what the underlying models can and cannot do — confident errors, no understanding of the individual learner beyond what is stored, no emotional perception. Covers L6 for a non-technical decision-maker without pretending to technical depth. | *[OPEN — needs input: assign owner]* | Before launch |
+| M1 | **Documented read-and-acknowledge.** Each founder reads the classification record, the Article 5 check, the tripwire document, and the trigger card, and records a dated acknowledgement in a single-table log in this repository. No LMS, no quiz — a dated line each, kept as the Article 4 evidence. **Log created 2026-08-07** ([`2026-08-07-ai-literacy-acknowledgement-log.md`](2026-08-07-ai-literacy-acknowledgement-log.md)); both acknowledgements pending. | Founder (Zuzana) | Before launch |
+| M2 | **Trigger card.** A one-page plain-language card listing the seven reassessment triggers and the blocked marketing vocabulary, written for use during a sales or partnership conversation rather than at a desk. **Drafted 2026-08-07** ([`2026-08-07-ai-act-trigger-card.md`](2026-08-07-ai-act-trigger-card.md)); operator adoption pending. | Founder (Zuzana) | Before first external commercial conversation about institutional use |
+| M3 | **Refresh on trigger.** Whenever a reassessment trigger fires or the classification record is revised, both founders re-read the changed record and re-acknowledge. Ties literacy to the same events that drive reassessment, so it cannot silently go stale. | Founder (Zuzana) | Standing |
+| M4 | **Periodic refresh.** Re-read and re-acknowledge at each periodic review of the classification record (proposed annually). | Founder (Zuzana) | Annual, with the classification review |
+| M5 | **Onboarding gate.** Any new employee, contractor, or advisor who will deal with the operation of the AI system completes M1 before being given the access their role requires. Written now, while the answer is trivially small, so that it exists before the company grows past the point where it is obvious. | Founder (Zuzana) | On first hire or engagement |
+| M6 | **Founder-level model-limitations briefing.** A short written explanation, aimed at a non-technical reader, of what the underlying models can and cannot do — confident errors, no understanding of the individual learner beyond what is stored, no emotional perception. Covers L6 for a non-technical decision-maker without pretending to technical depth. | Jørn (technical founder), with agent drafting support | Before launch |
 
 ### 4.3 Literacy embedded in the engineering rule set
 
@@ -135,13 +135,16 @@ discharge it; §4.3 is the enforcement layer beneath them.
 
 Recorded deliberately, so the DPO reviews a true picture:
 
-1. **No measure has yet been executed.** Everything in §4.2 is proposed. The Article 4 position at the date
-   of this note rests on §4.1 — written constraints and automated guards, not on any recorded training.
+1. **Execution has begun but is not complete.** The M1 acknowledgement log exists and the M2 trigger card
+   is drafted (both 2026-08-07); no acknowledgement has yet been recorded, and M3–M6 remain proposed. The
+   Article 4 position at the date of this note therefore still rests primarily on §4.1 — written
+   constraints and automated guards — plus the started-but-unfinished M1/M2.
 2. **Key-person concentration.** One person, non-technical by her own description, holds the decisions most
    likely to move the classification. Mitigations are documentary (a trigger card, a written record, an
-   external DPO to escalate to), not structural. A second competent reviewer would be the real mitigation
-   and does not exist at present.
-3. **No named engineering-oversight person is recorded here**, pending the [OPEN] item in §2.
+   external DPO to escalate to) plus one internal second pair of eyes: the technical founder (Jørn, §2)
+   can act as an informal second reviewer on trigger-relevant decisions, but no structural four-eyes rule
+   exists and commercial decisions remain one person's.
+3. **Engineering oversight is now named** (Jørn, §2 — recorded 2026-08-07); his acknowledgement under M1 is pending alongside the other founder's.
 4. **Nothing here is externally validated.** No training has been assessed by a third party, and this note
    is not a compliance claim.
 5. **The AI-agent operating model is unusual** and its Article 4 treatment (agents as tools governed by
@@ -154,7 +157,7 @@ Recorded deliberately, so the DPO reviews a true picture:
 
 | Field | Value |
 |---|---|
-| Owner | Zuzana Kopecna, Chair |
+| Owner | Zuzana Kopečná, Founder |
 | Next review | With the classification record — proposed annually, next due **2027-07-30**, and immediately on any reassessment trigger |
 | Evidence location | This document plus the acknowledgement log created by M1 |
 
@@ -163,3 +166,4 @@ Recorded deliberately, so the DPO reviews a true picture:
 | Version | Date | Change | Author |
 |---|---|---|---|
 | v0.1 | 2026-07-30 | Initial Article 4 note, responding to the DPO's requirement of 2026-07-30. | agent-drafted for management review |
+| v0.2 | 2026-08-07 | Pre-review completion pass: second founder recorded (Jørn — technical/engineering oversight; operator-confirmed 2026-08-07), M6 owner assigned, M1 acknowledgement log created ([`2026-08-07-ai-literacy-acknowledgement-log.md`](2026-08-07-ai-literacy-acknowledgement-log.md)), M2 trigger card drafted ([`2026-08-07-ai-act-trigger-card.md`](2026-08-07-ai-act-trigger-card.md)), limitations §5 items 1–3 updated to match, owner name/title aligned to the operator ruling of 2026-08-01 (Zuzana Kopečná, Founder). | agent-drafted for management review |
