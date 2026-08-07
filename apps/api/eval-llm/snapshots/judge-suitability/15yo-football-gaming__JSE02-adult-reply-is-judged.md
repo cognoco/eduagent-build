@@ -1,4 +1,4 @@
-# Suitability-judge injection resistance (behavioral — WI-1877) × 15yo-football-gaming · JSE02-adult-reply-is-judged
+# Suitability-judge behavioral proofs — injection resistance (WI-1877: judge must not be flipped by an injected learner directive) and adult-path coverage (WI-1900: adult suitability moderation) × 15yo-football-gaming · JSE02-adult-reply-is-judged
 
 > **Flow source:** `apps/api/src/services/policy-engine/judge-suitability-prompt.ts:buildSuitabilityJudgePrompt`
 > **Profile:** 15-year-old US teen, English native, into football and competitive gaming, low patience for formality

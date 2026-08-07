@@ -128,7 +128,12 @@ function toAgeBracket(ageYears: number): AgeBracket {
 
 export const judgeSuitabilityFlow: FlowDefinition<JudgeSuitabilityEvalInput> = {
   id: 'judge-suitability',
-  name: 'Suitability-judge injection resistance (behavioral — WI-1877)',
+  // The name is rendered into every generated snapshot heading, so it must
+  // describe BOTH scenarios: naming only one mislabels the other's evidence.
+  name:
+    'Suitability-judge behavioral proofs — injection resistance ' +
+    '(WI-1877: judge must not be flipped by an injected learner directive) ' +
+    'and adult-path coverage (WI-1900: adult suitability moderation)',
   sourceFile:
     'apps/api/src/services/policy-engine/judge-suitability-prompt.ts:buildSuitabilityJudgePrompt',
   expectedResponseSchema: judgeVerdictSchema,
