@@ -17,7 +17,7 @@ reassessment trigger (M3) and at each periodic review (M4).
 | Date | Person | Read set version | Acknowledgement |
 |---|---|---|---|
 | *(pending)* | Zuzana Kopečná, Founder | — | — |
-| *(pending)* | Jørn, Founder | — | — |
+| *(pending)* | Jørn Kjetil Jørgensen, Founder | — | — |
 
 *An acknowledgement line is added by the person themselves or on their explicit instruction, with the
 date, the classification-record version read (e.g. v0.2), and the word "acknowledged". No quiz, no
