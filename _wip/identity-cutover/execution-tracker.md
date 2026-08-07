@@ -19,6 +19,14 @@ scope: complete the identity-foundation cutover end-to-end — reconcile the app
 > is a current instruction. Stamped under NEX-ADR-0000 §I.3 clause 2 (terminal stamping of
 > W-state is part of closing) after this document caused a session to assert, wrongly, that
 > the identity rebuild was still pending.
+>
+> **Re-check the claims without redoing the archaeology:** WI-586 (WP-TAIL-drop-legacy —
+> drop legacy identity tables and readers) is Closed in Cosmo;
+> `docs/adr/MMT-ADR-0020-cutover-completion-amendments.md` (Accepted 2026-06-29) records the
+> application cutover to the ratified identity model; and
+> `rg IDENTITY_V2_ENABLED apps/api/src apps/mobile/src packages` returns test files only.
+
+---
 
 > **The durable entry point for PRG-06.** Charter / canon authority / slice sequence /
 > coarse status / current position / launch gate / change log. Per the umbrella planning

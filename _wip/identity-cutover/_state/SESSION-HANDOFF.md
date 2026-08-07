@@ -6,6 +6,13 @@
 > Closed and `IDENTITY_V2_ENABLED` is absent from production code (verified against the
 > repository). There is no GO to wait for.
 > **Everything below is history.** Stamped under NEX-ADR-0000 §I.3 clause 2.
+>
+> **Re-check the claims:** WI-586 (WP-TAIL-drop-legacy — drop legacy identity tables and
+> readers) is Closed in Cosmo; `docs/adr/MMT-ADR-0020-cutover-completion-amendments.md`
+> (Accepted 2026-06-29) records the application cutover; and
+> `rg IDENTITY_V2_ENABLED apps/api/src apps/mobile/src packages` returns test files only.
+
+---
 
 > Role: shepherd PRG-06 / WS-18 → Cosmo Close. CANON WINS over S0-S6. Orchestrate; don't write prod code.
 > Two gates: **Gate-1** = green-PR squash-merge (me) · **Gate-2** = Cosmo Close (SEPARATE autonomous reviewer, validates vs **origin/main**; healthy).
