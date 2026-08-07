@@ -165,13 +165,22 @@ export async function handleSuitabilityJudge(
     // synchronous enforcing gate, which raises this alarm itself when enabled.
     // Emitting here for minors would double-alarm and would change the minor
     // path, which the ruling holds untouched.
+    //
+    // Memoized in its own step: this function runs with retries: 2, so any
+    // retry re-executes non-step code after the last completed step. The
+    // emitters mint a fresh crypto.randomUUID() per call, so an unmemoized
+    // dispatch would raise a SECOND distinct alarm for one verdict — duplicate
+    // operator pages on a safety path. Matches payment-failed-observe.ts.
     if (ageBracket === 'adult') {
-      await dependencies.emitUnavailable({
-        sessionId,
-        profileId,
-        flow,
-        model: tutorModel,
-        provider: tutorVendor,
+      await step.run('emit-adult-suitability-unavailable', async () => {
+        await dependencies.emitUnavailable({
+          sessionId,
+          profileId,
+          flow,
+          model: tutorModel,
+          provider: tutorVendor,
+        });
+        return null;
       });
     }
     return { degraded: true as const };
@@ -209,14 +218,19 @@ export async function handleSuitabilityJudge(
       flags: outcome.flags,
     })
   ) {
-    await dependencies.emitBlocked({
-      sessionId,
-      profileId,
-      flow,
-      model: tutorModel,
-      provider: tutorVendor,
-      flags: outcome.flags,
-      mode: 'observed',
+    // Memoized for the same reason as the degraded branch above — a retry must
+    // not raise a second blocked alarm for one already-judged reply.
+    await step.run('emit-adult-suitability-blocked', async () => {
+      await dependencies.emitBlocked({
+        sessionId,
+        profileId,
+        flow,
+        model: tutorModel,
+        provider: tutorVendor,
+        flags: outcome.flags,
+        mode: 'observed',
+      });
+      return null;
     });
   }
 

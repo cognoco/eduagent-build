@@ -41,12 +41,22 @@ type Outcome =
   | { status: 'reply_not_found' }
   | { status: 'degraded' };
 
+/**
+ * Step runner that short-circuits ONLY the DB-backed `rehydrate-and-judge`
+ * closure (returning a canned outcome) and genuinely executes every other step
+ * — so the escalation dispatches, which must live inside their own memoized
+ * steps, actually run and are observable. `names` records the step names used,
+ * which is how the memoization itself is asserted.
+ */
 function stepReturning(outcome: Outcome) {
+  const names: string[] = [];
   return {
-    run: (async () => outcome) as <T>(
-      name: string,
-      fn: () => Promise<T> | T,
-    ) => Promise<T>,
+    names,
+    run: (async (name: string, fn: () => unknown) => {
+      names.push(name);
+      if (name === 'rehydrate-and-judge') return outcome;
+      return await fn();
+    }) as unknown as <T>(name: string, fn: () => Promise<T> | T) => Promise<T>,
   };
 }
 
@@ -101,6 +111,43 @@ describe('[WI-1900] adult-path escalation', () => {
     expect(arg.mode).toBe('observed');
     expect(arg.flags).toEqual(['age_inappropriate']);
     expect(d.emitUnavailable).not.toHaveBeenCalled();
+  });
+
+  // Regression guard for the review finding on 32841eef9: the dispatches were
+  // called directly in the function body. This function runs with retries: 2,
+  // so a retry re-executes everything after the last completed step — and the
+  // emitters mint a fresh UUID per call, so an unmemoized dispatch raises a
+  // SECOND distinct alarm for one verdict. Duplicate operator pages on a
+  // safety path. Each dispatch must own a memoized step.
+  it('memoizes each escalation dispatch in its own step (no duplicate alarm on retry)', async () => {
+    const d = deps();
+    const s = stepReturning(violation);
+
+    await handleSuitabilityJudge(
+      { event: { data: payload('adult') }, step: s },
+      d,
+    );
+
+    expect(s.names).toEqual([
+      'rehydrate-and-judge',
+      'emit-adult-suitability-blocked',
+    ]);
+    expect(d.emitBlocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('memoizes the degraded-judge alarm in its own step', async () => {
+    const d = deps();
+    const s = stepReturning({ status: 'degraded' });
+
+    await handleSuitabilityJudge(
+      { event: { data: payload('adult') }, step: s },
+      d,
+    );
+
+    expect(s.names).toEqual([
+      'rehydrate-and-judge',
+      'emit-adult-suitability-unavailable',
+    ]);
   });
 
   it('does NOT alarm for a minor violation — the minor path is untouched', async () => {
