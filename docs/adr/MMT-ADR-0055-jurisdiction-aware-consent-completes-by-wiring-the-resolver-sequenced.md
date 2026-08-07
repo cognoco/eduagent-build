@@ -61,3 +61,4 @@ Finally, this area conflates two different gates unless forcibly separated. *"Ma
 ## Provenance
 
 - Architecture sign-off (human-typed, operator Jorn): <https://github.com/cognoco/eduagent-build/pull/2996#issuecomment-5207213508> — ratification comment on the acceptance pull request, 2026-08-05, following the decision sitting in which the draft was read in full.
+- Amendment sign-off (human-typed, operator Jorn): <https://github.com/cognoco/eduagent-build/pull/2997#issuecomment-5217467167> — covers the 2026-08-07 review-round corrections to this record: the Context correction naming the already-jurisdiction-aware guardian-attachment ceremony, clause 2's residence-capture dependency and input discipline, clause 3's definition-of-done additions, clause 6's consent-blocked wording, and the aligned alternative rationale. The ruling itself is unchanged from the sitting; the amendments correct factual and internal-consistency defects found in review.
