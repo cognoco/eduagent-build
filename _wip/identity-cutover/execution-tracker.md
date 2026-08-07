@@ -1,6 +1,6 @@
 ---
 title: Identity Cutover — Execution Tracker (PRG-06)
-status: ACTIVE (stood up 2026-06-15) — shepherd launch GATED (see §6)
+status: TERMINAL — completed; stamped 2026-08-07 (was "ACTIVE — shepherd launch GATED")
 owner: Jorn (orchestrator) + PRG-06 shepherd session (to be launched)
 roster: PRG-06 in _wip/umbrella-program/program-roster.md
 scope: complete the identity-foundation cutover end-to-end — reconcile the application
@@ -9,6 +9,24 @@ scope: complete the identity-foundation cutover end-to-end — reconcile the app
 ---
 
 # Identity Cutover — Execution Tracker
+
+> **TERMINAL — the cutover completed. Stamped 2026-08-07.**
+> Verified against the repository, not against this document: WI-586 is Closed,
+> `IDENTITY_V2_ENABLED` is absent from production code, `consent_grant` is live, and
+> `person.residence_jurisdiction` is `NOT NULL`. The shepherd launch this tracker gates
+> is moot — the work it was gating is done.
+> **Everything below is history.** Live identity state is the code and Cosmo; nothing here
+> is a current instruction. Stamped under NEX-ADR-0000 §I.3 clause 2 (terminal stamping of
+> W-state is part of closing) after this document caused a session to assert, wrongly, that
+> the identity rebuild was still pending.
+>
+> **Re-check the claims without redoing the archaeology:** WI-586 (WP-TAIL-drop-legacy —
+> drop legacy identity tables and readers) is Closed in Cosmo;
+> `docs/adr/MMT-ADR-0020-cutover-completion-amendments.md` (Accepted 2026-06-29) records the
+> application cutover to the ratified identity model; and
+> `rg IDENTITY_V2_ENABLED apps/api/src apps/mobile/src packages` returns test files only.
+
+---
 
 > **The durable entry point for PRG-06.** Charter / canon authority / slice sequence /
 > coarse status / current position / launch gate / change log. Per the umbrella planning
