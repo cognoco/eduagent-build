@@ -162,6 +162,8 @@ type SessionRouteEnv = {
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
     JUDGE_FRAMEWORK_ENABLED?: string;
+    // [WI-1900] Adult post-display coverage fraction; parsed, not trusted.
+    JUDGE_ADULT_SUITABILITY_SAMPLING?: string;
     JUDGE_ENFORCEMENT_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;

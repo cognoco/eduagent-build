@@ -911,6 +911,8 @@ describe('ALLOW_MISSING_IDEMPOTENCY_KV env flag', () => {
 describe('validateProductionBindings', () => {
   const PROD_ENV: Env = {
     ENVIRONMENT: 'production',
+    // [WI-1900] Post-parse Env carries the coerced number, not the raw binding.
+    JUDGE_ADULT_SUITABILITY_SAMPLING: 0.1,
     DATABASE_URL: 'postgresql://prod/db',
     APP_URL: 'https://www.mentomate.com',
     API_ORIGIN: 'https://api.mentomate.com',

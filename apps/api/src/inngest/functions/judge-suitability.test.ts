@@ -82,7 +82,7 @@ function payload(ageBracket: 'adult' | 'adolescent' | 'child') {
 const violation = {
   status: 'judged' as const,
   overall: 'violation',
-  flags: ['harassment'] as JudgeFlagCategory[],
+  flags: ['age_inappropriate'] as JudgeFlagCategory[],
 };
 
 describe('[WI-1900] adult-path escalation', () => {
@@ -99,7 +99,7 @@ describe('[WI-1900] adult-path escalation', () => {
     // 'observed' is what keeps this out of the operator blocked-count digest —
     // the reply was already displayed, so no learner was protected.
     expect(arg.mode).toBe('observed');
-    expect(arg.flags).toEqual(['harassment']);
+    expect(arg.flags).toEqual(['age_inappropriate']);
     expect(d.emitUnavailable).not.toHaveBeenCalled();
   });
 
@@ -145,7 +145,7 @@ describe('[WI-1900] adult-path escalation', () => {
         step: stepReturning({
           status: 'judged',
           overall: 'concern',
-          flags: ['harassment'] as JudgeFlagCategory[],
+          flags: ['age_inappropriate'] as JudgeFlagCategory[],
         }),
       },
       d,

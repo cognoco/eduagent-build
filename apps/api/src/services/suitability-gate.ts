@@ -77,7 +77,7 @@ export function shouldBlockSuitabilityVerdict(
   // the post-display adult rail — which only carries overall+flags across the
   // Inngest step boundary (raw text and rationale deliberately stay inside the
   // step closure) — can reuse this predicate without an unsafe cast.
-  verdict: Pick<JudgeVerdict, 'overall' | 'flags'>,
+  verdict: Pick<JudgeVerdict, 'overall' | 'flags'> & { rationale?: string },
 ): boolean {
   if (verdict.overall !== 'violation') return false;
   return verdict.flags.some(
