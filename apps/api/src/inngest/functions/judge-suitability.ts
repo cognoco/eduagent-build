@@ -22,6 +22,11 @@ import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { createLogger } from '../../services/logger';
 import { runSuitabilityJudge } from '../../services/policy-engine/judge-suitability';
+import { shouldBlockSuitabilityVerdict } from '../../services/suitability-gate';
+import {
+  emitSuitabilityBlockedEvent,
+  emitSuitabilityJudgeUnavailableEvent,
+} from '../../services/exchanges';
 
 const logger = createLogger();
 
@@ -35,13 +40,34 @@ type JudgeOutcome =
   | { status: 'reply_not_found' }
   | { status: 'degraded' };
 
-export async function handleSuitabilityJudge({
-  event,
-  step,
-}: {
-  event: { data: unknown };
-  step: { run: <T>(name: string, fn: () => Promise<T> | T) => Promise<T> };
-}) {
+/**
+ * [WI-1900] Injectable escalation emitters. Mirrors the `IngestDependencies`
+ * pattern in blocked-safety-digest.ts — the production defaults are the real
+ * `services/exchanges` emitters, and tests substitute fakes rather than
+ * jest.mock-ing an internal module (GC1). Without this the adult-path
+ * escalation added below would be unverifiable, since the rest of this handler
+ * reaches the database.
+ */
+export interface SuitabilityJudgeDependencies {
+  emitBlocked: typeof emitSuitabilityBlockedEvent;
+  emitUnavailable: typeof emitSuitabilityJudgeUnavailableEvent;
+}
+
+const defaultSuitabilityJudgeDependencies: SuitabilityJudgeDependencies = {
+  emitBlocked: emitSuitabilityBlockedEvent,
+  emitUnavailable: emitSuitabilityJudgeUnavailableEvent,
+};
+
+export async function handleSuitabilityJudge(
+  {
+    event,
+    step,
+  }: {
+    event: { data: unknown };
+    step: { run: <T>(name: string, fn: () => Promise<T> | T) => Promise<T> };
+  },
+  dependencies: SuitabilityJudgeDependencies = defaultSuitabilityJudgeDependencies,
+) {
   const payload = parseEventData(event.data);
   if (!payload) {
     // Malformed payload will never become valid — skip cleanly so Inngest does
@@ -130,6 +156,24 @@ export async function handleSuitabilityJudge({
       flow,
       tutorModel,
     });
+    // [WI-1900] Adult-path escalation. Before this, a degraded judge on the
+    // adult rail produced a log line and nothing queryable — silent recovery on
+    // a safety path. Reuses the SAME structured alarm the minor enforcing gate
+    // raises (operator ruling 2026-08-04).
+    //
+    // Adult-scoped deliberately: a minor's reply is ALSO covered by the
+    // synchronous enforcing gate, which raises this alarm itself when enabled.
+    // Emitting here for minors would double-alarm and would change the minor
+    // path, which the ruling holds untouched.
+    if (ageBracket === 'adult') {
+      await dependencies.emitUnavailable({
+        sessionId,
+        profileId,
+        flow,
+        model: tutorModel,
+        provider: tutorVendor,
+      });
+    }
     return { degraded: true as const };
   }
 
@@ -145,6 +189,36 @@ export async function handleSuitabilityJudge({
     tutorModel,
     conversationLanguage,
   });
+
+  // [WI-1900] Adult-path escalation on a blocking-grade verdict. The reply is
+  // ALREADY DISPLAYED — this rail is post-display, so nothing is blocked and
+  // fail-closed is not available here. What AC-2 can mean for adults is the
+  // escalation half: never silent recovery. `mode: 'observed'` tells the
+  // operator digest not to count this as a block (see blocked-safety-digest.ts).
+  //
+  // Reuses shouldBlockSuitabilityVerdict so the adult rail inherits the SAME
+  // over-block controls as the minor gate: 'concern' never alarms, and a
+  // violation flagged only over_blocking/topic_drift never alarms.
+  //
+  // Adult-scoped for the same reason as the degraded branch above: minors are
+  // covered by the synchronous enforcing gate, which raises its own event.
+  if (
+    ageBracket === 'adult' &&
+    shouldBlockSuitabilityVerdict({
+      overall: outcome.overall,
+      flags: outcome.flags,
+    })
+  ) {
+    await dependencies.emitBlocked({
+      sessionId,
+      profileId,
+      flow,
+      model: tutorModel,
+      provider: tutorVendor,
+      flags: outcome.flags,
+      mode: 'observed',
+    });
+  }
 
   return {
     judged: true as const,

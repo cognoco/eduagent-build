@@ -2139,6 +2139,8 @@ export async function maybeDispatchSuitabilityJudge(input: {
   tutorModel: string | undefined;
   flow: string;
   conversationLanguage?: ConversationLanguage;
+  /** [WI-1900] Adult coverage fraction — see SuitabilityJudgeDispatchInput. */
+  adultSampling?: number;
 }): Promise<void> {
   const event = resolveSuitabilityJudgeDispatch({
     ...input,
@@ -4285,6 +4287,8 @@ export async function processMessage(
     mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
+    /** [WI-1900] Adult post-display coverage fraction; undefined → launch default. */
+    judgeAdultSuitabilitySampling?: number;
     judgeEnforcementEnabled?: boolean;
     answerEvaluationEnabled?: boolean;
   },
@@ -4644,6 +4648,7 @@ export async function processMessage(
     // JUDGE_FRAMEWORK_ENABLED; no-op when the flag is off or not sampled.
     await maybeDispatchSuitabilityJudge({
       enabled: options?.judgeFrameworkEnabled === true,
+      adultSampling: options?.judgeAdultSuitabilitySampling,
       profileId,
       sessionId: session.id,
       replyEventId: persisted.aiEventId,
@@ -4716,6 +4721,8 @@ export async function streamMessage(
     mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
+    /** [WI-1900] Adult post-display coverage fraction; undefined → launch default. */
+    judgeAdultSuitabilitySampling?: number;
     judgeEnforcementEnabled?: boolean;
     answerEvaluationEnabled?: boolean;
   },
@@ -5169,6 +5176,7 @@ export async function streamMessage(
         // reply row id only; default-off behind JUDGE_FRAMEWORK_ENABLED.
         await maybeDispatchSuitabilityJudge({
           enabled: options?.judgeFrameworkEnabled === true,
+          adultSampling: options?.judgeAdultSuitabilitySampling,
           profileId,
           sessionId: session.id,
           replyEventId: persisted.aiEventId,

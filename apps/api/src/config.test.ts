@@ -14,6 +14,7 @@ import {
   isMentorNoticeEnabled,
   isMentorNoticePushPostMvpEnabled,
   resolveMentorNoticePolicyRevision,
+  resolveAdultSuitabilitySampling,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -1214,5 +1215,43 @@ describe('isMaintenanceProductionEnabled [WI-1051]', () => {
 
   it("returns false for '1' (JS-truthy string, not the required literal)", () => {
     expect(isMaintenanceProductionEnabled('1')).toBe(false);
+  });
+});
+
+// [WI-1900] Adult post-display suitability coverage. Unlike the boolean gates
+// above, this one fails SAFE toward the shipped launch rate rather than toward
+// zero: a binding that silently resolved to 0 would disable adult coverage
+// entirely while looking identical to a healthy judge.
+describe('resolveAdultSuitabilitySampling', () => {
+  it('parses the Workers string binding into a number', () => {
+    // Cloudflare hands every binding through as a string.
+    expect(resolveAdultSuitabilitySampling('0.25')).toBe(0.25);
+    expect(resolveAdultSuitabilitySampling('1')).toBe(1);
+  });
+
+  it('accepts an already-numeric value unchanged', () => {
+    expect(resolveAdultSuitabilitySampling(0.4)).toBe(0.4);
+  });
+
+  it('honours an explicit zero (deliberate opt-out is not malformed)', () => {
+    // 0 is a legitimate operator choice and must NOT be rescued to the default.
+    expect(resolveAdultSuitabilitySampling('0')).toBe(0);
+    expect(resolveAdultSuitabilitySampling(0)).toBe(0);
+  });
+
+  it('falls back to the launch default when the binding is absent', () => {
+    expect(resolveAdultSuitabilitySampling(undefined)).toBe(0.1);
+  });
+
+  it('falls back to the launch default on a malformed binding, never to 0', () => {
+    // The load-bearing case: garbage must not silently zero adult coverage.
+    expect(resolveAdultSuitabilitySampling('not-a-number')).toBe(0.1);
+    expect(resolveAdultSuitabilitySampling('')).toBe(0.1);
+    expect(resolveAdultSuitabilitySampling(Number.NaN)).toBe(0.1);
+  });
+
+  it('clamps out-of-range values into [0, 1]', () => {
+    expect(resolveAdultSuitabilitySampling('5')).toBe(1);
+    expect(resolveAdultSuitabilitySampling('-2')).toBe(0);
   });
 });

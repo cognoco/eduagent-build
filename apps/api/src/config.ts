@@ -266,6 +266,20 @@ const envSchema = z.object({
   // calibration-gated evidence from real minor-traffic judge.verdict data.
   JUDGE_ENFORCEMENT_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Adult post-display suitability coverage (WI-1900, operator ruling
+  // 2026-08-04). Fraction of ADULT tutor replies sent to the post-display
+  // suitability judge; minors are always covered at 1.0 and are unaffected by
+  // this key. Previously the hard-coded ADULT_SUITABILITY_SAMPLING constant in
+  // policy-engine/judge-profile.ts — the ruling requires a config value so
+  // coverage can ratchet toward full-async by configuration, not redesign.
+  // Default 0.1 preserves the shipped launch rate exactly, so landing this key
+  // is a zero-behavior-change refactor until an environment overrides it.
+  JUDGE_ADULT_SUITABILITY_SAMPLING: z.coerce
+    .number()
+    .min(0)
+    .max(1)
+    .default(0.1),
+
   // Challenge Round grader (MMT-ADR-0016 §2 / plan 2026-06-26). Sources
   // challenge_round_evaluation from a dedicated judge call instead of the
   // inline tutor envelope (gpt-oss silently drops the signal). Default-ON as
@@ -582,6 +596,32 @@ export function isReviewContinuityOpenerEnabled(
  */
 export function isJudgeFrameworkEnabled(value: string | undefined): boolean {
   return value === 'true';
+}
+
+/**
+ * [WI-1900] Adult post-display suitability coverage. Read at the exchange route
+ * boundary and threaded through as `options.judgeAdultSuitabilitySampling`.
+ * Cloudflare Workers hands bindings through as strings, so the raw value is
+ * parsed here rather than trusted as a number.
+ *
+ * Fails SAFE toward the shipped launch default (0.1) rather than toward 0: a
+ * malformed or absent binding must never silently drop adult coverage to zero,
+ * which would look identical to "the judge is working" while covering nobody.
+ * Out-of-range values clamp into [0, 1].
+ */
+export function resolveAdultSuitabilitySampling(
+  value: string | number | undefined,
+): number {
+  if (typeof value === 'string' && value.trim() === '') {
+    // A present-but-BLANK binding is malformed, not a deliberate 0. Number('')
+    // is 0 and finite, so without this guard a blank secret would silently
+    // disable adult coverage while looking like a healthy configured value —
+    // the same present-but-blank failure shape as WI-2832's SENTRY_DSN.
+    return 0.1;
+  }
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return 0.1;
+  return Math.min(1, Math.max(0, parsed));
 }
 
 /**

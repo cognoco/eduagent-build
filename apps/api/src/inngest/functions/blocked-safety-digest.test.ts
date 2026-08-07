@@ -110,6 +110,95 @@ describe('[WI-1691] blocked-safety digest Inngest functions', () => {
     expect(JSON.stringify(record.mock.calls)).not.toContain('private');
   });
 
+  // [WI-1900] The post-display adult judge reuses app/safety.suitability_blocked
+  // to raise a real alarm, but it fires AFTER display — no reply was replaced.
+  // suitabilityBlockedCount is an operator-facing safety metric; counting an
+  // observed detection there would assert a learner was protected when none
+  // was. These two tests are the guard on that false-compliance signal.
+  it('[WI-1900] does NOT count an observed-mode suitability event in the digest', async () => {
+    const record = jest.fn();
+    const { step, runNames } = createInngestStepRunner();
+
+    await expect(
+      runBlockedSafetyDigestIngest(
+        {
+          event: {
+            name: 'app/safety.suitability_blocked',
+            data: {
+              eventId: '00000000-0000-4000-8000-000000001900',
+              timestamp: '2026-08-07T10:00:00.000Z',
+              mode: 'observed',
+            },
+          },
+          step,
+        },
+        { record },
+      ),
+    ).resolves.toEqual({ status: 'skipped', reason: 'observed_only' });
+
+    // Never reaches the durable counter step at all.
+    expect(record).not.toHaveBeenCalled();
+    expect(runNames()).toEqual([]);
+  });
+
+  it('[WI-1900] still counts a suitability event with NO mode (pre-WI-1900 enforced events)', async () => {
+    // Backward compatibility: every event emitted before WI-1900 came from the
+    // synchronous minor enforcing gate and carries no mode. Those must keep
+    // counting exactly as before — the new field must not silently drop them.
+    const record = jest.fn().mockResolvedValue({
+      recorded: true,
+      bucketDate: '2026-08-07',
+    });
+    const { step } = createInngestStepRunner();
+
+    await expect(
+      runBlockedSafetyDigestIngest(
+        {
+          event: {
+            name: 'app/safety.suitability_blocked',
+            data: {
+              eventId: '00000000-0000-4000-8000-000000001901',
+              timestamp: '2026-08-07T10:00:00.000Z',
+            },
+          },
+          step,
+        },
+        { record },
+      ),
+    ).resolves.toEqual({
+      status: 'recorded',
+      recorded: true,
+      bucketDate: '2026-08-07',
+    });
+    expect(record).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-1900] counts an explicitly enforced-mode suitability event', async () => {
+    const record = jest.fn().mockResolvedValue({
+      recorded: true,
+      bucketDate: '2026-08-07',
+    });
+    const { step } = createInngestStepRunner();
+
+    await expect(
+      runBlockedSafetyDigestIngest(
+        {
+          event: {
+            name: 'app/safety.suitability_blocked',
+            data: {
+              eventId: '00000000-0000-4000-8000-000000001902',
+              timestamp: '2026-08-07T10:00:00.000Z',
+              mode: 'enforced',
+            },
+          },
+          step,
+        },
+        { record },
+      ),
+    ).resolves.toMatchObject({ status: 'recorded' });
+    expect(record).toHaveBeenCalledTimes(1);
+  });
+
   it('captures invalid payload shape without logging or capturing raw data', async () => {
     const record = jest.fn();
     const { step, runNames } = createInngestStepRunner();

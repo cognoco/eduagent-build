@@ -315,6 +315,11 @@ describe('[WI-1691] blocked-safety digest event identity', () => {
         'model',
         'tutorModel',
         'flags',
+        // [WI-1900] Which rail raised this: 'enforced' (synchronous minor gate,
+        // reply actually replaced) or 'observed' (post-display adult judge,
+        // nothing blocked). A closed enum literal — carries no learner content,
+        // so it belongs on this allowlist rather than weakening the check.
+        'mode',
         'timestamp',
       ],
     ];

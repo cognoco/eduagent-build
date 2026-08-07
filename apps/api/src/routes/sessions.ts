@@ -99,6 +99,7 @@ import {
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
   isJudgeFrameworkEnabled,
+  resolveAdultSuitabilitySampling,
   isJudgeEnforcementEnabled,
   isMentorNoticeEnabled,
   isAnswerEvaluationRuntimeEnabled,
@@ -550,6 +551,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
+      // [WI-1900] Adult post-display coverage fraction — config-valued so
+      // coverage ratchets by configuration, not redesign.
+      const judgeAdultSuitabilitySampling = resolveAdultSuitabilitySampling(
+        c.env.JUDGE_ADULT_SUITABILITY_SAMPLING,
+      );
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
@@ -576,6 +582,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             mentorNoticeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
+            judgeAdultSuitabilitySampling,
             judgeEnforcementEnabled,
             answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
@@ -717,6 +724,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
+      // [WI-1900] Adult post-display coverage fraction — config-valued so
+      // coverage ratchets by configuration, not redesign.
+      const judgeAdultSuitabilitySampling = resolveAdultSuitabilitySampling(
+        c.env.JUDGE_ADULT_SUITABILITY_SAMPLING,
+      );
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
@@ -751,6 +763,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             mentorNoticeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
+            judgeAdultSuitabilitySampling,
             judgeEnforcementEnabled,
             answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
