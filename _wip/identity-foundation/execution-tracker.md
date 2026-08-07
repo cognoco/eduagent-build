@@ -1,5 +1,13 @@
 # Identity Foundation — Execution Tracker
 
+> **TERMINAL — the activity completed. Stamped 2026-08-07.**
+> The "Last updated" line below is frozen at 2026-06-14 and says WI-586 convergence has
+> "only operator/counsel items remain[ing]". That is no longer true: WI-586 is Closed, and
+> `IDENTITY_V2_ENABLED` is absent from production code (verified against the repository,
+> not against this document).
+> **Everything below is history.** Live identity state is the code and Cosmo. Stamped under
+> NEX-ADR-0000 §I.3 clause 2 (terminal stamping of W-state is part of closing).
+
 **Stream:** identity-foundation (umbrella roster **PRG-01**) · **Activity:** clean-cut execution (waves W0–W4 + tail)
 **Last updated:** 2026-06-14 (CUT wave WI-689..693 + CUT-tail preconditions WI-722/723 all CLOSED; WI-586 convergence now has zero open code-side blockers — only operator/counsel items remain) · **Owner:** Jorn (+ runway session agents)
 

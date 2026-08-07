@@ -1,5 +1,12 @@
 # PRG-06 Identity Cutover — Shepherd Session Handoff
 
+> **TERMINAL — the cutover completed and this shepherd is retired. Stamped 2026-08-07.**
+> The banner below reports WI-586 as "committed-surgical @ `e9fe75e72`, NOT pushed, NOT at
+> push bar" and the shepherd as awaiting an orchestrator GO. Both are stale: WI-586 is
+> Closed and `IDENTITY_V2_ENABLED` is absent from production code (verified against the
+> repository). There is no GO to wait for.
+> **Everything below is history.** Stamped under NEX-ADR-0000 §I.3 clause 2.
+
 > Role: shepherd PRG-06 / WS-18 → Cosmo Close. CANON WINS over S0-S6. Orchestrate; don't write prod code.
 > Two gates: **Gate-1** = green-PR squash-merge (me) · **Gate-2** = Cosmo Close (SEPARATE autonomous reviewer, validates vs **origin/main**; healthy).
 > ⚠️ **`_state/` JSONL channel is EPHEMERAL** (resyncs wipe/truncate it). **Trust COSMO + origin/main + gh, not the files.** Durable anchors = the **harness task list** + Cosmo. Outbox via python (not shell heredocs); IDs continue monotonically (next after **prg06ic-064**).
