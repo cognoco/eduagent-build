@@ -192,6 +192,7 @@ async function seedShareableFacts(
     sessionId: session.id,
     profileId: supporteePersonId,
     content: 'integ learner-facing summary',
+    learnerRecap: 'integ persisted learner recap',
     aiFeedback: 'integ raw AI feedback',
     highlight: RAW_HIGHLIGHT,
     narrative: RAW_NARRATIVE,

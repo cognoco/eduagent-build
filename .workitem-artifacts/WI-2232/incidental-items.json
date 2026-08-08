@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Audit weekly-report ownership shapes across test fixtures",
+    "type": "Hygiene",
+    "priority": "P2",
+    "description": "Inventory weekly-report seeds and mocks against their production writer ownership contract so supporter- and supportee-shaped rows cannot mask read-scope regressions.",
+    "acceptanceCriteria": "Every weekly-report fixture and mock is classified as self-report-shaped or supporter-digest-shaped with its production writer cited; misleading shapes are corrected or explicitly named; direct tests prove the intended list and exact-link reader; weak shared-record consumers cannot stay green solely because recap or milestone facts remain.",
+    "found_in": "https://github.com/cognoco/eduagent-build/pull/2710#discussion_r3686401198",
+    "tags": ["gap"]
+  }
+]

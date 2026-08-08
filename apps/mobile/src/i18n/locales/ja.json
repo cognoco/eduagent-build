@@ -4521,7 +4521,9 @@
       "structuralOnly": "構造的な情報のみ。メモやチャットの原文は含まれません。",
       "errorTitle": "共有記録を読み込めませんでした",
       "errorMessage": "しばらくしてからもう一度お試しください。",
-      "retry": "再試行"
+      "retry": "再試行",
+      "unavailable_one": "現在、1件の更新を読み込めませんでした。",
+      "unavailable_other": "現在、{{count}}件の更新を読み込めませんでした。"
     },
     "appeal": {
       "label": "アテンションレポートをリクエスト",

@@ -97,12 +97,10 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   // --- Journal (same person/edge, still the rich supportee).
   await pressableClick(page.getByTestId('tab-journal'));
   await expect(page).toHaveURL(/\/journal$/);
-  const journalPlaceholder = page.getByTestId(
-    'person-scope-journal-placeholder',
-  );
-  await expect(journalPlaceholder).toBeVisible();
+  const personJournal = page.getByTestId('person-scope-journal');
+  await expect(personJournal).toBeVisible();
   await expect(
-    journalPlaceholder.getByText(richDisplayName, { exact: true }),
+    personJournal.getByText(richDisplayName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toBeVisible();
 
@@ -119,9 +117,9 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   // is still active (scope-context.tsx persists activeScope via SecureStore
   // keyed on profileId, re-hydrated on next mount) — not reverted to the hub.
   await page.reload({ waitUntil: 'commit' });
-  await expect(journalPlaceholder).toBeVisible({ timeout: 30_000 });
+  await expect(personJournal).toBeVisible({ timeout: 30_000 });
   await expect(
-    journalPlaceholder.getByText(richDisplayName, { exact: true }),
+    personJournal.getByText(richDisplayName, { exact: true }),
   ).toBeVisible();
 
   // --- EMPTY SHARED RECORD: switching to the empty-record supportee renders
@@ -129,9 +127,9 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   await pressableClick(
     page.getByTestId(`scope-chip-option-person-${emptyPersonId}`),
   );
-  await expect(journalPlaceholder).toBeVisible();
+  await expect(personJournal).toBeVisible();
   await expect(
-    journalPlaceholder.getByText(emptyDisplayName, { exact: true }),
+    personJournal.getByText(emptyDisplayName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toHaveCount(0);
   await expect(

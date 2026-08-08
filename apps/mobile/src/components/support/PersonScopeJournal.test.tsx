@@ -17,10 +17,11 @@ import {
   createTestProfile,
 } from '../../test-utils/screen-render';
 import {
+  createRoutedMockFetch,
   fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../test-utils/mock-api-routes';
-import { PersonScopeJournalPlaceholder } from './PersonScopeJournalPlaceholder';
+import { PersonScopeJournal } from './PersonScopeJournal';
 
 jest.mock(
   'react-i18next',
@@ -28,19 +29,12 @@ jest.mock(
 );
 
 let mockFetch: RoutedMockFetch;
+let previousFetch: typeof globalThis.fetch;
+const mockPush = jest.fn();
 
-jest.mock(
-  // gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client
-  '../../lib/api-client',
-  () => {
-    const {
-      createRoutedMockFetch,
-      mockApiClientFactory,
-    } = require('../../test-utils/mock-api-routes');
-    mockFetch = createRoutedMockFetch();
-    return mockApiClientFactory(mockFetch);
-  },
-);
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
@@ -77,6 +71,10 @@ const SHARED_RECORD: SharedRecord = {
         title: 'Knows equivalent fractions',
         detail: 'Answered the check without hints.',
         source: 'assessment',
+        artifact: {
+          kind: 'weekly_report',
+          id: '550e8400-e29b-41d4-a716-446655440301',
+        },
       },
     ],
   },
@@ -91,6 +89,10 @@ const SHARED_RECORD: SharedRecord = {
         title: 'Knows equivalent fractions',
         detail: 'Answered the check without hints.',
         source: 'assessment',
+        artifact: {
+          kind: 'weekly_report',
+          id: '550e8400-e29b-41d4-a716-446655440301',
+        },
       },
     ],
   },
@@ -114,10 +116,22 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
   },
 };
 
-function renderWithProfile(ui: React.ReactElement): QueryClient {
+function renderWithProfile(
+  ui: React.ReactElement,
+  initialRecord?: SharedRecord,
+): QueryClient {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
   });
+  if (initialRecord) {
+    queryClient.setQueryData(
+      ['visibility-shared-record', PERSON_ID, EDGE_ID],
+      initialRecord,
+    );
+  }
   const { wrapper } = createScreenWrapper({
     activeProfile: createTestProfile(),
     profiles: [createTestProfile()],
@@ -127,16 +141,20 @@ function renderWithProfile(ui: React.ReactElement): QueryClient {
   return queryClient;
 }
 
-describe('PersonScopeJournalPlaceholder', () => {
+describe('PersonScopeJournal', () => {
   let queryClient: QueryClient | undefined;
 
   afterEach(() => {
     cleanupScreen(queryClient);
     queryClient = undefined;
+    globalThis.fetch = previousFetch;
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+    previousFetch = globalThis.fetch;
+    mockFetch = createRoutedMockFetch();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,
       SHARED_RECORD,
@@ -144,9 +162,7 @@ describe('PersonScopeJournalPlaceholder', () => {
   });
 
   it('renders the fetched shared record for the active person scope', async () => {
-    queryClient = renderWithProfile(
-      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
-    );
+    queryClient = renderWithProfile(<PersonScopeJournal scope={EMMA_SCOPE} />);
 
     await waitFor(() => {
       screen.getByText('Emma has 1 shareable update.');
@@ -180,12 +196,35 @@ describe('PersonScopeJournalPlaceholder', () => {
         ],
       },
     });
-    queryClient = renderWithProfile(
-      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
-    );
+    queryClient = renderWithProfile(<PersonScopeJournal scope={EMMA_SCOPE} />);
 
     await waitFor(() => screen.getByText('Session recap ready'));
     expect(screen.queryByText('Legacy recap detail')).toBeNull();
+  });
+
+  it('deep-links a durable artifact inside the selected person Journal', async () => {
+    queryClient = renderWithProfile(<PersonScopeJournal scope={EMMA_SCOPE} />);
+
+    await waitFor(() => {
+      screen.getByTestId(
+        'journal-artifact-weekly_report-550e8400-e29b-41d4-a716-446655440301',
+      );
+    });
+
+    fireEvent.press(
+      screen.getByTestId(
+        'journal-artifact-weekly_report-550e8400-e29b-41d4-a716-446655440301',
+      ),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/journal/[personId]/[artifactKind]/[artifactId]',
+      params: {
+        personId: PERSON_ID,
+        artifactKind: 'weekly_report',
+        artifactId: '550e8400-e29b-41d4-a716-446655440301',
+      },
+    });
   });
 
   it('shows a visual empty state when the fetched record has no facts', async () => {
@@ -194,9 +233,7 @@ describe('PersonScopeJournalPlaceholder', () => {
       EMPTY_SHARED_RECORD,
     );
 
-    queryClient = renderWithProfile(
-      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
-    );
+    queryClient = renderWithProfile(<PersonScopeJournal scope={EMMA_SCOPE} />);
 
     await waitFor(() => {
       screen.getByTestId('person-scope-journal-empty-lamp', {
@@ -217,6 +254,23 @@ describe('PersonScopeJournalPlaceholder', () => {
     expect(screen.queryByText('No shared record yet')).toBeNull();
   });
 
+  it('shows a refresh error instead of cached person Journal data', async () => {
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/shared-record`,
+      new Response(JSON.stringify({ message: 'nope' }), { status: 500 }),
+    );
+
+    queryClient = renderWithProfile(
+      <PersonScopeJournal scope={EMMA_SCOPE} />,
+      SHARED_RECORD,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-shared-record-error');
+    });
+    expect(screen.queryByText('Knows equivalent fractions')).toBeNull();
+  });
+
   it('requests the attention report when the appeal affordance is pressed', async () => {
     const APPEAL_REPORT: AppealReport = {
       supportershipId: EDGE_ID,
@@ -230,9 +284,7 @@ describe('PersonScopeJournalPlaceholder', () => {
       APPEAL_REPORT,
     );
 
-    queryClient = renderWithProfile(
-      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
-    );
+    queryClient = renderWithProfile(<PersonScopeJournal scope={EMMA_SCOPE} />);
 
     await waitFor(() => {
       screen.getByTestId('visibility-appeal-button');
@@ -267,17 +319,19 @@ describe('PersonScopeJournalPlaceholder', () => {
     });
 
     const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false, gcTime: 0 },
+      },
     });
     const { wrapper } = createScreenWrapper({
       activeProfile: createTestProfile(),
       profiles: [createTestProfile()],
       queryClient,
     });
-    const { rerender } = render(
-      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
-      { wrapper },
-    );
+    const { rerender } = render(<PersonScopeJournal scope={EMMA_SCOPE} />, {
+      wrapper,
+    });
 
     await waitFor(() => {
       screen.getByTestId('visibility-appeal-button');
@@ -289,7 +343,7 @@ describe('PersonScopeJournalPlaceholder', () => {
 
     // Switch person scope without unmounting — the same component instance
     // stays mounted and just receives a new `scope` prop.
-    rerender(<PersonScopeJournalPlaceholder scope={NOAH_SCOPE} />);
+    rerender(<PersonScopeJournal scope={NOAH_SCOPE} />);
 
     await waitFor(() => {
       screen.getByTestId('visibility-appeal-button');

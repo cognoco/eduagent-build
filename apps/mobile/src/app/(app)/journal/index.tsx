@@ -2,7 +2,7 @@ import React from 'react';
 
 import { JournalTabView } from '../../../components/journal/JournalTabView';
 import {
-  PersonScopeJournalPlaceholder,
+  PersonScopeJournal,
   SupportHubJournalTab,
 } from '../../../components/support';
 import { useScopeContext } from '../../../lib/scope-context';
@@ -21,7 +21,7 @@ export default function JournalScreen(): React.ReactElement {
   }
 
   if (activeScope.kind === 'person') {
-    return <PersonScopeJournalPlaceholder scope={activeScope} />;
+    return <PersonScopeJournal scope={activeScope} />;
   }
 
   return <JournalTabView />;

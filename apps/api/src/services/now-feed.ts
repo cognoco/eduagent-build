@@ -117,6 +117,10 @@ export const ROUTE_CATALOG = {
     chain: ['subject.hub'],
   },
   journal: { params: [], chain: [] },
+  'journal.artifact': {
+    params: ['personId', 'artifactKind', 'artifactId'],
+    chain: ['journal'],
+  },
   'support.hub': { params: [], chain: [] },
 } as const satisfies Record<
   NowDeepLinkRoute,
@@ -492,12 +496,34 @@ export async function collectCandidatesForRequest(
   if (request.scope !== 'self') return candidates;
 
   const hubCandidates = await collectSupporterHubCandidates(db, personId, now);
-  if (hubCandidates.length === 0) return candidates;
+  return mergeSupporterHubCandidatesIntoSelfFeed(
+    candidates,
+    hubCandidates,
+    personId,
+    now,
+  );
+}
+
+export function mergeSupporterHubCandidatesIntoSelfFeed(
+  selfCandidates: NowFeedCandidate[],
+  hubCandidates: NowFeedCandidate[],
+  supporterPersonId: string,
+  now: Date,
+): NowFeedCandidate[] {
+  if (hubCandidates.length === 0) return selfCandidates;
+
+  const recapAnnouncements = hubCandidates.filter(
+    (candidate) =>
+      candidate.scope === 'person' &&
+      candidate.params.ledgerKind === 'recap_ready' &&
+      candidate.deepLink.route === 'journal.artifact',
+  );
 
   return [
-    ...candidates,
+    ...selfCandidates,
+    ...recapAnnouncements,
     {
-      id: `support-hub-pointer:${personId}`,
+      id: `support-hub-pointer:${supporterPersonId}`,
       kind: 'support_hub_pointer',
       createdAt: now,
       sortAt: now,
@@ -619,9 +645,14 @@ async function collectNowCandidates(
     visibility === 'self'
       ? collectTopicMasteredCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
-    visibility === 'self'
-      ? collectRecapReadyCandidates(db, profileId, scope, now)
-      : Promise.resolve([]),
+    collectRecapReadyCandidates(
+      db,
+      profileId,
+      scope,
+      now,
+      accessGuard,
+      visibility,
+    ),
     visibility === 'self'
       ? collectSnapshotReadyCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
@@ -1293,11 +1324,27 @@ async function collectTopicMasteredCandidates(
 // A learner_recap set weeks ago can therefore resurface as if it were new.
 // No dedicated "recap became visible" timestamp exists to fix this precisely;
 // out of scope for this WI — flagged for a possible follow-up.
+export function resolveRecapReadyDeepLink(
+  scope: NowScope,
+  personId: string,
+  sessionId: string,
+): NowDeepLink {
+  return scope === 'person'
+    ? resolveDeepLink('journal.artifact', {
+        personId,
+        artifactKind: 'session_recap',
+        artifactId: sessionId,
+      })
+    : resolveDeepLink('session.summary', { sessionId });
+}
+
 async function collectRecapReadyCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
   now: Date,
+  accessGuard?: SQL,
+  visibility: 'self' | 'supporter' = 'self',
 ): Promise<NowFeedCandidate[]> {
   const cutoff = new Date(
     now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
@@ -1316,6 +1363,10 @@ async function collectRecapReadyCandidates(
         isNotNull(sessionSummaries.learnerRecap),
         isNull(sessionSummaries.purgedAt),
         gt(sessionSummaries.updatedAt, cutoff),
+        visibility === 'supporter'
+          ? eq(sessionSummaries.status, 'accepted')
+          : undefined,
+        accessGuard,
       ),
     )
     .orderBy(desc(sessionSummaries.updatedAt), asc(sessionSummaries.id))
@@ -1331,13 +1382,16 @@ async function collectRecapReadyCandidates(
       ledgerKind: 'recap_ready',
       sessionId: row.sessionId,
     },
-    // [WI-1121 review fix] 'session.summary' (→ /session-summary/[sessionId]),
-    // not 'session.resume' (→ the live session chat) — this session already
-    // ended; its recap lives on the summary screen.
-    deepLink: resolveDeepLink('session.summary', { sessionId: row.sessionId }),
+    // The learner's own announcement retains the session-summary destination.
+    // A supporter announcement must instead open the same durable recap
+    // surfaced in that person's authorized Journal.
+    deepLink: resolveRecapReadyDeepLink(scope, profileId, row.sessionId),
     scope,
   }));
 }
+
+/** @internal - exported only for focused query-shape regression coverage. */
+export { collectRecapReadyCandidates as collectRecapReadyCandidatesForTesting };
 
 async function collectSnapshotReadyCandidates(
   db: Database,

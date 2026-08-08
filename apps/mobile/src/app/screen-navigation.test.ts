@@ -17,8 +17,8 @@ import * as ts from 'typescript';
 // router.push without ever offering the user a way *back*, so its presence
 // gives a false-positive pass. The audit must only credit primitives that
 // actually move the user off the current screen toward a known prior
-// location: replace, the goBackOrReplace helper, the ChatShell which renders
-// its own back chevron, or visible back/close affordances.
+// location: replace, a sanctioned back-or-fallback helper, the ChatShell which
+// renders its own back chevron, or visible back/close affordances.
 //
 // Bare router.back() is intentionally NOT credited here. It only proves there
 // is some prior history entry, not that the entry is the parent the user
@@ -26,6 +26,7 @@ import * as ts from 'typescript';
 const EXIT_PATTERNS = [
   /router\.replace\(/, // router.replace(...) — replaces current entry
   /goBackOrReplace\(/, // goBackOrReplace helper (wraps router.back/replace)
+  /navigateBackToJournal\(/, // Journal helper (wraps router.back/replace)
   /ChatShell/, // ChatShell component has built-in back button
   /name="close"/, // Ionicons close button
   /name="chevron-back"/, // Ionicons chevron-back button

@@ -1,0 +1,18 @@
+{
+  "pageId": "39f8bce9-1f7c-8115-a29a-eca8d5651913",
+  "id": "WI-2232",
+  "name": "Rehome existing durable reports and recaps into person Journal",
+  "description": "CLASSIFICATION: V0/V1 outcome parity for seeing what the supported person learned. Reuse existing durable report/recap artifacts and rehome them in the authorized person Journal; do not build a second generation or analytics system.",
+  "acceptanceCriteria": "MINIMUM LAUNCH OUTCOME: person Journal lists existing report/recap artifacts the caller is authorized to see; announcements deep-link to the durable artifact; accepted visibility is enforced server-side and pending/revoked relationships deny; loading, empty, and stale-link states are explicit; a seeded journey proves multiple existing artifacts survive relaunch. DEFERRED: new report types, generalized infinite history, and new generation schedules.",
+  "riskImpact": "A supporter can link successfully yet cannot perform the core promised outcome of understanding the person's learning; authorization mistakes disclose learning data.",
+  "type": "Enhancement",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:builder:WI-2232",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}

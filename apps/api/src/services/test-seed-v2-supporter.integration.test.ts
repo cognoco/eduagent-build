@@ -137,7 +137,10 @@ function createIntegrationDb(): Database {
       expect(seeded.ids.topicId).toBeTruthy();
       expect(seeded.ids.retentionCardId).toBeTruthy();
       expect(seeded.ids.sessionSummaryId).toBeTruthy();
+      expect(seeded.ids.secondSessionId).toBeTruthy();
+      expect(seeded.ids.secondSessionSummaryId).toBeTruthy();
       expect(seeded.ids.weeklyReportId).toBeTruthy();
+      expect(seeded.ids.secondWeeklyReportId).toBeTruthy();
       expect(seeded.ids.milestoneId).toBeTruthy();
     });
 
@@ -195,11 +198,21 @@ function createIntegrationDb(): Database {
 
     it('[AC-5 canary] the shared-record read model surfaces only shareable facts (weekly report / recap / milestone), and a forward-regression canary confirms its payload never carries the private-artifact marker', async () => {
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: seeded.ids.edgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.supporteePersonId,
       });
-      expect(record.supporterView.facts.length).toBeGreaterThan(0);
+      expect(
+        record.supporterView.facts
+          .map((fact) => fact.artifact)
+          .filter((artifact) => artifact !== undefined),
+      ).toEqual(
+        expect.arrayContaining([
+          { kind: 'weekly_report', id: seeded.ids.weeklyReportId },
+          { kind: 'weekly_report', id: seeded.ids.secondWeeklyReportId },
+          { kind: 'session_recap', id: seeded.ids.sessionId },
+          { kind: 'session_recap', id: seeded.ids.secondSessionId },
+        ]),
+      );
 
       // [Phase-4 review, WI-2241] Same canary caveat as the structural-wall
       // case above: readSharedRecordForSupportee (shared-record-read-model.ts)
@@ -296,7 +309,6 @@ function createIntegrationDb(): Database {
       expect(structural.subjects).toEqual([]);
 
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: seeded.ids.emptyEdgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.emptySupporteePersonId,
       });
@@ -600,7 +612,6 @@ function createIntegrationDb(): Database {
 
     it("[AC-4 direction 1 canary] the supporter's own Me-scope subject never appears in the supportee's shared-record read", async () => {
       const record = await readSharedRecordForSupportee(db, {
-        supportershipId: seeded.ids.edgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
         supporteePersonId: seeded.ids.supporteePersonId,
       });

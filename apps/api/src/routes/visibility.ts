@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   appealReportSchema,
   appealRequestSchema,
+  sharedRecordArtifactKindSchema,
   sharedRecordSchema,
   visibilityContractSchema,
   visibilityLinkAcceptSchema,
@@ -27,7 +28,10 @@ import {
 } from '../services/linking-ceremony';
 import { requestSelfUnlink } from '../services/supportership-revocation';
 import { buildAttentionReport } from '../services/supporter-report';
-import { readSharedRecordForSupportee } from '../services/shared-record-read-model';
+import {
+  readSharedArtifactForSupportee,
+  readSharedRecordForSupportee,
+} from '../services/shared-record-read-model';
 import { safeSend } from '../services/safe-non-core';
 
 const idParamSchema = z.object({
@@ -36,6 +40,12 @@ const idParamSchema = z.object({
 
 const personIdParamSchema = z.object({
   personId: z.string().uuid(),
+});
+
+const artifactParamSchema = z.object({
+  personId: z.string().uuid(),
+  artifactKind: sharedRecordArtifactKindSchema,
+  artifactId: z.string().uuid(),
 });
 
 const appealBodySchema = z.object({
@@ -177,14 +187,24 @@ export const visibilityRoutes = new Hono<VisibilityRouteEnv>()
     async (c) => {
       const { db, callerPersonId } = withCaller(c);
       const { personId } = c.req.valid('param');
-      const contract = await findAcceptedContractForSupportee(db, {
+      const record = await readSharedRecordForSupportee(db, {
         supporterPersonId: callerPersonId,
         supporteePersonId: personId,
       });
-      const record = await readSharedRecordForSupportee(db, {
-        supportershipId: contract.supportershipId,
+      return c.json(sharedRecordSchema.parse(record));
+    },
+  )
+  .get(
+    '/visibility/reports/:personId/artifacts/:artifactKind/:artifactId',
+    zValidator('param', artifactParamSchema),
+    async (c) => {
+      const { db, callerPersonId } = withCaller(c);
+      const { personId, artifactKind, artifactId } = c.req.valid('param');
+      const record = await readSharedArtifactForSupportee(db, {
         supporterPersonId: callerPersonId,
         supporteePersonId: personId,
+        artifactKind,
+        artifactId,
       });
       return c.json(sharedRecordSchema.parse(record));
     },

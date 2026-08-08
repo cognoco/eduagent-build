@@ -1,5 +1,6 @@
 import type { Database } from '@eduagent/database';
 import { nowDeepLinkRouteSchema } from '@eduagent/schemas';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import {
   PARKED_AGING_WINDOW_DAYS,
@@ -9,8 +10,11 @@ import {
   orderSupporterHubCandidates,
   buildNowFeedFromCandidates,
   buildNowOverflowFromCandidates,
+  collectRecapReadyCandidatesForTesting,
   isRetentionDueAt,
+  mergeSupporterHubCandidatesIntoSelfFeed,
   rankCandidates,
+  resolveRecapReadyDeepLink,
   resolveDeepLink,
   type NowFeedCandidate,
 } from './now-feed';
@@ -28,6 +32,55 @@ describe('WI-2113 retention transition', () => {
     expect(isRetentionDueAt(new Date('2026-06-11T11:59:59.000Z'), now)).toBe(
       true,
     );
+  });
+});
+
+describe('supporter recap-ready projection', () => {
+  it('requires accepted summaries for supporter links without narrowing the learner feed', async () => {
+    const capturedWhere: unknown[] = [];
+    const query = {} as {
+      from: jest.Mock;
+      where: jest.Mock;
+      orderBy: jest.Mock;
+      limit: jest.Mock;
+    };
+    query.from = jest.fn();
+    query.where = jest.fn((condition: unknown) => {
+      capturedWhere.push(condition);
+      return query;
+    });
+    query.orderBy = jest.fn();
+    query.limit = jest.fn().mockResolvedValue([]);
+    query.from.mockReturnValue(query);
+    query.orderBy.mockReturnValue(query);
+    const db = {
+      select: jest.fn().mockReturnValue(query),
+    } as unknown as Database;
+
+    await collectRecapReadyCandidatesForTesting(
+      db,
+      '00000000-0000-4000-8000-000000000001',
+      'person',
+      now,
+      undefined,
+      'supporter',
+    );
+    await collectRecapReadyCandidatesForTesting(
+      db,
+      '00000000-0000-4000-8000-000000000001',
+      'self',
+      now,
+      undefined,
+      'self',
+    );
+
+    const dialect = new PgDialect();
+    const supporterQuery = dialect.sqlToQuery(capturedWhere[0] as never);
+    const selfQuery = dialect.sqlToQuery(capturedWhere[1] as never);
+    expect(supporterQuery.sql).toContain('"session_summaries"."status" = $');
+    expect(supporterQuery.params).toContain('accepted');
+    expect(selfQuery.sql).not.toContain('"session_summaries"."status" = $');
+    expect(selfQuery.params).not.toContain('accepted');
   });
 });
 
@@ -336,6 +389,57 @@ describe('now feed ranking', () => {
       feed.cards.find((item) => item.kind === 'support_hub_pointer'),
     ).not.toHaveProperty('edgeId');
   });
+
+  it('preserves supporter recap announcements in the consumed self feed', () => {
+    const recap = candidate({
+      id: 'supportee-recap',
+      kind: 'ledger_moment',
+      templateKey: 'now.ledger_moment.recap_ready',
+      params: { ledgerKind: 'recap_ready', sessionId: 'session-1' },
+      deepLink: resolveDeepLink('journal.artifact', {
+        personId: 'person-1',
+        artifactKind: 'session_recap',
+        artifactId: 'session-1',
+      }),
+      scope: 'person',
+      personId: 'person-1',
+      edgeId: 'edge-1',
+    });
+    const unrelatedHubCandidate = candidate({
+      id: 'supportee-retention',
+      kind: 'retention_due',
+      scope: 'person',
+      personId: 'person-1',
+      edgeId: 'edge-1',
+    });
+
+    const merged = mergeSupporterHubCandidatesIntoSelfFeed(
+      [candidate({ id: 'self-session', kind: 'unfinished_session' })],
+      [recap, unrelatedHubCandidate],
+      'supporter-1',
+      now,
+    );
+
+    expect(merged).toContain(recap);
+    expect(merged).not.toContain(unrelatedHubCandidate);
+    expect(merged).toContainEqual(
+      expect.objectContaining({
+        kind: 'support_hub_pointer',
+        params: { count: 2 },
+      }),
+    );
+    const consumedCards = [
+      ...buildNowFeedFromCandidates(merged, 'self', now).cards,
+      ...buildNowOverflowFromCandidates(merged, 'self', now).items,
+    ];
+    expect(consumedCards).toContainEqual(
+      expect.objectContaining({
+        deepLink: recap.deepLink,
+        personId: 'person-1',
+        edgeId: 'edge-1',
+      }),
+    );
+  });
 });
 
 describe('now feed route catalog', () => {
@@ -376,6 +480,42 @@ describe('now feed route catalog', () => {
       route: 'journal',
       params: {},
       chain: [],
+    });
+  });
+
+  it('builds durable Journal artifact links with their person context', () => {
+    expect(
+      resolveDeepLink('journal.artifact', {
+        personId: 'person-1',
+        artifactKind: 'weekly_report',
+        artifactId: 'artifact-1',
+      }),
+    ).toEqual({
+      route: 'journal.artifact',
+      params: {
+        personId: 'person-1',
+        artifactKind: 'weekly_report',
+        artifactId: 'artifact-1',
+      },
+      chain: ['journal'],
+    });
+  });
+
+  it('routes a supporter-scoped recap announcement to its durable person Journal artifact', () => {
+    expect(
+      resolveRecapReadyDeepLink(
+        'person',
+        '00000000-0000-4000-8000-000000000011',
+        '00000000-0000-4000-8000-000000000012',
+      ),
+    ).toEqual({
+      route: 'journal.artifact',
+      params: {
+        personId: '00000000-0000-4000-8000-000000000011',
+        artifactKind: 'session_recap',
+        artifactId: '00000000-0000-4000-8000-000000000012',
+      },
+      chain: ['journal'],
     });
   });
 

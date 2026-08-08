@@ -4521,7 +4521,9 @@
       "structuralOnly": "Apenas fatos estruturais. Sem notas brutas ou texto de chat.",
       "errorTitle": "Erro ao carregar registro compartilhado",
       "errorMessage": "Tente novamente em um instante.",
-      "retry": "Tentar novamente"
+      "retry": "Tentar novamente",
+      "unavailable_one": "Não foi possível carregar 1 atualização agora.",
+      "unavailable_other": "Não foi possível carregar {{count}} atualizações agora."
     },
     "appeal": {
       "label": "Solicitar relatório de atenção",

@@ -4,6 +4,7 @@ import {
   type AppealReport,
   type ScopeDescriptor,
   type SharedRecord,
+  type SharedRecordArtifactKind,
 } from '@eduagent/schemas';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
@@ -27,6 +28,39 @@ export function useSharedRecord(
     fetch: (signal) =>
       client.visibility.reports[':personId']['shared-record'].$get(
         { param: { personId: scope.personId } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+  });
+}
+
+export function useSharedRecordArtifact(
+  scope: PersonScope,
+  artifactKind: SharedRecordArtifactKind,
+  artifactId: string,
+): UseQueryResult<SharedRecord> {
+  const client = useApiClient();
+
+  return useApiQuery({
+    queryKey: [
+      'visibility-shared-artifact',
+      scope.personId,
+      scope.edgeId,
+      artifactKind,
+      artifactId,
+    ],
+    schema: sharedRecordSchema,
+    fetch: (signal) =>
+      client.visibility.reports[':personId'].artifacts[':artifactKind'][
+        ':artifactId'
+      ].$get(
+        {
+          param: {
+            personId: scope.personId,
+            artifactKind,
+            artifactId,
+          },
+        },
         { init: { signal } },
       ),
     select: (json) => json,

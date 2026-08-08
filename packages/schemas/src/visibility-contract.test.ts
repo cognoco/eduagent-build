@@ -2,6 +2,7 @@ import {
   coLearningPromptPayloadSchema,
   reportableFactKindSchema,
   reportableFactSchema,
+  sharedRecordArtifactKindSchema,
   sharedRecordSchema,
   visibilityContractSchema,
   visibilityLinkAcceptSchema,
@@ -111,6 +112,35 @@ describe('visibility contract schemas', () => {
         },
       }).factIds,
     ).toEqual(['fact-1']);
+  });
+
+  it('accepts only durable weekly-report and session-recap references', () => {
+    expect(sharedRecordArtifactKindSchema.options).toEqual([
+      'weekly_report',
+      'session_recap',
+    ]);
+
+    const fact = reportableFactSchema.parse({
+      id: `weekly-report:${UUID_2}`,
+      kind: 'observable_engagement',
+      title: 'Weekly report',
+      source: 'weekly_report_summary',
+      artifact: {
+        kind: 'weekly_report',
+        id: UUID_2,
+      },
+    });
+
+    expect(fact.artifact).toEqual({
+      kind: 'weekly_report',
+      id: UUID_2,
+    });
+    expect(
+      reportableFactSchema.safeParse({
+        ...fact,
+        artifact: { kind: 'private_note', id: UUID_3 },
+      }).success,
+    ).toBe(false);
   });
 
   describe('[WI-992] visibilityMomentPayloadSchema — typed per-notice payloads', () => {

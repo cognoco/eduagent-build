@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { mentorNoticePolicyObservationField } from './mentor-notices.ts';
+import { sharedRecordArtifactKindSchema } from './visibility-contract.ts';
 
 export const nowScopeSchema = z.enum(['self', 'supporter-hub', 'person']);
 export type NowScope = z.infer<typeof nowScopeSchema>;
@@ -30,6 +31,7 @@ export const nowDeepLinkRouteSchema = z.enum([
   'retention.review',
   'challenge.start',
   'journal',
+  'journal.artifact',
   'support.hub',
 ]);
 export type NowDeepLinkRoute = z.infer<typeof nowDeepLinkRouteSchema>;
@@ -52,6 +54,9 @@ export const nowCardParamsSchema = z.record(z.string(), z.unknown()).and(
     bookId: z.string().uuid().optional(),
     topicId: z.string().uuid().optional(),
     noticeId: z.string().uuid().optional(),
+    personId: z.string().uuid().optional(),
+    artifactKind: sharedRecordArtifactKindSchema.optional(),
+    artifactId: z.string().uuid().optional(),
   }),
 );
 export type NowCardParams = z.infer<typeof nowCardParamsSchema>;

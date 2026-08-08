@@ -19,7 +19,7 @@ const V2_PARITY_TEST_PATTERNS = Object.freeze([
   'apps/mobile/src/app/\\(app\\)/session/index\\.test\\.tsx',
   'apps/mobile/src/app/\\(app\\)/quiz/results\\.test\\.tsx',
   'apps/mobile/src/app/\\(app\\)/dictation/review\\.test\\.tsx',
-  'apps/mobile/src/components/support/PersonScopeJournalPlaceholder\\.test\\.tsx',
+  'apps/mobile/src/components/support/PersonScopeJournal\\.test\\.tsx',
   'apps/mobile/src/components/support/SupportHubJournalTab\\.test\\.tsx',
   'apps/mobile/src/components/support/PersonScopeStructuralSubjects\\.test\\.tsx',
   'apps/mobile/src/app/\\(app\\)/link/initiate\\.test\\.tsx',

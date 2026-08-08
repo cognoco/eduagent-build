@@ -1,6 +1,7 @@
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, ScrollView, View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
+import { useRouter } from 'expo-router';
 
 import { DeskLampAnimation } from '../common/DeskLampAnimation';
 import { MagicPenAnimation } from '../common/MagicPenAnimation';
@@ -50,19 +51,21 @@ function PersonScopeJournalEmptyState({
   );
 }
 
-export function PersonScopeJournalPlaceholder({
+export function PersonScopeJournal({
   scope,
 }: {
   scope: PersonScope;
 }): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const query = useSharedRecord(scope);
   const appeal = useAppealVisibility(scope);
 
   return (
-    <View
-      testID="person-scope-journal-placeholder"
-      className="flex-1 bg-background px-5 py-4"
+    <ScrollView
+      testID="person-scope-journal"
+      className="flex-1 bg-background"
+      contentContainerClassName="px-5 py-4"
     >
       <Text className="text-h2 font-semibold text-text-primary">
         {scope.displayName}
@@ -70,7 +73,7 @@ export function PersonScopeJournalPlaceholder({
       <View className="mt-4">
         {query.isLoading ? (
           <ActivityIndicator accessibilityLabel={t('common.loading')} />
-        ) : query.isError && !query.data ? (
+        ) : query.isError ? (
           <SharedRecordView
             error={query.error}
             onRetry={() => void query.refetch()}
@@ -86,11 +89,23 @@ export function PersonScopeJournalPlaceholder({
             appealReport={appeal.data}
             appealError={appeal.error}
             onRetryAppeal={() => appeal.mutate()}
+            onOpenArtifact={(artifact) => {
+              // Already inside the Journal stack; dynamic segments identify the leaf artifact.
+              router.push({
+                pathname:
+                  '/(app)/journal/[personId]/[artifactKind]/[artifactId]',
+                params: {
+                  personId: scope.personId,
+                  artifactKind: artifact.kind,
+                  artifactId: artifact.id,
+                },
+              });
+            }}
           />
         ) : (
           <PersonScopeJournalEmptyState scope={scope} />
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }

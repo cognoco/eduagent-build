@@ -79,7 +79,7 @@ function SupportHubJournalPersonCard({
       <View className="mt-3">
         {query.isLoading ? (
           <ActivityIndicator accessibilityLabel={t('common.loading')} />
-        ) : query.isError && !query.data ? (
+        ) : query.isError ? (
           <SharedRecordView
             error={query.error}
             onRetry={() => void query.refetch()}

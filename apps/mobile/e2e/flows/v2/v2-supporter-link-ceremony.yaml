@@ -237,7 +237,7 @@ tags:
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'person-scope-journal'
     timeout: 15000
 - assertNotVisible:
     id: 'visibility-shared-record'

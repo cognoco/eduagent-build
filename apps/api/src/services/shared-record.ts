@@ -28,6 +28,7 @@ export function projectSharedRecord(input: {
   facts: readonly CandidateReportFact[];
   generatedAt?: Date;
   supporteeDisplayName?: string;
+  unavailableFactCount?: number;
 }): SharedRecord {
   const facts = filterToReportable(input.facts);
   const factIds = facts.map((fact) => fact.id);
@@ -37,6 +38,9 @@ export function projectSharedRecord(input: {
     supportershipId: input.supportershipId,
     generatedAt,
     factIds,
+    ...(input.unavailableFactCount && input.unavailableFactCount > 0
+      ? { unavailableFactCount: input.unavailableFactCount }
+      : {}),
     supporterView: {
       audience: 'supporter',
       factIds,

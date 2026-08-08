@@ -17,6 +17,7 @@ import {
   createTestProfile,
 } from '../../test-utils/screen-render';
 import {
+  createRoutedMockFetch,
   fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../test-utils/mock-api-routes';
@@ -28,19 +29,7 @@ jest.mock(
 );
 
 let mockFetch: RoutedMockFetch;
-
-jest.mock(
-  // gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client
-  '../../lib/api-client',
-  () => {
-    const {
-      createRoutedMockFetch,
-      mockApiClientFactory,
-    } = require('../../test-utils/mock-api-routes');
-    mockFetch = createRoutedMockFetch();
-    return mockApiClientFactory(mockFetch);
-  },
-);
+let previousFetch: typeof globalThis.fetch;
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
@@ -104,10 +93,22 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
   },
 };
 
-function renderWithProfile(ui: React.ReactElement): QueryClient {
+function renderWithProfile(
+  ui: React.ReactElement,
+  initialRecord?: SharedRecord,
+): QueryClient {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { gcTime: 0 },
+    },
   });
+  if (initialRecord) {
+    queryClient.setQueryData(
+      ['visibility-shared-record', PERSON_ID, EDGE_ID],
+      initialRecord,
+    );
+  }
   const { wrapper } = createScreenWrapper({
     activeProfile: createTestProfile(),
     profiles: [createTestProfile()],
@@ -123,10 +124,14 @@ describe('SupportHubJournalTab', () => {
   afterEach(() => {
     cleanupScreen(queryClient);
     queryClient = undefined;
+    globalThis.fetch = previousFetch;
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+    previousFetch = globalThis.fetch;
+    mockFetch = createRoutedMockFetch();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,
       SHARED_RECORD,
@@ -221,6 +226,23 @@ describe('SupportHubJournalTab', () => {
     await waitFor(() => {
       screen.getByTestId('visibility-shared-record-error');
     });
+  });
+
+  it('shows a refresh error instead of cached Support Hub data', async () => {
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/shared-record`,
+      new Response(JSON.stringify({ message: 'nope' }), { status: 500 }),
+    );
+
+    queryClient = renderWithProfile(
+      <SupportHubJournalTab personScopes={[EMMA_SCOPE]} />,
+      SHARED_RECORD,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-shared-record-error');
+    });
+    expect(screen.queryByText('Practiced fractions')).toBeNull();
   });
 
   it('requests the attention report when the appeal affordance is pressed', async () => {

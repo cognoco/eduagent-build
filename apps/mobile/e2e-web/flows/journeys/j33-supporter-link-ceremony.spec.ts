@@ -216,12 +216,10 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
 
   await pressableClick(page.getByTestId('tab-journal'));
   await expect(page).toHaveURL(/\/journal$/);
-  const journalPlaceholder = page.getByTestId(
-    'person-scope-journal-placeholder',
-  );
-  await expect(journalPlaceholder).toBeVisible();
+  const personJournal = page.getByTestId('person-scope-journal');
+  await expect(personJournal).toBeVisible();
   await expect(
-    journalPlaceholder.getByText(supporteeDisplayName, { exact: true }),
+    personJournal.getByText(supporteeDisplayName, { exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toHaveCount(0);
   await expect(
@@ -241,7 +239,7 @@ test('J-33 supporter <-> supportee: reach the link ceremony via deep-link initia
 
   await page.goForward();
   await expect(page).toHaveURL(/\/journal$/);
-  await expect(journalPlaceholder).toBeVisible();
+  await expect(personJournal).toBeVisible();
 
   // RECOVERY — revoke through the production supportee action, then prove
   // both the supportee's safe return and the supporter's fail-closed scope.
