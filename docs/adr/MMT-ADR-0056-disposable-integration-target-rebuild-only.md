@@ -1,4 +1,4 @@
-# MMT-ADR-0055 — The disposable API-integration target is rebuild-only by contract
+# MMT-ADR-0056 — The disposable API-integration target is rebuild-only by contract
 
 **Status:** Proposed · **Scope:** The disposable Postgres target used for API integration tests — its remedy path when its schema no longer matches the pinned revision, and what the operator authorization for rebuilding it is scoped to · **Deciders:** pending Architecture sign-off
 
