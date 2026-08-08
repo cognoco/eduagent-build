@@ -1,6 +1,6 @@
 # What was done
 
-Closed the placeholder-identity class with a forward-only pre-commit guard, without touching the mis-attributed history it protects against.
+Eliminated the placeholder-identity failure class with a forward-only pre-commit guard, without touching the mis-attributed history it protects against. ("Eliminated" describes the defect class, not this work item's lifecycle state — the item advances only through the completion command, and nothing here self-closes it.)
 
 Dozens of commits landed on this repo authored as the test placeholder, yet no persistent configuration surface reproduces it — the checkout, the sampled worktrees and the global config all resolve the correct identity, and no repo-level user section or worktree override file exists. The bad identity therefore comes from a transient, process-scoped override that has since stopped applying. Root-causing which context did it is not a precondition for closing the class, and it was not found; the guard works regardless of which context sets it next.
 
