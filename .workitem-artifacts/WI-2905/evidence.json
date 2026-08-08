@@ -1,0 +1,25 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "MMT-ADR-0024 corrected. A TITLE CORRECTION block amends the supersession claim to state accurately that the chip owns scope SELECTION while resolveNavigationContract() still owns navigation SHAPE and the gate surface, with four code citations embedded and verified against main on 2026-08-08: the V2 tab set is hardcoded in the hook not the chip; resolveNavigationContract is called on every path including V2 with no short-circuit ahead of it; the V2 branch returns the resolved contract alongside V2_TABS; and useNavigationHomeContract/useNavigationDataScopeContract have no V2 branch at all. Recorded as a factual amendment, not a status change - the ADR remains Proposed under explicit non-reliance.",
+      "pointer": "docs/adr/MMT-ADR-0024-scope-chip-supersedes-nav-contract.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "S6 T10's conditional deletion rewritten to be CODE-VERIFIED, never ADR-derived. The former clause 'or delete it if the V2 chip fully owns shape' restated the ADR title as fact; it is replaced by four named checks that must all be demonstrated at execution time with command output pasted into the change-set: no V2 invocation of resolveNavigationContract, no live import, no live NavigationContract type or gates consumer, and V0/V1 flags actually retired. Check 3 is the one the old wording missed - the gate surface outlives the tab-shape matrix and is read by screens, not by the chip. Failing any check means reduce the file, stated as the default branch rather than a fallback. The same false premise was also removed from the deletion-target table row.",
+      "pointer": "docs/plans/v2-plan/2026-06-10-s6-cutover-deletions.md"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Scope limit preserved in both documents and left undisturbed by this change. The ADR's non-reliance table continues to route person-scope visibility and reportability walls to MMT-ADR-0027/0028 as ratified authority, and the plan's pre-execution checklist continues to state that no deletion change-set may cite MMT-ADR-0024 as governing authority. The new T10 block reinforces rather than replaces that wall by pointing back to it explicitly for the reduction path's authority.",
+      "pointer": "docs/plans/v2-plan/2026-06-10-s6-cutover-deletions.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "WI-2062 cited, not absorbed. The ADR correction names it as the audit that surfaced the drift and records that this item was captured separately so the guard lands independently of WI-2062's Kind-guard block. No part of WI-2062's disposition scope is taken over here: its explicit non-reliance record, effective 2026-08-01, is left intact and is referenced rather than rewritten.",
+      "pointer": "docs/adr/MMT-ADR-0024-scope-chip-supersedes-nav-contract.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-08-local-deterministic"
+}
