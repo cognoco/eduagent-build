@@ -388,9 +388,20 @@ severity / effort / track fields are omitted — sizing belongs to the spawned c
 ## Routing of the captures
 
 All sixteen findings were filed via `/cosmo:capture` with `--origin-wi WI-3122`, at
-`Stage=Captured`, `WI-3147`–`WI-3162`. Two notes a reviewer should have rather than discover:
+`Stage=Captured`, `WI-3147`–`WI-3162` — one Work Item per finding, its id recorded beside the
+finding above.
 
-- **`Workstream` is deliberately unset on all sixteen.** Workstream routing for audit/governance
+**A seventeenth capture, `WI-3163`, is not a finding.** It is this audit's successor: the
+predicate sweep that owns the 1,264 candidates for which only artifact existence was established
+(§ Coverage). It was filed through the same path, `/cosmo:capture --origin-wi WI-3122`, and carries
+`Stage=Captured` · `State=Active` · `Altitude=Item` · `Execution Path=Unset` · `Workstream` empty ·
+`Related Items` → `WI-3122`. It is counted in `docs/audit/INDEX.md`'s drain list — seventeen
+captures — and deliberately **not** counted among the sixteen findings, because a stated coverage
+limitation is not a verified contradiction and must not be filed as one.
+
+Three notes a reviewer should have rather than discover:
+
+- **`Workstream` is deliberately unset on all seventeen.** Workstream routing for audit/governance
   items is an open question with the MentoMate PgM — `WI-3091` (MMT-ADR-0046 override audit across
   every model-driven surface), `WI-3102` (`check-adr-provenance` misses `Proposed → Accepted` flips
   on existing ADR files) and `WI-3122` itself are already waiting on that ruling — so guessing a
@@ -400,8 +411,10 @@ All sixteen findings were filed via `/cosmo:capture` with `--origin-wi WI-3122`,
   Workstream ("Stream 2 — Estate-Canon Drain (PRG-20)") onto every row at creation; it was cleared
   on all sixteen immediately afterwards by a direct property PATCH. That PATCH is the only
   out-of-band Cosmo write this audit made, it touched no lifecycle field (`Stage`, `Fixed In`,
-  claim props), and it is recorded here rather than left to be found.
-- **Filing is where this item's scope ends.** Nothing filed here was fixed here.
+  claim props), and it is recorded here rather than left to be found. The same clear was applied to
+  `WI-3163`.
+- **Filing is where this item's scope ends.** Nothing filed here was fixed here — including
+  `WI-3163`, which is filed and cited, not started.
 
 ## Out of scope / not checked
 
