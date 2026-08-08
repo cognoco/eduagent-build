@@ -16,10 +16,11 @@ The application URL may be activated only after the database credential split
 and RLS gate in `docs/deployment-and-secrets.md` are satisfied. Current RLS
 enablement has incomplete policies and most calls do not set the scoped profile
 GUC, so a normal non-owner/non-`BYPASSRLS` role would break reads and writes.
-Use either the explicitly reviewed temporary `BYPASSRLS` posture with no
-ownership/DDL/admin capability, or defer the swap until scoped RLS is complete.
-Production activation requires prior staging catalog evidence, authenticated
-read/write smoke, and a negative cross-profile access check.
+Use either the standard explicitly reviewed temporary `BYPASSRLS` posture with
+no ownership/DDL/admin capability, the OPQ-163 temporary
+`production_worker` exception described below, or defer the swap until scoped
+RLS is complete. Production activation requires prior staging catalog evidence,
+authenticated read/write smoke, and a negative cross-profile access check.
 
 ## Safeguards
 
@@ -33,7 +34,8 @@ read/write smoke, and a negative cross-profile access check.
   same-role migration/Worker credentials, rejects Worker ownership, schema
   CREATE, CREATEROLE, replication, other migration/admin capabilities, and any
   `SET ROLE` path to those capabilities. A reachable membership with
-  `ADMIN OPTION` is also rejected because it can change its own `SET` option.
+  `ADMIN OPTION` is also rejected because it can change its own `SET` option,
+  except for the exact production-only temporary fingerprint authorized below.
   The verifier additionally requires `SELECT`, `INSERT`, `UPDATE`, and
   `DELETE` on every application table plus `USAGE` and `UPDATE` on every
   application sequence.
@@ -50,6 +52,23 @@ read/write smoke, and a negative cross-profile access check.
 
 Merging or materially changing this workflow activates a recurring production
 mutation and requires the Quartet two-key production approval before merge.
+
+## Temporary production Worker role exception
+
+The 2026-08-06 OPQ-163 operator ruling authorizes the protected production
+Worker to use `production_worker` while Neon support removes the managed
+administrative bundle in place. The repository variable must be exactly
+`PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE=production_worker`; it is not a secret
+and does not contain a database URL. The verifier accepts the exception only
+for `DEPLOY_ENV=production`, only when the live role name matches, and only when
+the approved managed-admin fingerprint matches exactly. Any name, environment,
+or fingerprint drift fails closed with the normal capability violations.
+
+WI-3062 blocks MVP launch until the administrative bundle has been stripped
+from both `production_worker` and `staging_worker`, both temporary variables and
+verifier paths are removed, and the standard verifier succeeds in both
+environments. No credential rotation is required unless Neon cannot remediate
+the existing roles in place.
 
 ## Alerting
 
@@ -131,7 +150,9 @@ retains it and schedules no deletion.
 1. Confirm `DOPPLER_TOKEN_PRD`, `CLOUDFLARE_API_TOKEN`, `CF_ACCOUNT_ID`,
    `DATABASE_URL_PRODUCTION`, `DATABASE_URL_PRODUCTION_APP`, both database host
    hints, and the reviewed `WORKER_DATABASE_BYPASSRLS_EXPECTED` repository
-   variable are present.
+   variable are present. While the OPQ-163 production workaround is active,
+   also confirm the repository variable
+   `PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE=production_worker` is present.
 2. Dispatch `Production Worker Secret Sync` from `main`.
 3. Confirm the sync step targets `mentomate-api-prd` and the health step returns
    HTTP 200 with `status=ok`.
@@ -145,6 +166,7 @@ retains it and schedules no deletion.
     $env:DEPLOY_ENV = 'production'
     $env:MIGRATOR_DATABASE_URL = $env:DATABASE_URL_PRODUCTION
     $env:WORKER_DATABASE_URL = $env:DATABASE_URL_PRODUCTION_APP
+    $env:PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE = 'production_worker'
     $env:WRANGLER_SYNC_CONFIG = Join-Path $env:TEMP 'wrangler-secret-sync.jsonc'
     Set-Content -LiteralPath $env:WRANGLER_SYNC_CONFIG -Value '{"name":"mentomate-api-prd"}'
     node packages/database/scripts/verify-worker-db-role.mjs

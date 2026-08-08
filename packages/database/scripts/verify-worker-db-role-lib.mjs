@@ -20,7 +20,7 @@ const FORBIDDEN_CAPABILITIES = [
   ],
 ];
 
-const TEMPORARY_STAGING_ADMIN_FINGERPRINT = new Map([
+const TEMPORARY_NEON_MANAGED_ADMIN_FINGERPRINT = new Map([
   ['can_create_database', true],
   ['can_create_role', true],
   ['can_replicate', true],
@@ -71,6 +71,21 @@ export function parseTemporaryStagingAdminException({ deployEnv, value }) {
   return value;
 }
 
+export function parseTemporaryProductionAdminException({ deployEnv, value }) {
+  if (!value) return null;
+  if (deployEnv !== 'production') {
+    throw new Error(
+      'PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE is forbidden outside production',
+    );
+  }
+  if (value !== 'production_worker') {
+    throw new Error(
+      'PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE must be exactly "production_worker"',
+    );
+  }
+  return value;
+}
+
 export function parseExpectedBypassRls(value) {
   if (value === 'true') return true;
   if (value === 'false') return false;
@@ -81,7 +96,12 @@ export function parseExpectedBypassRls(value) {
 
 export function assertWorkerDatabaseCapabilities(
   capabilities,
-  { deployEnv, expectedBypassRls, temporaryStagingAdminRole } = {},
+  {
+    deployEnv,
+    expectedBypassRls,
+    temporaryStagingAdminRole,
+    temporaryProductionAdminRole,
+  } = {},
 ) {
   if (typeof expectedBypassRls !== 'boolean') {
     throw new Error(
@@ -89,31 +109,29 @@ export function assertWorkerDatabaseCapabilities(
     );
   }
 
-  const temporaryStagingAdminExceptionConfigured = Boolean(
-    temporaryStagingAdminRole,
-  );
-  const temporaryStagingAdminException =
-    deployEnv === 'staging' &&
-    temporaryStagingAdminRole === 'staging_worker' &&
-    capabilities.role_name === temporaryStagingAdminRole;
+  const temporaryAdminRole =
+    temporaryStagingAdminRole || temporaryProductionAdminRole;
+  const temporaryAdminExceptionConfigured = Boolean(temporaryAdminRole);
+  const temporaryAdminException =
+    ((deployEnv === 'staging' && temporaryAdminRole === 'staging_worker') ||
+      (deployEnv === 'production' &&
+        temporaryAdminRole === 'production_worker')) &&
+    capabilities.role_name === temporaryAdminRole;
   const violations = FORBIDDEN_CAPABILITIES.filter(([property]) => {
     if (!capabilities[property]) return false;
     return !(
-      temporaryStagingAdminException &&
-      TEMPORARY_STAGING_ADMIN_FINGERPRINT.has(property)
+      temporaryAdminException &&
+      TEMPORARY_NEON_MANAGED_ADMIN_FINGERPRINT.has(property)
     );
   }).map(([, message]) => message);
-  if (
-    temporaryStagingAdminExceptionConfigured &&
-    !temporaryStagingAdminException
-  ) {
+  if (temporaryAdminExceptionConfigured && !temporaryAdminException) {
     violations.push(
       'configured exception role does not match the live Worker role',
     );
   }
-  if (temporaryStagingAdminException) {
+  if (temporaryAdminException) {
     const fingerprintDiffers = [
-      ...TEMPORARY_STAGING_ADMIN_FINGERPRINT.entries(),
+      ...TEMPORARY_NEON_MANAGED_ADMIN_FINGERPRINT.entries(),
     ].some(
       ([property, expected]) =>
         typeof capabilities[property] !== 'boolean' ||
@@ -121,7 +139,7 @@ export function assertWorkerDatabaseCapabilities(
     );
     if (fingerprintDiffers) {
       violations.push(
-        'staging_worker Neon managed-admin fingerprint differs from the reviewed workaround',
+        `${temporaryAdminRole} Neon managed-admin fingerprint differs from the reviewed workaround`,
       );
     }
   }
