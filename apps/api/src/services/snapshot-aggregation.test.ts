@@ -227,6 +227,7 @@ function makeSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
     wallClockSeconds: 700,
     metadata: {},
     rawInput: null,
+    safetyFlaggedAt: null,
     filedAt: null,
     filingStatus: null,
     filingRetryCount: 0,

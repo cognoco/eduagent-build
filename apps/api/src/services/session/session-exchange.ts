@@ -82,6 +82,7 @@ import {
   type ImageData,
 } from '../exchanges';
 import { applyDangerousProcedureGate } from '../dangerous-procedure-gate';
+import { flagSessionSafety } from '../safety-flag';
 import { applyMinorPiiEchoGate } from '../minor-pii-echo-gate';
 import { runSuitabilityEnforcement } from '../suitability-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
@@ -4401,6 +4402,14 @@ export async function processMessage(
     throw err;
   }
 
+  // [WI-3140] Tripwire-to-memory firewall. `safetyFlagged` covers both
+  // detectors on this path — the deterministic tripwire short-circuit and the
+  // model envelope's `signals.crisis_redirect` — so one stamp here excludes the
+  // session from memory analysis and the embeddings index downstream.
+  if (result.safetyFlagged) {
+    await flagSessionSafety(db, profileId, sessionId, 'exchange.process');
+  }
+
   // T6: source the asked-question from the last assistant turn in history
   // (the mentor's most recent question, assembled before this LLM call — no DB
   // read). `content` is a re-wrapped JSON envelope; projectAiResponseContent
@@ -4814,6 +4823,16 @@ export async function streamMessage(
     throw new LlmStreamError('streamExchange threw', cause);
   }
 
+  // [WI-3140] Tripwire-to-memory firewall, deterministic leg. Stamped BEFORE
+  // the stream is handed to the caller, not in onComplete: the tripwire hit is
+  // already known here, and a client that disconnects mid-stream never runs
+  // onComplete — which would leave a persisted user message unflagged. The
+  // model-layer leg cannot be stamped here (the envelope does not exist yet)
+  // and is handled in onComplete below.
+  if (result.safetyFlagged) {
+    await flagSessionSafety(db, profileId, sessionId, 'exchange.stream');
+  }
+
   return {
     stream: result.stream,
     async onComplete() {
@@ -4925,6 +4944,16 @@ export async function streamMessage(
           expectedResponseMinutes: 0,
           fallback: outcome.fallback,
         };
+      }
+
+      // [WI-3140] Tripwire-to-memory firewall, model-layer leg. A crisis
+      // redirect the model itself signalled only becomes visible now that the
+      // envelope is parsed. The deterministic leg was already stamped above,
+      // hence the `!result.safetyFlagged` guard — no double write. Read the raw
+      // classified outcome, not `parsed` below: the app-help signal guard must
+      // never be able to suppress a safeguarding stamp.
+      if (!result.safetyFlagged && outcome.parsed.crisisRedirect) {
+        await flagSessionSafety(db, profileId, sessionId, 'exchange.stream');
       }
 
       const modeGuarded = appHelpTurn
