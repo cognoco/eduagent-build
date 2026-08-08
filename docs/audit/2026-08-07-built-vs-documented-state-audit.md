@@ -173,7 +173,9 @@ not show that a flag gates the feature the sentence says it gates, that a column
 constraint claimed, that a route is registered at the path given, or that a service owns the write
 attributed to it. Existence is a necessary condition for those claims and not a sufficient one, so
 those tokens are classified **unresolved, with reason** rather than verified. Counting them as
-verified would be the same error this audit exists to catch, committed by the audit.
+verified would be the same error this audit exists to catch, committed by the audit. Closing that
+gap is owned by **`WI-3163`** (predicate sweep over the 1,264 candidates this audit could only
+establish existence for) — filed so the gap has an owner rather than living only in this paragraph.
 
 | Acceptance-Criteria bucket | (a) L1 canon | (b) Accepted ADRs | (c) W-state, non-terminal |
 |---|---|---|---|
@@ -193,7 +195,7 @@ Each column sums to its candidate total: 38 + 10 + 524 + 25 = 597 · 40 + 3 + 33
 
 | Reason | (a) | (b) | (c) |
 |---|---|---|---|
-| Existence established mechanically; **predicate not verified** | 494 | 318 | 452 |
+| Existence established mechanically; **predicate not verified** — owned by `WI-3163` | 494 | 318 | 452 |
 | `WI-NN` id never fetched from Cosmo (reference/provenance, not a status claim) | 30 | 14 | 103 |
 | Repo-external absolute path into the `nexus` repository — unverifiable from here | — | — | 3 |
 
@@ -450,8 +452,13 @@ All sixteen findings were filed via `/cosmo:capture` with `--origin-wi WI-3122`,
   are now classified **unresolved, with reason**, and "verified consistent" is reserved for the 133
   tokens whose predicate was established by hand and enumerated in § Coverage. Verifying the
   remaining 1,264 predicates is a genuinely larger exercise than this item's bounded population —
-  it means reading the sentence around every mention, not the token — and is the honest shape of a
-  follow-up rather than something quietly folded in here.
+  it means reading the sentence around every mention, not the token — so it is a successor rather
+  than something quietly folded in here. That successor is **`WI-3163`** (predicate sweep over the
+  1,264 candidates WI-3122 could only establish existence for), filed with the per-population split
+  (494 / 318 / 452), this report's method as its regeneration recipe, and WI-3122's two operator
+  rulings inherited as its own failure conditions. **A known gap recorded only in a document is a
+  gap nobody owns — which is the drift this audit was commissioned to find.** Citing its successor
+  is how this report avoids becoming an instance of its own subject.
 - **Cosmo verification was targeted, not exhaustive.** The population contains 154 distinct `WI-NN`
   tokens (30 in (a), 14 in (b), 110 in (c) non-terminal, 483 mentions in (c) alone). Seven were
   fetched from Cosmo — the ones carrying explicit lifecycle-status claims in the two live trackers,
