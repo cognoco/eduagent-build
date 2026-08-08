@@ -1,0 +1,25 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Repair independently verified against current main, not taken from the PR description. The repaired file on origin/main derives the deadline from the run clock - PERIOD_END_AT = new Date(Date.now() + 30 days) - and all three former literals (two periodEndAt, one deadlineAt) now reference it; no 2026-08-01 literal survives outside an explanatory comment. HOW RECURRENCE IS AVOIDED: run-clock-relative derivation, not a frozen clock and not a later fixed date. The value is recomputed on every run, so the scenario means the same thing on every future date and the deadline can never fall into the past. GATE EVIDENCE after the former deadline: the Flag-ON integration (IDENTITY_V2_ENABLED) check concluded success on three separate main-branch commits on 2026-08-08 - 786cbb301 at 00:40Z, a0af5be62 at 01:29Z, f747627be at 01:46Z - and the required main job, which is what the bomb reddened on every API pull request, concluded success at 01:32Z. Seven days past the 2026-08-01 detonation date.",
+      "pointer": "apps/api/src/services/billing/payment-failed-alert.integration.test.ts"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Sibling sweep performed and findings triaged rather than dumped. Method: grep deadline-shaped identifiers (deadline/expire/expiresAt/periodEnd/cycleReset/grace/validUntil/renewsAt/trialEnd/until) against future-dated literals from 2026-09 onward across test and fixture files. 11 hits on origin/main at 2026-08-08. A future literal is only a BOMB when the consuming code compares it to the REAL clock; where the test injects an explicit now, the relationship is fixed forever and the literal is inert. Three cleared as SAFE by reading the call site: trial.integration.test.ts:211 (resetDailyQuotas receives NOW = 2026-05-15), reconcile-worker-secrets.test.ts:75 (validateOwnershipManifest receives new Date 2026-08-01), and the 2026-09-06 mentor-notice/now-feed/session-exchange literals which ARE the injected now rather than a deadline. 8 remain uncleared because they are seeded into the DB and consumed by production paths whose clock source was not traced - earliest possible detonation 2026-12-31. Captured through the sanctioned path as WI-3145 with the reproduce command, the per-literal file:line list, the cleared-versus-uncleared split, and the PR 2803 repair pattern to copy.",
+      "pointer": "git grep -nE \"(deadline|expire|periodEnd|cycleReset|validUntil)[A-Za-z]*:?\\\\s*[:=]?\\\\s*.*'20(26-(09|1[0-2])|2[7-9])\" -- '*.test.ts'"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Lifecycle provenance recorded. This item's completion ties PR 2803's squash-merge commit 503f4759ec49390b838b4f95549a4bbbaddb7845 (merged 2026-08-01T07:33:55Z, single file, +12/-3, test-only) into Cosmo as Fixed In, so the repair stops being untracked landed work. Fixed In is passed explicitly rather than auto-derived, because this reconciliation item produces no code change of its own and the commit that must be provenanced is the earlier repair, not this item's artifacts commit.",
+      "pointer": "503f4759ec49390b838b4f95549a4bbbaddb7845"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "The BID-19 exclusion ruling is cited in the completion summary: binding ruling msg_8dbac7af5ee4 excludes this work from BID-19, which is why the repair was landed and reconciled outside that batch and why this item exists as a separate provenance record rather than as a BID-19 member.",
+      "pointer": "503f4759ec49390b838b4f95549a4bbbaddb7845"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-08-local-deterministic"
+}
