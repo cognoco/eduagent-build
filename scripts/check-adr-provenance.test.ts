@@ -5,6 +5,7 @@ import {
   hasHumanArchitectureSignoff,
   isAcceptedAdr,
   isFeatSubject,
+  isStatusFlipToAccepted,
   type AddedAdr,
   type BaselineEntry,
 } from './check-adr-provenance';
@@ -56,6 +57,78 @@ describe('ADR header parsing', () => {
         '**Deciders:** Architecture sign-off pending',
       ),
     ).toBe(false);
+  });
+});
+
+describe('status flips on existing ADRs', () => {
+  const proposed =
+    '**Status:** Proposed - **Deciders:** Architecture sign-off pending';
+  const acceptedSigned =
+    '**Status:** Accepted - 2026-08-04 - **Deciders:** Architect (jjoerg) + Claude';
+  const acceptedUnsigned =
+    '**Status:** Accepted - 2026-08-04 - **Deciders:** PM + Claude';
+
+  it('detects Proposed -> Accepted, and not edits to already-Accepted ADRs', () => {
+    expect(isStatusFlipToAccepted(proposed, acceptedUnsigned)).toBe(true);
+    expect(isStatusFlipToAccepted(acceptedUnsigned, acceptedUnsigned)).toBe(
+      false,
+    );
+    // Unreadable pre-image cannot prove a transition.
+    expect(isStatusFlipToAccepted(undefined, acceptedUnsigned)).toBe(false);
+  });
+
+  it('blocks a flip to Accepted without human Architecture sign-off', () => {
+    expect(
+      findViolations(
+        [addedAdr({ body: acceptedUnsigned, statusFlip: true })],
+        [],
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'accepted_missing_arch_signoff',
+        file,
+      }),
+    ]);
+  });
+
+  it('allows a flip to Accepted with conforming sign-off', () => {
+    expect(
+      findViolations(
+        [addedAdr({ body: acceptedSigned, statusFlip: true })],
+        [],
+      ),
+    ).toEqual([]);
+  });
+
+  it('does not apply the feat(...) addition rule to flips', () => {
+    expect(
+      findViolations(
+        [
+          addedAdr({
+            body: acceptedSigned,
+            statusFlip: true,
+            subject: 'feat(api): add consent workflow',
+            message: 'feat(api): add consent workflow\n',
+          }),
+        ],
+        [],
+      ),
+    ).toEqual([]);
+  });
+
+  it('grandfathers baselined files on flip, same escape as additions', () => {
+    expect(
+      findViolations(
+        [addedAdr({ body: acceptedUnsigned, statusFlip: true })],
+        [
+          {
+            kind: 'accepted_missing_arch_signoff',
+            file,
+            reason: 'grandfathered pre-guard Accepted ADR',
+          },
+        ],
+      ),
+    ).toEqual([]);
   });
 });
 

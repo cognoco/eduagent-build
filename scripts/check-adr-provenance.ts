@@ -1,8 +1,12 @@
 // ADR provenance ratchet - MMT-ADR-0000 section II.6.
 //
-// Forward-only guard for newly added docs/adr/MMT-ADR-*.md files:
+// Forward-only guard for docs/adr/MMT-ADR-*.md files:
 //   - a feat(...) commit must not add an ADR unless explicitly allowlisted;
-//   - a newly added Accepted ADR must record human Architecture sign-off.
+//   - a newly added Accepted ADR must record human Architecture sign-off;
+//   - an existing ADR whose Status flips to Accepted in the change must record
+//     the same sign-off. The flip is judged against the pre-image, so an edit
+//     to an already-Accepted ADR is not flagged. The feat(...) rule is an
+//     addition rule and does not apply to flips.
 //
 // The guard deliberately does not enforce ADR immutability.
 
@@ -23,12 +27,17 @@ const ALLOW_COMMENT_RE = /\bADR provenance allow:\s*\S+/i;
 
 export type ViolationKind = 'feat_adr_add' | 'accepted_missing_arch_signoff';
 
+/**
+ * An ADR change under guard: either a newly added file, or an existing file
+ * whose Status flipped to Accepted (statusFlip).
+ */
 export interface AddedAdr {
   file: string;
   body: string;
   subject?: string;
   message?: string;
   commit?: string;
+  statusFlip?: boolean;
 }
 
 export interface BaselineEntry {
@@ -85,6 +94,18 @@ export function hasHumanArchitectureSignoff(body: string): boolean {
   return Boolean(deciders && HUMAN_ARCHITECTURE_RE.test(deciders));
 }
 
+/**
+ * True when the change turns a not-Accepted ADR into an Accepted one. An
+ * unreadable pre-image cannot prove a transition, so it is not one.
+ */
+export function isStatusFlipToAccepted(
+  before: string | undefined,
+  after: string,
+): boolean {
+  if (before === undefined) return false;
+  return !isAcceptedAdr(before) && isAcceptedAdr(after);
+}
+
 export function findViolations(
   addedAdrs: AddedAdr[],
   baseline: BaselineEntry[],
@@ -95,6 +116,7 @@ export function findViolations(
   for (const adr of addedAdrs) {
     if (
       !options.skipSubjectCheck &&
+      !adr.statusFlip &&
       adr.subject &&
       isFeatSubject(adr.subject) &&
       !isBaselineAllowed(
@@ -242,8 +264,45 @@ function collectRangeAddedAdrs(
     }
   }
 
-  return Array.from(addedByCommit.values()).sort((a, b) =>
-    a.file.localeCompare(b.file),
+  return [
+    ...addedByCommit.values(),
+    ...collectRangeStatusFlips(mergeBase, head),
+  ].sort((a, b) => a.file.localeCompare(b.file));
+}
+
+// Files added in the range are --diff-filter=A here, so they never double up
+// with the added set above.
+function collectRangeStatusFlips(base: string, head: string): AddedAdr[] {
+  return listAdrFiles([
+    'diff',
+    '--name-only',
+    '--diff-filter=M',
+    base,
+    head,
+    '--',
+    'docs/adr/MMT-ADR-*.md',
+  ]).flatMap((file) => {
+    const after = readFileAtRef(head, file);
+    if (after === undefined) return [];
+    if (!isStatusFlipToAccepted(readFileAtRef(base, file), after)) return [];
+    return [
+      {
+        file,
+        body: after,
+        statusFlip: true,
+        commit: lastCommitTouching(base, head, file),
+      },
+    ];
+  });
+}
+
+function lastCommitTouching(
+  base: string,
+  head: string,
+  file: string,
+): string | undefined {
+  return (
+    git(['rev-list', '-1', `${base}..${head}`, '--', file]).trim() || undefined
   );
 }
 
@@ -252,24 +311,38 @@ function collectStagedAddedAdrs(args: Args): AddedAdr[] {
     ? parseCommitMessage(fs.readFileSync(args.commitMsgFile, 'utf8'))
     : undefined;
 
-  return git([
+  const added = listAdrFiles([
     'diff',
     '--cached',
     '--name-only',
     '--diff-filter=A',
     '--',
     'docs/adr/MMT-ADR-*.md',
-  ])
-    .split('\n')
-    .map((line) => normalizePath(line.trim()))
-    .filter((file) => file && isAdrPath(file))
-    .map((file) => ({
-      file,
-      body: git(['show', `:${file}`]),
-      subject: subjectAndMessage?.subject,
-      message: subjectAndMessage?.message,
-    }))
-    .sort((a, b) => a.file.localeCompare(b.file));
+  ]).map((file) => ({
+    file,
+    body: git(['show', `:${file}`]),
+    subject: subjectAndMessage?.subject,
+    message: subjectAndMessage?.message,
+  }));
+
+  return [...added, ...collectStagedStatusFlips()].sort((a, b) =>
+    a.file.localeCompare(b.file),
+  );
+}
+
+function collectStagedStatusFlips(): AddedAdr[] {
+  return listAdrFiles([
+    'diff',
+    '--cached',
+    '--name-only',
+    '--diff-filter=M',
+    '--',
+    'docs/adr/MMT-ADR-*.md',
+  ]).flatMap((file) => {
+    const after = git(['show', `:${file}`]);
+    if (!isStatusFlipToAccepted(readFileAtRef('HEAD', file), after)) return [];
+    return [{ file, body: after, statusFlip: true }];
+  });
 }
 
 function resolveMergeBase(base: string | undefined, head: string): string {
@@ -316,6 +389,13 @@ function listAddedAdrFilesForCommit(hash: string): string[] {
     '--',
     'docs/adr/MMT-ADR-*.md',
   ])
+    .split('\n')
+    .map((line) => normalizePath(line.trim()))
+    .filter((file) => file && isAdrPath(file));
+}
+
+function listAdrFiles(gitArgs: string[]): string[] {
+  return git(gitArgs)
     .split('\n')
     .map((line) => normalizePath(line.trim()))
     .filter((file) => file && isAdrPath(file));
@@ -428,8 +508,9 @@ function main(): number {
   });
 
   if (violations.length === 0) {
+    const flips = addedAdrs.filter((adr) => adr.statusFlip).length;
     process.stdout.write(
-      `adr-provenance: clean (${addedAdrs.length} added ADRs checked)\n`,
+      `adr-provenance: clean (${addedAdrs.length - flips} added, ${flips} status-flip ADRs checked)\n`,
     );
     return 0;
   }
