@@ -59,12 +59,12 @@ Gaps needing **engineering** (proposed remedies in the sections; several need ne
 | # | Work | Section | Tracking |
 |---|---|---|---|
 | E1 | Memory consent into the consent log: `consent_grant` purpose + version + grantor; remove the implicit grant path; surface the control on Privacy & data | A4 Gaps 1–5 | **WI-2928** (operator-ruled 2026-07-31; unimplemented). Prerequisite WI-2929 landed 2026-08-05 |
-| E2 | Residence: collect habitual residence at onboarding and call `resolveJurisdiction()` fail-closed on general access; store-console country-availability evidence | A3 Gaps 1, 2, 7 | New WI needed; resolver exists (WI-2690); ADR basis: MMT-ADR-0052 / MMT-ADR-0055 (both Accepted 2026-08-05 — capture work in build) |
-| E3 | Tripwire-to-memory firewall: exclude tripwire/crisis-flagged events from analysis input and embedding content | A5 Gap 3 | New WI needed — the package's principal open control |
-| E4 | Store filtered (not raw) text in `session_embeddings.content`; memory-consent gate symmetry on the embedding step (pending R5) | A5 Gaps 5, 6 | New WI needed |
-| E5 | Extend the write-gate corpus beyond health/disability; native-speaker review of the 9 non-English corpora (or restrict memory to English at unlock) | A5 Gaps 1, 2 | New WI needed |
-| E6 | Deletion-propagation drill: execute the 15-item end-to-end plan incl. memory-facts assertions, retain-tier survival, PITR drill; file Neon backup-window evidence | A6 Gaps 3, 5 | WI-2390 / WI-2056 / WI-2057 partially cover; drill WI needed |
-| E7 | Copy set: decision-point consent copy (duration, deletion rights, no-ads/no-training), correct/delete sentences in the child notice, in-app duration statement, journal export-promise fix — one 7-locale change-set, coordinated with the Art 50(2) W3/W7 items | A13 Gaps 2, 3, 5, 6 | New WI needed |
+| E2 | Residence: collect habitual residence at onboarding and call `resolveJurisdiction()` fail-closed on general access; store-console country-availability evidence | A3 Gaps 1, 2, 7 | Collection = **WI-2743** (Executing, bid-53 lane); enforcement = **WI-2927** (Ready, blocked by 2743); store-console evidence = **WI-3139** (captured 2026-08-07). Resolver exists (WI-2690); ADR basis: MMT-ADR-0052 / MMT-ADR-0055 (both Accepted 2026-08-05) |
+| E3 | Tripwire-to-memory firewall: exclude tripwire/crisis-flagged events from analysis input and embedding content | A5 Gap 3 | **WI-3140** (captured 2026-08-07) — the package's principal open control |
+| E4 | Store filtered (not raw) text in `session_embeddings.content`; memory-consent gate symmetry on the embedding step (pending R5) | A5 Gaps 5, 6 | **WI-3141** (captured 2026-08-07) |
+| E5 | Extend the write-gate corpus beyond health/disability; native-speaker review of the 9 non-English corpora (or restrict memory to English at unlock) | A5 Gaps 1, 2 | **WI-3142** (captured 2026-08-07) |
+| E6 | Deletion-propagation drill: execute the 15-item end-to-end plan incl. memory-facts assertions, retain-tier survival, PITR drill; file Neon backup-window evidence | A6 Gaps 3, 5 | Drill = **WI-3143** (captured 2026-08-07); WI-2390 / WI-2056 / WI-2057 partially cover surrounding scope |
+| E7 | Copy set: decision-point consent copy (duration, deletion rights, no-ads/no-training), correct/delete sentences in the child notice, in-app duration statement, journal export-promise fix — one 7-locale change-set, coordinated with the Art 50(2) W3/W7 items | A13 Gaps 2, 3, 5, 6 | **WI-3144** (captured 2026-08-07) |
 | E8 | Adult self-consent withdrawal surface (or notice correction); AdultSelfConsentGate mounting | A4 Gaps 7, 8 | WI-2411 (gate); withdrawal surface untracked |
 
 ## 5. Assembly and submission plan
