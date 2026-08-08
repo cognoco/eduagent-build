@@ -19,7 +19,14 @@ The four code claims in the WI were re-verified against the current branch tip b
 
 The four new T10 checks were then run against the current tree to confirm they are load-bearing rather than decorative. All four fail today, which is the correct result — the guard blocks the deletion. The third check is the decisive one and is the check the previous wording had no equivalent of: the contract type and its gate surface are referenced in hundreds of places across mobile source, because the gate surface outlives the tab-shape matrix and is read by screens rather than by the chip. Whole-file deletion on the old condition would have broken every one of those references.
 
-Documentation-only change: no code, config, schema, or test files touched, so no test or typecheck target applies.
+Validation actually run, rather than asserted:
+
+- The lifecycle preflight (`execute complete --validate`) passes every check: all four summary sections, all three prose trip-wires, evidence manifest present, every acceptance criterion covered by a machine-verifiable claim, and every claim pointer resolved against the tree. Read-only, no remote writes.
+- Both edited documents were staged as git objects against the origin base and the resulting diff was inspected before the branch was pushed, confirming a surgical change (a handful of added lines per file) rather than a whitespace-mangled whole-file rewrite — a real risk when authoring files off-tree on Windows.
+- The evidence manifest is valid JSON by construction: the preflight parses it, and a malformed manifest fails that gate before any transition.
+- Every file path and test file named in the new plan text was confirmed to exist via `git ls-files` rather than cited from memory, including the usage-guard test the plan now protects.
+
+No code, config, CI, schema or test files were touched, so the repo's test, typecheck and lint targets have no subject in this change; the change-class router routes it as documentation. The four grep checks written into the plan are reproduced with their revision and hit counts in the evidence manifest.
 
 # Caveats / Follow-ups
 

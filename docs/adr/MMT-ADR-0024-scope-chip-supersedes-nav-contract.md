@@ -1,10 +1,12 @@
-# MMT-ADR-0024 — Relationship scope chip supersedes mode/proxy tab-shape navigation
+# MMT-ADR-0024 — Relationship scope chip owns scope SELECTION (it does not supersede the navigation contract)
+
+> Heading corrected 2026-08-08 (`WI-2905` — the work item that found this ADR's supersession claim contradicting the code, and that guards the cutover plan's conditional deletion against it). The previous heading read "Relationship scope chip **supersedes mode/proxy tab-shape navigation**", which a reader could take as established fact and which the code contradicts. The filename is deliberately unchanged: inbound references across plans, specs and prior change-sets cite it, and renaming buys no correctness.
 
 **Status:** Proposed · **explicit non-reliance in force (recorded 2026-08-01 — see § Disposition)** · 2026-06-20 (re-affirmed Proposed 2026-06-30) · **Scope:** Mobile app shell navigation and relationship-lens data access · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Person identity model), MMT-ADR-0008 (guardianship operation is distinct from everyday visibility) · **Amended by:** MMT-ADR-0037 (Accepted — supporter IA amendments an eventual acceptance change-set must incorporate)
 
 > **A Proposed ADR promotes no rule into canon.** This decision is not in force: nothing here is binding on `architecture.md` or on implementation until an acceptance change-set lands, and that change-set must amend canon in lockstep. (A section describing this model was once added to `architecture.md` prematurely and has been removed.) The § Disposition below makes the non-force posture an explicit, durable non-reliance record: downstream rollout and deletion work must not treat any clause of this ADR as ratified authority.
 
-> **TITLE CORRECTION — the chip supersedes scope SELECTION, not tab SHAPE (recorded 2026-08-08, WI-2905).** This ADR's title and its "supersedes mode/proxy tab-shape navigation" framing overstate what the V2 chip actually owns, and a reader skimming the title can reach the opposite of the truth. **Verified against `main` on 2026-08-08:**
+> **TITLE CORRECTION — the chip owns scope SELECTION, not tab SHAPE (recorded 2026-08-08 by `WI-2905` — the work item that found this drift and code-verified the cutover plan's deletion condition against it).** This ADR's former title and its "supersedes mode/proxy tab-shape navigation" framing overstate what the V2 chip actually owns, and a reader skimming the title can reach the opposite of the truth. **Verified against `main` on 2026-08-08:**
 >
 > - `apps/mobile/src/hooks/use-navigation-contract.ts:22` hardcodes the V2 tab set (`V2_TABS = {mentor, subjects, journal}`) in the **hook**, not in the chip. The chip does not compute it.
 > - `use-navigation-contract.ts:78-97` calls `resolveNavigationContract(...)` with `activeProfile`, `profiles`, `isParentProxy`, `appContext`, `role`, `subscription` and the flags — and this runs on **every** path, V2 included; there is no V2 short-circuit ahead of it.
@@ -13,7 +15,7 @@
 >
 > So the accurate statement is: **the scope chip owns scope SELECTION (whose data is in view); `resolveNavigationContract()` still owns navigation SHAPE and the gate surface.** The chip has not superseded the navigation contract, and `navigation-contract.ts` is live code on the V2 path.
 >
-> This correction is a factual amendment to points 4–5's framing, not a status change: the ADR remains **Proposed** under explicit non-reliance. It exists because the plan for the legacy-shell deletion once carried a conditional deletion of `navigation-contract.ts` phrased as "if the V2 chip fully owns shape" — a condition that reads as satisfied on this ADR's title and is **false in code**. That condition is now code-verified rather than ADR-derived; see `docs/plans/v2-plan/2026-06-10-s6-cutover-deletions.md` § T10. Surfaced by the `WI-2062` ADR-0024 disposition audit and captured separately so the guard could land independently of it.
+> This correction is a factual amendment to points 4–5's framing, not a status change: the ADR remains **Proposed** under explicit non-reliance. It exists because the plan for the legacy-shell deletion once carried a conditional deletion of `navigation-contract.ts` phrased as "if the V2 chip fully owns shape" — a condition that reads as satisfied on this ADR's title and is **false in code**. That condition is now code-verified rather than ADR-derived; see `docs/plans/v2-plan/2026-06-10-s6-cutover-deletions.md` § T10. Surfaced by `WI-2062` — the ADR-0024 disposition audit that produced the § Disposition non-reliance record below, currently blocked on a separate Cosmo Kind guard — and captured separately so this guard could land whether or not that audit unblocks.
 
 ## Context
 
