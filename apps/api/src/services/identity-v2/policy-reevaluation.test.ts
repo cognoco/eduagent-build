@@ -182,4 +182,50 @@ describe('[WI-2745] classifyPolicyChange', () => {
       expect(mayApplyAutomatically('unchanged')).toBe(false);
     });
   });
+
+  describe('[BREAK] the full band ordering, every pair', () => {
+    // WHAT THIS ARMS AND WHAT IT DOES NOT, stated precisely because the
+    // intuitive reading of it is wrong.
+    //
+    // The ranking used to be an ordered ARRAY read with `indexOf`, which yields
+    // -1 for any band missing from it. It is now a
+    // `Record<ConsentAgeBand, number>`, so a band added to the schema is a
+    // COMPILE error here rather than a silent -1. That compile error is the
+    // real guard, and no runtime test can observe it — with every band present
+    // there is no -1 left to produce.
+    //
+    // MEASURED, NOT ASSUMED. Reverting to the array and omitting the BOTTOM
+    // band leaves all of these green: -1 still sorts below every other rank, so
+    // dropping the lowest element preserves the ordering exactly. Omitting the
+    // TOP band is what inverts — prior=`adult` then ranks -1, so a drop to
+    // `below_minimum` reads as a RELAXATION and would auto-apply — and that
+    // probe turns 8 tests red here.
+    //
+    // So these pairs arm the ORDERING of the bands that exist, both directions,
+    // against a future edit that reorders or drops one. They cannot arm the
+    // not-yet-existing-band case; the Record type does that.
+    const ASCENDING: readonly ConsentAgeBand[] = [
+      'below_minimum',
+      'guardian_required_minor',
+      'consent_capable_minor',
+      'adult',
+    ];
+
+    const pairs: Array<[ConsentAgeBand, ConsentAgeBand]> = ASCENDING.flatMap(
+      (from) =>
+        ASCENDING.map((to): [ConsentAgeBand, ConsentAgeBand] => [from, to]),
+    );
+
+    it.each(pairs)('classifies %s → %s by capability order', (from, to) => {
+      const expected =
+        ASCENDING.indexOf(to) > ASCENDING.indexOf(from)
+          ? 'relaxation'
+          : ASCENDING.indexOf(to) < ASCENDING.indexOf(from)
+            ? 'restriction'
+            : 'unchanged';
+      expect(
+        classifyPolicyChange(decision({ band: from }), decision({ band: to })),
+      ).toBe(expected);
+    });
+  });
 });

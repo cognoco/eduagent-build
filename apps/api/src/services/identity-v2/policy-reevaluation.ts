@@ -22,16 +22,25 @@ export type PolicyChangeKind = 'unchanged' | 'relaxation' | 'restriction';
  * That is precisely why AC-2's restriction rule is not dead code on an
  * age-axis job: the axis cannot produce a restriction, but the job re-resolves
  * a WHOLE decision, and the rest of that decision can.
+ *
+ * A `Record` keyed by the band union rather than an ordered array, and that
+ * choice is load-bearing rather than stylistic: a `ConsentAgeBand[]` lets a
+ * newly added schema member compile silently, and `indexOf` then returns -1 for
+ * it. -1 sorts BELOW every real band, so an unknown PRIOR band makes
+ * `bandRaised` true against any known next band — the change classifies as a
+ * relaxation and `mayApplyAutomatically` returns true. That is failure in the
+ * one direction this module exists to prevent. As a Record, a new band is a
+ * compile error here instead.
  */
-const AGE_BAND_ORDER: readonly ConsentAgeBand[] = [
-  'below_minimum',
-  'guardian_required_minor',
-  'consent_capable_minor',
-  'adult',
-];
+const AGE_BAND_RANK: Record<ConsentAgeBand, number> = {
+  below_minimum: 0,
+  guardian_required_minor: 1,
+  consent_capable_minor: 2,
+  adult: 3,
+};
 
 function bandRank(band: ConsentAgeBand): number {
-  return AGE_BAND_ORDER.indexOf(band);
+  return AGE_BAND_RANK[band];
 }
 
 /**

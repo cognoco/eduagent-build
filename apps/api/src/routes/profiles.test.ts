@@ -978,6 +978,7 @@ describe('GET /v1/profiles/residence-countries', () => {
       countryCode: string;
       countryName: string;
       effectiveAt: Date;
+      expiresAt?: Date | null;
     }>,
   ): Database {
     return {
@@ -1015,6 +1016,63 @@ describe('GET /v1/profiles/residence-countries', () => {
       countries: [
         { countryCode: 'AT', countryName: 'Austria' },
         { countryCode: 'DE', countryName: 'Germany' },
+      ],
+    });
+  });
+
+  it('[BREAK] shows the name IN FORCE, not a rename scheduled for the future', async () => {
+    // The registry is effective-dated so a rename can be STAGED ahead of its
+    // legal date. Picking the newest row by effectiveAt alone would publish
+    // that rename early, in a picker a user chooses their residence from.
+    const res = await makeApp({
+      db: makeRegistryDb([
+        {
+          countryCode: 'DE',
+          countryName: 'Germany',
+          effectiveAt: new Date('1990-10-03T00:00:00Z'),
+          expiresAt: null,
+        },
+        {
+          countryCode: 'DE',
+          countryName: 'Germany (renamed, not yet in force)',
+          effectiveAt: new Date('3000-01-01T00:00:00Z'),
+          expiresAt: null,
+        },
+      ]),
+    }).request('/v1/profiles/residence-countries');
+
+    expect(await res.json()).toEqual({
+      countries: [{ countryCode: 'DE', countryName: 'Germany' }],
+    });
+  });
+
+  it('[BREAK] still lists a country whose only row is out of the window', async () => {
+    // Membership is deliberately NOT window-filtered, for the same reason it is
+    // not filtered by launch status: habitual residence is a fact about the
+    // person, not a permission. A country with only an expired or not-yet-
+    // effective row is still a real place someone lives, and dropping it would
+    // leave them unable to say where that is.
+    const res = await makeApp({
+      db: makeRegistryDb([
+        {
+          countryCode: 'XA',
+          countryName: 'Expired Only',
+          effectiveAt: new Date('1990-01-01T00:00:00Z'),
+          expiresAt: new Date('1991-01-01T00:00:00Z'),
+        },
+        {
+          countryCode: 'XF',
+          countryName: 'Future Only',
+          effectiveAt: new Date('3000-01-01T00:00:00Z'),
+          expiresAt: null,
+        },
+      ]),
+    }).request('/v1/profiles/residence-countries');
+
+    expect(await res.json()).toEqual({
+      countries: [
+        { countryCode: 'XA', countryName: 'Expired Only' },
+        { countryCode: 'XF', countryName: 'Future Only' },
       ],
     });
   });
