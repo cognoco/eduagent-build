@@ -1,6 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
+import {
+  createOwnerJourneyPhaseDiagnostics,
+  ownerEntryPhase,
+  type OwnerJourneyPhaseDiagnostics,
+} from '../../helpers/owner-journey-phase-diagnostics';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -46,13 +51,18 @@ const ENTRY_CASES = [
 
 async function signInFreshOwner(
   page: Page,
-  { alias }: { alias: string },
+  {
+    alias,
+    diagnostics,
+  }: { alias: string; diagnostics?: OwnerJourneyPhaseDiagnostics },
 ): Promise<void> {
   await seedAndSignIn(page, {
     scenario: 'parent-multi-child',
     alias,
     landingPath: '/mentor',
     landingTestId: 'mentor-screen',
+    diagnostics,
+    diagnosticReadinessMarker: 'mentor-screen',
   });
 }
 
@@ -90,38 +100,76 @@ async function expectOwnerLearnerEntry(
 test('V2 owner learner Account returns its exact self scope to each initiating tab', async ({
   page,
 }) => {
-  await signInFreshOwner(page, { alias: 'v2-account-owner-return' });
-
-  for (const entry of ENTRY_CASES) {
-    await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
-      await page.goto(entry.path, { waitUntil: 'commit' });
-      await expectOwnerLearnerEntry(page, entry);
-
-      await page.getByTestId('account-avatar-button').click();
-      await expect(page).toHaveURL(
-        new RegExp(`/account\\?returnTo=${entry.token}(?:&.*)?$`),
-      );
-      await expect(page.getByTestId('account-screen')).toBeVisible();
-      await expect(
-        page.getByText('Account', { exact: true }).first(),
-      ).toBeVisible();
-      for (const row of OWNER_ROWS) {
-        await expect(page.getByTestId(row)).toBeVisible();
-      }
-
-      await page.getByTestId(entry.leafRow).click();
-      await expect(page.getByTestId(entry.leafScreen)).toBeVisible({
-        timeout: 60_000,
-      });
-      await page.goBack({ waitUntil: 'commit' });
-      await expect(page.getByTestId('account-screen')).toBeVisible({
-        timeout: 60_000,
-      });
-
-      await page.getByTestId('account-back').click();
-      await expect(page).toHaveURL(new RegExp(`${entry.path}(?:\\?.*)?$`));
-      await expectOwnerLearnerEntry(page, entry);
+  const diagnostics = createOwnerJourneyPhaseDiagnostics();
+  try {
+    await signInFreshOwner(page, {
+      alias: 'v2-account-owner-return',
+      diagnostics,
     });
+
+    for (const entry of ENTRY_CASES) {
+      await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
+        diagnostics.enter({
+          phase: ownerEntryPhase(entry.token, 'account-entry'),
+          url: entry.path,
+          readinessMarker: entry.screen,
+        });
+        await page.goto(entry.path, { waitUntil: 'commit' });
+        await expectOwnerLearnerEntry(page, entry);
+
+        await page.getByTestId('account-avatar-button').click();
+        diagnostics.enter({
+          phase: ownerEntryPhase(entry.token, 'account-ready'),
+          url: page.url(),
+          readinessMarker: 'account-screen',
+        });
+        await expect(page).toHaveURL(
+          new RegExp(`/account\\?returnTo=${entry.token}(?:&.*)?$`),
+        );
+        await expect(page.getByTestId('account-screen')).toBeVisible();
+        await expect(
+          page.getByText('Account', { exact: true }).first(),
+        ).toBeVisible();
+        for (const row of OWNER_ROWS) {
+          await expect(page.getByTestId(row)).toBeVisible();
+        }
+
+        diagnostics.enter({
+          phase: ownerEntryPhase(entry.token, 'leaf-ready'),
+          url: page.url(),
+          readinessMarker: 'leaf-screen',
+        });
+        await page.getByTestId(entry.leafRow).click();
+        await expect(page.getByTestId(entry.leafScreen)).toBeVisible({
+          timeout: 60_000,
+        });
+        diagnostics.enter({
+          phase: ownerEntryPhase(entry.token, 'browser-back'),
+          url: page.url(),
+          readinessMarker: 'browser-history',
+        });
+        await page.goBack({ waitUntil: 'commit' });
+        diagnostics.enter({
+          phase: ownerEntryPhase(entry.token, 'account-return'),
+          url: page.url(),
+          readinessMarker: 'account-screen',
+        });
+        await expect(page.getByTestId('account-screen')).toBeVisible({
+          timeout: 60_000,
+        });
+
+        diagnostics.enter({
+          phase: ownerEntryPhase(entry.token, 'initiating-tab-return'),
+          url: entry.path,
+          readinessMarker: 'initiating-tab',
+        });
+        await page.getByTestId('account-back').click();
+        await expect(page).toHaveURL(new RegExp(`${entry.path}(?:\\?.*)?$`));
+        await expectOwnerLearnerEntry(page, entry);
+      });
+    }
+  } finally {
+    diagnostics.dispose();
   }
 });
 

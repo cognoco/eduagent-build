@@ -461,11 +461,12 @@ describe('POST /feedback', () => {
   it('does not queue or retry a permanent Resend rejection', async () => {
     const { inngest } = require('../inngest/client');
     (inngest.send as jest.Mock).mockClear();
-    fetchSpy.mockImplementationOnce(async () =>
-      new Response(JSON.stringify({ name: 'validation_error' }), {
-        status: 422,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    fetchSpy.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ name: 'validation_error' }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     const app = createTestApp(undefined, {

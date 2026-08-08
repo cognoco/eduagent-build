@@ -1,3 +1,5 @@
+import { createOwnerJourneyPhaseDiagnostics } from './owner-journey-phase-diagnostics';
+
 const originalEmailPrefix = process.env.PLAYWRIGHT_EMAIL_PREFIX;
 const originalApiUrl = process.env.PLAYWRIGHT_API_URL;
 const originalTestSeedSecret = process.env.PLAYWRIGHT_TEST_SEED_SECRET;
@@ -6,6 +8,7 @@ const originalClerkSecretKey = process.env.CLERK_SECRET_KEY;
 const originalFetch = global.fetch;
 
 afterEach(() => {
+  jest.useRealTimers();
   if (originalEmailPrefix === undefined) {
     delete process.env.PLAYWRIGHT_EMAIL_PREFIX;
   } else {
@@ -43,6 +46,63 @@ function loadTestSeedHelper(): typeof import('./test-seed') {
   process.env.PLAYWRIGHT_SKIP_LOCAL_API = '1';
   return jest.requireActual('./test-seed');
 }
+
+function seedResponse(email: string): Response {
+  return new Response(
+    JSON.stringify({
+      scenario: 'solo-learner',
+      accountId: 'account-id',
+      profileId: 'profile-id',
+      email,
+      password: 'seed-password',
+      ids: {},
+    }),
+    { status: 200 },
+  );
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+describe('[WI-2826] server-owned seed phase diagnostics', () => {
+  it('retains seed timing until server-owned Clerk provisioning returns', async () => {
+    jest.useFakeTimers({ now: 1_000 });
+    const email = 'seeded@example.com';
+    const seed = deferred<Response>();
+    global.fetch = jest.fn(() => seed.promise) as jest.Mock;
+    const output: string[] = [];
+    const diagnostics = createOwnerJourneyPhaseDiagnostics({
+      emit: (line) => output.push(line),
+    });
+    const { seedScenario } = loadTestSeedHelper();
+
+    const result = seedScenario(
+      { scenario: 'solo-learner', email },
+      diagnostics,
+    );
+    await jest.advanceTimersByTimeAsync(5_000);
+    expect(output).toContain(
+      '[V2 owner journey] phase=seed-request elapsedMs=5000 attempt=1 pathname=/v1/__test/seed',
+    );
+
+    seed.resolve(seedResponse(email));
+    await expect(result).resolves.toMatchObject({ email });
+    expect(output).toContain(
+      '[V2 owner journey] phase=seed-request elapsedMs=5000 attempt=1 statusClass=2xx pathname=/v1/__test/seed readiness=server-owned-seed-response',
+    );
+    expect(output.join('\n')).not.toMatch(/clerk-(lookup|verification)/);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    diagnostics.dispose();
+  });
+});
 
 describe('[WI-2820 P1] prefix cleanup batching', () => {
   it('repeats a full Worker batch and stops after the partial batch', async () => {

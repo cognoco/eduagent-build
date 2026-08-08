@@ -1,4 +1,9 @@
 import { apiBaseUrl, buildTestSeedHeaders, seedEmailPrefix } from './runtime';
+import type {
+  OwnerJourneyPhase,
+  OwnerJourneyPhaseDiagnostics,
+  OwnerJourneyReadinessMarker,
+} from './owner-journey-phase-diagnostics';
 
 export interface SeedResponse {
   scenario: string;
@@ -45,12 +50,31 @@ async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
   action: string,
+  diagnostic?: {
+    reporter: OwnerJourneyPhaseDiagnostics;
+    phase: OwnerJourneyPhase;
+    backoffPhase?: OwnerJourneyPhase;
+    readinessMarker?: OwnerJourneyReadinessMarker;
+  },
 ): Promise<Response> {
   // Initialised to a generic Error so the post-loop throw is always typed —
   // overwritten on every retryable failure with the actual status + body.
   let lastError = new Error(`${action} failed: no attempts made`);
   for (let attempt = 0; attempt < RETRY_MAX_ATTEMPTS; attempt++) {
+    const requestUrl = input instanceof Request ? input.url : input;
+    diagnostic?.reporter.enter({
+      phase: diagnostic.phase,
+      attempt: attempt + 1,
+      url: requestUrl,
+    });
     const response = await fetch(input, init);
+    diagnostic?.reporter.enter({
+      phase: diagnostic.phase,
+      attempt: attempt + 1,
+      status: response.status,
+      url: requestUrl,
+      readinessMarker: response.ok ? diagnostic.readinessMarker : undefined,
+    });
     if (response.ok) {
       return response;
     }
@@ -74,6 +98,14 @@ async function fetchWithRetry(
 
     lastError = new Error(`${action} failed (${response.status}): ${detail}`);
     if (attempt < RETRY_MAX_ATTEMPTS - 1) {
+      if (diagnostic?.backoffPhase) {
+        diagnostic.reporter.enter({
+          phase: diagnostic.backoffPhase,
+          attempt: attempt + 1,
+          status: response.status,
+          url: requestUrl,
+        });
+      }
       // Exponential backoff with ±20% jitter
       const base = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
       const jitter = base * (0.8 + Math.random() * 0.4);
@@ -95,10 +127,13 @@ async function readJsonOrThrow<T>(
   return (await response.json()) as T;
 }
 
-export async function seedScenario(input: {
-  scenario: string;
-  email: string;
-}): Promise<SeedResponse> {
+export async function seedScenario(
+  input: {
+    scenario: string;
+    email: string;
+  },
+  diagnostics?: OwnerJourneyPhaseDiagnostics,
+): Promise<SeedResponse> {
   const response = await fetchWithRetry(
     `${apiBaseUrl}/v1/__test/seed`,
     {
@@ -110,6 +145,14 @@ export async function seedScenario(input: {
       body: JSON.stringify(input),
     },
     `Seeding ${input.scenario}`,
+    diagnostics
+      ? {
+          reporter: diagnostics,
+          phase: 'seed-request',
+          backoffPhase: 'seed-backoff',
+          readinessMarker: 'server-owned-seed-response',
+        }
+      : undefined,
   );
 
   return readJsonOrThrow<SeedResponse>(response, `Seeding ${input.scenario}`);

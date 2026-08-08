@@ -892,10 +892,7 @@ async function attachSeedLoginToPerson(
     .update(person)
     .set({ loginId: null })
     .where(
-      and(
-        eq(person.id, existing.personId),
-        eq(person.loginId, existing.id),
-      ),
+      and(eq(person.id, existing.personId), eq(person.loginId, existing.id)),
     );
   await db
     .update(login)
@@ -5476,7 +5473,11 @@ function makeConsentThresholdSeeder(
       residenceJurisdiction:
         opts.location === 'US' ? 'US' : opts.location === 'EU' ? 'EU' : 'ROW',
     });
-    await attachSeedLoginToPerson(db, { personId: profileId, clerkUserId, email });
+    await attachSeedLoginToPerson(db, {
+      personId: profileId,
+      clerkUserId,
+      email,
+    });
     await db.insert(membership).values({
       personId: profileId,
       organizationId: accountId,

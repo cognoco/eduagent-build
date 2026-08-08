@@ -464,7 +464,9 @@ describe('seedScenario', () => {
       strandedLogin.email,
     );
     const insertMock = db.insert as unknown as jest.Mock;
-    expect(insertMock.mock.calls.some(([table]) => table === login)).toBe(false);
+    expect(insertMock.mock.calls.some(([table]) => table === login)).toBe(
+      false,
+    );
 
     const updateMock = db.update as unknown as jest.Mock;
     const loginUpdateIndex = updateMock.mock.calls.findIndex(
@@ -1112,7 +1114,9 @@ describe('seedScenario', () => {
       'Clerk user creation failed (422): synthetic-duplicate-detail',
     );
     expect(
-      fetchMock.mock.calls.filter(([input]) => String(input).includes('/users?')),
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).includes('/users?'),
+      ),
     ).toHaveLength(2);
   });
 });

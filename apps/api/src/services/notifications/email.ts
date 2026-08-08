@@ -177,11 +177,14 @@ export async function sendEmail(
     ) === true;
 
   if (!recipientAllowed) {
-    logger.warn('[email] non-production recipient not allowlisted — skipping send', {
-      event: 'notification.email.non_production_recipient',
-      type: payload.type,
-      environment: options.environment,
-    });
+    logger.warn(
+      '[email] non-production recipient not allowlisted — skipping send',
+      {
+        event: 'notification.email.non_production_recipient',
+        type: payload.type,
+        environment: options.environment,
+      },
+    );
     return {
       sent: false,
       retryability: 'none',

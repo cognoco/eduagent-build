@@ -52,11 +52,7 @@ describe('global deleted-person FK boundary', () => {
     );
 
     try {
-      const response = await app.request(
-        '/throws',
-        {},
-        TEST_ENV,
-      );
+      const response = await app.request('/throws', {}, TEST_ENV);
       expect(response.status).toBe(500);
       await expect(response.json()).resolves.toMatchObject({
         code: ERROR_CODES.INTERNAL_ERROR,

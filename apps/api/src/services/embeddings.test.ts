@@ -175,7 +175,10 @@ describe('generateEmbedding', () => {
 
     await expect(
       generateEmbedding('Some text', TEST_API_KEY),
-    ).rejects.not.toHaveProperty('message', expect.stringContaining(providerBody));
+    ).rejects.not.toHaveProperty(
+      'message',
+      expect.stringContaining(providerBody),
+    );
   });
 
   it('carries a bounded Retry-After delay on a 429 response', async () => {
@@ -279,21 +282,25 @@ describe('parseVoyageRetryAfterMs', () => {
   });
 
   it('parses an HTTP date', () => {
-    expect(
-      parseVoyageRetryAfterMs('Sat, 01 Aug 2026 12:02:00 GMT', now),
-    ).toBe(120_000);
+    expect(parseVoyageRetryAfterMs('Sat, 01 Aug 2026 12:02:00 GMT', now)).toBe(
+      120_000,
+    );
   });
 
   it('caps excessive provider delays at fifteen minutes', () => {
     expect(parseVoyageRetryAfterMs('86400', now)).toBe(15 * 60_000);
   });
 
-  it.each([null, '', '-1', '1.5', 'not-a-date', 'Sat, 01 Aug 2026 11:00:00 GMT'])(
-    'returns null for an unusable Retry-After value %p',
-    (value) => {
-      expect(parseVoyageRetryAfterMs(value, now)).toBeNull();
-    },
-  );
+  it.each([
+    null,
+    '',
+    '-1',
+    '1.5',
+    'not-a-date',
+    'Sat, 01 Aug 2026 11:00:00 GMT',
+  ])('returns null for an unusable Retry-After value %p', (value) => {
+    expect(parseVoyageRetryAfterMs(value, now)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

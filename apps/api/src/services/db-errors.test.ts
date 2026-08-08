@@ -42,9 +42,9 @@ describe('db-errors', () => {
       'mentor_activity_ledger_profile_id_person_id_fk',
       'notification_preferences_profile_id_person_id_fk',
     ])('detects the known stale-person constraint %s', (constraint) => {
-      expect(isDeletedPersonReferenceViolation(pgForeignKeyViolation(constraint))).toBe(
-        true,
-      );
+      expect(
+        isDeletedPersonReferenceViolation(pgForeignKeyViolation(constraint)),
+      ).toBe(true);
     });
 
     it('detects a known constraint through a Drizzle wrapper', () => {

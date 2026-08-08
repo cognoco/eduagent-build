@@ -55,10 +55,7 @@ export function captureException(err: unknown, context?: ErrorContext): void {
  * Captures a queryable Sentry message event for operational anomalies that are
  * not exceptions but still need alerting/24h volume checks.
  */
-export function captureMessage(
-  message: string,
-  context?: ErrorContext,
-): void {
+export function captureMessage(message: string, context?: ErrorContext): void {
   Sentry.withScope((scope) => {
     if (context?.userId) {
       scope.setUser({ id: context.userId });

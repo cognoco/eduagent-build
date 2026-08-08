@@ -116,10 +116,10 @@ export const accountReclaimAttempt = inngest.createFunction(
 
           if (!result.sent) {
             if (result.retryability !== 'transient') {
-              logger.warn(
-                '[account-reclaim-attempt] email not sent',
-                { accountId: account.id, reason: result.reason },
-              );
+              logger.warn('[account-reclaim-attempt] email not sent', {
+                accountId: account.id,
+                reason: result.reason,
+              });
               return {
                 status: 'not_sent' as const,
                 reason: result.reason,
