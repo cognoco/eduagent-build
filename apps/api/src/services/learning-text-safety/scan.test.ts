@@ -1101,3 +1101,376 @@ describe('[WI-2628 AC-5] persistence-boundary wiring guard (forward-only)', () =
     expect(guard).not.toContain(GATE_MODULE);
   });
 });
+
+describe('[WI-3142] Article 9 domains beyond health — unnamed-attribution-only scope', () => {
+  // Closes Gap 1 of the memory-unlock evidence package
+  // (docs/compliance/memory-unlock-package/a5-art9-suppression.md): the corpus
+  // covered health/disability only, so a stored profile field asserting the
+  // learner's religion, ethnicity, politics, union membership or sexual
+  // orientation passed the storage gate untouched.
+  //
+  // WHY THESE TERMS ARE NOT `broad`. "Catholic", "communist", "gay", "Roma" are
+  // ordinary words in history, civics and religious-education homework. In the
+  // broad scope a bare mention makes the text non-clear, which would route the
+  // whole schoolwork corpus through the judge. They are attribution-scoped
+  // instead — the same rationale the homograph acronyms already use.
+  //
+  // WHY A THIRD SCOPE AND NOT `attributed-only`. The existing attributed-only
+  // grammar includes the Latin `namedPatterns` — the "capitalized token = person
+  // name" heuristic that makes `Petr has dyslexia.` block. Over a religion or
+  // politics slot that heuristic hard-blocks the single most common shape in
+  // history homework: `Martin Luther was Catholic.`, `Gandhi was Hindu.` The
+  // Art 9 risk this gate exists for is a characterisation of the LEARNER, not a
+  // statement about a historical figure, so the new scope keeps every
+  // attribution shape that names a data subject (person reference, possessive,
+  // Japanese particle/honorific) and drops the bare-capitalized-name heuristic
+  // alone. Both directions are asserted below.
+  interface DomainRow {
+    readonly domain: string;
+    /** Person-attributed status assertion about a data subject. Must block. */
+    readonly attributed: string;
+    /** The same subject matter as ordinary schoolwork prose. Must stay clear. */
+    readonly mention: string;
+  }
+
+  const EN_DOMAIN_ROWS: readonly DomainRow[] = [
+    {
+      domain: 'racial or ethnic origin',
+      attributed: 'The learner is Roma and speaks Romani at home.',
+      mention: 'The Roma people migrated across Europe over many centuries.',
+    },
+    {
+      domain: 'political opinions',
+      attributed: 'The student is a communist.',
+      mention:
+        'Communist parties grew quickly across Europe after the first world war.',
+    },
+    {
+      domain: 'religious or philosophical beliefs',
+      attributed: 'The learner is Catholic and attends mass on Sundays.',
+      mention:
+        'The Reformation split the Catholic Church in the sixteenth century.',
+    },
+    {
+      domain: 'trade-union membership',
+      attributed: 'She is a trade union member and pays dues every month.',
+      mention:
+        'Trade union membership grew rapidly during the Industrial Revolution.',
+    },
+    {
+      domain: 'sex life or sexual orientation',
+      attributed: 'The learner is gay.',
+      mention:
+        'The novel follows the gay rights movement through the 1970s and 1980s.',
+    },
+    {
+      domain: 'genetic data',
+      attributed: 'Her DNA test result shows a hereditary condition.',
+      mention: 'A DNA test can reveal where a family originally came from.',
+    },
+  ];
+
+  it('covers all six Article 9 domains the health-only corpus omitted', () => {
+    expect(EN_DOMAIN_ROWS).toHaveLength(6);
+  });
+
+  describe.each(EN_DOMAIN_ROWS)('$domain', ({ attributed, mention }) => {
+    it('blocks the person-attributed status assertion', () => {
+      const result = scanAsLlm(attributed, 'en');
+      expect(result.classification).toBe('block');
+      // Deterministic, so the disclosure never reaches the judge and is never
+      // persisted — the same guarantee the health domain already carries.
+      expect(result.disposition).toBe('block');
+      expect(result.reason).toBe('person_attribution');
+      expect(result.protectedLexemeCount).toBeGreaterThan(0);
+    });
+
+    it('keeps the ordinary educational mention clear', () => {
+      const result = scanAsLlm(mention, 'en');
+      expect(result.classification).toBe('clear');
+      expect(result.disposition).toBe('clear');
+      // Count zero pins the no-lexeme path: an unattributed status word is
+      // outside the detector entirely, not merely un-blocked.
+      expect(result.protectedLexemeCount).toBe(0);
+    });
+  });
+
+  it('blocks a hedged status attribution as a diagnostic inference', () => {
+    const result = scanAsLlm('The learner is probably Muslim.', 'en');
+    expect(result.classification).toBe('block');
+    expect(result.reason).toBe('diagnostic_inference');
+  });
+
+  it('reports reviewed confidence for an English-only status match', () => {
+    // The English set is authored, not generated, so an English-only match must
+    // report the strength it actually has.
+    const result = scanAsLlm('The learner is Catholic.', 'en');
+    expect(result.classification).toBe('block');
+    expect(result.corpusConfidence).toBe('reviewed');
+  });
+
+  // THE NAMED-FIGURE CONTROL — the reason the scope is a third one. Each string
+  // is a capitalized historical name plus a status word: the exact shape the
+  // attributed-only `namedPatterns` heuristic would hard-block, with no judge
+  // appeal, in a learner's history note.
+  it.each([
+    'Martin Luther was Catholic before he broke with Rome.',
+    'Gandhi was Hindu and led the independence movement.',
+    'Lenin was a communist revolutionary.',
+    'Mandela was an activist for most of his life.',
+  ])('keeps a historical-figure attribution clear: %s', (text) => {
+    const result = scanAsLlm(text, 'en');
+    expect(result.classification).toBe('clear');
+    expect(result.protectedLexemeCount).toBe(0);
+  });
+
+  it('still blocks the same shape when the subject is a data subject, not a name', () => {
+    // The other half of the control: dropping the name heuristic must not drop
+    // the attribution grammar. `he`/`she`/`they` are person references, so a
+    // third party the learner is describing is still caught.
+    for (const text of [
+      'He is Catholic.',
+      'She is a communist.',
+      'They are Hindu.',
+    ]) {
+      expect(scanAsLlm(text, 'en').classification).toBe('block');
+    }
+  });
+
+  // FALSE-POSITIVE CONTROLS. Every string is ordinary learning content that a
+  // careless corpus would block. The homograph exclusions ("conservative",
+  // "straight", "asexual", "orthodox", bare colour and continent adjectives,
+  // bare "union") are asserted here rather than left to a code comment.
+  const BENIGN_LEARNING_TEXT: readonly string[] = [
+    'A conservative estimate puts the total at about two hundred.',
+    'Draw a straight line between the two points.',
+    'Plants can reproduce by asexual reproduction.',
+    'His orthodox method of solving the equation is the quickest.',
+    'My black cat sleeps on the windowsill.',
+    'Her white shirt is part of the school uniform.',
+    'The European Union has twenty-seven member states.',
+    'Her essay compares communist and capitalist economies.',
+    'Buddhist temples in Japan often contain wooden pagodas.',
+    'Trade unions formed in the nineteenth century to protect workers.',
+    'Photosynthesis converts light into chemical energy.',
+  ];
+
+  describe.each(
+    Object.keys(LANGUAGE_CORPORA) as readonly ConversationLanguage[],
+  )('declared %s', (language) => {
+    it.each(BENIGN_LEARNING_TEXT)(
+      'keeps benign learning content clear regardless of declared language: %s',
+      (text) => {
+        // The new sets are ALWAYS-ON, exactly like the attributed-only sets, so
+        // a false positive in one grammar is a false positive in all ten.
+        const result = scanAsLlm(text, language);
+        expect(result.classification).toBe('clear');
+        expect(result.protectedLexemeCount).toBe(0);
+      },
+    );
+  });
+
+  it('leaves the battery.ts personalization probe non-blocking', () => {
+    // Named regression control from the live probe battery — unchanged by this
+    // extension, asserted here so a corpus edit cannot quietly break it.
+    const result = scanAsLlm(
+      'Personalization matrix: age 11, ADHD-style short-burst support, serious study, returning learner.',
+      'en',
+    );
+    expect(result.classification).not.toBe('block');
+  });
+
+  it('leaves every health/disability classification unchanged', () => {
+    // The extension is additive. Re-asserted across the whole language table so
+    // a shared-slot mistake in the new sets surfaces here rather than as a
+    // silent reclassification of the shipped Article-9 control.
+    for (const row of LANGUAGE_ROWS) {
+      expect(scanAsLlm(row.blockGeneric, row.language).classification).toBe(
+        'block',
+      );
+      expect(scanAsLlm(row.blockNamed, row.language).classification).toBe(
+        'block',
+      );
+      expect(scanAsLlm(row.ambiguous, row.language).classification).toBe(
+        'ambiguous',
+      );
+      expect(scanAsLlm(row.clear, row.language).classification).toBe('clear');
+    }
+  });
+
+  // THE NINE LLM-PREPARED CORPORA. Operator ruling 2026-08-08: persistent
+  // memory is English-only at unlock, and these sets are prepared best-effort so
+  // that native-speaker review has something to review. They are NOT relied on
+  // as a compliance control — but they ARE live in the gate today, so each one
+  // owes the same two-directional proof the English set gives: a disclosure
+  // blocks, and ordinary schoolwork on the same subject stays clear.
+  interface NonEnglishRow {
+    readonly language: ConversationLanguage;
+    /** Person-attributed religious status — must block. */
+    readonly attributed: string;
+    /** The Reformation as a history topic — must stay clear. */
+    readonly mention: string;
+    /** A second benign string chosen to probe this language's own homographs. */
+    readonly benign: string;
+  }
+
+  const NON_ENGLISH_ROWS: readonly NonEnglishRow[] = [
+    {
+      language: 'cs',
+      attributed: 'Žák je katolík.',
+      mention: 'Reformace v šestnáctém století rozdělila západní církev.',
+      benign: 'Odbory vznikly v devatenáctém století.',
+    },
+    {
+      language: 'de',
+      attributed: 'Der Schüler ist Katholik.',
+      mention:
+        'Die Reformation spaltete im sechzehnten Jahrhundert die Kirche.',
+      benign: 'Die Gewerkschaften entstanden im neunzehnten Jahrhundert.',
+    },
+    {
+      language: 'es',
+      attributed: 'El alumno es católico.',
+      mention: 'La Reforma dividió la Iglesia en el siglo XVI.',
+      // `judías` is Spanish for green beans as well as Jewish women — the
+      // model flagged the homograph and it is exactly the collision the
+      // possessive-adjacency requirement has to survive.
+      benign: 'Mi madre cocina judías verdes los domingos.',
+    },
+    {
+      language: 'fr',
+      attributed: "L'élève est catholique.",
+      mention: "La Réforme a divisé l'Église au seizième siècle.",
+      benign: 'Les syndicats sont nés au dix-neuvième siècle.',
+    },
+    {
+      language: 'it',
+      attributed: 'Lo studente è cattolico.',
+      mention: 'La Riforma divise la Chiesa nel sedicesimo secolo.',
+      benign: 'Il sindacato nacque nell’Ottocento.',
+    },
+    {
+      language: 'ja',
+      attributed: '生徒はカトリック教徒です。',
+      mention: 'この章では宗教改革について説明します。',
+      // Japanese is the language this extension had to curate: CJK terms carry
+      // no word boundary and the attribution window spans 24 characters, so a
+      // generic category noun becomes a substring trap. 民族 (folk/ethnic) once
+      // blocked this sentence through 民族音楽 (folk music).
+      benign: '私は民族音楽が好きです。',
+    },
+    {
+      language: 'nb',
+      attributed: 'Eleven er katolikk.',
+      mention: 'Reformasjonen delte kirken på 1500-tallet.',
+      benign: 'Fagforeningene ble stiftet på 1800-tallet.',
+    },
+    {
+      language: 'pl',
+      attributed: 'Uczeń jest katolikiem.',
+      mention: 'Reformacja podzieliła Kościół w XVI wieku.',
+      benign: 'Związki zawodowe powstały w XIX wieku.',
+    },
+    {
+      language: 'pt',
+      attributed: 'O aluno é católico.',
+      mention: 'A Reforma dividiu a Igreja no século XVI.',
+      benign: 'Os sindicatos surgiram no século XIX.',
+    },
+  ];
+
+  it('covers every non-English Conversation Language', () => {
+    const covered = NON_ENGLISH_ROWS.map((row) => row.language).sort();
+    const expected = (
+      Object.keys(LANGUAGE_CORPORA) as readonly ConversationLanguage[]
+    )
+      .filter((language) => language !== 'en')
+      .sort();
+    expect(covered).toEqual(expected);
+  });
+
+  describe.each(NON_ENGLISH_ROWS)(
+    '$language (model-generated)',
+    ({ language, attributed, mention, benign }) => {
+      it('blocks the person-attributed religious status', () => {
+        const result = scanAsLlm(attributed, language);
+        expect(result.classification).toBe('block');
+        expect(result.disposition).toBe('block');
+        expect(result.reason).toBe('person_attribution');
+      });
+
+      it('never claims reviewed confidence for a generated match', () => {
+        // Under-claim, never over-claim: these sets have had no native-speaker
+        // review, and the result has to say so.
+        expect(scanAsLlm(attributed, language).corpusConfidence).toBe(
+          'model-generated',
+        );
+      });
+
+      it.each([
+        ['the history-topic mention', mention],
+        ['ordinary learning content', benign],
+      ])('keeps %s clear', (_label, text) => {
+        const result = scanAsLlm(text, language);
+        expect(result.classification).toBe('clear');
+        expect(result.protectedLexemeCount).toBe(0);
+      });
+    },
+  );
+
+  describe('scope partition is structural, not conventional', () => {
+    const scopeTerms = (
+      scope: 'broad' | 'attributed-only' | 'unnamed-attribution-only',
+    ) =>
+      Object.values(LANGUAGE_CORPORA).flatMap((corpus) =>
+        corpus.lexemes[scope].map((lexeme) => lexeme.toLowerCase()),
+      );
+
+    it('declares unnamed-attribution-only terms for every supported language', () => {
+      for (const [language, corpus] of Object.entries(LANGUAGE_CORPORA)) {
+        expect({
+          language,
+          count: corpus.lexemes['unnamed-attribution-only'].length,
+        }).toEqual({ language, count: expect.any(Number) });
+        expect(
+          corpus.lexemes['unnamed-attribution-only'].length,
+        ).toBeGreaterThan(0);
+      }
+    });
+
+    it('keeps every unnamed-attribution-only term out of the broad detector', () => {
+      // The cheap wrong fix is promoting a status term to `broad`. If anyone
+      // does, every history and religious-education note starts routing to the
+      // judge — so assert the absence structurally.
+      const broad = new Set(scopeTerms('broad'));
+      expect(
+        scopeTerms('unnamed-attribution-only').filter((term) =>
+          broad.has(term),
+        ),
+      ).toEqual([]);
+    });
+
+    it('keeps the homograph acronym scope and the status scope disjoint', () => {
+      const acronyms = new Set(scopeTerms('attributed-only'));
+      expect(
+        scopeTerms('unnamed-attribution-only').filter((term) =>
+          acronyms.has(term),
+        ),
+      ).toEqual([]);
+    });
+
+    it('declares no bare colour or continent adjective in any scope', () => {
+      // These are the terms whose possessive attribution ("my black cat", "her
+      // Asian elephant") is ordinary prose far more often than it is an origin
+      // disclosure. Excluded deliberately; pinned so a later corpus pass cannot
+      // add them back without reading this test.
+      const excluded = ['black', 'white', 'asian', 'african', 'european'];
+      const all = [
+        ...scopeTerms('broad'),
+        ...scopeTerms('attributed-only'),
+        ...scopeTerms('unnamed-attribution-only'),
+      ];
+      expect(all.filter((term) => excluded.includes(term))).toEqual([]);
+    });
+  });
+});

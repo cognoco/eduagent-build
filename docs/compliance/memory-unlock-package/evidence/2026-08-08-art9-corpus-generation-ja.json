@@ -1,0 +1,1454 @@
+{
+  "workItem": "WI-3142",
+  "purpose": "Best-effort LLM-prepared Article 9 protected-lexeme corpus for a non-English conversation language. UNREVIEWED: not load-bearing as a compliance control. Native-speaker review is a precondition for enabling persistent memory in this language.",
+  "operatorRuling": "2026-08-08 — persistent memory is English-only at unlock; non-English corpora are prepared best-effort via LLM generation and marked model-generated.",
+  "language": "ja",
+  "languageName": "Japanese",
+  "generatedAt": "2026-08-08T18:13:38.581Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-pro",
+  "systemPrompt": "You are a native-speaker lexicographer working with a data-protection engineer. You are building a DETECTION corpus for a deterministic text scanner, not an encyclopedia. The scanner matches literal lowercase phrases inside person-attribution constructions only. A bare mention of a term never fires; only \"<person reference> <verb> <term>\" and \"<possessive> <term>\" do. Your job is therefore to maximise recall of PERSON-ATTRIBUTED STATUS ASSERTIONS while keeping ordinary schoolwork prose out. Answer with strict JSON only. No markdown, no code fences, no commentary.",
+  "appliedScope": "unnamed-attribution-only",
+  "appliedScopeNote": "Every accepted term is applied at unnamed-attribution-only regardless of the model recommendation. Promotion to broad is a human decision.",
+  "termCount": 115,
+  "domains": [
+    {
+      "domain": "racial-or-ethnic-origin",
+      "label": "racial or ethnic origin",
+      "prompt": "Target language: Japanese (ja).\nArticle 9 special-category domain: racial or ethnic origin.\n\nWHAT TO RETURN\nEthnic-group and origin nouns/adjectives that describe a PERSON (Roma, Sinti, Kurdish, indigenous, \"of mixed heritage\", \"ethnic minority\", \"immigrant background\", \"ethnicity\"). EXCLUDE bare colour words and bare continent/region adjectives — their attributed forms (\"my black cat\", \"their African elephant\") are ordinary prose far more often than an origin disclosure.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nJapanese has no case endings but DOES have script variation that Unicode NFKC does not bridge. Give the kanji form, the katakana form and the common romaji/English loan form as SEPARATE entries where each is genuinely used (自閉症 / 発達障害 / カトリック).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Japanese prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"アイヌ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific indigenous people of Japan.\"\n    },\n    {\n      \"term\": \"ロマ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian for 'Rome'.\",\n      \"justification\": \"A specific ethnic group. Attribution reduces ambiguity.\"\n    },\n    {\n      \"term\": \"シンティ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Close to Italian 'sinti' (you feel).\",\n      \"justification\": \"A specific ethnic group, often associated with Roma.\"\n    },\n    {\n      \"term\": \"クルド人\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person of Kurdish ethnicity.\"\n    },\n    {\n      \"term\": \"先住民\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A general term for indigenous people.\"\n    },\n    {\n      \"term\": \"少数民族\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A term for 'ethnic minority'.\"\n    },\n    {\n      \"term\": \"民族\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Core term for 'ethnicity' or 'ethnic group'.\"\n    },\n    {\n      \"term\": \"人種\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Core term for 'race'.\"\n    },\n    {\n      \"term\": \"ハーフ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English 'half'. Script difference and context reduce ambiguity.\",\n      \"justification\": \"Common colloquial term for a person of mixed parentage.\"\n    },\n    {\n      \"term\": \"混血\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A term for 'mixed race', sometimes considered dated.\"\n    },\n    {\n      \"term\": \"移民\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'immigrant' status.\"\n    },\n    {\n      \"term\": \"難民\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'refugee' status, implying origin.\"\n    },\n    {\n      \"term\": \"外国人\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A common term for 'foreigner', indicating non-native origin.\"\n    },\n    {\n      \"term\": \"部族\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates 'tribal' affiliation, a form of social origin.\"\n    },\n    {\n      \"term\": \"外国にルーツを持つ\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific phrase meaning 'having roots in a foreign country'.\"\n    },\n    {\n      \"term\": \"移民の背景\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A phrase meaning 'immigrant background'.\"\n    },\n    {\n      \"term\": \"ethnic minority\",\n      \"form\": \"english loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English phrase sometimes used in Japanese text to denote this status.\"\n    },\n    {\n      \"term\": \"indigenous\",\n      \"form\": \"english loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English term sometimes used in Japanese text for indigenous status.\"\n    },\n    {\n      \"term\": \"immigrant background\",\n      \"form\": \"english loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English phrase sometimes used in Japanese text for this status.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"ダブル\",\n      \"reason\": \"Too ambiguous. Means 'double' in English and is used frequently in other contexts.\"\n    },\n    {\n      \"term\": \"ミックス\",\n      \"reason\": \"Too ambiguous. Means 'mix' in English and is used frequently in other contexts.\"\n    },\n    {\n      \"term\": \"国籍\",\n      \"reason\": \"Refers to nationality, a legal status often less sensitive than ethnic origin.\"\n    },\n    {\n      \"term\": \"出身\",\n      \"reason\": \"Extremely common term for 'origin' (e.g., town, school), creating false positives.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 807,
+        "completion_tokens": 4488,
+        "total_tokens": 5295,
+        "cost": 0.04588875,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.04588875,
+          "upstream_inference_prompt_cost": 0.00100875,
+          "upstream_inference_completions_cost": 0.04488
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3049,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "アイヌ",
+          "form": "katakana",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific indigenous people of Japan."
+        },
+        {
+          "term": "シンティ",
+          "form": "katakana",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Close to Italian 'sinti' (you feel).",
+          "justification": "A specific ethnic group, often associated with Roma."
+        },
+        {
+          "term": "クルド人",
+          "form": "katakana/kanji",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person of Kurdish ethnicity."
+        },
+        {
+          "term": "先住民",
+          "form": "kanji",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A general term for indigenous people."
+        },
+        {
+          "term": "少数民族",
+          "form": "kanji",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A term for 'ethnic minority'."
+        },
+        {
+          "term": "混血",
+          "form": "kanji",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A term for 'mixed race', sometimes considered dated."
+        },
+        {
+          "term": "外国にルーツを持つ",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific phrase meaning 'having roots in a foreign country'."
+        },
+        {
+          "term": "移民の背景",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A phrase meaning 'immigrant background'."
+        },
+        {
+          "term": "ethnic minority",
+          "form": "english loanword",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English phrase sometimes used in Japanese text to denote this status."
+        },
+        {
+          "term": "indigenous",
+          "form": "english loanword",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English term sometimes used in Japanese text for indigenous status."
+        },
+        {
+          "term": "immigrant background",
+          "form": "english loanword",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English phrase sometimes used in Japanese text for this status."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "ダブル",
+          "reason": "Too ambiguous. Means 'double' in English and is used frequently in other contexts."
+        },
+        {
+          "term": "ミックス",
+          "reason": "Too ambiguous. Means 'mix' in English and is used frequently in other contexts."
+        },
+        {
+          "term": "国籍",
+          "reason": "Refers to nationality, a legal status often less sensitive than ethnic origin."
+        },
+        {
+          "term": "出身",
+          "reason": "Extremely common term for 'origin' (e.g., town, school), creating false positives."
+        }
+      ],
+      "curationExcluded": [
+        {
+          "term": "ロマ",
+          "reason": "substring of ロマンス / ロマンチック — a plausible learner interest"
+        },
+        {
+          "term": "民族",
+          "reason": "category noun — fires inside 民族音楽 / 民族衣装 (folk music, folk dress)"
+        },
+        {
+          "term": "人種",
+          "reason": "category noun — ordinary social-studies vocabulary, not a person status"
+        },
+        {
+          "term": "ハーフ",
+          "reason": "substring of ハーフタイム / ハーフパイプ"
+        },
+        {
+          "term": "移民",
+          "reason": "topic noun — 移民問題 (the immigration question) is a civics subject"
+        },
+        {
+          "term": "難民",
+          "reason": "topic noun — 難民問題 (the refugee question) is a civics subject"
+        },
+        {
+          "term": "外国人",
+          "reason": "ordinary vocabulary (\"a foreign friend\"); not an Article 9 category alone"
+        },
+        {
+          "term": "部族",
+          "reason": "topic noun — tribes as a history subject"
+        }
+      ]
+    },
+    {
+      "domain": "political-opinions",
+      "label": "political opinions or affiliation",
+      "prompt": "Target language: Japanese (ja).\nArticle 9 special-category domain: political opinions or affiliation.\n\nWHAT TO RETURN\nPolitical-affiliation and opinion nouns/adjectives applied to a person (communist, socialist, anarchist, nationalist, feminist, far-right, \"party member\", \"political views\"). EXCLUDE words whose ordinary sense dominates in schoolwork — the local equivalents of English \"conservative\" (a conservative estimate), \"liberal\" (a liberal amount), \"green\", \"independent\", \"radical\", \"progressive\".\n\nMORPHOLOGY — this is the part generic answers get wrong.\nJapanese has no case endings but DOES have script variation that Unicode NFKC does not bridge. Give the kanji form, the katakana form and the common romaji/English loan form as SEPARATE entries where each is genuinely used (自閉症 / 発達障害 / カトリック).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Japanese prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"共産主義者\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a communist.\"\n    },\n    {\n      \"term\": \"コミュニスト\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a communist.\"\n    },\n    {\n      \"term\": \"communist\",\n      \"form\": \"romaji/loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Common English loanword for a communist.\"\n    },\n    {\n      \"term\": \"社会主義者\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a socialist.\"\n    },\n    {\n      \"term\": \"ソーシャリスト\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a socialist.\"\n    },\n    {\n      \"term\": \"socialist\",\n      \"form\": \"romaji/loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Common English loanword for a socialist.\"\n    },\n    {\n      \"term\": \"無政府主義者\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as an anarchist.\"\n    },\n    {\n      \"term\": \"アナキスト\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as an anarchist.\"\n    },\n    {\n      \"term\": \"anarchist\",\n      \"form\": \"romaji/loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Common English loanword for an anarchist.\"\n    },\n    {\n      \"term\": \"国家主義者\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a nationalist.\"\n    },\n    {\n      \"term\": \"ナショナリスト\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a nationalist.\"\n    },\n    {\n      \"term\": \"フェミニスト\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to feminism.\"\n    },\n    {\n      \"term\": \"feminist\",\n      \"form\": \"romaji/loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Common English loanword for a feminist.\"\n    },\n    {\n      \"term\": \"ファシスト\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a fascist.\"\n    },\n    {\n      \"term\": \"fascist\",\n      \"form\": \"romaji/loanword\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Common English loanword for a fascist.\"\n    },\n    {\n      \"term\": \"マルクス主義者\",\n      \"form\": \"katakana+kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically identifies a person as a Marxist.\"\n    },\n    {\n      \"term\": \"極右\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's far-right political alignment.\"\n    },\n    {\n      \"term\": \"極左\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's far-left political alignment.\"\n    },\n    {\n      \"term\": \"右翼\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can literally mean 'right wing' of a bird or plane.\",\n      \"justification\": \"In personal attribution, it almost always means right-wing political alignment.\"\n    },\n    {\n      \"term\": \"左翼\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can literally mean 'left wing' of a bird or plane.\",\n      \"justification\": \"In personal attribution, it almost always means left-wing political alignment.\"\n    },\n    {\n      \"term\": \"党員\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States membership in a political party.\"\n    },\n    {\n      \"term\": \"政治的見解\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political views, a direct statement of opinion.\"\n    },\n    {\n      \"term\": \"政治思想\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political ideology.\"\n    },\n    {\n      \"term\": \"政治信条\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political beliefs.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"保守\",\n      \"reason\": \"High ambiguity; also means 'maintenance' or 'upkeep'.\"\n    },\n    {\n      \"term\": \"保守的\",\n      \"reason\": \"Excluded per instructions; also used generally for 'cautious'.\"\n    },\n    {\n      \"term\": \"リベラル\",\n      \"reason\": \"Excluded per instructions; also used generally for 'open-minded'.\"\n    },\n    {\n      \"term\": \"自由主義者\",\n      \"reason\": \"Excluded per instructions on 'liberal'.\"\n    },\n    {\n      \"term\": \"緑\",\n      \"reason\": \"Excluded per instructions; primarily means the color green.\"\n    },\n    {\n      \"term\": \"無所属\",\n      \"reason\": \"Excluded per instructions; ambiguous (e.g., unaffiliated with a school club).\"\n    },\n    {\n      \"term\": \"過激派\",\n      \"reason\": \"Excluded per instructions on 'radical'.\"\n    },\n    {\n      \"term\": \"革新\",\n      \"reason\": \"Excluded per instructions; also means 'innovation' in business/technology.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 811,
+        "completion_tokens": 6432,
+        "total_tokens": 7243,
+        "cost": 0.06533375,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.06533375,
+          "upstream_inference_prompt_cost": 0.00101375,
+          "upstream_inference_completions_cost": 0.06432
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4548,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "共産主義者",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a communist."
+        },
+        {
+          "term": "コミュニスト",
+          "form": "katakana",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a communist."
+        },
+        {
+          "term": "communist",
+          "form": "romaji/loanword",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Common English loanword for a communist."
+        },
+        {
+          "term": "社会主義者",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a socialist."
+        },
+        {
+          "term": "ソーシャリスト",
+          "form": "katakana",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a socialist."
+        },
+        {
+          "term": "socialist",
+          "form": "romaji/loanword",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Common English loanword for a socialist."
+        },
+        {
+          "term": "無政府主義者",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as an anarchist."
+        },
+        {
+          "term": "アナキスト",
+          "form": "katakana",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as an anarchist."
+        },
+        {
+          "term": "anarchist",
+          "form": "romaji/loanword",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Common English loanword for an anarchist."
+        },
+        {
+          "term": "国家主義者",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a nationalist."
+        },
+        {
+          "term": "ナショナリスト",
+          "form": "katakana",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a nationalist."
+        },
+        {
+          "term": "フェミニスト",
+          "form": "katakana",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to feminism."
+        },
+        {
+          "term": "feminist",
+          "form": "romaji/loanword",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Common English loanword for a feminist."
+        },
+        {
+          "term": "ファシスト",
+          "form": "katakana",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a fascist."
+        },
+        {
+          "term": "fascist",
+          "form": "romaji/loanword",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Common English loanword for a fascist."
+        },
+        {
+          "term": "マルクス主義者",
+          "form": "katakana+kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically identifies a person as a Marxist."
+        },
+        {
+          "term": "極右",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's far-right political alignment."
+        },
+        {
+          "term": "極左",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's far-left political alignment."
+        },
+        {
+          "term": "党員",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States membership in a political party."
+        },
+        {
+          "term": "政治的見解",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political views, a direct statement of opinion."
+        },
+        {
+          "term": "政治思想",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political ideology."
+        },
+        {
+          "term": "政治信条",
+          "form": "kanji",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political beliefs."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "保守",
+          "reason": "High ambiguity; also means 'maintenance' or 'upkeep'."
+        },
+        {
+          "term": "保守的",
+          "reason": "Excluded per instructions; also used generally for 'cautious'."
+        },
+        {
+          "term": "リベラル",
+          "reason": "Excluded per instructions; also used generally for 'open-minded'."
+        },
+        {
+          "term": "自由主義者",
+          "reason": "Excluded per instructions on 'liberal'."
+        },
+        {
+          "term": "緑",
+          "reason": "Excluded per instructions; primarily means the color green."
+        },
+        {
+          "term": "無所属",
+          "reason": "Excluded per instructions; ambiguous (e.g., unaffiliated with a school club)."
+        },
+        {
+          "term": "過激派",
+          "reason": "Excluded per instructions on 'radical'."
+        },
+        {
+          "term": "革新",
+          "reason": "Excluded per instructions; also means 'innovation' in business/technology."
+        }
+      ],
+      "curationExcluded": [
+        {
+          "term": "右翼",
+          "reason": "also \"right field\" in baseball"
+        },
+        {
+          "term": "左翼",
+          "reason": "also \"left field\" in baseball"
+        }
+      ]
+    },
+    {
+      "domain": "religious-or-philosophical-beliefs",
+      "label": "religious or philosophical beliefs",
+      "prompt": "Target language: Japanese (ja).\nArticle 9 special-category domain: religious or philosophical beliefs.\n\nWHAT TO RETURN\nReligious/denominational/philosophical affiliation applied to a person (Catholic, Protestant, Muslim, Jewish, Hindu, Buddhist, atheist, agnostic, devout, \"converted to Islam\", \"religious belief\"), plus belief-marking dress where it is unambiguous (hijab, kippah). EXCLUDE the local equivalent of bare \"orthodox\" (an orthodox method) and bare \"religious\"/\"religion\" (religious education is a school subject).\n\nMORPHOLOGY — this is the part generic answers get wrong.\nJapanese has no case endings but DOES have script variation that Unicode NFKC does not bridge. Give the kanji form, the katakana form and the common romaji/English loan form as SEPARATE entries where each is genuinely used (自閉症 / 発達障害 / カトリック).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Japanese prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"キリスト教徒\",\n      \"form\": \"kanji/katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's religious affiliation as Christian.\"\n    },\n    {\n      \"term\": \"クリスチャン\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A common loanword for Christian, indicating personal affiliation.\"\n    },\n    {\n      \"term\": \"カトリック教徒\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly identifies a person as a Catholic believer.\"\n    },\n    {\n      \"term\": \"プロテスタント\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person's denomination as Protestant.\"\n    },\n    {\n      \"term\": \"イスラム教徒\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's religious affiliation as Muslim.\"\n    },\n    {\n      \"term\": \"ムスリム\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A common loanword for Muslim, indicating personal affiliation.\"\n    },\n    {\n      \"term\": \"イスラム教に改宗\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes the act of converting to Islam, a status disclosure.\"\n    },\n    {\n      \"term\": \"ヒジャブ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific religious head covering indicating Islamic faith.\"\n    },\n    {\n      \"term\": \"ユダヤ教徒\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's religious affiliation as Jewish.\"\n    },\n    {\n      \"term\": \"ユダヤ人\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also be ethnic, but attribution implies religious/cultural identity.\",\n      \"justification\": \"Refers to a Jewish person, often implying religious affiliation.\"\n    },\n    {\n      \"term\": \"キッパー\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English 'kipper' (fish). Unlikely to match attributional phrases.\",\n      \"justification\": \"Japanese for kippah, a religious head covering indicating Jewish faith.\"\n    },\n    {\n      \"term\": \"仏教徒\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's religious affiliation as Buddhist.\"\n    },\n    {\n      \"term\": \"ヒンドゥー教徒\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's religious affiliation as Hindu.\"\n    },\n    {\n      \"term\": \"神道を信仰\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states belief in Shinto, avoiding ambiguity of the bare term.\"\n    },\n    {\n      \"term\": \"無神論者\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's philosophical stance as an atheist.\"\n    },\n    {\n      \"term\": \"不可知論者\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's philosophical stance as an agnostic.\"\n    },\n    {\n      \"term\": \"無宗教\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person's lack of religious affiliation.\"\n    },\n    {\n      \"term\": \"信心深い\",\n      \"form\": \"kanji/hiragana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as devout or pious, indicating strong belief.\"\n    },\n    {\n      \"term\": \"宗教的信条\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's religious beliefs.\"\n    },\n    {\n      \"term\": \"シーア派\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's denomination within Islam (Shia).\"\n    },\n    {\n      \"term\": \"スンニ派\",\n      \"form\": \"katakana/kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's denomination within Islam (Sunni).\"\n    },\n    {\n      \"term\": \"改宗した\",\n      \"form\": \"kanji/hiragana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'converted' in a non-religious sense, but context reduces risk.\",\n      \"justification\": \"Indicates a person has converted their beliefs, usually religious.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"宗教\",\n      \"reason\": \"Too general ('religion'). Common in academic contexts like 'religious studies'.\"\n    },\n    {\n      \"term\": \"信仰\",\n      \"reason\": \"Too general ('faith', 'belief'). Can refer to non-religious belief.\"\n    },\n    {\n      \"term\": \"正教\",\n      \"reason\": \"Ambiguous. Can mean 'orthodoxy' in general, not just Orthodox Christianity.\"\n    },\n    {\n      \"term\": \"神道\",\n      \"reason\": \"Too common in historical/cultural contexts not about personal belief.\"\n    },\n    {\n      \"term\": \"仏教\",\n      \"reason\": \"Too common in historical/cultural contexts (e.g., 'Buddhist art').\"\n    },\n    {\n      \"term\": \"イスラム\",\n      \"reason\": \"Too broad. Can refer to 'Islamic finance' or 'Islamic art'.\"\n    },\n    {\n      \"term\": \"キリスト教\",\n      \"reason\": \"Too broad. Can refer to 'Christian culture' or history.\"\n    },\n    {\n      \"term\": \"カトリック\",\n      \"reason\": \"Can refer to a Catholic school or hospital, not a person's belief.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 818,
+        "completion_tokens": 5500,
+        "total_tokens": 6318,
+        "cost": 0.0560225,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0560225,
+          "upstream_inference_prompt_cost": 0.0010225,
+          "upstream_inference_completions_cost": 0.055
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3620,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "キリスト教徒",
+          "form": "kanji/katakana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's religious affiliation as Christian."
+        },
+        {
+          "term": "クリスチャン",
+          "form": "katakana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A common loanword for Christian, indicating personal affiliation."
+        },
+        {
+          "term": "カトリック教徒",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly identifies a person as a Catholic believer."
+        },
+        {
+          "term": "プロテスタント",
+          "form": "katakana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person's denomination as Protestant."
+        },
+        {
+          "term": "イスラム教徒",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's religious affiliation as Muslim."
+        },
+        {
+          "term": "ムスリム",
+          "form": "katakana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A common loanword for Muslim, indicating personal affiliation."
+        },
+        {
+          "term": "イスラム教に改宗",
+          "form": "phrase",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes the act of converting to Islam, a status disclosure."
+        },
+        {
+          "term": "ヒジャブ",
+          "form": "katakana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific religious head covering indicating Islamic faith."
+        },
+        {
+          "term": "ユダヤ教徒",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's religious affiliation as Jewish."
+        },
+        {
+          "term": "ユダヤ人",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also be ethnic, but attribution implies religious/cultural identity.",
+          "justification": "Refers to a Jewish person, often implying religious affiliation."
+        },
+        {
+          "term": "キッパー",
+          "form": "katakana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English 'kipper' (fish). Unlikely to match attributional phrases.",
+          "justification": "Japanese for kippah, a religious head covering indicating Jewish faith."
+        },
+        {
+          "term": "仏教徒",
+          "form": "kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's religious affiliation as Buddhist."
+        },
+        {
+          "term": "ヒンドゥー教徒",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's religious affiliation as Hindu."
+        },
+        {
+          "term": "神道を信仰",
+          "form": "phrase",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states belief in Shinto, avoiding ambiguity of the bare term."
+        },
+        {
+          "term": "無神論者",
+          "form": "kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's philosophical stance as an atheist."
+        },
+        {
+          "term": "不可知論者",
+          "form": "kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's philosophical stance as an agnostic."
+        },
+        {
+          "term": "無宗教",
+          "form": "kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person's lack of religious affiliation."
+        },
+        {
+          "term": "信心深い",
+          "form": "kanji/hiragana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as devout or pious, indicating strong belief."
+        },
+        {
+          "term": "宗教的信条",
+          "form": "kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's religious beliefs."
+        },
+        {
+          "term": "シーア派",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's denomination within Islam (Shia)."
+        },
+        {
+          "term": "スンニ派",
+          "form": "katakana/kanji",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's denomination within Islam (Sunni)."
+        },
+        {
+          "term": "改宗した",
+          "form": "kanji/hiragana",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'converted' in a non-religious sense, but context reduces risk.",
+          "justification": "Indicates a person has converted their beliefs, usually religious."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "宗教",
+          "reason": "Too general ('religion'). Common in academic contexts like 'religious studies'."
+        },
+        {
+          "term": "信仰",
+          "reason": "Too general ('faith', 'belief'). Can refer to non-religious belief."
+        },
+        {
+          "term": "正教",
+          "reason": "Ambiguous. Can mean 'orthodoxy' in general, not just Orthodox Christianity."
+        },
+        {
+          "term": "神道",
+          "reason": "Too common in historical/cultural contexts not about personal belief."
+        },
+        {
+          "term": "仏教",
+          "reason": "Too common in historical/cultural contexts (e.g., 'Buddhist art')."
+        },
+        {
+          "term": "イスラム",
+          "reason": "Too broad. Can refer to 'Islamic finance' or 'Islamic art'."
+        },
+        {
+          "term": "キリスト教",
+          "reason": "Too broad. Can refer to 'Christian culture' or history."
+        },
+        {
+          "term": "カトリック",
+          "reason": "Can refer to a Catholic school or hospital, not a person's belief."
+        }
+      ]
+    },
+    {
+      "domain": "trade-union-membership",
+      "label": "trade-union membership",
+      "prompt": "Target language: Japanese (ja).\nArticle 9 special-category domain: trade-union membership.\n\nWHAT TO RETURN\nMembership of, or office in, a trade union (union member, trade unionist, shop steward, union dues, unionised, \"member of a union\"). EXCLUDE the bare word for \"union\" on its own — it also names the European Union and, in mathematics, the union of sets.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nJapanese has no case endings but DOES have script variation that Unicode NFKC does not bridge. Give the kanji form, the katakana form and the common romaji/English loan form as SEPARATE entries where each is genuinely used (自閉症 / 発達障害 / カトリック).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Japanese prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"組合員\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean co-op member, but context clarifies.\",\n      \"justification\": \"Means 'member of an association/union'.\"\n    },\n    {\n      \"term\": \"労働組合員\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifically means 'trade union member'.\"\n    },\n    {\n      \"term\": \"組合費\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'union dues'. Possessive use ('my dues') indicates membership.\"\n    },\n    {\n      \"term\": \"労働組合費\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'trade union dues'. Possessive use indicates membership.\"\n    },\n    {\n      \"term\": \"職場委員\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific union role: 'shop steward' or 'workplace committee member'.\"\n    },\n    {\n      \"term\": \"組合代表\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'union representative', a specific role.\"\n    },\n    {\n      \"term\": \"組合役員\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'union official/officer', a specific role.\"\n    },\n    {\n      \"term\": \"執行委員\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can refer to non-union executive committees.\",\n      \"justification\": \"Means 'executive committee member', a common union role.\"\n    },\n    {\n      \"term\": \"分会長\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'branch leader', a specific union leadership role.\"\n    },\n    {\n      \"term\": \"組合活動家\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'union activist', indicating active involvement.\"\n    },\n    {\n      \"term\": \"労働組合活動家\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'trade union activist', indicating active involvement.\"\n    },\n    {\n      \"term\": \"ユニオンメンバー\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Katakana loanword for 'union member'.\"\n    },\n    {\n      \"term\": \"組合に加入\",\n      \"form\": \"kanji/hiragana phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Part of the phrase 'to join a union', indicating status.\"\n    },\n    {\n      \"term\": \"労働組合に加入\",\n      \"form\": \"kanji/hiragana phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Part of the phrase 'to join a trade union', indicating status.\"\n    },\n    {\n      \"term\": \"組合のメンバー\",\n      \"form\": \"kanji/katakana phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'member of the union', a direct statement of status.\"\n    },\n    {\n      \"term\": \"労働組合のメンバー\",\n      \"form\": \"kanji/katakana phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Means 'member of the trade union', a direct statement of status.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"組合\",\n      \"reason\": \"Too general: can mean co-op, guild, or other non-trade union association.\"\n    },\n    {\n      \"term\": \"労働組合\",\n      \"reason\": \"Bare term for 'trade union', common in non-disclosure contexts like schoolwork.\"\n    },\n    {\n      \"term\": \"ユニオン\",\n      \"reason\": \"Too ambiguous: means European Union, set union in math, and is a common word.\"\n    },\n    {\n      \"term\": \"書記長\",\n      \"reason\": \"Ambiguous: common high-level role in political parties, not just unions.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 792,
+        "completion_tokens": 5113,
+        "total_tokens": 5905,
+        "cost": 0.05212,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.05212,
+          "upstream_inference_prompt_cost": 0.00099,
+          "upstream_inference_completions_cost": 0.05113
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3828,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "組合員",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean co-op member, but context clarifies.",
+          "justification": "Means 'member of an association/union'."
+        },
+        {
+          "term": "労働組合員",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifically means 'trade union member'."
+        },
+        {
+          "term": "組合費",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'union dues'. Possessive use ('my dues') indicates membership."
+        },
+        {
+          "term": "労働組合費",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'trade union dues'. Possessive use indicates membership."
+        },
+        {
+          "term": "職場委員",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific union role: 'shop steward' or 'workplace committee member'."
+        },
+        {
+          "term": "組合代表",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'union representative', a specific role."
+        },
+        {
+          "term": "組合役員",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'union official/officer', a specific role."
+        },
+        {
+          "term": "執行委員",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can refer to non-union executive committees.",
+          "justification": "Means 'executive committee member', a common union role."
+        },
+        {
+          "term": "分会長",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'branch leader', a specific union leadership role."
+        },
+        {
+          "term": "組合活動家",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'union activist', indicating active involvement."
+        },
+        {
+          "term": "労働組合活動家",
+          "form": "kanji",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'trade union activist', indicating active involvement."
+        },
+        {
+          "term": "ユニオンメンバー",
+          "form": "katakana",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Katakana loanword for 'union member'."
+        },
+        {
+          "term": "組合に加入",
+          "form": "kanji/hiragana phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Part of the phrase 'to join a union', indicating status."
+        },
+        {
+          "term": "労働組合に加入",
+          "form": "kanji/hiragana phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Part of the phrase 'to join a trade union', indicating status."
+        },
+        {
+          "term": "組合のメンバー",
+          "form": "kanji/katakana phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'member of the union', a direct statement of status."
+        },
+        {
+          "term": "労働組合のメンバー",
+          "form": "kanji/katakana phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Means 'member of the trade union', a direct statement of status."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "組合",
+          "reason": "Too general: can mean co-op, guild, or other non-trade union association."
+        },
+        {
+          "term": "労働組合",
+          "reason": "Bare term for 'trade union', common in non-disclosure contexts like schoolwork."
+        },
+        {
+          "term": "ユニオン",
+          "reason": "Too ambiguous: means European Union, set union in math, and is a common word."
+        },
+        {
+          "term": "書記長",
+          "reason": "Ambiguous: common high-level role in political parties, not just unions."
+        }
+      ]
+    },
+    {
+      "domain": "sex-life-or-sexual-orientation",
+      "label": "sex life or sexual orientation",
+      "prompt": "Target language: Japanese (ja).\nArticle 9 special-category domain: sex life or sexual orientation.\n\nWHAT TO RETURN\nSexual orientation and sex-life status applied to a person (gay, lesbian, bisexual, pansexual, queer, homosexual, heterosexual, LGBTQ, transgender, intersex, \"sexual orientation\", \"sexually active\"). EXCLUDE the local equivalent of \"straight\" (a straight line), of \"asexual\" (asexual reproduction is core biology), and of \"coming out\" (he is coming out of the room). EXCLUDE \"boyfriend\"/\"girlfriend\" — far too common to be a disclosure signal.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nJapanese has no case endings but DOES have script variation that Unicode NFKC does not bridge. Give the kanji form, the katakana form and the common romaji/English loan form as SEPARATE entries where each is genuinely used (自閉症 / 発達障害 / カトリック).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Japanese prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"ゲイ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French/Italian 'gai' (happy) is similar but spelled differently. Low risk.\",\n      \"justification\": \"Directly states a person's sexual orientation as gay.\"\n    },\n    {\n      \"term\": \"gay\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French/Italian 'gai' (happy) is similar but spelled differently. Low risk.\",\n      \"justification\": \"English loanword used in Japanese to state sexual orientation.\"\n    },\n    {\n      \"term\": \"レズビアン\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation as lesbian.\"\n    },\n    {\n      \"term\": \"lesbian\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state sexual orientation.\"\n    },\n    {\n      \"term\": \"バイセクシャル\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation as bisexual.\"\n    },\n    {\n      \"term\": \"bisexual\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state sexual orientation.\"\n    },\n    {\n      \"term\": \"両性愛\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Japanese term for bisexuality, a sexual orientation.\"\n    },\n    {\n      \"term\": \"パンセクシャル\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation as pansexual.\"\n    },\n    {\n      \"term\": \"pansexual\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state sexual orientation.\"\n    },\n    {\n      \"term\": \"クィア\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's identity as queer.\"\n    },\n    {\n      \"term\": \"queer\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English 'queer' can mean 'strange', but attribution context clarifies.\",\n      \"justification\": \"English loanword used in Japanese to state identity.\"\n    },\n    {\n      \"term\": \"同性愛\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Japanese term for homosexuality, a sexual orientation.\"\n    },\n    {\n      \"term\": \"ホモセクシュアル\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation as homosexual.\"\n    },\n    {\n      \"term\": \"homosexual\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state sexual orientation.\"\n    },\n    {\n      \"term\": \"異性愛\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Japanese term for heterosexuality, a sexual orientation.\"\n    },\n    {\n      \"term\": \"ヘテロセクシュアル\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation as heterosexual.\"\n    },\n    {\n      \"term\": \"heterosexual\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state sexual orientation.\"\n    },\n    {\n      \"term\": \"LGBT\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for lesbian, gay, bisexual, transgender community/identity.\"\n    },\n    {\n      \"term\": \"LGBTQ\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for lesbian, gay, bisexual, transgender, queer community/identity.\"\n    },\n    {\n      \"term\": \"トランスジェンダー\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's gender identity as transgender.\"\n    },\n    {\n      \"term\": \"transgender\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state gender identity.\"\n    },\n    {\n      \"term\": \"インターセックス\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person's status as intersex.\"\n    },\n    {\n      \"term\": \"intersex\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese to state intersex status.\"\n    },\n    {\n      \"term\": \"性的指向\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"The specific term for 'sexual orientation'.\"\n    },\n    {\n      \"term\": \"ホモ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Latin 'homo' (man) used in science (e.g. Homo sapiens).\",\n      \"justification\": \"Abbreviation for homosexual, used to state sexual orientation.\"\n    },\n    {\n      \"term\": \"ヘテロ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Abbreviation for heterosexual, used to state sexual orientation.\"\n    },\n    {\n      \"term\": \"バイ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Homograph for English 'bye', but attribution context clarifies.\",\n      \"justification\": \"Abbreviation for bisexual, used to state sexual orientation.\"\n    },\n    {\n      \"term\": \"ノンバイナリー\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person's gender identity as non-binary.\"\n    },\n    {\n      \"term\": \"non-binary\",\n      \"form\": \"romaji/English\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loanword used in Japanese for non-binary identity.\"\n    },\n    {\n      \"term\": \"Xジェンダー\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person's gender identity as X-gender, a non-binary identity.\"\n    },\n    {\n      \"term\": \"セクマイ\",\n      \"form\": \"katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Abbreviation for 'sexual minority', stating a person's status.\"\n    },\n    {\n      \"term\": \"性的マイノリティ\",\n      \"form\": \"kanji/katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"The full term for 'sexual minority', stating a person's status.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"ストレート\",\n      \"reason\": \"Too ambiguous. Means straight line, straight hair, or a straight drink.\"\n    },\n    {\n      \"term\": \"アセクシュアル\",\n      \"reason\": \"Ambiguous with asexual reproduction in biology schoolwork.\"\n    },\n    {\n      \"term\": \"無性愛\",\n      \"reason\": \"Kanji for asexual. Ambiguous with asexual reproduction in biology.\"\n    },\n    {\n      \"term\": \"カミングアウト\",\n      \"reason\": \"A verb phrase, not a status. Also ambiguous (e.g., coming out of a room).\"\n    },\n    {\n      \"term\": \"彼氏\",\n      \"reason\": \"'Boyfriend' is too common and not a direct status disclosure.\"\n    },\n    {\n      \"term\": \"彼女\",\n      \"reason\": \"'Girlfriend' is too common; also the pronoun for 'she/her'.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 833,
+        "completion_tokens": 6701,
+        "total_tokens": 7534,
+        "cost": 0.06805125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.06805125,
+          "upstream_inference_prompt_cost": 0.00104125,
+          "upstream_inference_completions_cost": 0.06701
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4197,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "ゲイ",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French/Italian 'gai' (happy) is similar but spelled differently. Low risk.",
+          "justification": "Directly states a person's sexual orientation as gay."
+        },
+        {
+          "term": "gay",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French/Italian 'gai' (happy) is similar but spelled differently. Low risk.",
+          "justification": "English loanword used in Japanese to state sexual orientation."
+        },
+        {
+          "term": "レズビアン",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation as lesbian."
+        },
+        {
+          "term": "lesbian",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state sexual orientation."
+        },
+        {
+          "term": "バイセクシャル",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation as bisexual."
+        },
+        {
+          "term": "bisexual",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state sexual orientation."
+        },
+        {
+          "term": "両性愛",
+          "form": "kanji",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Japanese term for bisexuality, a sexual orientation."
+        },
+        {
+          "term": "パンセクシャル",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation as pansexual."
+        },
+        {
+          "term": "pansexual",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state sexual orientation."
+        },
+        {
+          "term": "クィア",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's identity as queer."
+        },
+        {
+          "term": "queer",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English 'queer' can mean 'strange', but attribution context clarifies.",
+          "justification": "English loanword used in Japanese to state identity."
+        },
+        {
+          "term": "同性愛",
+          "form": "kanji",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Japanese term for homosexuality, a sexual orientation."
+        },
+        {
+          "term": "ホモセクシュアル",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation as homosexual."
+        },
+        {
+          "term": "homosexual",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state sexual orientation."
+        },
+        {
+          "term": "異性愛",
+          "form": "kanji",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Japanese term for heterosexuality, a sexual orientation."
+        },
+        {
+          "term": "ヘテロセクシュアル",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation as heterosexual."
+        },
+        {
+          "term": "heterosexual",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state sexual orientation."
+        },
+        {
+          "term": "LGBT",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for lesbian, gay, bisexual, transgender community/identity."
+        },
+        {
+          "term": "LGBTQ",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for lesbian, gay, bisexual, transgender, queer community/identity."
+        },
+        {
+          "term": "トランスジェンダー",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's gender identity as transgender."
+        },
+        {
+          "term": "transgender",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state gender identity."
+        },
+        {
+          "term": "インターセックス",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person's status as intersex."
+        },
+        {
+          "term": "intersex",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese to state intersex status."
+        },
+        {
+          "term": "性的指向",
+          "form": "kanji",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "The specific term for 'sexual orientation'."
+        },
+        {
+          "term": "ノンバイナリー",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person's gender identity as non-binary."
+        },
+        {
+          "term": "non-binary",
+          "form": "romaji/English",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loanword used in Japanese for non-binary identity."
+        },
+        {
+          "term": "Xジェンダー",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person's gender identity as X-gender, a non-binary identity."
+        },
+        {
+          "term": "セクマイ",
+          "form": "katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Abbreviation for 'sexual minority', stating a person's status."
+        },
+        {
+          "term": "性的マイノリティ",
+          "form": "kanji/katakana",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "The full term for 'sexual minority', stating a person's status."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "ストレート",
+          "reason": "Too ambiguous. Means straight line, straight hair, or a straight drink."
+        },
+        {
+          "term": "アセクシュアル",
+          "reason": "Ambiguous with asexual reproduction in biology schoolwork."
+        },
+        {
+          "term": "無性愛",
+          "reason": "Kanji for asexual. Ambiguous with asexual reproduction in biology."
+        },
+        {
+          "term": "カミングアウト",
+          "reason": "A verb phrase, not a status. Also ambiguous (e.g., coming out of a room)."
+        },
+        {
+          "term": "彼氏",
+          "reason": "'Boyfriend' is too common and not a direct status disclosure."
+        },
+        {
+          "term": "彼女",
+          "reason": "'Girlfriend' is too common; also the pronoun for 'she/her'."
+        }
+      ],
+      "curationExcluded": [
+        {
+          "term": "ホモ",
+          "reason": "substring of ホモサピエンス — biology curriculum"
+        },
+        {
+          "term": "ヘテロ",
+          "reason": "substring of ヘテロ接合 (heterozygous) — biology curriculum"
+        },
+        {
+          "term": "バイ",
+          "reason": "substring of バイオリン (violin), バイク, バイト"
+        }
+      ]
+    },
+    {
+      "domain": "genetic-data",
+      "label": "genetic data",
+      "prompt": "Target language: Japanese (ja).\nArticle 9 special-category domain: genetic data.\n\nWHAT TO RETURN\nONLY multi-word, inherently disclosure-shaped phrases about genetic testing or hereditary status (\"DNA test result\", \"genetic test\", \"genetic screening\", \"hereditary condition\"). Do NOT return bare \"DNA\", \"gene\" or \"chromosome\" — those are biology-curriculum vocabulary. Biometric data is deliberately out of scope: Article 9 defines it by the identification PURPOSE, not by any word a learner types, so return no biometric terms.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nJapanese has no case endings but DOES have script variation that Unicode NFKC does not bridge. Give the kanji form, the katakana form and the common romaji/English loan form as SEPARATE entries where each is genuinely used (自閉症 / 発達障害 / カトリック).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Japanese prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"遺伝子検査\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific medical procedure, a genetic test.\"\n    },\n    {\n      \"term\": \"遺伝子テスト\",\n      \"form\": \"kanji+katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific medical procedure, a genetic test.\"\n    },\n    {\n      \"term\": \"dna検査\",\n      \"form\": \"romaji+kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific medical procedure, a DNA test.\"\n    },\n    {\n      \"term\": \"dnaテスト\",\n      \"form\": \"romaji+katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific medical procedure, a DNA test.\"\n    },\n    {\n      \"term\": \"dna test\",\n      \"form\": \"romaji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"English loan phrase for a DNA test.\"\n    },\n    {\n      \"term\": \"遺伝子スクリーニング\",\n      \"form\": \"kanji+katakana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific process of genetic screening.\"\n    },\n    {\n      \"term\": \"遺伝子解析\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific process of genetic analysis.\"\n    },\n    {\n      \"term\": \"dna解析\",\n      \"form\": \"romaji+kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific process of DNA analysis.\"\n    },\n    {\n      \"term\": \"dna鑑定\",\n      \"form\": \"romaji+kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to DNA analysis for identity, paternity, or forensics.\"\n    },\n    {\n      \"term\": \"遺伝子配列\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Attributed use refers to a person's specific gene sequence.\"\n    },\n    {\n      \"term\": \"遺伝性疾患\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a hereditary disease status.\"\n    },\n    {\n      \"term\": \"遺伝病\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a hereditary disease status.\"\n    },\n    {\n      \"term\": \"遺伝的素因\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to an inherited susceptibility to a condition.\"\n    },\n    {\n      \"term\": \"遺伝的体質\",\n      \"form\": \"kanji\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to an inherited physical constitution or disposition.\"\n    },\n    {\n      \"term\": \"遺伝子検査の結果\",\n      \"form\": \"kanji+hiragana\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly refers to the outcome of a personal genetic test.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"遺伝子\",\n      \"reason\": \"Single word for 'gene'; common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"dna\",\n      \"reason\": \"Single term for 'DNA'; common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"染色体\",\n      \"reason\": \"Single word for 'chromosome'; common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"ゲノム\",\n      \"reason\": \"Single word for 'genome'; common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"遺伝\",\n      \"reason\": \"Single word for 'heredity'; too general and abstract.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 819,
+        "completion_tokens": 3724,
+        "total_tokens": 4543,
+        "cost": 0.03826375,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.03826375,
+          "upstream_inference_prompt_cost": 0.00102375,
+          "upstream_inference_completions_cost": 0.03724
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2522,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "遺伝子検査",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific medical procedure, a genetic test."
+        },
+        {
+          "term": "遺伝子テスト",
+          "form": "kanji+katakana",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific medical procedure, a genetic test."
+        },
+        {
+          "term": "dna検査",
+          "form": "romaji+kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific medical procedure, a DNA test."
+        },
+        {
+          "term": "dnaテスト",
+          "form": "romaji+katakana",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific medical procedure, a DNA test."
+        },
+        {
+          "term": "dna test",
+          "form": "romaji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "English loan phrase for a DNA test."
+        },
+        {
+          "term": "遺伝子スクリーニング",
+          "form": "kanji+katakana",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific process of genetic screening."
+        },
+        {
+          "term": "遺伝子解析",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific process of genetic analysis."
+        },
+        {
+          "term": "dna解析",
+          "form": "romaji+kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific process of DNA analysis."
+        },
+        {
+          "term": "dna鑑定",
+          "form": "romaji+kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to DNA analysis for identity, paternity, or forensics."
+        },
+        {
+          "term": "遺伝子配列",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Attributed use refers to a person's specific gene sequence."
+        },
+        {
+          "term": "遺伝性疾患",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a hereditary disease status."
+        },
+        {
+          "term": "遺伝病",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a hereditary disease status."
+        },
+        {
+          "term": "遺伝的素因",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to an inherited susceptibility to a condition."
+        },
+        {
+          "term": "遺伝的体質",
+          "form": "kanji",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to an inherited physical constitution or disposition."
+        },
+        {
+          "term": "遺伝子検査の結果",
+          "form": "kanji+hiragana",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly refers to the outcome of a personal genetic test."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "遺伝子",
+          "reason": "Single word for 'gene'; common biology curriculum vocabulary."
+        },
+        {
+          "term": "dna",
+          "reason": "Single term for 'DNA'; common biology curriculum vocabulary."
+        },
+        {
+          "term": "染色体",
+          "reason": "Single word for 'chromosome'; common biology curriculum vocabulary."
+        },
+        {
+          "term": "ゲノム",
+          "reason": "Single word for 'genome'; common biology curriculum vocabulary."
+        },
+        {
+          "term": "遺伝",
+          "reason": "Single word for 'heredity'; too general and abstract."
+        }
+      ]
+    }
+  ],
+  "curationNote": "Terms listed under domains[].curationExcluded were returned by the model, then removed by the generator's post-generation curation list before reaching corpus.ts. rawResponse is unmodified."
+}
