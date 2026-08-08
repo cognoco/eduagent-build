@@ -723,12 +723,13 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml` — authenticates `wrangler deploy` |
 | `DATABASE_URL_STAGING` | `deploy.yml` — staging Neon migrations before staging deploys |
 | `DATABASE_URL_PRODUCTION` | `deploy.yml` — production Neon migrations before production deploys |
-| `DATABASE_URL_STAGING_APP` | `deploy.yml` — staging Worker application role (data access, no schema DDL) |
-| `DATABASE_URL_PRODUCTION_APP` | `deploy.yml`, `production-secret-sync.yml` — production Worker application role (data access, no schema DDL) |
+| `DATABASE_URL_STAGING_APP` | `deploy.yml` — staging Worker application credential; temporarily resolves to the bounded `staging_worker` managed-role workaround documented below |
+| `DATABASE_URL_PRODUCTION_APP` | `deploy.yml`, `production-secret-sync.yml` — production Worker application credential; temporarily resolves to the bounded `production_worker` managed-role workaround documented below |
 | `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
 | `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
 | `WORKER_DATABASE_BYPASSRLS_EXPECTED` (repository variable) | `deploy.yml`, `production-secret-sync.yml` — exact reviewed Worker BYPASSRLS posture (`true` or `false`) |
 | `STAGING_WORKER_ADMIN_EXCEPTION_ROLE` (temporary repository variable) | `deploy.yml` staging checks only — must be exactly `staging_worker`; permits only Neon's managed-admin capability set for the staging workaround. Production never receives it. Remove with WI-3062 before MVP launch. |
+| `PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE` (temporary repository variable) | `deploy.yml`, `production-secret-sync.yml` production checks only — must be exactly `production_worker`; permits only the operator-reviewed managed-admin fingerprint for the production workaround. Staging never receives it. Remove with WI-3062 before MVP launch. |
 | `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
 | `DOPPLER_TOKEN_PRD` | `deploy.yml`, `production-secret-sync.yml` — production Doppler service token for Worker secret sync |
 | `SKIP_DOPPLER_SYNC` | Deprecated tripwire only — protected staging/production deploys fail if it is `true`; remove the stale setting after confirming the guarded sync path |
@@ -774,7 +775,7 @@ Workers. Prefer the guarded deployment/scheduled workflows, which verify the
 target, application-role capabilities, migration-role separation, and reviewed
 BYPASSRLS posture before mutation.
 
-### Temporary staging Worker role exception
+### Temporary staging and production Worker role exceptions
 
 OPQ-163 authorizes the staging Worker to use the Neon control-plane role
 `staging_worker` while Neon support resolves least-privilege role provisioning.
@@ -785,10 +786,24 @@ ownership, any other role name, and every production use. The reviewed managed
 role fingerprint does include `SET ROLE` and role-admin reach; OPQ-163 knowingly
 accepts that effective admin reach in staging only. The verifier pins the
 top-level reachability booleans but cannot detect expansion among roles inside
-an already-true reachability category; that residual risk is also accepted only
-for this temporary staging use. WI-3062 is a hard blocker of the final MVP
-compliance gate and requires the role, variable, verifier allowance, and
-credential to be removed.
+an already-true reachability category; that residual risk is accepted for this
+temporary staging use.
+
+The 2026-08-06 OPQ-163 operator ruling applies the same bounded workaround to
+production. Set `PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE=production_worker` only
+while that role is the `DATABASE_URL_PRODUCTION_APP` credential. The verifier
+accepts it only for `DEPLOY_ENV=production`, only when the live role name and
+reviewed managed-admin fingerprint match exactly, and continues to reject direct
+superuser status, direct application-object ownership, schema creation, any
+other role name, and any drift in the pinned capability categories. The
+workflow-touching change requires Quartet two-key production approval before
+merge.
+
+WI-3062 is a hard blocker of the final MVP compliance gate and requires both
+roles to have their administrative bundle stripped in place, both repository
+variables and verifier allowances removed, and the standard verifier re-proven
+for staging and production. No credential rotation is required unless Neon
+cannot remediate the existing roles in place.
 
 ### What gets filtered out
 

@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import * as workerRoleLib from './verify-worker-db-role-lib.mjs';
 import {
   assertDistinctDatabaseCredentials,
   assertMigratorDatabaseTarget,
@@ -53,6 +54,11 @@ const neonManagedAdminCapabilities = {
   can_create_schema: false,
   has_forbidden_set_role_path: true,
   has_role_admin_path: true,
+};
+
+const productionNeonManagedAdminCapabilities = {
+  ...neonManagedAdminCapabilities,
+  role_name: 'production_worker',
 };
 
 test('accepts only the exact staging_worker Neon managed-admin workaround in staging', () => {
@@ -175,6 +181,161 @@ test('keeps the staging workaround fail-closed for production, wrong roles, and 
       ),
     /managed-admin fingerprint differs/i,
   );
+});
+
+test('accepts only the exact production_worker Neon managed-admin workaround in production', () => {
+  assert.equal(
+    typeof workerRoleLib.parseTemporaryProductionAdminException,
+    'function',
+    'production exception parser must be exported',
+  );
+  const parseTemporaryProductionAdminException =
+    workerRoleLib.parseTemporaryProductionAdminException;
+  assert.equal(
+    parseTemporaryProductionAdminException({
+      deployEnv: 'production',
+      value: 'production_worker',
+    }),
+    'production_worker',
+  );
+  assert.doesNotThrow(() =>
+    assertWorkerDatabaseCapabilities(productionNeonManagedAdminCapabilities, {
+      deployEnv: 'production',
+      expectedBypassRls: true,
+      temporaryProductionAdminRole: 'production_worker',
+    }),
+  );
+});
+
+test('keeps the production workaround fail-closed for staging, wrong roles, and fingerprint drift', () => {
+  const parseTemporaryProductionAdminException =
+    workerRoleLib.parseTemporaryProductionAdminException;
+  assert.equal(
+    typeof parseTemporaryProductionAdminException,
+    'function',
+    'production exception parser must be exported',
+  );
+  assert.throws(
+    () =>
+      parseTemporaryProductionAdminException({
+        deployEnv: 'staging',
+        value: 'production_worker',
+      }),
+    /forbidden outside production/i,
+  );
+  assert.throws(
+    () =>
+      parseTemporaryProductionAdminException({
+        deployEnv: 'production',
+        value: 'some_other_role',
+      }),
+    /must be exactly "production_worker"/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(productionNeonManagedAdminCapabilities, {
+        deployEnv: 'production',
+        expectedBypassRls: true,
+      }),
+    /database create/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(dmlOnlyCapabilities, {
+        deployEnv: 'production',
+        expectedBypassRls: false,
+        temporaryProductionAdminRole: 'production_worker',
+      }),
+    /configured exception role does not match the live Worker role/i,
+  );
+  for (const capability of [
+    'can_create_database',
+    'can_create_role',
+    'can_replicate',
+    'has_forbidden_set_role_path',
+    'has_role_admin_path',
+  ]) {
+    assert.throws(
+      () =>
+        assertWorkerDatabaseCapabilities(
+          {
+            ...productionNeonManagedAdminCapabilities,
+            [capability]: false,
+          },
+          {
+            deployEnv: 'production',
+            expectedBypassRls: true,
+            temporaryProductionAdminRole: 'production_worker',
+          },
+        ),
+      /managed-admin fingerprint differs/i,
+    );
+  }
+  const missingProductionFingerprintCapability = {
+    ...productionNeonManagedAdminCapabilities,
+  };
+  delete missingProductionFingerprintCapability.can_create_schema;
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(missingProductionFingerprintCapability, {
+        deployEnv: 'production',
+        expectedBypassRls: true,
+        temporaryProductionAdminRole: 'production_worker',
+      }),
+    /managed-admin fingerprint differs/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(
+        {
+          ...productionNeonManagedAdminCapabilities,
+          can_create_schema: true,
+        },
+        {
+          deployEnv: 'production',
+          expectedBypassRls: true,
+          temporaryProductionAdminRole: 'production_worker',
+        },
+      ),
+    /managed-admin fingerprint differs/i,
+  );
+  assert.throws(
+    () =>
+      assertWorkerDatabaseCapabilities(
+        {
+          ...productionNeonManagedAdminCapabilities,
+          bypasses_rls: false,
+        },
+        {
+          deployEnv: 'production',
+          expectedBypassRls: true,
+          temporaryProductionAdminRole: 'production_worker',
+        },
+      ),
+    /BYPASSRLS posture differs/i,
+  );
+  for (const capability of ['is_superuser', 'owns_application_objects']) {
+    assert.throws(
+      () =>
+        assertWorkerDatabaseCapabilities(
+          {
+            ...productionNeonManagedAdminCapabilities,
+            [capability]: true,
+          },
+          {
+            deployEnv: 'production',
+            expectedBypassRls: true,
+            temporaryProductionAdminRole: 'production_worker',
+          },
+        ),
+      new RegExp(
+        capability === 'is_superuser'
+          ? 'superuser'
+          : 'owns application objects',
+        'i',
+      ),
+    );
+  }
 });
 
 test('accepts a non-owner DML role under an explicit RLS posture', () => {
@@ -401,6 +562,21 @@ test('protected workflows verify the Worker role before migration or secret sync
     stagingExceptionOccurrences.length,
     'every staging exception reference must preserve the complete staging-only predicate',
   );
+  const productionOnlyExceptionLine =
+    "PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE: ${{ github.event_name == 'workflow_dispatch' && inputs.api_environment == 'production' && vars.PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE || '' }}";
+  const productionExceptionOccurrences = apiDeploy
+    .split('\n')
+    .filter((line) => line.trim() === productionOnlyExceptionLine);
+  assert.equal(
+    productionExceptionOccurrences.length,
+    2,
+    'the production-only exception must be passed to both deploy role checks',
+  );
+  assert.equal(
+    apiDeploy.match(/PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE:/g)?.length,
+    productionExceptionOccurrences.length,
+    'every production exception reference must preserve the complete production-only predicate',
+  );
 
   const scheduledVerify = productionSync.indexOf('verify-worker-db-role.mjs');
   const scheduledSync = productionSync.indexOf('pnpm secrets:sync prd');
@@ -413,5 +589,10 @@ test('protected workflows verify the Worker role before migration or secret sync
     productionSync,
     /STAGING_WORKER_ADMIN_EXCEPTION_ROLE/,
     'production secret sync must never receive the staging exception',
+  );
+  assert.match(
+    productionSync,
+    /PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE:\s*\$\{\{ vars\.PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE \}\}/,
+    'production secret sync must receive the production exception',
   );
 });

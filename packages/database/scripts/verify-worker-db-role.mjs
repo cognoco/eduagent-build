@@ -19,6 +19,7 @@ import {
   assertWorkerDatabaseCapabilities,
   assertWorkerDatabaseTarget,
   parseExpectedBypassRls,
+  parseTemporaryProductionAdminException,
   parseTemporaryStagingAdminException,
 } from './verify-worker-db-role-lib.mjs';
 
@@ -51,6 +52,10 @@ async function main() {
     deployEnv,
     value: process.env.STAGING_WORKER_ADMIN_EXCEPTION_ROLE,
   });
+  const temporaryProductionAdminRole = parseTemporaryProductionAdminException({
+    deployEnv,
+    value: process.env.PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE,
+  });
 
   const workerSql = neon(workerDatabaseUrl);
   const migratorSql = neon(migratorDatabaseUrl);
@@ -64,6 +69,7 @@ async function main() {
     deployEnv,
     expectedBypassRls,
     temporaryStagingAdminRole,
+    temporaryProductionAdminRole,
   });
   assertDistinctDatabaseCredentials({
     workerDatabaseUrl,
@@ -77,6 +83,11 @@ async function main() {
   if (temporaryStagingAdminRole) {
     console.warn(
       '⚠ Accepted temporary staging_worker Neon managed-admin workaround; removal is launch-blocked by WI-3062',
+    );
+  }
+  if (temporaryProductionAdminRole) {
+    console.warn(
+      '⚠ Accepted temporary production_worker Neon managed-admin workaround; removal is launch-blocked by WI-3062',
     );
   }
 }

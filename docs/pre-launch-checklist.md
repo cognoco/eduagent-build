@@ -48,7 +48,9 @@ Last updated: 2026-05-29
   - [ ] `DATABASE_URL_STAGING_HOST`
   - [ ] `DATABASE_URL_PRODUCTION_HOST`
   - [ ] Repository variable `WORKER_DATABASE_BYPASSRLS_EXPECTED` — exact reviewed Worker posture, `true` or `false`; verifier rejects an unset or mismatched value
-  - [ ] **Remove temporary staging Worker admin exception (WI-3062)** — OPQ-163 knowingly accepts the managed role's effective admin reach through `SET ROLE` and role administration in staging only, including the verifier's inability to detect expansion inside an already-true reachability category; replace `staging_worker`, delete `STAGING_WORKER_ADMIN_EXCEPTION_ROLE`, remove the verifier allowance, delete/disable the Neon role, and re-prove the standard role verifier before WI-1577 can report GO
+  - [ ] Temporary repository variable `STAGING_WORKER_ADMIN_EXCEPTION_ROLE=staging_worker` is present only while the OPQ-163 staging workaround is active
+  - [ ] Temporary repository variable `PRODUCTION_WORKER_ADMIN_EXCEPTION_ROLE=production_worker` is present only while the OPQ-163 production workaround is active; its workflow-touching PR has Quartet two-key production approval
+  - [ ] **Remove both temporary Worker admin exceptions (WI-3062)** — strip the managed administrative bundle from `staging_worker` and `production_worker` in place, delete both exception variables and verifier allowances, and re-prove the standard role verifier in both environments before WI-1577 can report GO; no credential rotation is required unless Neon cannot remediate the existing roles
   - [ ] `EXPO_TOKEN`
   - [ ] `DOPPLER_TOKEN_STG` — config-scoped Doppler service token for staging; used by `deploy.yml` Doppler→Worker sync step
   - [ ] `DOPPLER_TOKEN_PRD` — config-scoped Doppler service token for production; used by `deploy.yml` Doppler→Worker sync step
