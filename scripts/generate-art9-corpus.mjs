@@ -209,6 +209,22 @@ for (const code of SELECTED) {
 // --- dedupe corpus ----------------------------------------------------------
 
 /**
+ * The exact source line fragment that identifies a corpus block's language.
+ *
+ * A PLAIN STRING, matched with `includes`, deliberately not a RegExp. Both call
+ * sites used to build `new RegExp(\`language: '${code}',\`)` from the
+ * `--languages` CLI value, which CodeQL flags as `js/regex-injection` — a
+ * command-line argument reaching a regex constructor. The match is purely
+ * literal, so dropping the regex is both the simpler fix and a strictly exact
+ * one: no escaping to get wrong, and no metacharacter in a supplied value can
+ * change what matches. (`code` is separately validated against `LANGUAGES` at
+ * CLI parse time; this does not rely on that.)
+ */
+function languageDeclaration(code) {
+  return `language: '${code}',`;
+}
+
+/**
  * String literals already present in ONE language's corpus block, lowercased.
  *
  * PER-LANGUAGE, and that is load-bearing rather than tidy. Deduping against the
@@ -232,7 +248,7 @@ function existingCorpusLiterals(code) {
   const literals = new Set();
   for (const block of blocks) {
     const body = block[1];
-    if (!new RegExp(`language: '${code}',`).test(body)) continue;
+    if (!body.includes(languageDeclaration(code))) continue;
     for (const match of body.matchAll(/'((?:[^'\\\n]|\\.)*)'/g)) {
       literals.add(match[1].toLowerCase());
     }
@@ -504,7 +520,7 @@ function applyEvidence(code) {
   const source = readFileSync(CORPUS_PATH, 'utf8');
   const block = [
     ...source.matchAll(/const \w+: LanguageCorpus = \{\n([\s\S]*?)\n\};/g),
-  ].find((m) => new RegExp(`language: '${code}',`).test(m[1]));
+  ].find((m) => m[1].includes(languageDeclaration(code)));
   if (!block) throw new Error(`No corpus block for '${code}'`);
 
   const anchor = /\n {4}'unnamed-attribution-only': \[[^\]]*\],/;
