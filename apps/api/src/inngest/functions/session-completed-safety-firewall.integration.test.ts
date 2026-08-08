@@ -8,8 +8,9 @@
  * must produce ZERO profile-memory writes and ZERO `session_embeddings` rows,
  * while an otherwise identical unflagged session still produces both.
  *
- * `should not persist safeguarding content` (the last test) is the regression
- * guard: revert either enforcement site in session-completed.ts and it fails.
+ * The last test — `a safety-flagged session yields no memory writes and no
+ * embedding` — is the regression guard: revert either enforcement site in
+ * session-completed.ts and it fails.
  *
  * External-boundary mocks only (AGENTS.md § Code Quality Guards):
  *   1. jest.spyOn(llm, 'routeAndCall') — the sanctioned LLM boundary
@@ -350,11 +351,17 @@ describe('WI-3140 tripwire-to-memory firewall — session-completed enforcement'
 
   it('control: an unflagged session is analysed and embedded', async () => {
     const scenario = await seedScenario({ memoryConsent: 'granted' });
+    const strugglesBefore = await loadStruggles(scenario.profileId);
 
     await runPipeline(scenario);
 
-    const struggles = await loadStruggles(scenario.profileId);
-    expect(struggles.length).toBeGreaterThan(0);
+    // The seeded struggle is repeated by the analysis LLM at a higher
+    // confidence, so a run that actually analysed the transcript rewrites the
+    // array. Comparing against the pre-run snapshot (rather than asserting
+    // non-empty, which the seed alone would satisfy) is what makes this a real
+    // control for the flagged case below.
+    const strugglesAfter = await loadStruggles(scenario.profileId);
+    expect(strugglesAfter).not.toEqual(strugglesBefore);
 
     const embeddings = await db.query.sessionEmbeddings.findMany({
       where: and(
@@ -382,6 +389,9 @@ describe('WI-3140 tripwire-to-memory firewall — session-completed enforcement'
     const strugglesAfter = await loadStruggles(scenario.profileId);
     expect(strugglesAfter).toEqual(strugglesBefore);
 
+    // Forward-looking: nothing in this step writes memory_facts today, but the
+    // DPO-facing guarantee is "zero memory_facts rows for a flagged session",
+    // so the assertion stands as a guard against a future writer landing here.
     const facts = await db.query.memoryFacts.findMany({
       where: eq(memoryFacts.profileId, scenario.profileId),
     });
