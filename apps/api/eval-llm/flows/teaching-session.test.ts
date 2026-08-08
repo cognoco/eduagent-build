@@ -504,7 +504,7 @@ describe('assertScenarioProfilesResolve', () => {
     expect(ids).toHaveLength(6);
   });
 
-  it('all 5 scenarios have distinct profileIds covering the expected profiles', () => {
+  it('all 6 scenarios have distinct profileIds covering the expected profiles', () => {
     const profileIds = TEACHING_SCENARIOS.map((s) => s.profileId);
     expect(profileIds).toContain('12yo-dinosaurs');
     expect(profileIds).toContain('15yo-football-gaming');
