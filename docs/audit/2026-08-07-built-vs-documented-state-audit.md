@@ -10,6 +10,10 @@ this report records drift and edits nothing it audits.
 (assessment only)
 **Audited commit:** `019c72e36180cbe5a80f46ef9cf3e6f583c2b786` (`origin/main` at audit start).
 Every `file:line` below is that revision.
+**Revision:** rev 2 (2026-08-08), after review rework. The findings are unchanged from rev 1; the
+Coverage section was rebuilt so that the ~1,264 mechanically-resolved tokens are classified
+**unresolved (existence established, predicate not verified)** instead of sitting outside the
+Acceptance Criteria's four buckets, where they read as verified. See § Coverage.
 
 ---
 
@@ -25,6 +29,12 @@ dead evidence pointers inside Accepted ADRs. Two are `w-state-stale`: the live `
 roster makes stale lifecycle claims about six Work Items that Cosmo has Closed, and the approved
 docs-tree mapping still plans against a `docs/meetings/` directory that has already moved. No
 finding is remediated here; each is filed as its own Work Item.
+
+**On this report's own coverage claim:** of 1,642 extracted candidates, **133 are verified
+consistent and 1,414 are unresolved with a stated reason** — overwhelmingly because a mechanical
+pass established that a named artifact *exists* without establishing the predicate asserted about
+it. That is a deliberately unflattering number. An audit about documents overstating what has been
+established is the last place to overstate what has been established.
 
 ## Severity
 
@@ -152,62 +162,96 @@ disclosures).
 
 ## Coverage
 
-Counts are per population, at the unit the audit actually verified — the distinct artifact token,
-with its mention count in parentheses.
+**Read this section before the findings.** The unit of account is the distinct artifact token.
+The four buckets below are the Acceptance Criteria's own — candidates extracted, verified
+consistent, findings, and every candidate left unresolved *with the reason*. Every extracted token
+lands in exactly one of them; nothing sits outside the taxonomy.
 
-| | (a) L1 canon | (b) Accepted ADRs | (c) W-state, non-terminal |
+**The bucket that matters most is the last one.** 1,264 tokens were resolved *mechanically* — the
+named artifact was located in the tree. That establishes **existence, not the predicate**: it does
+not show that a flag gates the feature the sentence says it gates, that a column carries the
+constraint claimed, that a route is registered at the path given, or that a service owns the write
+attributed to it. Existence is a necessary condition for those claims and not a sufficient one, so
+those tokens are classified **unresolved, with reason** rather than verified. Counting them as
+verified would be the same error this audit exists to catch, committed by the audit.
+
+| Acceptance-Criteria bucket | (a) L1 canon | (b) Accepted ADRs | (c) W-state, non-terminal |
 |---|---|---|---|
 | Files | 9 | 37 | 15 of 28 |
 | Lines | 6,846 | 2,813 | 9,971 (all 28) |
 | Artifact-bearing lines (sieve) | 1,186 | 569 | 1,701 (all 28) |
-| **Distinct artifact tokens extracted** (mentions) | **597** (1,174) | **397** (948) | **648** (1,495) |
-| — resolvable classes (`PATH` `FLAG` `ROUTE` `SCRIPT` `SNAKE` `CAMEL`) | 534 | 343 | 503 |
-| — reference classes (`WI` `ADR`) | 63 | 54 | 145 |
-| *Resolvable classes* — resolved mechanically | 494 | 318 | 452 |
-| *Resolvable classes* — hand-adjudicated residue | 40 | 25 | 51 |
-| — verified consistent | 5 | 0 | 19 |
-| — excluded by the extraction rule | 25 | 22 | 25 |
-| — **findings (tokens)** | **10** | **3** | **4** |
-| — unresolved, with reason | 0 | 0 | 3 |
-| *Reference classes* — `MMT-ADR` ids verified against `docs/adr/` | 33 | 40 | 35 |
-| *Reference classes* — `WI-NN` ids fetched from Cosmo | 0 | 0 | 7 |
-| *Reference classes* — `WI-NN` ids unresolved, with reason | 30 | 14 | 103 |
-| Findings from the negative-polarity / status passes | 2 | 0 | 1 |
-| **Findings, total** | **12** | **2** | **2** |
+| **Candidates extracted** (mentions) | **597** (1,174) | **397** (948) | **648** (1,495) |
+| **Verified consistent** — predicate established | **38** | **40** | **55** |
+| **Findings** — token slots consumed | **10** | **3** | **10** |
+| **Unresolved, with reason** | **524** | **332** | **558** |
+| Excluded by the extraction rule (never candidates) | 25 | 22 | 25 |
 
-**Total unresolved with reason: 150** — 147 `WI-NN` tokens not fetched from Cosmo, plus the 3
-repo-external paths described below.
+Each column sums to its candidate total: 38 + 10 + 524 + 25 = 597 · 40 + 3 + 332 + 22 = 397 ·
+55 + 10 + 558 + 25 = 648. **Total unresolved with reason: 1,414.**
 
-Notes on the buckets:
+### What is in "unresolved, with reason"
 
-- **Verified consistent** in (a): the negative assertions `no MODE_IDENTITY_V1 flag`
-  (`docs/architecture.md:644`) and `There is no packages/factory/ package` (`:1477`) both hold;
-  `pnpm --filter @eduagent/database db:migrate` resolves to a real script; and
-  `age_method` / `residence_method` / `age_estimation_signal` (`docs/canon/identity/data-model.md:150-151`)
-  are **value-set names, not columns** — the same document declares the columns as
-  `age_knowing` / `residence_knowing` JSONB at `:146-147`, which is exactly what
-  `packages/database/src/schema/identity.ts:103,105` ships. No drift.
-- **Verified consistent** in (c): all 19 memory tokens in
-  `_wip/identity-foundation/2026-06-09-wi-531-pipeline-rule-memory-handoff.md`. The nine
-  `.claude/memory/feedback_*.md` paths it names are absent **because the document itself records
-  them as deleted** (`:55-70`), and the ten `feedback_*`/`project_*` rows in its disposition table
-  are marked `delete` for WI-387, which executed. The one row marked **KEEP-in-place**,
-  `feedback_nx_reset_before_commit`, is still present. That handoff is accurate.
+| Reason | (a) | (b) | (c) |
+|---|---|---|---|
+| Existence established mechanically; **predicate not verified** | 494 | 318 | 452 |
+| `WI-NN` id never fetched from Cosmo (reference/provenance, not a status claim) | 30 | 14 | 103 |
+| Repo-external absolute path into the `nexus` repository — unverifiable from here | — | — | 3 |
+
+### What is in "verified consistent", enumerated
+
+The label is used only where the **predicate itself** was established by hand, so it is auditable
+rather than asserted. All 133 are listed or characterised here.
+
+- **(a), 5 resolvable-class tokens.** `MODE_IDENTITY_V1` — `docs/architecture.md:644` asserts the
+  flag does **not** exist; zero hits repo-wide, so the negative predicate holds.
+  `pnpm --filter @eduagent/database db:migrate` — `docs/deployment-and-secrets.md:392` says to run
+  it; the script exists in `packages/database/package.json`, so the predicate ("this is runnable")
+  holds. `age_method` / `residence_method` / `age_estimation_signal` —
+  `docs/canon/identity/data-model.md:150-151` presents these as ENUM-style **value-set names**, and
+  the same document declares the backing columns as `age_knowing` / `residence_knowing` JSONB at
+  `:146-147`, which is exactly what `packages/database/src/schema/identity.ts:103,105` ships. The
+  predicate is the value-set relationship, and it holds.
+- **(c), 19 resolvable-class tokens**, all in
+  `_wip/identity-foundation/2026-06-09-wi-531-pipeline-rule-memory-handoff.md`. The predicate is
+  the document's own disposition claim, not mere absence: nine `.claude/memory/feedback_*.md` paths
+  are absent **and the document records them as deleted** at `:55-70`; ten `feedback_*` /
+  `project_*` rows in its disposition table are marked `delete` for WI-387, which executed; and the
+  single row marked **KEEP-in-place**, `feedback_nx_reset_before_commit`, **is still present**. The
+  KEEP row is what makes this verification rather than coincidence — a blanket deletion would have
+  taken it too.
+- **(c), 1 `WI-NN` token.** `WI-779` (WP-FLAG: remove `IDENTITY_V2_ENABLED` + legacy schema/twins)
+  is `Ready` / `Parked` in Cosmo, consistent with the roster describing it as gated. The other six
+  fetched ids contradicted the roster and became Finding 15.
+- **108 `MMT-ADR-NNNN` citation tokens** (33 / 40 / 35). For a bare cross-reference the predicate
+  *is* existence — "see `MMT-ADR-0013`" claims nothing more than that the ADR exists — so the
+  existence check is a complete predicate check for this class, and 49 of the 50 distinct ids
+  resolve to a file. The exception, `MMT-ADR-0003`, is cited only at
+  `_wip/umbrella-program/2026-07-30-s2-06a-disposition-ledger.md:21` and its `06b` sibling, both of
+  which assert it is a deliberately unfilled gap in the sequence; it is absent, so that predicate
+  holds too. Where a sentence around an ADR citation makes a further claim, that claim is a
+  decision or policy statement and is excluded by the extraction rule, not counted here.
+
+### How findings map onto token slots
+
+Sixteen findings consume 23 token slots, and the two numbers differ for two reasons worth stating
+rather than leaving to be reverse-engineered. Three findings — Finding 1 and Finding 2 in (a),
+Finding 15 in (c) — came from the negative-polarity and status-table passes and consume **no**
+token slot, because the sieve cannot see an assertion whose content is an absence or a status word.
+Conversely Finding 15 alone consumes **six** `WI-NN` slots, one per contradicted Work Item. Per
+population: (a) 12 findings over 10 slots, (b) 2 over 3, (c) 2 over 10.
+
+Notes on the remaining bucket:
+
 - **Excluded by the extraction rule** covers illustrative examples (7 in (a)), migration-history
   and plan-table rows (11 in (a)), explicit future/`v1.1` scoping (5 in (a)), ADR decision bodies
   (22 in (b) — see the disclosure below), and unexecuted plan *targets* in (c)'s mapping documents
   (`docs/registers/flows/`, `docs/specs/flows/`, `docs/canon/navigation/`, `docs/compliance/store/`
   and siblings), which are correctly absent because the plan has not run.
-- **Reference classes.** 50 distinct `MMT-ADR-NNNN` ids are cited across the three populations; 49
-  resolve to a file in `docs/adr/`. The one that does not — `MMT-ADR-0003` — is cited only at
-  `_wip/umbrella-program/2026-07-30-s2-06a-disposition-ledger.md:21` and its sibling `06b:21`, both
-  of which state that 0003 "is a pre-existing gap in the sequence and was deliberately **not**
-  filled". The assertion is that the ADR is absent, and it is absent. Verified consistent.
-- **Unresolved, with reason** — 3 tokens in (c), all absolute or repo-external paths into the
-  `nexus` repository (`/Users/vetinari/nexus/_WIP/zdx-productionization/harness-hygiene-tracker.md`
-  and two `_WIP/zdx-productionization/…` siblings). They name artifacts in a different repository
-  and cannot be verified from this one. Verifying them is a cross-repo exercise, out of this item's
-  bounded population.
+- **The three repo-external paths.** `/Users/vetinari/nexus/_WIP/zdx-productionization/harness-hygiene-tracker.md`
+  and two `_WIP/zdx-productionization/…` siblings name artifacts in a **different repository**.
+  Verifying them is a cross-repo exercise outside this item's bounded population, so they are
+  unresolved rather than reported as dead pointers — an absent path in another repo is not evidence
+  of drift here.
 
 ## Findings
 
@@ -394,16 +438,20 @@ All sixteen findings were filed via `/cosmo:capture` with `--origin-wi WI-3122`,
   Related: `MMT-ADR-0011`'s `ward_person_id` is absent because `MMT-ADR-0015` renamed it, and
   `charge_person_id` ships — an ADR superseded on a point by a later ADR is the chain working, not
   drift, and was recorded as such.
-- **Mechanical resolution is an EXISTENCE check, not a predicate check — and this is the larger of
-  the two blind spots.** The ~1,264 tokens resolved mechanically prove only that the named artifact
-  is present somewhere in the tree. They do **not** verify what the sentence claims *about* it:
-  "flag Z gates W", "nothing calls X", "column C is `NOT NULL`", "route R is registered", "service
-  S owns the write" all pass a bare existence hit while their actual predicate goes unchecked.
-  Predicate verification happened only for the hand-adjudicated residue and the two targeted
-  passes. Finding 6 is the cautionary instance: `/v1/stripe-webhook` surfaced *because* the token
-  happened to fail resolution — a mis-stated route whose token resolved anywhere in the tree would
-  have passed silently. Treat the mechanically-resolved column as "the artifact exists", never as
-  "the claim is true".
+- **Mechanical resolution is an EXISTENCE check, not a predicate check.** The ~1,264 tokens
+  resolved mechanically prove only that the named artifact is present somewhere in the tree. They
+  do **not** verify what the sentence claims *about* it: "flag Z gates W", "nothing calls X",
+  "column C is `NOT NULL`", "route R is registered", "service S owns the write" all pass a bare
+  existence hit while their actual predicate goes unchecked. Finding 6 is the cautionary instance:
+  `/v1/stripe-webhook` surfaced *because* the token happened to fail resolution — a mis-stated
+  route whose token resolved anywhere in the tree would have passed silently.
+  **In rev 1 this was disclosed here but not reflected in the counts**, which left those tokens
+  outside the Acceptance Criteria's four buckets and reading as verified; review caught it. They
+  are now classified **unresolved, with reason**, and "verified consistent" is reserved for the 133
+  tokens whose predicate was established by hand and enumerated in § Coverage. Verifying the
+  remaining 1,264 predicates is a genuinely larger exercise than this item's bounded population —
+  it means reading the sentence around every mention, not the token — and is the honest shape of a
+  follow-up rather than something quietly folded in here.
 - **Cosmo verification was targeted, not exhaustive.** The population contains 154 distinct `WI-NN`
   tokens (30 in (a), 14 in (b), 110 in (c) non-terminal, 483 mentions in (c) alone). Seven were
   fetched from Cosmo — the ones carrying explicit lifecycle-status claims in the two live trackers,
