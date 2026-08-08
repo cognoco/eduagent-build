@@ -46,7 +46,7 @@ import { sessionCompleted } from './session-completed';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
-const VOYAGE_URL = 'https://api.voyageai.com';
+const VOYAGE_HOST = 'api.voyageai.com';
 const originalFetch = globalThis.fetch;
 const voyageCalls: string[] = [];
 
@@ -266,8 +266,17 @@ beforeAll(() => {
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input.toString();
-    if (url.startsWith(VOYAGE_URL)) {
+    // Match on the parsed hostname, never a prefix: `startsWith` on the origin
+    // would also match a lookalike host such as `api.voyageai.com.evil.test`.
+    // `input` is `RequestInfo | URL`, and `Request.toString()` yields
+    // `[object Request]`, so each shape is unwrapped explicitly.
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    if (new URL(url).hostname === VOYAGE_HOST) {
       voyageCalls.push(url);
       return new Response(
         JSON.stringify({ data: [{ embedding: new Array(1024).fill(0.01) }] }),
