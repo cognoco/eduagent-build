@@ -84,6 +84,10 @@ import {
 } from './functions/summary-regenerate';
 import { summaryReconciliationCron } from './functions/summary-reconciliation-cron';
 import {
+  sessionEmbeddingBackfill,
+  sessionEmbeddingBackfillCron,
+} from './functions/session-embedding-backfill';
+import {
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
@@ -201,6 +205,8 @@ export {
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
   summaryReconciliationCron,
+  sessionEmbeddingBackfillCron,
+  sessionEmbeddingBackfill,
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
@@ -307,6 +313,11 @@ export const functions = [
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
   summaryReconciliationCron,
+  // [WI-3141] Catch-up for embeds session-completed deferred (fail-closed on a
+  // missing summary). Runs 04:30 UTC — after summary reconciliation, before
+  // the transcript purge.
+  sessionEmbeddingBackfillCron,
+  sessionEmbeddingBackfill,
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,

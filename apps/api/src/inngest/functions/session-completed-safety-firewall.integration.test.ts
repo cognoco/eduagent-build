@@ -78,10 +78,17 @@ const ANALYSIS_LLM_RESPONSE = JSON.stringify({
   confidence: 'medium',
   closingLine: 'Keep going!',
   learnerRecap: 'You worked through photosynthesis.',
-  narrative: 'Session focused on the light reactions.',
+  // [WI-3141] These four are also read as the llm_summary: the embedding step
+  // now writes the summary-safe text, so the control case only produces an
+  // embedding when this response satisfies `llmSummarySchema`. That schema
+  // requires reEntryRecommendation >= 20 chars AND the narrative to name a
+  // topic from topicsCovered (packages/schemas/src/llm-summary.ts:11-58) —
+  // the previous fixture satisfied neither.
+  narrative: 'Session focused on photosynthesis and the light reactions.',
   topicsCovered: ['photosynthesis'],
   sessionState: 'completed',
-  reEntryRecommendation: 'Review again.',
+  reEntryRecommendation:
+    'Review the light reactions again at the start of the next session.',
 });
 
 interface Scenario {

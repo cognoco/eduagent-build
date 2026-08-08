@@ -1,7 +1,7 @@
 import { llmSummarySchema } from '@eduagent/schemas';
 import { getProfile } from '../fixtures/profiles';
 import { sessionSummaryFlow } from './session-summary';
-import { buildSummaryEmbeddingText } from '../../src/services/transcript-purge';
+import { buildSummaryEmbeddingText } from '../../src/services/session-embedding-content';
 
 function normalizeText(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');

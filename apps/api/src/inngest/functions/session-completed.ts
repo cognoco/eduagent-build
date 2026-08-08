@@ -31,10 +31,8 @@ import {
 import { computeLanguageSessionSummary } from '../../services/language-session-summary';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { recordSessionActivity } from '../../services/streaks';
-import {
-  extractSessionContent,
-  storeSessionEmbedding,
-} from '../../services/embeddings';
+import { storeSessionEmbedding } from '../../services/embeddings';
+import { loadSummarySafeEmbeddingContent } from '../../services/session-embedding-content';
 import {
   precomputeCoachingCard,
   writeCoachingCardCache,
@@ -2107,8 +2105,8 @@ export const sessionCompleted = inngest.createFunction(
           // [WI-3140] Tripwire-to-memory firewall, embeddings leg. Same fresh
           // in-step read and same rule as analyze-learner-profile above: a
           // safety-flagged session is never embedded, so no safeguarding
-          // disclosure reaches Voyage or the `session_embeddings` index (whose
-          // stored `content` is the raw transcript extract).
+          // disclosure reaches Voyage or the `session_embeddings` index — not
+          // even in the summary-safe form WI-3141 now stores there.
           const safetyFlagRow = await db.query.learningSessions.findFirst({
             where: and(
               eq(learningSessions.id, sessionId),
@@ -2127,14 +2125,41 @@ export const sessionCompleted = inngest.createFunction(
             return;
           }
 
+          // [WI-3141] The stored `session_embeddings.content` is the
+          // summary-safe text, never the transcript — see the ordering design
+          // in services/session-embedding-content.ts. The three steps that
+          // populate the summary (write-coaching-card creates the row,
+          // generate-learner-recap writes learner_recap, generate-llm-summary
+          // writes llm_summary) all run earlier in THIS function, so on the
+          // happy path the text is already there.
+          //
+          // All three are soft steps, so it can still be missing. Then we fail
+          // closed: no row rather than a raw one. session-embedding-backfill's
+          // daily sweep writes it once summary reconciliation has repaired the
+          // summary, so failing closed defers the embedding, never drops it.
+          const summarySafe = await loadSummarySafeEmbeddingContent(
+            db,
+            sessionId,
+            profileId,
+          );
+          if (summarySafe.status !== 'ok') {
+            logger.warn('[session-completed] embedding deferred', {
+              event: 'privacy.session_embedding_deferred',
+              step: 'generate-embeddings',
+              profileId,
+              sessionId,
+              reason: summarySafe.reason,
+            });
+            return;
+          }
+
           const voyageApiKey = getStepVoyageApiKey();
-          const content = await extractSessionContent(db, sessionId, profileId);
           await storeSessionEmbedding(
             db,
             sessionId,
             profileId,
             topicId ?? null,
-            content,
+            summarySafe.content,
             voyageApiKey,
           );
         }),

@@ -9,10 +9,7 @@ jest.mock('./embeddings', () => {
 });
 
 import type { Database } from '@eduagent/database';
-import {
-  buildSummaryEmbeddingText,
-  purgeSessionTranscript,
-} from './transcript-purge';
+import { purgeSessionTranscript } from './transcript-purge';
 
 function createPurgeDb(summaryRow: Record<string, unknown> | null) {
   const deleteEmbeddingsReturning = jest
@@ -72,26 +69,9 @@ function createPurgeDb(summaryRow: Record<string, unknown> | null) {
   };
 }
 
-describe('buildSummaryEmbeddingText', () => {
-  it('includes the summary narrative, anchors, recap, and re-entry hint', () => {
-    const text = buildSummaryEmbeddingText(
-      {
-        narrative:
-          'Worked through fractions and connected equivalent forms with pictures.',
-        topicsCovered: ['fractions', 'equivalent fractions'],
-        sessionState: 'completed',
-        reEntryRecommendation:
-          'Resume with one more equivalent-fractions example and ask for the rule aloud.',
-      },
-      'You connected pictures to the fraction rule.',
-    );
-
-    expect(text).toContain('Narrative: Worked through fractions');
-    expect(text).toContain('Topics: fractions, equivalent fractions');
-    expect(text).toContain('Learner recap: You connected pictures');
-    expect(text).toContain('Resume here: Resume with one more');
-  });
-});
+// [WI-3141] buildSummaryEmbeddingText moved to services/session-embedding-content.ts
+// (the initial embed writes the same text now, not just the purge rewrite).
+// Its unit tests moved with it — see session-embedding-content.test.ts.
 
 describe('purgeSessionTranscript', () => {
   beforeEach(() => {
