@@ -1,0 +1,18 @@
+{
+  "pageId": "3af8bce9-1f7c-8172-a465-c61663573f8e",
+  "id": "WI-2993",
+  "name": "Reconcile the landed billing grace-period date-bomb repair",
+  "description": "Record and independently reconcile PR #2803, which repaired a repo-wide API integration time bomb after its literal grace deadline expired on 2026-08-01; binding ruling msg_8dbac7af5ee4 excludes this work from BID-19.",
+  "acceptanceCriteria": "Reconciliation item for already-landed work (retyped Bug→Task at triage: the defect was repaired by PR #2803 before capture; the remaining work is provenance + independent verification, not a fix). Context: a repo-wide API integration time bomb — a literal UTC grace deadline in the billing grace-period tests — expired 2026-08-01 and PR #2803 repaired it (test-only change); binding ruling msg_8dbac7af5ee4 excludes this from BID-19. AC: (1) independently verify the repair against the current main: the Flag-ON integration gate passes after the former deadline, and the repaired tests no longer encode a fixed future date that will re-expire (state HOW the new shape avoids recurrence — relative dates, frozen clock, or equivalent); (2) sibling sweep: search the integration/test fixtures for any OTHER literal future-dated deadline of the same class and list findings (capture real ones as incidental items through the sanctioned path — the value is having searched); (3) lifecycle provenance recorded: this item's completion ties PR #2803's merge commit into Cosmo per the landed-work provenance practice, so the repair stops being untracked; (4) the BID-19 exclusion ruling is cited in the completion summary. Done: the repair is verified, provenanced, and its date-bomb class is known to be (or not be) unique.",
+  "riskImpact": "Before the repair, every API pull request could fail the required Flag-ON integration gate after the fixed UTC deadline expired. The landed change is test-only; the remaining risk is untracked lifecycle provenance if it is not reconciled.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}
