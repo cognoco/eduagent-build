@@ -4,7 +4,11 @@ import type {
   QualityIssue,
   Scenario,
 } from './types';
-import { PROFILES, type EvalProfile } from '../fixtures/profiles';
+import {
+  PROFILES,
+  isScenarioOnlyProfile,
+  type EvalProfile,
+} from '../fixtures/profiles';
 import { writeSnapshot } from './snapshot';
 import {
   aggregateFlowSamples,
@@ -312,6 +316,19 @@ export async function runHarness(
       // produce one item per scenario. `scenarioId` is undefined in the
       // anonymous case so snapshot paths stay backwards-compatible.
       const items: Array<{ scenarioId?: string; input: unknown }> = [];
+      // [WI-2462] A scenario-only profile runs ONLY in a flow that pins
+      // profiles by id. Note this is NOT "the flow has enumerateScenarios" —
+      // most flows enumerate for EVERY profile, so the flow has to declare it.
+      // Recorded as a skip rather than dropped silently, so a profile nothing
+      // pins shows up in the summary instead of vanishing.
+      if (isScenarioOnlyProfile(profile) && flow.pinsProfilesById !== true) {
+        summary.skipped.push({
+          flowId: flow.id,
+          profileId: profile.id,
+          reason: 'scenario-only profile not pinned by this flow',
+        });
+        continue;
+      }
       if (flow.enumerateScenarios) {
         const scenarios = flow.enumerateScenarios(profile);
         if (!scenarios || scenarios.length === 0) {

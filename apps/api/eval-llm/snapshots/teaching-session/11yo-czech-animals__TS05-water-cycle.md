@@ -242,6 +242,6 @@ I know water goes up into the sky and then falls back as rain, but I don't reall
 - Teaching-session scenario: TS05-water-cycle
 - Topic: The Water Cycle (Koloběh Vody)
 - Starting gap: You know that 'water goes up and comes back down as rain' but you are fuzzy on the details. You think clouds might be made of water vapor (a gas you can't see) floating up from rivers — not liquid water droplets. You are not sure what evaporation really is and confuse water vapor with visible steam or mist.
-- Audience scope: PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — says nothing about under-10 or adult teaching
+- Audience scope: PRE-SCREEN ONLY — 5 scenarios across ages 11–17 plus a single 34yo adult (1 scenario); adult teaching quality rests on that one case
 - Tier 1 shows only the OPENING mentor turn. Tier 2 runs up to 8 mentor turns against a stuck-unless-taught simulated learner, then an unaided transfer probe, then an LLM judge.
 - Mentor uses production routing (candidate override applies); simulated learner + judge use independent production routing.

@@ -1,4 +1,6 @@
+import { isScenarioOnlyProfile } from '../fixtures/profiles';
 import {
+  countEnvelopeFlowSamples,
   deriveEnvelopeBudget,
   deriveEnvelopeProviderDemandFromMatrix,
   resolveEnvelopeLiveCallCap,
@@ -193,5 +195,84 @@ describe('resolveEnvelopeLiveCallCap', () => {
         { providerCalls: 376 },
       ),
     ).toBe(376);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2462] scenario-only profiles stay out of the global cross-product.
+//
+// The runner fans every flow across every profile, so adding a profile for one
+// pinned scenario used to add a sample to every default-prompt flow as well —
+// moving other flows' counts, which AC-3 forbids. `scenarioOnly` opts a profile
+// out. budget.ts re-reads the flag STRUCTURALLY (it carries no imports by
+// convention), so the drift test below is what stops that second copy from
+// disagreeing with the canonical predicate.
+// ---------------------------------------------------------------------------
+
+describe('scenarioOnly profiles (WI-2462)', () => {
+  const defaultPromptFlow: EnvelopeMatrixFlow = {
+    id: 'default-prompt-flow',
+    emitsEnvelope: true,
+    buildPromptInput: () => ({}),
+  };
+
+  const pinningFlow: EnvelopeMatrixFlow = {
+    id: 'pinning-flow',
+    emitsEnvelope: true,
+    pinsProfilesById: true,
+    buildPromptInput: () => null,
+    enumerateScenarios: (profile: unknown) =>
+      (profile as { id?: string }).id === 'pinned'
+        ? [{ scenarioId: 'S1', input: {} }]
+        : null,
+  };
+
+  const ordinary = { id: 'ordinary' };
+  const pinned = { id: 'pinned', scenarioOnly: true };
+
+  it('does not count a scenario-only profile in a default-prompt flow', () => {
+    // The whole point: adding `pinned` must not move this flow's count.
+    expect(countEnvelopeFlowSamples(defaultPromptFlow, [ordinary])).toBe(1);
+    expect(
+      countEnvelopeFlowSamples(defaultPromptFlow, [ordinary, pinned]),
+    ).toBe(1);
+  });
+
+  it('still counts a scenario-only profile in a flow that pins it', () => {
+    // Opting out of the cross-product must not opt it out of its own scenario,
+    // or the coverage it was added for silently disappears.
+    expect(countEnvelopeFlowSamples(pinningFlow, [ordinary, pinned])).toBe(1);
+  });
+
+  it('leaves ordinary profiles in the cross-product (guard is narrowing only)', () => {
+    expect(
+      countEnvelopeFlowSamples(defaultPromptFlow, [ordinary, { id: 'other' }]),
+    ).toBe(2);
+  });
+
+  it("budget.ts's structural read agrees with the canonical predicate", () => {
+    // Drift guard. budget.ts cannot import isScenarioOnlyProfile, so this
+    // asserts the two decide identically across the shapes that reach them —
+    // a disagreement would make the preflight estimate and the real run
+    // disagree, and the live gate would truncate or under-report coverage.
+    const cases: unknown[] = [
+      ordinary,
+      pinned,
+      { id: 'explicit-false', scenarioOnly: false },
+      { id: 'truthy-not-true', scenarioOnly: 1 },
+      null,
+      undefined,
+      {},
+    ];
+    for (const candidate of cases) {
+      const canonical = isScenarioOnlyProfile(candidate);
+      const structural =
+        (candidate as { scenarioOnly?: unknown } | null | undefined)
+          ?.scenarioOnly === true;
+      expect({ candidate, decision: structural }).toEqual({
+        candidate,
+        decision: canonical,
+      });
+    }
   });
 });

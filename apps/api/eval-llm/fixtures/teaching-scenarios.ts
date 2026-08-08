@@ -1,12 +1,23 @@
 // ---------------------------------------------------------------------------
 // Eval-LLM — Teaching-Session Scenario Fixtures
 //
-// Five scenarios spanning the pre-teen/teen profile set (11–17yo). Each pins
-// a real EvalProfile.id so the harness can build an age-aware ExchangeContext.
+// Six scenarios: five across the pre-teen/teen profile set (11–17yo) and one
+// adult (34yo, TS06 — WI-2462). Each pins a real EvalProfile.id so the harness
+// can build an age-aware ExchangeContext.
 //
-// SCOPE LABEL — must appear on every artifact that uses these scenarios:
-// PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — says nothing about under-10
-// or adult teaching quality. Authoring under-10 + adult scenarios is T13.
+// SCOPE LABEL — must appear on every artifact that uses these scenarios; see
+// SCENARIO_BAND_LABEL below. It is not decoration: it is stamped into every
+// snapshot and printed with the results, so it must describe what the evidence
+// actually covers. Keep it in step with the fixture set — a stale label makes
+// every artifact overclaim.
+//
+// NO UNDER-13 COVERAGE, AND THAT IS DELIBERATE. PROFILE_MINIMUM_AGE is 13
+// (packages/schemas/src/age.ts) — under-13 is the sub-COPPA band, blocked
+// fail-closed at profile creation, and the privacy publication manifest
+// records that under-13 cannot register in any country. Coverage for a cohort
+// the product refuses to create would read as assurance while describing
+// nothing real, so it is out of scope here rather than merely unwritten.
+// (The 11yo and 12yo profiles predate the 13 floor — see WI-2462's notes.)
 // ---------------------------------------------------------------------------
 
 import type { EvalProfile } from './profiles';
@@ -42,10 +53,11 @@ export interface TeachingScenario {
 // ---------------------------------------------------------------------------
 
 export const SCENARIO_BAND_LABEL =
-  'PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — says nothing about under-10 or adult teaching';
+  'PRE-SCREEN ONLY — 5 scenarios across ages 11–17 plus a single 34yo adult (1 scenario); adult teaching quality rests on that one case';
 
 // ---------------------------------------------------------------------------
-// Scenario fixtures — five, one per subject family + one non-English band
+// Scenario fixtures — five across 11–17 (one per subject family + one
+// non-English band), plus one adult
 // ---------------------------------------------------------------------------
 
 const TEACHING_SCENARIOS: TeachingScenario[] = [
@@ -139,6 +151,28 @@ const TEACHING_SCENARIOS: TeachingScenario[] = [
       'Using only what was explained to you in this conversation: what are clouds actually made of, and how did the water get up there to form them?',
     transferRubric:
       'Correct answer must state: (1) clouds are made of tiny liquid water droplets — NOT water vapor or mist; (2) liquid water from oceans/lakes/rivers evaporated (turned to vapor) when heated by the Sun, rose into the atmosphere, and cooled — which caused condensation into droplets that form clouds. Must distinguish evaporation (liquid → invisible gas) from the visible cloud (liquid droplets).',
+  },
+
+  // TS06 — Mathematics / Statistics (34yo adult, English, EU) — RESIST SCENARIO
+  // WI-2462: the first adult (18+) case. Distinct from TS02 in more than age —
+  // the learner argues from lived experience rather than deferring, so it
+  // exercises whether the mentor teaches an adult as a capable peer instead of
+  // falling back on the pacing and framing that suit an adolescent.
+  {
+    id: 'TS06-base-rate-screening',
+    profileId: '34yo-adult-statistics',
+    subjectName: 'Mathematics',
+    topicTitle: 'Base Rates and What a Positive Screening Result Means',
+    topicDescription:
+      "A test's accuracy and the chance that a positive result is correct are two different things, and for a rare condition they diverge sharply. Suppose a condition affects 1 in 1,000 people, and a screening test correctly flags 99% of people who have it (sensitivity) and wrongly flags 5% of people who do not (false-positive rate). Take 100,000 people: 100 have the condition and about 99 of them test positive. The other 99,900 do not have it, and 5% of them — about 4,995 people — also test positive. So roughly 5,094 positive results appear, of which only about 99 are correct: a positive result means roughly a 2% chance of actually having the condition. The driver is the BASE RATE: when a condition is rare, the far larger healthy group produces more false positives than the small affected group produces true positives, even with a seemingly accurate test. The quantity people want (the chance of disease given a positive result) is not the quantity the test reports (the chance of a positive result given disease); swapping the two is the inversion error.",
+    startingGap:
+      "You believe that a test described as '99% accurate' means a positive result gives you a 99% chance of having the condition. You have seen this framing in real reporting and used it in your own work, so you are not shy about it. Push back at least twice: first insist the accuracy figure IS the answer, then — when the tutor separates the two conditional probabilities — object that this sounds like a statistical technicality that would not survive contact with a real clinic. Only accept once the tutor walks concrete counts of people through the arithmetic rather than restating the rule. You are an adult professional: you argue from experience, you do not simply defer, and vague reassurance makes you more sceptical rather than less.",
+    learnerOpening:
+      "I keep seeing screening tests described as 99% accurate. So if I test positive, that's a 99% chance I actually have the thing, right? That's how I've been reading these studies at work, and nobody has corrected me yet.",
+    transferProbe:
+      'Using only what was explained in this conversation: a different condition affects about 1 in 10,000 people, and its test wrongly flags 1% of healthy people. Someone tests positive. Roughly what are the chances they actually have it — high or low — and what is doing the work in that answer?',
+    transferRubric:
+      'Correct answer: the chance is LOW — on the order of 1% (roughly 1 true positive against about 100 false positives per 10,000 people; anything conveying "around one in a hundred" or "very low" is correct). The explanation must attribute this to the BASE RATE: the condition is rare, so the huge healthy group generates far more false positives than the tiny affected group generates true positives. Credit the point that the test\'s accuracy figure answers a different question (positive given disease) than the one asked (disease given positive). The answer must NOT report a high probability, and must NOT rest on the 1% false-positive rate alone without reference to rarity.',
   },
 ];
 

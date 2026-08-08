@@ -242,6 +242,6 @@ Wait — ½ of ⅓... doesn't 'of' mean you add them together? Or like, shouldn'
 - Teaching-session scenario: TS02-fractions-of-fractions
 - Topic: Multiplying Fractions (Fractions of Fractions)
 - Starting gap: You believe that 'of' in a math problem means to add (like 'a slice of pie' sounds additive to you), and that multiplication always makes numbers bigger — 'times means more.' You are stubborn about this. The first time the tutor explains the correct rule, you don't buy it — you think they might be confused or oversimplifying. Push back once or twice with your original belief or a related misunderstanding before you accept the explanation. Only accept if the tutor gives a clear, concrete example you can picture (e.g. taking half of a chocolate bar that is already one-third of a full bar).
-- Audience scope: PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — says nothing about under-10 or adult teaching
+- Audience scope: PRE-SCREEN ONLY — 5 scenarios across ages 11–17 plus a single 34yo adult (1 scenario); adult teaching quality rests on that one case
 - Tier 1 shows only the OPENING mentor turn. Tier 2 runs up to 8 mentor turns against a stuck-unless-taught simulated learner, then an unaided transfer probe, then an LLM judge.
 - Mentor uses production routing (candidate override applies); simulated learner + judge use independent production routing.

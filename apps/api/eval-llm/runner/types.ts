@@ -178,4 +178,17 @@ export interface FlowDefinition<Input = unknown> {
    * distribution drift.
    */
   emitsEnvelope?: boolean;
+
+  /**
+   * [WI-2462] True when this flow selects its OWN profiles by profileId — its
+   * scenarios name the profile they apply to — rather than being fanned across
+   * every profile in PROFILES. Only such a flow runs a `scenarioOnly` profile
+   * (see `EvalProfile.scenarioOnly`).
+   *
+   * Note this is NOT implied by having `enumerateScenarios`: most enumerating
+   * flows produce scenarios for EVERY profile, so pinning has to be declared
+   * rather than inferred from shape. Mirrored structurally on
+   * `EnvelopeMatrixFlow` in `runner/budget.ts`, which carries no imports.
+   */
+  pinsProfilesById?: boolean;
 }

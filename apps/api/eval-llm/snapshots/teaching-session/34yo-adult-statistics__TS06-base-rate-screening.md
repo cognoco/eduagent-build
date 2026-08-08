@@ -1,53 +1,53 @@
-# Teaching Session (multi-turn, transfer probe, LLM-judged) × 13yo-spanish-beginner · TS03-past-tense-trigger
+# Teaching Session (multi-turn, transfer probe, LLM-judged) × 34yo-adult-statistics · TS06-base-rate-screening
 
 > **Flow source:** `apps/api/src/services/exchanges.ts:buildSystemPrompt`
-> **Profile:** 13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
-> **Scenario:** `TS03-past-tense-trigger`
+> **Profile:** 34-year-old EU adult, English native, career-switching into data analysis, brings real-world experience and pushes back on hand-waving
+> **Scenario:** `TS06-base-rate-screening`
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 13 years (birth year 2013) |
+| Age | 34 years (birth year 1992) |
 | Native language | en |
 | Conversation language | en |
 | Location | EU |
 | Pronouns | she/her |
-| Interests | horses (free time), showjumping (free time), eventing (free time), nature photography (free time) |
-| Library topics | Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography |
-| CEFR | A2 |
-| Target language | es |
-| Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
-| Strengths | Spanish pronunciation (Spanish) |
-| Preferred explanations | step-by-step, examples |
-| Pace | thorough |
-| Analogy domain | nature |
+| Interests | data analysis (both), public health reporting (both), long-distance running (free time), cooking (free time) |
+| Library topics | descriptive statistics, probability basics, spreadsheet modelling, reading medical studies |
+| CEFR | — |
+| Target language | — |
+| Struggles | conditional probability (statistics); interpreting p-values (statistics) |
+| Strengths | spreadsheet formulas (statistics); summarising findings in writing (writing) |
+| Preferred explanations | examples, step-by-step |
+| Pace | quick |
+| Analogy domain | cooking |
 
 ## Builder input
 
 ```json
 {
-  "scenarioId": "TS03-past-tense-trigger",
-  "topicTitle": "Choosing Between Preterite and Imperfect in Spanish",
-  "startingGap": "You pick Spanish past tenses based purely on how finished the sentence feels to you, rather than applying a rule. You often confuse the two: you reach for the imperfect for finished actions because it sounds 'more past-y' to you, and you use preterite for habitual things. You don't yet know the completed-action vs. habit/state rule.",
-  "learnerOpening": "I never know which past tense to use. I just kind of feel which one sounds more past? Like 'comía' sounds really in-the-past to me so I use that a lot. Is that the right way to think about it?",
-  "profileId": "13yo-spanish-beginner",
+  "scenarioId": "TS06-base-rate-screening",
+  "topicTitle": "Base Rates and What a Positive Screening Result Means",
+  "startingGap": "You believe that a test described as '99% accurate' means a positive result gives you a 99% chance of having the condition. You have seen this framing in real reporting and used it in your own work, so you are not shy about it. Push back at least twice: first insist the accuracy figure IS the answer, then — when the tutor separates the two conditional probabilities — object tha… [+358 chars]",
+  "learnerOpening": "I keep seeing screening tests described as 99% accurate. So if I test positive, that's a 99% chance I actually have the thing, right? That's how I've been reading these studies at work, and nobody has corrected me yet.",
+  "profileId": "34yo-adult-statistics",
   "context": {
-    "sessionId": "eval-ts-TS03-past-tense-trigger",
-    "profileId": "eval-profile-13yo-spanish-beginner",
-    "subjectName": "Languages",
-    "topicTitle": "Choosing Between Preterite and Imperfect in Spanish",
-    "topicDescription": "Spanish has two main past tenses. The preterite (pretérito indefinido) describes completed, one-time actions with a clear endpoint: 'Ayer comí pasta' (Yesterday I ate pasta — done). The imperfect (pretérito imperfecto) describes habits, ongoing background states, or repeated actions in the past: 'Comía pasta' (I used to eat pasta / I was eating pasta). The key question is: does… [+206 chars]",
+    "sessionId": "eval-ts-TS06-base-rate-screening",
+    "profileId": "eval-profile-34yo-adult-statistics",
+    "subjectName": "Mathematics",
+    "topicTitle": "Base Rates and What a Positive Screening Result Means",
+    "topicDescription": "A test's accuracy and the chance that a positive result is correct are two different things, and for a rare condition they diverge sharply. Suppose a condition affects 1 in 1,000 people, and a screening test correctly flags 99% of people who have it (sensitivity) and wrongly flags 5% of people who do not (false-positive rate). Take 100,000 people: 100 have the condition and abo… [+681 chars]",
     "sessionType": "learning",
     "escalationRung": 2,
     "exchangeHistory": [],
-    "birthYear": 2013,
+    "birthYear": 1992,
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
     "conversationLanguage": "en"
   },
-  "learnerAge": 13
+  "learnerAge": 34
 }
 ```
 
@@ -111,11 +111,11 @@ NO-RECALL RECOVERY — NON-NEGOTIABLE RULES:
 - Switch immediately to support: give one concrete cue, re-teach the smallest missing idea, or show a short example. Then ask one easier check if needed.
 - If the learner replies only "ok", "yes", "sure", or similar after you offered to review, treat it as consent to continue the review; do not demand another unsupported recall answer.
 
-Communication style: Friendly, curious, and concrete.
-Talk to an early teen — short sentences, vivid everyday examples, and one idea at a time.
-Avoid abstract jargon; when a technical term is unavoidable, define it once in plain words.
-Keep the tone warm but calm — no performative enthusiasm, no baby talk.
-When they get something right, a brief "yes, that's it" is plenty.
+Communication style: Crisp, professional, respectful of existing knowledge.
+Assume the learner is a capable adult who chose to study this — skip motivational framing.
+Be concise. Define technical terms once, then use them as first-class vocabulary.
+Draw on analogies from work, life, and broader experience, not school or classrooms.
+Never patronise. No emoji, no cheerleading, no "great question!" — just clear teaching.
 
 Default tone:
 Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
@@ -123,10 +123,10 @@ Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
 
-Current topic: <topic_title>Choosing Between Preterite and Imperfect in Spanish</topic_title>
-Topic description: <topic_description>Spanish has two main past tenses. The preterite (pretérito indefinido) describes completed, one-time actions with a clear endpoint: 'Ayer comí pasta' (Yesterday I ate pasta — done). The imperfect (pretérito imperfecto) describes habits, ongoing background states, or repeated actions in the past: 'Comía pasta' (I used to eat pasta / I was eating pasta). The key question is: does the action have a defined endpoint (preterite) or is it a state / background / habit (imperfect)? Signal words: ayer/un</topic_description>
+Current topic: <topic_title>Base Rates and What a Positive Screening Result Means</topic_title>
+Topic description: <topic_description>A test's accuracy and the chance that a positive result is correct are two different things, and for a rare condition they diverge sharply. Suppose a condition affects 1 in 1,000 people, and a screening test correctly flags 99% of people who have it (sensitivity) and wrongly flags 5% of people who do not (false-positive rate). Take 100,000 people: 100 have the condition and about 99 of them test positive. The other 99,900 do not have it, and 5% of them — about 4,995 people — also test positive. </topic_description>
 
-Subject: <subject_name>Languages</subject_name>
+Subject: <subject_name>Mathematics</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
@@ -167,7 +167,7 @@ Only ask this ONCE per session — after asking once (whether the learner agrees
 At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and set `ui_hints.note_prompt.show` to true AND `ui_hints.note_prompt.post_session` to true.
 
 Encouragement + Prohibitions:
-When the learner makes a correct connection or shows understanding, name what they got right: "You just linked respiration back to the energy cycle — that's the key insight." When they persist through difficulty, acknowledge the effort specifically: "You stuck with the equation even when it got confusing — that patience matters." Keep it real — if you can't point to something specific the learner did, say nothing. Never generic.
+Acknowledge strong reasoning or unexpected connections briefly: "Good catch", "That's a sharp connection", "Exactly right, and here's why that matters..." Deliver it and move forward — don't linger on praise. Never patronize.
 - Do NOT expand into related topics the learner did not ask about. Stick to the current concept.
 - Avoid generic praise words even inside longer sentences. Do not describe the learner, answer, effort, or work as "great", "amazing", "awesome", "fantastic", or "excellent". Name the specific reasoning instead.
 - Avoid overheated intensifiers such as "super important", "super useful", "definitely", "absolutely", "crucial", "very important", "really important", or "incredibly". Use plain concrete wording that explains why the idea matters.
@@ -188,8 +188,8 @@ FINAL OUTPUT FILTER:
 - Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.
 
 <source_pack>
-<source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="I never know which past tense to use. I just kind of feel which one sounds more past? Like &apos;comía&apos; sounds really in-the-past to me so I use that a lot. Is that the right way to think about it?"/>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Choosing Between Preterite and Imperfect in Spanish: Spanish has two main past tenses. The preterite (pretérito indefinido) describes completed, one-time actions with a clear endpoint: &apos;Ayer comí pasta&apos; (Yesterday I ate pasta — done). The imperfect (pretérito imperfecto) describes habits, ongoing background states, or repeated actions in the past: &apos;Comía pa..."/>
+<source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="I keep seeing screening tests described as 99% accurate. So if I test positive, that&apos;s a 99% chance I actually have the thing, right? That&apos;s how I&apos;ve been reading these studies at work, and nobody has corrected me yet."/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Base Rates and What a Positive Screening Result Means: A test&apos;s accuracy and the chance that a positive result is correct are two different things, and for a rare condition they diverge sharply. Suppose a condition affects 1 in 1,000 people, and a screening test correctly flags 99% of people who have it (sensitivity) and wrongly flags 5% of people who do no..."/>
 <source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims."/>
 </source_pack>
 
@@ -234,14 +234,14 @@ Signal guidance:
 ## Generated prompt — user
 
 ```
-I never know which past tense to use. I just kind of feel which one sounds more past? Like 'comía' sounds really in-the-past to me so I use that a lot. Is that the right way to think about it?
+I keep seeing screening tests described as 99% accurate. So if I test positive, that's a 99% chance I actually have the thing, right? That's how I've been reading these studies at work, and nobody has corrected me yet.
 ```
 
 ## Builder notes
 
-- Teaching-session scenario: TS03-past-tense-trigger
-- Topic: Choosing Between Preterite and Imperfect in Spanish
-- Starting gap: You pick Spanish past tenses based purely on how finished the sentence feels to you, rather than applying a rule. You often confuse the two: you reach for the imperfect for finished actions because it sounds 'more past-y' to you, and you use preterite for habitual things. You don't yet know the completed-action vs. habit/state rule.
+- Teaching-session scenario: TS06-base-rate-screening
+- Topic: Base Rates and What a Positive Screening Result Means
+- Starting gap: You believe that a test described as '99% accurate' means a positive result gives you a 99% chance of having the condition. You have seen this framing in real reporting and used it in your own work, so you are not shy about it. Push back at least twice: first insist the accuracy figure IS the answer, then — when the tutor separates the two conditional probabilities — object that this sounds like a statistical technicality that would not survive contact with a real clinic. Only accept once the tutor walks concrete counts of people through the arithmetic rather than restating the rule. You are an adult professional: you argue from experience, you do not simply defer, and vague reassurance makes you more sceptical rather than less.
 - Audience scope: PRE-SCREEN ONLY — 5 scenarios across ages 11–17 plus a single 34yo adult (1 scenario); adult teaching quality rests on that one case
 - Tier 1 shows only the OPENING mentor turn. Tier 2 runs up to 8 mentor turns against a stuck-unless-taught simulated learner, then an unaided transfer probe, then an LLM judge.
 - Mentor uses production routing (candidate override applies); simulated learner + judge use independent production routing.

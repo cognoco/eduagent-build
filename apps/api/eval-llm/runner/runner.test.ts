@@ -124,6 +124,85 @@ describe('runHarness scenario fan-out', () => {
   });
 });
 
+// Exercises the skip branch at its real call site inside runHarness. The
+// predicate itself is unit-tested in budget.test.ts, but a predicate that is
+// correct in isolation says nothing about whether the harness consults it
+// correctly — a wrong condition here, or a pinning flow that silently drops
+// the profile, would pass every other test in this suite. Uses the real
+// scenario-only fixture rather than a synthetic one so the wiring under test
+// is the wiring that ships.
+describe('runHarness scenario-only profile gating', () => {
+  const SCENARIO_ONLY_PROFILE = '34yo-adult-statistics';
+
+  function makeFlow(
+    id: string,
+    pinsProfilesById?: boolean,
+  ): FlowDefinition<{ scenarioId: string }> {
+    return {
+      id,
+      name: `Flow ${id}`,
+      sourceFile: 'test',
+      ...(pinsProfilesById === undefined ? {} : { pinsProfilesById }),
+      buildPromptInput: () => null,
+      // A pinning flow does its own profile selection inside
+      // enumerateScenarios; the runner only needs to know it pins, via
+      // pinsProfilesById. Returning one scenario for whichever profile it is
+      // handed is enough to prove the profile reached this point at all.
+      enumerateScenarios(): Array<Scenario<{ scenarioId: string }>> {
+        return [{ scenarioId: 'SA', input: { scenarioId: 'SA' } }];
+      },
+      buildPrompt: (input) => ({ system: `prompt for ${input.scenarioId}` }),
+    };
+  }
+
+  async function cleanupFlow(flowId: string): Promise<void> {
+    const dir = path.resolve(__dirname, '..', 'snapshots', flowId);
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup failures
+    }
+  }
+
+  afterEach(async () => {
+    await cleanupFlow('non-pinning-flow');
+    await cleanupFlow('pinning-flow');
+  });
+
+  it('records a skip, and writes nothing, when a flow does not pin profiles', async () => {
+    const summary = await runHarness(
+      [makeFlow('non-pinning-flow') as FlowDefinition],
+      {
+        live: false,
+        profileFilter: new Set([SCENARIO_ONLY_PROFILE]),
+      },
+    );
+
+    expect(summary.skipped).toContainEqual({
+      flowId: 'non-pinning-flow',
+      profileId: SCENARIO_ONLY_PROFILE,
+      reason: 'scenario-only profile not pinned by this flow',
+    });
+    // The skip must be recorded rather than the profile vanishing silently.
+    expect(summary.snapshotsWritten).toBe(0);
+  });
+
+  it('processes the profile normally when the flow pins profiles by id', async () => {
+    const summary = await runHarness(
+      [makeFlow('pinning-flow', true) as FlowDefinition],
+      {
+        live: false,
+        profileFilter: new Set([SCENARIO_ONLY_PROFILE]),
+      },
+    );
+
+    expect(
+      summary.skipped.filter((s) => s.profileId === SCENARIO_ONLY_PROFILE),
+    ).toEqual([]);
+    expect(summary.snapshotsWritten).toBeGreaterThan(0);
+  });
+});
+
 describe('runHarness live budget cap', () => {
   const makeLiveFlow = (calls: {
     count: number;

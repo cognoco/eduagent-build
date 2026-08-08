@@ -242,6 +242,6 @@ The Moon changes shape because Earth's shadow covers part of it — like a slow 
 - Teaching-session scenario: TS01-moon-phases
 - Topic: Why the Moon Has Phases
 - Starting gap: You believe the Moon's phases are caused by Earth's shadow slowly covering and uncovering the Moon, like a gradual eclipse. You do not yet understand that phases come from the Moon's changing position in its orbit around Earth (how much of the sunlit side faces us). You are fairly confident in your eclipse explanation.
-- Audience scope: PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo) — says nothing about under-10 or adult teaching
+- Audience scope: PRE-SCREEN ONLY — 5 scenarios across ages 11–17 plus a single 34yo adult (1 scenario); adult teaching quality rests on that one case
 - Tier 1 shows only the OPENING mentor turn. Tier 2 runs up to 8 mentor turns against a stuck-unless-taught simulated learner, then an unaided transfer probe, then an LLM judge.
 - Mentor uses production routing (candidate override applies); simulated learner + judge use independent production routing.

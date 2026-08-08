@@ -16,6 +16,15 @@ export interface EnvelopeProviderCallContext {
 export interface EnvelopeMatrixFlow {
   id: string;
   emitsEnvelope?: boolean;
+  /**
+   * [WI-2462] True when this flow selects its OWN profiles by profileId (its
+   * scenarios name the profile they apply to) rather than being fanned across
+   * every profile. Only such a flow may run a `scenarioOnly` profile — see
+   * EvalProfile.scenarioOnly. Most flows enumerate scenarios for EVERY
+   * profile, so "has enumerateScenarios" does not imply "pins by id"; that is
+   * why this has to be declared rather than inferred.
+   */
+  pinsProfilesById?: boolean;
   buildPromptInput(profile: unknown): unknown;
   enumerateScenarios?(
     profile: unknown,
@@ -104,6 +113,16 @@ export function countEnvelopeFlowSamples(
   if (!flow.emitsEnvelope) return 0;
   let count = 0;
   for (const profile of profiles) {
+    // [WI-2462] A scenario-only profile runs ONLY in a flow that pins profiles
+    // by id. Read structurally: this file deliberately carries no imports (see
+    // header); the canonical predicate is isScenarioOnlyProfile in
+    // fixtures/profiles.ts and budget.test.ts asserts the two agree.
+    if (
+      (profile as { scenarioOnly?: unknown } | null)?.scenarioOnly === true &&
+      flow.pinsProfilesById !== true
+    ) {
+      continue;
+    }
     if (flow.enumerateScenarios) {
       const scenarios = flow.enumerateScenarios(profile) ?? [];
       count += scenarios.filter(
@@ -149,6 +168,15 @@ export function deriveEnvelopeProviderDemandFromMatrix(
     let outerRunLiveCalls = 0;
     let providerCalls = 0;
     for (const profile of profiles) {
+      // [WI-2462] Same scenario-only rule as countEnvelopeFlowSamples and
+      // runner.ts. This function walks its own loop, so the guard is repeated
+      // here or the demand estimate re-inflates for a profile the run skips.
+      if (
+        (profile as { scenarioOnly?: unknown } | null)?.scenarioOnly === true &&
+        flow.pinsProfilesById !== true
+      ) {
+        continue;
+      }
       if (flow.enumerateScenarios) {
         const scenarios = flow.enumerateScenarios(profile) ?? [];
         for (const scenario of scenarios) {
