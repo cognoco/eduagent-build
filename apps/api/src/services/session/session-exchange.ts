@@ -2689,6 +2689,22 @@ export async function prepareExchangeContext(
     reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
     clientId?: string;
+    /**
+     * [WI-2855] Registers a background promise with the runtime so it survives
+     * response completion. On Cloudflare Workers a pending promise that is
+     * neither awaited nor registered via `executionCtx.waitUntil` can be torn
+     * down once the Response settles.
+     *
+     * This is a service function with no Hono context, so the capability is
+     * threaded in from the route rather than reached for here — the caller
+     * owns the `executionCtx` access and its non-Worker fallback. Threading
+     * mirrors `deps.sendEmptyReplyFallbackEvent` (routes/sessions.ts).
+     *
+     * Absent (tests, non-Worker runtimes, callers that never dispatch): the
+     * background work simply stays detached, which is the pre-WI-2855
+     * behaviour and is harmless off Workers.
+     */
+    registerBackgroundWork?: (promise: Promise<unknown>) => void;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -3103,7 +3119,14 @@ export async function prepareExchangeContext(
     // payload — Inngest persists payloads in its third-party event store.
     // The consumer (ask-silent-classify) rehydrates the learner's persisted
     // user messages from session_events, scoped by profileId.
-    safeSend(
+    // [WI-2855] NOT awaited — the latency argument above still holds — but no
+    // longer merely detached. On Cloudflare Workers an unregistered pending
+    // promise can be torn down once the Response settles, which would lose BOTH
+    // the classification event and safeSend's Sentry escalation, leaving the
+    // session silently unclassified. Registering with executionCtx.waitUntil
+    // keeps the worker alive until it settles and adds NO latency to the
+    // response, so it costs nothing the original comment was protecting.
+    const silentClassificationDispatch = safeSend(
       () =>
         inngest.send({
           name: 'app/ask.classify_silently',
@@ -3124,6 +3147,10 @@ export async function prepareExchangeContext(
         },
       });
     });
+    // The hook owns its own executionCtx access and non-Worker fallback, so a
+    // missing runtime capability can never surface here as a thrown error on
+    // the exchange hot path.
+    options?.registerBackgroundWork?.(silentClassificationDispatch);
   }
 
   const [silentSubjectRows, silentTeachingPref] =
@@ -4290,6 +4317,11 @@ export async function processMessage(
     judgeFrameworkEnabled?: boolean;
     /** [WI-1900] Adult post-display coverage fraction; undefined → launch default. */
     judgeAdultSuitabilitySampling?: number;
+    /**
+     * [WI-2855] Keeps a background dispatch alive past response completion on
+     * Cloudflare Workers. Spread straight through to prepareExchangeContext.
+     */
+    registerBackgroundWork?: (promise: Promise<unknown>) => void;
     judgeEnforcementEnabled?: boolean;
     answerEvaluationEnabled?: boolean;
   },
@@ -4732,6 +4764,11 @@ export async function streamMessage(
     judgeFrameworkEnabled?: boolean;
     /** [WI-1900] Adult post-display coverage fraction; undefined → launch default. */
     judgeAdultSuitabilitySampling?: number;
+    /**
+     * [WI-2855] Keeps a background dispatch alive past response completion on
+     * Cloudflare Workers. Spread straight through to prepareExchangeContext.
+     */
+    registerBackgroundWork?: (promise: Promise<unknown>) => void;
     judgeEnforcementEnabled?: boolean;
     answerEvaluationEnabled?: boolean;
   },

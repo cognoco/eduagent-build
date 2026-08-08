@@ -585,6 +585,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeAdultSuitabilitySampling,
+            // [WI-2855] Keep the ask.classify_silently dispatch alive past
+            // response completion. On Workers an unregistered pending promise
+            // can be torn down once the Response settles, losing both the
+            // Inngest event and safeSend's Sentry escalation. waitUntil adds no
+            // latency. Mirrors routes/books.ts:186-223.
+            registerBackgroundWork: (promise) => {
+              try {
+                c.executionCtx.waitUntil(promise);
+              } catch {
+                // No executionCtx (test / non-Worker runtime). The dispatch
+                // already carries its own .catch and safeSend never rejects, so
+                // discarding the handle cannot surface an unhandled rejection.
+              }
+            },
             judgeEnforcementEnabled,
             answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
@@ -766,6 +780,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeAdultSuitabilitySampling,
+            // [WI-2855] Keep the ask.classify_silently dispatch alive past
+            // response completion. On Workers an unregistered pending promise
+            // can be torn down once the Response settles, losing both the
+            // Inngest event and safeSend's Sentry escalation. waitUntil adds no
+            // latency. Mirrors routes/books.ts:186-223.
+            registerBackgroundWork: (promise) => {
+              try {
+                c.executionCtx.waitUntil(promise);
+              } catch {
+                // No executionCtx (test / non-Worker runtime). The dispatch
+                // already carries its own .catch and safeSend never rejects, so
+                // discarding the handle cannot surface an unhandled rejection.
+              }
+            },
             judgeEnforcementEnabled,
             answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
