@@ -29,6 +29,13 @@ operator-confirmed 2026-08-08). Invoices bill ZWIZZLY AS (org.nr/VAT 811696072MV
 of record is the company regardless of the settling card. Expired cards removed 2026-08-08
 (`2026-08-08-api-org-billing-payment-methods-after-cleanup.png`).
 
+**Migration completion (2026-08-08):** both workers verified on company-org API keys — staging via
+the post-merge deploy secret sync, production via the first green scheduled secret sync (18:47Z,
+immediately after the WI-3124 verifier exception landed). The previously configured key from the
+founder's personal workspace (`sk-…ufEA`, created 18 May 2026) was revoked the same day
+(`2026-08-08-personal-workspace-key-revocation.png` — captures the key identity and the revocation
+dialog). All MentoMate OpenAI traffic now runs and bills under `org-SYWZ…` with the corrected DPA.
+
 **Retention hardening (2026-08-08):** org-level **API call logging = Disabled** — conversation
 storage in the OpenAI dashboard is impossible regardless of per-call parameters (the code uses
 chat completions, `apps/api/src/services/llm/providers/openai.ts`, which never sets `store`; the
