@@ -70,7 +70,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   **Execution start of W1+ remains gated on `WI-530`.** Live state is Cosmo's.
 - **W0 done (2026-06-10):** all 11 patch-now defects shipped — `WI-549`/`WI-550`
   Closed/Done (PRs #817/#818) and `WI-551` Closed/Done (`c5c9b39bb`). Baseline
-  reset `WI-569` executed + PR #845 merged (Reviewing).
+  reset `WI-569` executed + PR #845 merged (current Stage per Cosmo).
 - **Execution state (2026-06-12, post WI-586 plan-phase stop):** **ALL WAVES
   CLOSED — W0–W4** (every unit WI-549…584 Closed/Done); gates **G2 + G3 + G4
   FIRED**. Caveat discovered at the tail: the waves built the new model +
@@ -137,7 +137,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 - **N.0 routing (Phase N, 2026-06-09):** the audit `agent-instructions` doc-findings
   (F-037/038/039/040/041/042/045/046, F-113/114) were ruled to HH / PRG-03 (not
   Stream 2), all non-blocking → default-defer.
-- **WI-587 — RULED + EXECUTED (2026-06-11), now `Stage=Reviewing`:** the 19
+- **WI-587 — RULED + EXECUTED (2026-06-11); current Stage per Cosmo:** the 19
   residual `WI-387` memory-triage dispositions (10 user-KEEPs · 8
   product/user/mixed REVISEs · 1 CONFLICT — `feedback_never_lock_topics` vs the
   PRD FR119-vs-FR124 self-contradiction). **All 19 ruled by PM 2026-06-11** and
@@ -242,9 +242,10 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   (v2-only, verified; pre-launch/empty → 0-row blast radius). **WI-765 (enumeration) / WI-586
   (convergence runbook) / WI-828 (P5 — #11 drop) Closed**; soak-fix batch WI-821/824/826 Closed. **G5
   fired.** Post-drop cleanup in flight: **WI-805** (drop legacy `subscriptions` + ~18-site billing
-  sweep) + **WI-814** (staging reseed) Executing; **WI-779** (remove `IDENTITY_V2_ENABLED` + legacy
-  twins) + **WI-817** (flag-on lane green + make-required) Blocked-by WI-805 (wired 06-18); **WI-827**
-  folded as Duplicate → WI-779. **Not yet graduated** — terminal cleanup pending.
+  sweep) + **WI-814** (staging reseed) — current Stage per Cosmo; **WI-779** (remove
+  `IDENTITY_V2_ENABLED` + legacy twins) gated behind WI-805; **WI-817** (flag-on lane green +
+  make-required) — current Stage per Cosmo; **WI-827** folded as Duplicate → WI-779. **Not yet
+  graduated** — terminal cleanup pending.
 - **Activate-when:** — (active; cutover landed, terminal cleanup pending)
 
 ### PRG-18 · Flow Remediation — `active` (2026-06-18)
@@ -593,7 +594,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 1 | **PRG-12** l10n-a11y-mobile | ✓ **GRADUATED 06-12** — 8/8 WPs closed in ~1.5 days; ratchet baseline 361 → 12 |
 | 2 | **PRG-14** agent-instructions (+CI/Platform fold) | light thread (skill-description + sync fixes) **now**; skill-building after PRG-03 B4 |
 | 3 | **PRG-02** tail — quick-land batch | HH PR merged / `WI-530` closes; then batch the parked residue (`WI-538`/`543`/`561`/`457`–`460`/`534`…) |
-| 4 | **PRG-03** `WI-587` memory dispositions | ✓ **RULED + EXECUTED 06-11** — all 19 landed on `main` (`7cc8a9a8d`); WI-587 now **Reviewing**; only a manual `/cosmo:review` close remains (verified landed 06-13) |
+| 4 | **PRG-03** `WI-587` memory dispositions | ✓ **RULED + EXECUTED 06-11** — all 19 landed on `main` (`7cc8a9a8d`); WI-587's current Stage is per Cosmo (verified landed 06-13) |
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✓ **ACTIVATED 06-13** — 27 findings sliced into WI-698…704 (5 WP + 2 Item); slice scan 27/27 LIVE + 27/27 CLEAN (parallel-safe with the IF cutover); shepherd **SPAWNED 06-13** (Opus/medium + Sonnet executors) |
@@ -602,7 +603,7 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
 | 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
-| 13 | **PRG-06** Identity Cutover | ✓ **CUTOVER LANDED 06-18** — #8 flip + §3 repoint + #11 drop on prod (v2-only); WI-765/586/828 (incl. P5) Closed; soak batch WI-821/824/826 Closed. Terminal cleanup: WI-805 (drop legacy subscriptions) + WI-814 (staging reseed) Executing; WI-779/817 gated behind 805; WI-827 folded (dup). **Not yet graduated** |
+| 13 | **PRG-06** Identity Cutover | ✓ **CUTOVER LANDED 06-18** — #8 flip + §3 repoint + #11 drop on prod (v2-only); WI-765/586/828 (incl. P5) Closed; soak batch WI-821/824/826 Closed. Terminal cleanup: WI-805 (drop legacy subscriptions) + WI-814 (staging reseed) — current Stage per Cosmo; WI-779 gated behind 805; WI-817 — current Stage per Cosmo; WI-827 folded (dup). **Not yet graduated** |
 | 14 | **PRG-18** Flow Remediation | ✓ **STOOD UP 06-18** — WS-20 created; non-identity post-cutover mop-up (flow-revision sweep WI-818/819/820/822/825 + WI-782 moved from WS-18). **Zuzka-executed** (her own ZDX+agents); orchestrator owns ordering/deps; close via autonomous reviewer (TBD). Drop-orthogonal |
 
 Attention budget is evaluated per activation window when a gate clears — it is
@@ -695,9 +696,9 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
   Closed**; soak-fix batch WI-821/824/826 Closed. **G5 ("IF tail done") FIRED** → PRG-20 ungated;
   **PRG-11 Tier 3 newly eligible** (its gate "WI-586 closed + post-flip rescan" — WI-586 now Closed).
   **Post-drop cleanup in flight:** WI-805 (drop legacy `subscriptions` + ~18-site billing sweep) +
-  WI-814 (staging reseed) Executing; WI-779 (remove `IDENTITY_V2_ENABLED` + legacy schema/twins) +
-  WI-817 (flag-on lane green + make-required) **Blocked-by WI-805** (dependency wired 06-18); WI-827
-  (stale flag comment) folded as **Duplicate → WI-779**. PRG-06 **not yet graduated** (terminal
+  WI-814 (staging reseed) — current Stage per Cosmo; WI-779 (remove `IDENTITY_V2_ENABLED` + legacy
+  schema/twins) gated behind WI-805; WI-817 (flag-on lane green + make-required) — current Stage per
+  Cosmo; WI-827 (stale flag comment) folded as **Duplicate → WI-779**. PRG-06 **not yet graduated** (terminal
   cleanup pending). Dashboard regenerated.
 - **2026-06-18 — PRG-18 (Flow Remediation) STOOD UP — new Initiative for non-identity post-cutover mop-up.** Cosmo **Workstream "Flow Remediation"** (WS-20, `3838bce9-1f7c-812d-aa36-caea0b669e76`) created; seeded with the 2026-06-17 flow-revision sweep's non-identity defects (WI-818/819/820/822/825, moved in from unparented-Captured) + **WI-782** (V2-shell S4/S5 visibility-contract rework, moved out of WS-18 — its one non-identity holding; re-home if a V2-shell initiative activates), `Workstream Order` 100–600. **Execution model = NON-Quartet:** Zuzka runs her own ZDX+agents (capture/refine/execute); orchestrator owns workstream-level ordering/dependencies; done-signal = PR-merge-refs-WI; close = autonomous Gate-2 reviewer (operator TBD: ours vs Zuzka's). Tracker `_wip/flow-remediation/execution-tracker.md`. The "ours" v2-read-path bugs (WI-821/823/824/826) stay in PRG-06/WS-18. Dashboard regen pending.
 - **2026-06-15 — PRG-06 (Identity Cutover) STOOD UP — new Initiative ∥ PRG-01 (organization
@@ -884,7 +885,7 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
   Closed by the autonomous reviewer → boundary event "W3 envelope-router
   landed" fired; PRG-15 (errors-api) activation decision is LIVE, held behind
   attention budget (PRG-12 shepherd just spawned and wired the review loop;
-  WI-621/622 Ready). W3 now 5/6 — **G4 hangs on `WI-578` alone** (Executing);
+  WI-621/622 Ready). W3 now 5/6 — **G4 hangs on `WI-578` alone** (current Stage per Cosmo);
   tail `WI-585`/`586` pre-staged Ready.
 - **2026-06-11 (late evening) — PRG-11 moot scan DONE: hypothesis disproven.**
   Verdict over 28 scanned (+2 excluded-deferred F-008/F-100): **3 MOOT**

@@ -3,7 +3,6 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - 'docs/prd.md'
   - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
-  - 'docs/analysis/epics-inputs.md'
   - 'docs/analysis/architecture-inputs.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
   - 'docs/analysis/research/evidence based learning science.md'
@@ -131,7 +130,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 |---------|----------------------|-------|
 | **Theming** | CSS variable layer via NativeWind. One light palette + one dark palette in `lib/design-tokens.ts` (TypeScript, not JSON files) + `lib/theme.ts` (context + hooks). Theme follows system preference by default. The `personaType` database column was removed in Epic 12 — no per-persona theme variants. Components stay completely persona-unaware; use semantic tokens and CSS variables, not persona checks or hardcoded hex colors. Teal primary + lavender secondary (Epic 11). Dark-first default. | All UI |
 | **AI cost management** | Split into two layers: (1) **Metering middleware** calling `decrementQuota()` in `services/billing.ts` — conditional UPDATE via Drizzle ORM (`usedThisMonth < monthlyLimit`), returns remaining balance or rejection. Middleware interprets result: forward to LLM or return quota-exceeded with soft paywall data. Concurrent family usage handled by PostgreSQL row-level locking (`UPDATE ... SET remaining = remaining - 1 WHERE remaining > 0`) — no application-level locking. (2) **LLM orchestration module** in `services/llm/router.ts` — `routeAndCall(messages: ChatMessage[], rung: EscalationRung, options?) → Promise<RouteResult>`. Handles model selection by escalation rung, provider failover, streaming normalization (`routeAndStream` for SSE). Soft ceiling €0.05/session: **monitoring threshold, not a cutoff.** Never interrupt a learning session for cost reasons. Log when sessions exceed €0.05. If >20% of sessions consistently exceed ceiling, tune routing rules (e.g., lower the escalation rung threshold for reasoning models). Surface as a dashboard metric for cost monitoring. The metering middleware tracks per-session cost accumulation but does not enforce a hard stop — the quota system (monthly pool + top-ups) is the actual spending control. | Backend |
-| **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). **Parallel Example templates** cached in database: keyed by `subject + type + difficulty + system_prompt_hash`. System prompt change → hash change → old cache entries naturally bypassed. No explicit invalidation or TTL needed — stale entries are orphaned and can be garbage-collected periodically. No general-purpose prompt cache layer at MVP. | Backend |
+| **Prompt caching** | Provider-level first (Anthropic prompt caching for system prompts — stable per subject/persona combination). No database-backed Parallel Example template cache is built — there is no `system_prompt_hash` column and no prompt-hash cache keying anywhere in `apps/` or `packages/`. No general-purpose prompt cache layer at MVP. | Backend |
 | **Multi-profile data isolation** | **Repository pattern** with automatic scope injection: `createScopedRepository(profileId)` — every query gets `WHERE profile_id = $1` automatically. **Neon RLS** as defense-in-depth, not primary enforcement. Profile ID set via session context, not passed per-request. | Data layer |
 | **Session state management** | **Every exchange, hybrid model.** After each AI response completes, in one transaction: (1) **Append session event** (immutable log): `{ exchange_id, timestamp, user_message, ai_response, model_used, escalation_rung, hints_given, time_to_answer, confidence_signals }`. (2) **Upsert session summary row** (mutable current state): `{ session_id, current_rung, total_exchanges, topics_touched, last_exchange_at }`. Event log gives replay/audit/analytics. Summary row gives fast reads for "where are we." Both in same database transaction — not a separate save step. Cost negligible vs. LLM call; no data loss window. | Backend |
 | **Client recovery** | **Show partial, auto-retry with backoff.** Stream drops mid-token: freeze partial response in chat UI (student may have read it), show inline "reconnecting..." indicator, auto-retry same request at 1s/2s/4s backoff, max 3 attempts. If all fail: persona-appropriate error + manual retry button. Partial response handling: <20% received → replace on retry; >20% → append with visual separator. Never discard what the student already read. | Frontend |
@@ -367,13 +366,12 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 - The server emits one rollout-policy observation—non-negative monotonic revision, enabled value, and revision-bound opaque projection epoch—on every notice-bearing response or mutation result. One actor/profile mobile store orders observations across all surfaces and restart: lower revisions are ignored, disabled wins ties, enabled requires a higher revision after disable, and missing/malformed or failed hydration stays hidden.
 - The MVP has no mentor-notice push or scheduled nudge path. Flag-off stops prompt eligibility, mutations, projections, deep links, and observed cached surfaces while preserving rows for normal retention/deletion and possible re-enable. Fade still runs while off, and reads apply the same 21-day cutoff. Flag and revision change atomically in versioned configuration; this ADR amendment does not authorize changing deployed values, OTA, release, or deployment.
 
-**Prerequisite Graph (Epic 7, v1.1):**
-- New `topic_prerequisites` join table in `packages/database/src/schema/subjects.ts`: `prerequisite_topic_id` → `dependent_topic_id` with `relationship_type` enum (`REQUIRED | RECOMMENDED`)
-- Unique constraint on `(prerequisiteTopicId, dependentTopicId)`, check constraint prevents self-references
-- Cascade delete from `curriculumTopics` — removing a topic removes its edges
-- DAG validation: service-layer cycle detection via topological sort before insert (not a DB constraint — Drizzle doesn't support custom CHECK constraints with subqueries)
-- `curriculumAdaptations` table extended with nullable `prerequisiteContext` JSONB column to log orphaned dependents when a prerequisite is skipped. Zod schema for JSONB shape in `@eduagent/schemas`
-- SM-2 engine (`packages/retention/`) stays purely per-topic math — no graph awareness. Graph-aware flagging (dependent topics at-risk when prerequisite fades) lives in coaching card precomputation job, consuming SM-2 outputs + graph edges
+**Topic Connections (Epic 7):**
+- `topic_connections` table in `packages/database/src/schema/subjects.ts`: `topic_a_id` / `topic_b_id` — symmetric, untyped pairs. No direction, no status, no relationship-type enum
+- Cascade delete from `curriculumTopics` on both sides — removing a topic removes its edges
+- FK indexes on both `topic_a_id` and `topic_b_id` (BUG-393) — the hot-path read resolves edges by either side
+- No prerequisite infrastructure: no `topic_prerequisites` table, no DAG, no cycle detection, no topological sort. Topic ordering is `sortOrder` set by the LLM during generation; the LLM adapts in-session via learning-history context (`docs/specs/epics.md` Epic 7 v3, AD4/AD5)
+- SM-2 engine (`packages/retention/`) stays purely per-topic math — no graph awareness
 
 ### Authentication & Security
 
@@ -455,8 +453,9 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 /v1/consent/*               # GDPR consent flows
 /v1/streaks/*               # Streak tracking
 /v1/retention/*             # Retention data
-/v1/parking-lot/*           # Parking lot topics
-/v1/stripe-webhook          # Stripe webhook handler (dormant — future web billing)
+/v1/sessions/:sessionId/parking-lot                      # Parking lot topics
+/v1/subjects/:subjectId/topics/:topicId/parking-lot      # Parking lot topics
+/v1/stripe/webhook          # Stripe webhook handler (dormant — future web billing)
 /v1/test-seed/*             # E2E test seeding (gated; not public)
 /v1/inngest                 # Inngest webhook — NOT behind Clerk auth.
                             # Verify Inngest signing key, skip JWT middleware.
@@ -664,7 +663,7 @@ The three capabilities are split and never fused. Profile-management authority b
 packages/database/src/schema/
 ├── profiles.ts        # profiles, family_links, consent_states
 ├── sessions.ts        # learning_sessions, session_events, session_summaries
-├── subjects.ts        # curricula, topics, learning_paths, topic_prerequisites (v1.1)
+├── subjects.ts        # curricula, topics, learning_paths, topic_connections
 ├── assessments.ts     # assessments, recall_tests, mastery_scores
 ├── billing.ts         # subscriptions, quota_pools, top_up_credits
 ├── progress.ts        # progress tracking, coaching states
@@ -930,7 +929,7 @@ Both client and server import the same Zod schemas — single source of truth pr
 10. **Typed config object, never raw env reads.** All env vars accessed via typed config validated with Zod at startup (`apps/api/src/config.ts`). Missing var → fail immediately with clear error. Critical on Workers where env comes from `wrangler.toml` bindings.
 11. **Respect dependency direction.** `packages/` never imports from `apps/`. `schemas` never imports from `database`. Circular dependencies are build-breaking errors.
 12. **Named exports only.** No default exports except framework-required (Expo Router pages).
-13. **Cross-service calls through exported interfaces.** `services/exchanges.ts` calling `services/retention.ts` uses the exported function (e.g., `getTopicSchedules(profileId)`), never imports internal helpers. Circular import graphs between services are a refactoring signal — extract shared logic into a new service or push it down to `packages/database`.
+13. **Cross-service calls through exported interfaces.** `services/session/session-exchange.ts` calling `services/retention.ts` uses the exported function (e.g., `getRetentionStatus(state)`), never imports internal helpers. Circular import graphs between services are a refactoring signal — extract shared logic into a new service or push it down to `packages/database`.
 
 **Scoped-read discipline — the two sanctioned `db.select()` alternatives (rule 2's boundary).** Reads must use `createScopedRepository(profileId)` when the query operates on a single scoped table. For queries that join through a parent chain (e.g. `learning_sessions → curriculum_topics → curriculum_books → subjects`), use direct `db.select()` and enforce `profileId` via `subjects.profileId` (or the closest ancestor that owns it) in the WHERE clause — the scoped repo cannot express multi-table joins; the parent-chain pattern is the sanctioned alternative. Existing examples: `services/session/session-topic.ts`, `session-book.ts`, `session-subject.ts`. The second sanctioned deviation, for a **single scoped table**: reads that need ordering and/or a limit the scoped repo's `findFirst`/`findMany` API cannot express — e.g. a strict time-bound (`lt(createdAt, …)`) with `orderBy(desc(createdAt))` and `limit(1)` together to fetch the latest row before a timestamp, or an `orderBy` + `limit` pair with no time-bound at all — use direct `db.select()` with `profileId` pinned in the WHERE clause; it is the inexpressibility, not the specific predicate shape, that makes this the sanctioned pattern rather than a violation. Existing examples: `inngest/functions/review-calibration-grade.ts` (EU-7 grader-failure cap); `apps/api/src/services/now-feed.ts`'s `collectRecapReadyCandidates` and `collectSnapshotReadyCandidates` (WI-1121 derive-on-read projections).
 
@@ -1076,7 +1075,7 @@ eduagent/
 │       │   │   ├── consent.ts             # /v1/consent/* — GDPR consent flows
 │       │   │   ├── streaks.ts             # /v1/streaks/* — streak tracking
 │       │   │   ├── retention.ts           # /v1/retention/* — retention data
-│       │   │   ├── parking-lot.ts         # /v1/parking-lot/* — parking lot topics
+│       │   │   ├── parking-lot.ts         # /v1/…/parking-lot — parking lot topics
 │       │   │   ├── books.ts               # /v1/books/* — LivingBook management
 │       │   │   ├── book-suggestions.ts    # /v1/book-suggestions/*
 │       │   │   ├── celebrations.ts        # /v1/celebrations/*
@@ -1195,7 +1194,7 @@ eduagent/
 │   │   ├── src/
 │   │   │   ├── sessions.ts
 │   │   │   ├── profiles.ts
-│   │   │   ├── subjects.ts         # Curricula, topics, learning paths, topic_prerequisites (v1.1)
+│   │   │   ├── subjects.ts         # Curricula, topics, learning paths, topic_connections
 │   │   │   ├── assessments.ts
 │   │   │   ├── billing.ts          # Subscriptions, quota, top-ups
 │   │   │   ├── auth.ts             # Authentication schemas
@@ -1214,7 +1213,7 @@ eduagent/
 │   │   │   ├── schema/
 │   │   │   │   ├── profiles.ts         # profiles, family_links, consent_states
 │   │   │   │   ├── sessions.ts         # learning_sessions, session_events, session_summaries
-│   │   │   │   ├── subjects.ts         # curricula, topics, learning_paths, topic_prerequisites (v1.1)
+│   │   │   │   ├── subjects.ts         # curricula, topics, learning_paths, topic_connections
 │   │   │   │   ├── assessments.ts      # assessments, recall_tests, mastery_scores
 │   │   │   │   ├── billing.ts          # subscriptions, quota_pools, top_up_credits
 │   │   │   │   ├── progress.ts         # progress tracking, coaching states
@@ -1270,7 +1269,7 @@ eduagent/
 
 The original `lib/` was accumulating too many unrelated concerns. Replaced with purpose-specific directories:
 
-- **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Cross-service calls go through exported function interfaces (e.g., `exchanges.ts` calls `getTopicSchedules()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
+- **`services/`** — Business logic extracted from route handlers, including the `services/llm/` orchestration sub-module. Cross-service calls go through exported function interfaces (e.g., `session/session-exchange.ts` calls `getRetentionStatus()` from `retention.ts`), never internal imports. When the dependency graph between services gets tangled, that's a refactoring signal.
 - **`services/llm/`** — LLM orchestration module, nested inside `services/`. `routeAndCall()` in `router.ts`, exported via `index.ts` barrel. Services import as `from './llm'`. Provider modules are adapters registered by middleware based on config keys; runtime model choice is governed by `MMT-ADR-0014` and the vetted model register, not by provider/rung literals in this architecture document. Also includes a mock provider for testing. Does NOT include embedding generation — embedding is a different call pattern (single vector output, not streaming conversation).
 
 **LLM Response Envelope — Structured Output Contract:**
@@ -1384,7 +1383,7 @@ New prompt template in `services/llm/` for generating plausibly flawed explanati
 - **6 curated domains at launch:** cooking, sports, building, music, nature, gaming.
 - **Single universal list** (not split by persona) — the LLM already adjusts tone via `getAgeVoice()`, so analogies naturally adapt to teen vs adult register.
 - **Domain selection is per-profile, per-subject** — stored alongside existing teaching method preference in `teachingPreferences` table. CRUD via `services/retention-data.ts` (same service that handles `get/set/deleteTeachingPreference`).
-- **Prompt hash keying:** existing `system_prompt_hash` approach handles invalidation automatically when domain changes — a different analogy domain produces a different system prompt, which produces a different hash, which naturally bypasses stale cached prompt templates.
+- **Prompt cache invalidation:** no invalidation mechanism is built — there is no `system_prompt_hash` column and no database-backed prompt-template cache. A domain change alters the assembled system prompt directly; there is no stale cached template to bypass.
 
 **TEACH_BACK verification prompt (Epic 3 extension):**
 
@@ -1470,7 +1469,7 @@ Different concerns: rate limiting protects infrastructure, quota metering enforc
 **i18n — two distinct concerns:**
 
 1. **UI translations**: react-i18next and seven UI locales are implemented (`en`, `de`, `es`, `ja`, `nb`, `pl`, `pt`). Tutor-prose supports three additional languages (`cs`, `fr`, `it`). The current launch-country allowlist is governed separately by `docs/compliance/2026-07-23-13-plus-eea-launch-country-ruling.md`; a UI locale never authorizes a market.
-2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`preferredLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern.
+2. **LLM language preference**: NOT i18n infrastructure. The learner's preferred language is a field on their profile (`conversationLanguage`), injected into the system prompt during prompt assembly in `services/exchanges.ts`. The LLM responds in the learner's language naturally. This is a prompt construction concern, not a translation file concern.
 
 **Test data co-location:**
 
@@ -1496,8 +1495,8 @@ There is no `packages/factory/` package — test factories are co-located with t
 | `/v1/streaks/*` | Streak tracking | — | Clerk JWT |
 | `/v1/retention/*` | Retention data | — | Clerk JWT |
 | `/v1/settings/*` | User settings | — | Clerk JWT |
-| `/v1/parking-lot/*` | Parking lot topics | — | Clerk JWT |
-| `/v1/stripe-webhook` | Stripe event processing | Stripe | Webhook signing secret |
+| `/v1/sessions/:sessionId/parking-lot`, `/v1/subjects/:subjectId/topics/:topicId/parking-lot` | Parking lot topics | — | Clerk JWT |
+| `/v1/stripe/webhook` | Stripe event processing | Stripe | Webhook signing secret |
 | `/v1/inngest` | Event handler dispatch | Inngest platform | Inngest signing key |
 
 **Component Boundaries (Mobile):**
@@ -1546,7 +1545,7 @@ Service Function (business logic)
 | Neon (PostgreSQL) | All services via scoped repository | All services via scoped repository | `packages/database` — single access point |
 | pgvector (in Neon) | `queries/embeddings.ts` — vector similarity search for memory retrieval | `services/embeddings.ts` via Inngest (on session.completed) | Same Neon connection, separate query module |
 | Workers KV | `middleware/auth.ts` (JWKS), `services/metering.ts` (subscription) | RevenueCat webhook handler (subscription sync), Inngest events | KV namespace bindings in wrangler.toml |
-| Client storage | TanStack Query cache (automatic) | TanStack Query cache (automatic), `lib/storage.ts` (offline resilience) | AsyncStorage for persistence across app restarts |
+| Client storage | TanStack Query cache (automatic) | TanStack Query cache (automatic), `lib/query-persister.ts` (offline resilience) | AsyncStorage for persistence across app restarts |
 
 ### Requirements to Structure Mapping
 
@@ -1561,7 +1560,7 @@ Service Function (business logic)
 | **Epic 4: Progress** | `progress.ts`, `streaks.ts`, `dashboard.ts`, `parking-lot.ts` | `progress.ts`, `dashboard.ts`, `notifications.ts`, `streaks.ts`, `xp.ts`, `summaries.ts`, `parking-lot.ts` | `(app)/library.tsx`, `(app)/dashboard.tsx` | `progress.ts` | `schema/progress.ts` |
 | **Epic 5: Subscription** | `billing.ts`, `revenuecat-webhook.ts`, `stripe-webhook.ts` (dormant) | `billing.ts`, `subscription.ts`, `trial.ts`, `metering.ts` | `(app)/subscription.tsx` | `billing.ts` | `schema/billing.ts` |
 | **Epic 6: Language** | `language-progress.ts`, `subjects.ts` (extend) | `language-curriculum.ts`, `language-detect.ts`, `language-prompts.ts`, `language-session-engine.ts`, `language-session-summary.ts` | `(app)/onboarding/language-setup.tsx`, `(app)/more/mentor-language.tsx` | `language.ts` | `schema/language.ts` |
-| **Epic 7: Concept Map (v1.1)** | `curriculum.ts` (extend), `concept-map.ts` | `concept-map.ts` (new), `coaching-cards.ts` (extend) | `concept-map/` (new), `book/` (extend) | `subjects.ts` (extend `topic_prerequisites`), `curriculumAdaptations` (add JSONB column) | `@eduagent/schemas` (prerequisiteContext Zod schema) |
+| **Epic 7: Concept Map (v1.1)** | `curriculum.ts` (extend), `concept-map.ts` | `concept-map.ts` (new), `coaching-cards.ts` (extend) | `concept-map/` (new), `book/` (extend) | `subjects.ts` (extend `topic_connections`), `curriculumAdaptations` (add JSONB column) | `@eduagent/schemas` (prerequisiteContext Zod schema) |
 | **Epic 8: Full Voice Mode** | `sessions.ts` (extend for voice mode flag) | `exchanges.ts` (extend for voice context) | `session/` (extend: voice controls, waveform), `hooks/use-voice.ts` (new) | `sessions.ts` (extend: voice mode schemas) | `schema/sessions.ts` (voice mode flag on sessions) |
 
 **Cross-Cutting Concerns Mapping:**
@@ -1578,8 +1577,8 @@ Service Function (business logic)
 | Persona theming | `lib/design-tokens.ts` (TypeScript tokens), `lib/theme.ts` (context + hooks), root `_layout.tsx` |
 | Error handling | `errors.ts` (API), `common/ErrorBoundary.tsx`, `common/ErrorFallback.tsx` (mobile) |
 | Observability | `services/logger.ts` (structured JSON, Workers Logpush compatible), `sentry.ts`, `middleware/request-logger.ts` (correlation ID) |
-| i18n (UI) | English only for v1.0 — no i18n framework. Deferred to future release. |
-| i18n (LLM) | Profile `preferredLanguage` field → system prompt in `services/exchanges.ts` |
+| i18n (UI) | react-i18next with 7 UI locales (`en` source + `de`/`es`/`ja`/`nb`/`pl`/`pt`), registered in `apps/mobile/src/i18n/index.ts` |
+| i18n (LLM) | Profile `conversationLanguage` field → system prompt in `services/exchanges.ts` |
 | Spaced repetition | `packages/retention/` (math), `services/retention.ts` (orchestration) |
 
 ### Integration Points
@@ -1637,7 +1636,7 @@ Mobile App                          API (Hono on Workers)
    ├─ middleware/profile-scope.ts → scoped repository
    └─ services/exchanges.ts:
        ├─ Loads session context (summary row + recent events + pgvector memory via queries/embeddings.ts)
-       ├─ Assembles prompt (system + context + student message + preferredLanguage)
+       ├─ Assembles prompt (system + context + student message + conversationLanguage)
        ├─ services/llm/router.ts → routes to model by escalation rung → streams response
        └─ SSE stream back to mobile (client renders incrementally)
 
@@ -1735,7 +1734,7 @@ No contradictory decisions found. The Workers → Railway/Fly fallback path is c
 | Epic 4: Progress & Motivation | Library (full fetch), coaching card (KV cache), decay visualization, honest streak, notifications service | DONE |
 | Epic 5: Subscription | RevenueCat webhook-synced (mobile IAP primary), `decrementQuota()` via Drizzle ORM, KV-cached subscription status, family pool with row-level locking | DONE |
 | Epic 6: Language Learning | Four Strands methodology, vocabulary CRUD, CEFR levels, per-subject teaching preferences, language-aware prompts | DONE |
-| Epic 7: Self-Building Library | `topic_prerequisites` join table, shelf/book/chapter hierarchy, visual navigation, topic notes, filing mechanism | DONE |
+| Epic 7: Self-Building Library | `topic_connections` join table (symmetric, untyped), shelf/book/chapter hierarchy, visual navigation, topic notes, filing mechanism | DONE |
 | Epic 8: Full Voice Mode | On-device STT/TTS pipeline (`expo-speech-recognition` + `expo-speech`), voice session controls (pause/resume/replay/speed), session-level input mode, screen-reader-aware manual playback fallback | DONE |
 | Epic 9: Native IAP | RevenueCat integration, Apple StoreKit 2 + Google Play Billing, Stripe dormant for future web | DONE |
 | Epic 10: Pre-Launch UX Polish | 19 UX gap stories, consent flows, error handling, offline warnings | DONE |
@@ -1765,14 +1764,14 @@ All 121 MVP functional requirements have architectural support. The architecture
 | Rate limiting | 100 req/min | Cloudflare Workers rate limiting (wrangler.toml) + quota metering middleware | Covered |
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
 | Minor consent & age | 13+ access floor; consent authority from age × habitual-residence jurisdiction, fail-closed on unresolved residence (MMT-ADR-0052; sub-13 built, gated). Live general consent gate: age-only over-strict interim (as of 2026-08-07) until residence capture lands, then resolver wiring; guardian-attachment ceremony already jurisdiction-aware; country-availability gate ships independently of person-level consent (MMT-ADR-0055) | Append-only consent log; three-axis age model; backend-enforced floor — see § Identity Foundation (MMT-ADR-0015) | Defined — § Identity Foundation |
-| i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
+| i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `conversationLanguage` in system prompt for learning language. | Covered |
 | Accessibility | WCAG 2.1 AA | Tiered by release maturity: free-tier MVP support first, then broader operational hardening. NativeWind supports accessibility props. | Tiered |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
 
 **Offline Boundary:**
 
 MVP offline behavior is **read-only cached data, no offline writes**:
-- **Available offline**: Last-fetched coaching card, Library topics, and profile data — cached by TanStack Query in `lib/storage.ts` (AsyncStorage persistence). Stale but useful.
+- **Available offline**: Last-fetched coaching card, Library topics, and profile data — cached by TanStack Query in `lib/query-persister.ts` (identity-scoped AsyncStorage persistence). Stale but useful.
 - **Not available offline**: Active learning sessions, assessments, new exchanges, subscription changes — all require server roundtrip.
 - **Behavior**: When offline, show cached data with a subtle "offline" indicator. Disable actions that require the server (start session, submit answer, take assessment). No offline queue or sync protocol.
 - **Why this boundary**: Offline sessions would require local LLM inference or request queuing with conflict resolution — fundamentally different architecture. Defining this now prevents scope creep. Full offline is deferred to v2.0.

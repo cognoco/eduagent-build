@@ -1,10 +1,9 @@
 ---
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 inputDocuments:
-  - 'docs/prd.md'
+  - 'docs/PRD.md'
   - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
-  - 'docs/analysis/epics-inputs.md'
   - 'docs/_archive/factory-briefs/FB-Run023-parents.yaml'
   - 'docs/_archive/factory-briefs/FB-Run023-learner.yaml'
   - 'docs/_archive/factory-briefs/FB-Run023-languages.yaml'
@@ -2825,9 +2824,9 @@ _Per-subject analogy domain selection — lets learners choose a real-world doma
 - Component: `AnalogyDomainPicker` — reusable in subject settings and onboarding
 - NativeWind: selected state uses `bg-primary/10 border-primary`, unselected uses `bg-surface border-border`
 - Accessibility: each option has `accessibilityLabel` with full domain name (not abbreviation)
-- File locations: picker in `apps/mobile/src/components/settings/`, onboarding step in subject creation flow
+- File locations: picker in `apps/mobile/src/components/common/AnalogyDomainPicker.tsx`, onboarding step in subject creation flow
 - Domain list: `cooking`, `sports`, `building`, `music`, `nature`, `gaming` (stored as enum string in DB)
-- API: `PATCH /v1/settings/subject/:subjectId` with `analogyDomain` field (nullable)
+- API: `PUT /v1/settings/subjects/:subjectId/analogy-domain` with `analogyDomain` field (nullable)
 - LLM integration: `analogyDomain` injected into system prompt via `routeAndCall()` context
 
 **FRs:** FR134-FR137
