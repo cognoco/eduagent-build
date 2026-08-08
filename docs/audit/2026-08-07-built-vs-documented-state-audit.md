@@ -16,9 +16,11 @@ Every `file:line` below is that revision.
 ## TL;DR
 
 Sixteen verified contradictions across the 74-file bounded population. Twelve are in L1 canon —
-`docs/architecture.md` carries ten of them, including one **doc-behind** claim that the mobile app
-has no i18n framework when react-i18next and seven locales are live, and an epic-status row marking
-Epic 7 **DONE** on the strength of a `topic_prerequisites` table that was never created. Two are
+`docs/architecture.md` carries eight of them (the other four are one each in
+`docs/project_context.md` and `docs/deployment-and-secrets.md`, two in `docs/PRD.md`), including one
+**doc-behind** claim that the mobile app has no i18n framework when react-i18next and seven locales
+are live, and an epic-status row marking Epic 7 **DONE** on the strength of a `topic_prerequisites`
+table that was never created. Two are
 dead evidence pointers inside Accepted ADRs. Two are `w-state-stale`: the live `ACTIVE` program
 roster reports five Work Items as Executing/Reviewing that Cosmo has Closed, and the approved
 docs-tree mapping still plans against a `docs/meetings/` directory that has already moved. No
@@ -147,15 +149,23 @@ with its mention count in parentheses.
 | Files | 9 | 37 | 15 of 28 |
 | Lines | 6,846 | 2,813 | 9,971 (all 28) |
 | Artifact-bearing lines (sieve) | 1,186 | 569 | 1,701 (all 28) |
-| Distinct artifact tokens extracted | 534 (2,735) | 343 (1,807) | 503 (3,245) |
-| Resolved mechanically to a repo artifact | 494 | 318 | 452 |
-| Hand-adjudicated residue | 40 | 25 | 51 |
+| **Distinct artifact tokens extracted** (mentions) | **597** (1,174) | **397** (948) | **648** (1,495) |
+| — resolvable classes (`PATH` `FLAG` `ROUTE` `SCRIPT` `SNAKE` `CAMEL`) | 534 | 343 | 503 |
+| — reference classes (`WI` `ADR`) | 63 | 54 | 145 |
+| *Resolvable classes* — resolved mechanically | 494 | 318 | 452 |
+| *Resolvable classes* — hand-adjudicated residue | 40 | 25 | 51 |
 | — verified consistent | 5 | 0 | 19 |
 | — excluded by the extraction rule | 25 | 22 | 25 |
 | — **findings (tokens)** | **10** | **3** | **4** |
 | — unresolved, with reason | 0 | 0 | 3 |
+| *Reference classes* — `MMT-ADR` ids verified against `docs/adr/` | 33 | 40 | 35 |
+| *Reference classes* — `WI-NN` ids fetched from Cosmo | 0 | 0 | 7 |
+| *Reference classes* — `WI-NN` ids unresolved, with reason | 30 | 14 | 103 |
 | Findings from the negative-polarity / status passes | 2 | 0 | 1 |
 | **Findings, total** | **12** | **2** | **2** |
+
+**Total unresolved with reason: 150** — 147 `WI-NN` tokens not fetched from Cosmo, plus the 3
+repo-external paths described below.
 
 Notes on the buckets:
 
@@ -177,6 +187,11 @@ Notes on the buckets:
   (22 in (b) — see the disclosure below), and unexecuted plan *targets* in (c)'s mapping documents
   (`docs/registers/flows/`, `docs/specs/flows/`, `docs/canon/navigation/`, `docs/compliance/store/`
   and siblings), which are correctly absent because the plan has not run.
+- **Reference classes.** 50 distinct `MMT-ADR-NNNN` ids are cited across the three populations; 49
+  resolve to a file in `docs/adr/`. The one that does not — `MMT-ADR-0003` — is cited only at
+  `_wip/umbrella-program/2026-07-30-s2-06a-disposition-ledger.md:21` and its sibling `06b:21`, both
+  of which state that 0003 "is a pre-existing gap in the sequence and was deliberately **not**
+  filled". The assertion is that the ADR is absent, and it is absent. Verified consistent.
 - **Unresolved, with reason** — 3 tokens in (c), all absolute or repo-external paths into the
   `nexus` repository (`/Users/vetinari/nexus/_WIP/zdx-productionization/harness-hygiene-tracker.md`
   and two `_WIP/zdx-productionization/…` siblings). They name artifacts in a different repository
@@ -299,7 +314,22 @@ severity / effort / track fields are omitted — sizing belongs to the spawned c
 - **Claim:** `_wip/umbrella-program/2026-07-14-s2-02-docs-tree-mapping.md:278` (§4.14 "`docs/meetings/**`"), rows 23 and 24 at `:152-153`, and `:281`, `:336`, `:358`; plus `_wip/umbrella-program/2026-07-14-s2-01-decision-census.md:464`. Status `APPROVED`, execution assigned to WI-2074/WI-2076 — so these rows are the instruction set a future executor reads.
 - **Contradicted by:** `docs/meetings/` does not exist. All four named files now live in `docs/compliance/history/` — `2026-06-04-age-floor-decision-minutes.md`, `2026-06-05-launch-posture-decision-brief.md`, `2026-06-07-minors-compliance-requirements.md`, `age-country-explorer.html`. Both the source rows and the prescribed targets (`docs/_archive/meetings/`, `docs/compliance/minors-compliance-requirements.md`) are stated against a tree that has already moved, as is the §6 blocker the document flags.
 - **Direction:** `w-state-stale`
-- **Captured as:** WI-3161 (s2-02 docs-tree mapping plans against a docs/meetings/ that already moved) — auto-linked by dedup to **`WI-2066`** as a related item
+- **Captured as:** WI-3161 (s2-02 docs-tree mapping plans against a docs/meetings/ that already moved) — the capture pipeline's dedup judge auto-linked it as a related item to **`WI-2066` (S2-02: docs-tree reorg mapping table — legacy doc → target home per ADR-0000 §I.4; `Stage=Backlog`)**, i.e. to the very item that would execute this mapping. The link is apt but the two are not duplicates: WI-2066 executes the mapping, WI-3161 says the mapping's source rows must be re-derived first. Triage should keep both.
+
+## Routing of the captures
+
+All sixteen findings were filed via `/cosmo:capture` with `--origin-wi WI-3122`, at
+`Stage=Captured`, `WI-3147`–`WI-3162`. Two notes a reviewer should have rather than discover:
+
+- **`Workstream` is deliberately unset on all sixteen.** Workstream routing for audit/governance
+  items is an open question with the MentoMate PgM — `WI-3091`, `WI-3102` and `WI-3122` itself are
+  already waiting on that ruling — so guessing a home for a batch of sixteen would be harder to
+  undo than leaving them blank. `--origin-wi` inheritance (WI-1206) auto-copied `WI-3122`'s own
+  Workstream ("Stream 2 — Estate-Canon Drain (PRG-20)") onto every row at creation; it was cleared
+  on all sixteen immediately afterwards by a direct property PATCH. That PATCH is the only
+  out-of-band Cosmo write this audit made, it touched no lifecycle field (`Stage`, `Fixed In`,
+  claim props), and it is recorded here rather than left to be found.
+- **Filing is where this item's scope ends.** Nothing filed here was fixed here.
 
 ## Out of scope / not checked
 
@@ -338,12 +368,25 @@ severity / effort / track fields are omitted — sizing belongs to the spawned c
   Related: `MMT-ADR-0011`'s `ward_person_id` is absent because `MMT-ADR-0015` renamed it, and
   `charge_person_id` ships — an ADR superseded on a point by a later ADR is the chain working, not
   drift, and was recorded as such.
+- **Mechanical resolution is an EXISTENCE check, not a predicate check — and this is the larger of
+  the two blind spots.** The ~1,264 tokens resolved mechanically prove only that the named artifact
+  is present somewhere in the tree. They do **not** verify what the sentence claims *about* it:
+  "flag Z gates W", "nothing calls X", "column C is `NOT NULL`", "route R is registered", "service
+  S owns the write" all pass a bare existence hit while their actual predicate goes unchecked.
+  Predicate verification happened only for the hand-adjudicated residue and the two targeted
+  passes. Finding 6 is the cautionary instance: `/v1/stripe-webhook` surfaced *because* the token
+  happened to fail resolution — a mis-stated route whose token resolved anywhere in the tree would
+  have passed silently. Treat the mechanically-resolved column as "the artifact exists", never as
+  "the claim is true".
 - **Cosmo verification was targeted, not exhaustive.** The population contains 154 distinct `WI-NN`
   tokens (30 in (a), 14 in (b), 110 in (c) non-terminal, 483 mentions in (c) alone). Seven were
-  resolved against Cosmo — the ones carrying explicit lifecycle-status claims in the two live
-  trackers, which is where a stale claim does damage. The remaining `WI-NN` mentions are references
-  and provenance rather than status assertions, and were not individually fetched. A full
-  154-item Cosmo sweep would be a defensible follow-up and is **not** claimed here.
+  fetched from Cosmo — the ones carrying explicit lifecycle-status claims in the two live trackers,
+  which is where a stale claim does damage. The other 147 are counted as **unresolved with reason**
+  in the Coverage table, not as verified. The reason: they are references and provenance rather
+  than status assertions, and a full 154-item sweep exceeds this item's bounded population. It is
+  worth noting how the checked seven came out — **six of seven were stale** (Finding 15). That hit
+  rate, not the raw remaining count, is the argument for a follow-up sweep; a 6-in-7 rate in the
+  status-bearing subset says the unchecked 147 deserve a look by someone scoped to do it.
 - **The automated resolver produced false positives in both directions and was not trusted.** Its
   first pass missed `.claude/` entirely (ripgrep skips hidden directories), which would have
   manufactured a dozen phantom findings about deleted memory files; its second pass falsely
