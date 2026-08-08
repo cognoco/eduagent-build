@@ -1747,6 +1747,32 @@ export const sessionCompleted = inngest.createFunction(
               return;
             }
 
+            // [WI-3140] Tripwire-to-memory firewall. A session any turn of
+            // which was handled as a crisis redirect (deterministic tripwire
+            // hit, unscreenable image, or model `signals.crisis_redirect`)
+            // never reaches persistent memory: the transcript is not read, not
+            // sent to the analysis LLM, and no profile signal is derived from
+            // it. Read FRESH in-step — the flag is written mid-session by the
+            // exchange path, so any session row captured earlier in this
+            // function is stale by construction.
+            const safetyFlagRow = await db.query.learningSessions.findFirst({
+              where: and(
+                eq(learningSessions.id, sessionId),
+                eq(learningSessions.profileId, profileId),
+              ),
+              columns: { safetyFlaggedAt: true },
+            });
+            if (safetyFlagRow?.safetyFlaggedAt) {
+              logger.warn('[session-completed] memory analysis skipped', {
+                event: 'safety.memory_analysis_skipped',
+                step: 'analyze-learner-profile',
+                profileId,
+                sessionId,
+                reason: 'session_safety_flagged',
+              });
+              return;
+            }
+
             const transcriptEvents = await db.query.sessionEvents.findMany({
               where: and(
                 eq(sessionEvents.sessionId, sessionId),
@@ -2075,6 +2101,29 @@ export const sessionCompleted = inngest.createFunction(
           // to an external AI processor under the same llm_disclosure purpose).
           const gdprAllowed = await isLlmExchangeConsentAllowed(db, profileId);
           if (!gdprAllowed) {
+            return;
+          }
+
+          // [WI-3140] Tripwire-to-memory firewall, embeddings leg. Same fresh
+          // in-step read and same rule as analyze-learner-profile above: a
+          // safety-flagged session is never embedded, so no safeguarding
+          // disclosure reaches Voyage or the `session_embeddings` index (whose
+          // stored `content` is the raw transcript extract).
+          const safetyFlagRow = await db.query.learningSessions.findFirst({
+            where: and(
+              eq(learningSessions.id, sessionId),
+              eq(learningSessions.profileId, profileId),
+            ),
+            columns: { safetyFlaggedAt: true },
+          });
+          if (safetyFlagRow?.safetyFlaggedAt) {
+            logger.warn('[session-completed] embedding skipped', {
+              event: 'safety.session_embedding_skipped',
+              step: 'generate-embeddings',
+              profileId,
+              sessionId,
+              reason: 'session_safety_flagged',
+            });
             return;
           }
 

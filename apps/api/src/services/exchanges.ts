@@ -604,6 +604,15 @@ export interface ExchangeResult {
   teachBackAssessment?: NonNullable<
     NonNullable<LlmResponseEnvelope['signals']>['teach_back_assessment']
   >;
+  /**
+   * [WI-3140] This turn was handled as a crisis redirect — either the
+   * deterministic tripwire fired (text or image screen) or the model envelope
+   * carried `signals.crisis_redirect`. The session layer stamps
+   * `learning_sessions.safety_flagged_at` on it, which excludes the whole
+   * session from persistent-memory analysis and the embeddings index.
+   * Content-free by construction: a boolean, never the disclosure.
+   */
+  safetyFlagged: boolean;
 }
 
 /** Streaming variant result */
@@ -622,6 +631,14 @@ export interface ExchangeStreamResult {
   fallbackUsed?: boolean;
   /** Private source pack used to build the streaming prompt. */
   sourceEvidence: ExchangeSourceEvidence[];
+  /**
+   * [WI-3140] Deterministic short-circuit handled this turn as a crisis
+   * redirect. The model-layer `signals.crisis_redirect` case is NOT visible
+   * here — it only exists once the caller drains the stream and classifies
+   * `rawResponsePromise` — so `streamMessage` ORs this with the parsed
+   * outcome's `crisisRedirect` before stamping the session.
+   */
+  safetyFlagged: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1838,6 +1855,7 @@ function buildImageUnscreenedResult(context: ExchangeContext): ExchangeResult {
     latencyMs: 0,
     readyToFinish: false,
     topicOpenedPendingContent: false,
+    safetyFlagged: true,
   };
 }
 
@@ -1874,6 +1892,7 @@ function buildTripwireResult(
     latencyMs: 0,
     readyToFinish: false,
     topicOpenedPendingContent: false,
+    safetyFlagged: true,
   };
 }
 
@@ -2160,6 +2179,11 @@ export async function processExchange(
     // responsibility — never trust this flag alone.
     readyToFinish: finalParsed.readyToFinish,
     topicOpenedPendingContent: finalParsed.topicOpenedPendingContent,
+    // [WI-3140] Model-layer detector: the same signal that drives the crisis
+    // telemetry above also excludes this session from memory. The
+    // deterministic-tripwire detector raises it in buildTripwireResult /
+    // buildImageUnscreenedResult, which return before this point.
+    safetyFlagged: finalParsed.crisisRedirect,
     // Bug #348: pass the EVALUATE / TEACH_BACK assessment signals through to
     // session-exchange.persistExchangeResult so they land at
     // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} on the
@@ -2204,6 +2228,9 @@ export async function streamExchange(
       sourceEvidence: buildExchangeSourceEvidence(context, userMessage, {
         appHelpTurn: false,
       }),
+      // [WI-3140] Every builder call below is a crisis short-circuit (tripwire
+      // hit or unscreenable image), so the session is safety-flagged.
+      safetyFlagged: true,
     };
   };
 
@@ -2316,6 +2343,10 @@ export async function streamExchange(
     get fallbackUsed() {
       return result.fallbackUsed;
     },
+    // [WI-3140] No deterministic short-circuit fired on this turn. A
+    // model-layer crisis_redirect can still arrive in the envelope; the caller
+    // reads it off the classified outcome once the stream is drained.
+    safetyFlagged: false,
   };
 }
 

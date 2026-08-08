@@ -156,6 +156,20 @@ export const learningSessions = pgTable(
     wallClockSeconds: integer('wall_clock_seconds'),
     metadata: jsonb('metadata').default({}),
     rawInput: text('raw_input'),
+    /**
+     * [WI-3140] Safeguarding marker. Set when the deterministic safety tripwire
+     * fires or the LLM envelope carries `signals.crisis_redirect` on any turn of
+     * this session. Non-null excludes the session from persistent-memory
+     * analysis and from the session-embeddings index (session-completed steps
+     * `analyze-learner-profile` and `generate-embeddings`).
+     *
+     * CONTENT-FREE BY DESIGN: a timestamp and nothing else — no category, no
+     * quote, no disclosure text. Same metadata-only constraint that governs
+     * `emitCrisisRedirectEvent` (services/exchanges.ts, ruling se-032): the
+     * disclosure must never be re-persisted in a second location just to record
+     * that it happened.
+     */
+    safetyFlaggedAt: timestamp('safety_flagged_at', { withTimezone: true }),
     filedAt: timestamp('filed_at', { withTimezone: true }),
     filingStatus: filingStatusEnum('filing_status'),
     filingRetryCount: integer('filing_retry_count').notNull().default(0),

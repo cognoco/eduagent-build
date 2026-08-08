@@ -1,0 +1,1 @@
+ALTER TABLE "learning_sessions" ADD COLUMN "safety_flagged_at" timestamp with time zone;
