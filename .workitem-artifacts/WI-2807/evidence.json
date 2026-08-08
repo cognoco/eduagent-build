@@ -1,0 +1,20 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Defensive guard added as a PRE-COMMIT HOOK rather than commit-skill prose. The AC allows either; the hook is the correct half because the reported failure mode is a DIRECT git commit made outside the skill (merge commits when syncing origin/main into WI branches, or agents committing without the skill), which skill-doc guidance cannot reach. scripts/husky-identity-guard.sh refuses a commit whose resolved AUTHOR or COMMITTER identity is the Test User / test@example.com placeholder, and is wired into .husky/pre-commit as a subprocess immediately after the existing main-commit guard, matching that guard's established pattern. It reads git var GIT_AUTHOR_IDENT / GIT_COMMITTER_IDENT, NOT git config user.email - verified empirically before writing the guard that exporting GIT_AUTHOR_NAME flips git var output while git config keeps reporting the real identity, so a config-based guard would have passed on exactly the commits this must stop. That matters because the WI establishes the override is transient and process-scoped, i.e. environment-borne. Fails rather than warns, because authorship cannot be corrected afterwards under AC-2.",
+      "pointer": "scripts/husky-identity-guard.sh"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "No history rewrite attempted, and none is implied by anything in this change. The guard is forward-only: it inspects the identity of the commit being created and refuses it before authorship exists. No filter-branch, no rebase, no amend, no author rewriting of the 74 existing mis-attributed commits, which remain exactly as they are. The guard's own comment block and its refusal message both state that rewriting authorship on a shared branch is out of scope, so a future reader who hits the guard is not nudged toward the forbidden remedy.",
+      "pointer": "scripts/husky-identity-guard.sh"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The actual override source was NOT located, and no false claim is made that it was. The AC makes recording it conditional on finding it, and the guard is explicitly the durable fix independent of root-causing. What was re-verified on 2026-08-08: the checkout resolves the correct identity (Zuzana Kopecna, from --global; the repo-level config carries no [user] section), while git log still shows 74 commits authored Test User between 2026-07-01 and 2026-07-27 - so the symptom is real and the standing configuration is clean, exactly as the WI recorded on 2026-07-28. The guard closes the class regardless of which context sets it next, which is why root-causing is not a precondition for this item.",
+      "pointer": "scripts/husky-identity-guard.test.ts"
+    }
+  ],
+  "noiseBaselineVersion": "2026-08-08-local-deterministic"
+}
