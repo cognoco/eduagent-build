@@ -8,6 +8,12 @@ set -e
 # deliberate human main work: git commit --no-verify.
 sh scripts/husky-main-commit-guard.sh || exit 1
 
+# WI-2807 — placeholder identity guard. Runs early, before any lint work, so a
+# mis-attributed commit is refused at the cheapest possible moment: authorship
+# cannot be corrected afterwards (history rewrite on a shared branch is out of
+# scope). Subprocess, never sourced, matching the guard above.
+sh scripts/husky-identity-guard.sh || exit 1
+
 # Secret / large-file guard (WI-450 / gate-spec D3). Relocated out of the commit
 # skill into the hook so it runs for EVERY committer (human, agent, /commit, raw
 # git), not just when a skill chooses to scan. .gitignore is the primary control;

@@ -1,0 +1,18 @@
+{
+  "pageId": "3a98bce9-1f7c-813c-9225-c520207f5955",
+  "id": "WI-2807",
+  "name": "Repo-level git identity on Orion is Test User <test@example.com> — direct commits mis-attributed",
+  "description": "Discovered 2026-07-26 during BID-51 delivery. git config user.name/user.email in the eduagent-build checkout (inherited by all .worktrees) is Test User <test@example.com>. Commits made via the commit skill are correctly authored (crowka), but any direct git commit (merge commits when syncing origin/main into WI branches, or agents committing outside the skill) lands as Test User. Squash-merging shields main history, but branch history and any non-squash path is mis-attributed. Fix: set proper repo-level identity (or ensure the commit skill identity is applied globally) on this machine; audit where the Test User config came from (possibly a test harness leaked it).",
+  "acceptanceCriteria": "Verified 2026-07-28: main checkout `git config user.name`/`user.email` resolve correctly to 'Zuzana Kopečná' / 'zuzana.kopecna@zwizzly.com' (repo-level .git/config has no [user] section, falls through to the correct --global identity); three sampled active worktrees (.worktrees/WI-2828, WI-2783, WI-2690) resolve identically; no GIT_AUTHOR_NAME/GIT_COMMITTER_NAME env override present in the current shell; no .git/worktrees/*/config.worktree override file exists. However `git log --all --author=test@example.com` proves the symptom is real: commits landed under 'Test User <test@example.com>' as recently as 2026-07-27 08:17:42+02:00 (e.g. b92c39151b04ec62f2fea44a51ff5117bdd635ae) — so the bad identity is NOT reproducible in any currently-checked persistent config surface; it must come from a transient, session/execution-context-scoped override (e.g. a specific agent or CI runner setting GIT_AUTHOR_NAME for its own process) that has since stopped applying, not a standing misconfiguration. AC: (1) add a defensive guard in the repo's commit skill (.agents/skills/commit/SKILL.md) or a pre-commit hook that fails/warns when the resolved git author OR committer identity is 'test@example.com' / 'Test User', closing the class regardless of which context sets it next; (2) do NOT attempt to rewrite/amend historical commit authorship — out of scope, high-risk history rewrite on a shared branch; (3) if the actual override source is later located, record it as a comment on this item, but the guard is the durable fix independent of root-causing the exact transient source.",
+  "riskImpact": "",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Manual",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "Ramtop",
+  "bodyText": ""
+}
