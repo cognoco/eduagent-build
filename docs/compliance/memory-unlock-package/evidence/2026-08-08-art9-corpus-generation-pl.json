@@ -1,0 +1,2121 @@
+{
+  "workItem": "WI-3142",
+  "purpose": "Best-effort LLM-prepared Article 9 protected-lexeme corpus for a non-English conversation language. UNREVIEWED: not load-bearing as a compliance control. Native-speaker review is a precondition for enabling persistent memory in this language.",
+  "operatorRuling": "2026-08-08 — persistent memory is English-only at unlock; non-English corpora are prepared best-effort via LLM generation and marked model-generated.",
+  "language": "pl",
+  "languageName": "Polish",
+  "generatedAt": "2026-08-08T18:38:52.653Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-pro",
+  "systemPrompt": "You are a native-speaker lexicographer working with a data-protection engineer. You are building a DETECTION corpus for a deterministic text scanner, not an encyclopedia. The scanner matches literal lowercase phrases inside person-attribution constructions only. A bare mention of a term never fires; only \"<person reference> <verb> <term>\" and \"<possessive> <term>\" do. Your job is therefore to maximise recall of PERSON-ATTRIBUTED STATUS ASSERTIONS while keeping ordinary schoolwork prose out. Answer with strict JSON only. No markdown, no code fences, no commentary.",
+  "appliedScope": "unnamed-attribution-only",
+  "appliedScopeNote": "Every accepted term is applied at unnamed-attribution-only regardless of the model recommendation. Promotion to broad is a human decision.",
+  "termCount": 197,
+  "domains": [
+    {
+      "domain": "racial-or-ethnic-origin",
+      "label": "racial or ethnic origin",
+      "prompt": "Target language: Polish (pl).\nArticle 9 special-category domain: racial or ethnic origin.\n\nWHAT TO RETURN\nEthnic-group and origin nouns/adjectives that describe a PERSON (Roma, Sinti, Kurdish, indigenous, \"of mixed heritage\", \"ethnic minority\", \"immigrant background\", \"ethnicity\"). EXCLUDE bare colour words and bare continent/region adjectives — their attributed forms (\"my black cat\", \"their African elephant\") are ordinary prose far more often than an origin disclosure.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nPolish declines. Give nominative, genitive, accusative and instrumental singular AND the masculine/feminine pair (katolik / katolika / katolikiem / katoliczka).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Polish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"rom\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian: ROM (acronym).\",\n      \"justification\": \"Describes a person of Roma ethnicity.\"\n    },\n    {\n      \"term\": \"roma\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian: Rome (city).\",\n      \"justification\": \"Describes Roma ethnicity, e.g. 'jestem pochodzenia roma'.\"\n    },\n    {\n      \"term\": \"romem\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes being a Roma person, e.g. 'jestem Romem'.\"\n    },\n    {\n      \"term\": \"romka\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a woman of Roma ethnicity.\"\n    },\n    {\n      \"term\": \"romki\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes Roma ethnicity, e.g. 'pochodzenia romki'.\"\n    },\n    {\n      \"term\": \"romkę\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Used when the Roma woman is the object of a verb.\"\n    },\n    {\n      \"term\": \"romką\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes being a Roma woman, e.g. 'jestem Romką'.\"\n    },\n    {\n      \"term\": \"kurd\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of Kurdish ethnicity.\"\n    },\n    {\n      \"term\": \"kurda\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes Kurdish ethnicity, e.g. 'pochodzenia kurda'.\"\n    },\n    {\n      \"term\": \"kurdem\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes being a Kurdish person, e.g. 'jestem Kurdem'.\"\n    },\n    {\n      \"term\": \"kurdyjka\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a woman of Kurdish ethnicity.\"\n    },\n    {\n      \"term\": \"kurdyjki\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes Kurdish ethnicity, e.g. 'pochodzenia kurdyjki'.\"\n    },\n    {\n      \"term\": \"kurdyjkę\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Used when the Kurdish woman is the object of a verb.\"\n    },\n    {\n      \"term\": \"kurdyjką\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes being a Kurdish woman, e.g. 'jestem Kurdyjką'.\"\n    },\n    {\n      \"term\": \"metys\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of mixed ethnic heritage.\"\n    },\n    {\n      \"term\": \"metysa\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Declined form of Metys, e.g. 'syn metysa'.\"\n    },\n    {\n      \"term\": \"metysem\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes being a person of mixed heritage, e.g. 'jestem metysem'.\"\n    },\n    {\n      \"term\": \"metyska\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a woman of mixed ethnic heritage.\"\n    },\n    {\n      \"term\": \"metyski\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Declined form of Metyska, e.g. 'córka metyski'.\"\n    },\n    {\n      \"term\": \"metyską\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes being a woman of mixed heritage, e.g. 'jestem metyską'.\"\n    },\n    {\n      \"term\": \"rdzenny\",\n      \"form\": \"nominative singular masculine adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'native' for plants/animals.\",\n      \"justification\": \"When attributed to a person, means 'indigenous'.\"\n    },\n    {\n      \"term\": \"rdzenna\",\n      \"form\": \"nominative singular feminine adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'native' for plants/animals.\",\n      \"justification\": \"Feminine form of 'indigenous' attributed to a person.\"\n    },\n    {\n      \"term\": \"rdzennym\",\n      \"form\": \"instrumental singular masculine adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'native' for plants/animals.\",\n      \"justification\": \"Instrumental form of 'indigenous', e.g. 'jestem rdzennym mieszkańcem'.\"\n    },\n    {\n      \"term\": \"rdzenną\",\n      \"form\": \"instrumental singular feminine adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'native' for plants/animals.\",\n      \"justification\": \"Instrumental form of 'indigenous', e.g. 'jestem rdzenną mieszkanką'.\"\n    },\n    {\n      \"term\": \"mieszane pochodzenie\",\n      \"form\": \"nominative/accusative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly translates to 'mixed heritage/origin'.\"\n    },\n    {\n      \"term\": \"mieszanego pochodzenia\",\n      \"form\": \"genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Genitive form of 'mixed heritage', common in disclosures.\"\n    },\n    {\n      \"term\": \"mieszanym pochodzeniem\",\n      \"form\": \"instrumental\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Instrumental form of 'mixed heritage'.\"\n    },\n    {\n      \"term\": \"mniejszość etniczna\",\n      \"form\": \"nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly translates to 'ethnic minority'.\"\n    },\n    {\n      \"term\": \"mniejszości etnicznej\",\n      \"form\": \"genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Genitive form, e.g. 'członek mniejszości etnicznej'.\"\n    },\n    {\n      \"term\": \"mniejszość etniczną\",\n      \"form\": \"accusative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Accusative form of 'ethnic minority'.\"\n    },\n    {\n      \"term\": \"mniejszością etniczną\",\n      \"form\": \"instrumental\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Instrumental form, e.g. 'jestem mniejszością etniczną'.\"\n    },\n    {\n      \"term\": \"narodowość\",\n      \"form\": \"nominative/accusative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can be abstract in social studies.\",\n      \"justification\": \"When possessive ('moja narodowość'), it is a disclosure of nationality.\"\n    },\n    {\n      \"term\": \"narodowością\",\n      \"form\": \"instrumental\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Instrumental form of 'nationality', used in disclosures.\"\n    },\n    {\n      \"term\": \"etniczność\",\n      \"form\": \"nominative/accusative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can be abstract in social studies.\",\n      \"justification\": \"When possessive ('moja etniczność'), it is a disclosure of ethnicity.\"\n    },\n    {\n      \"term\": \"etnicznością\",\n      \"form\": \"instrumental\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Instrumental form of 'ethnicity', used in disclosures.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"rasa\",\n      \"reason\": \"Highly ambiguous; means 'breed' (animals) or 'race' (in sports).\"\n    },\n    {\n      \"term\": \"pochodzenie\",\n      \"reason\": \"Too generic; means 'origin' in many non-personal contexts.\"\n    },\n    {\n      \"term\": \"cygan\",\n      \"reason\": \"Largely considered a pejorative slur, not a neutral self-identifier.\"\n    },\n    {\n      \"term\": \"żyd\",\n      \"reason\": \"Primarily a religious identifier, better suited for the religion domain.\"\n    },\n    {\n      \"term\": \"sinti\",\n      \"reason\": \"Less common and has more irregular declensions than Romani.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 784,
+        "completion_tokens": 7971,
+        "total_tokens": 8755,
+        "cost": 0.08069,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.08069,
+          "upstream_inference_prompt_cost": 0.00098,
+          "upstream_inference_completions_cost": 0.07971
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5199,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "rom",
+          "form": "nominative singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian: ROM (acronym).",
+          "justification": "Describes a person of Roma ethnicity."
+        },
+        {
+          "term": "roma",
+          "form": "genitive/accusative singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian: Rome (city).",
+          "justification": "Describes Roma ethnicity, e.g. 'jestem pochodzenia roma'."
+        },
+        {
+          "term": "romem",
+          "form": "instrumental singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes being a Roma person, e.g. 'jestem Romem'."
+        },
+        {
+          "term": "romka",
+          "form": "nominative singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a woman of Roma ethnicity."
+        },
+        {
+          "term": "romki",
+          "form": "genitive singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes Roma ethnicity, e.g. 'pochodzenia romki'."
+        },
+        {
+          "term": "romkę",
+          "form": "accusative singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Used when the Roma woman is the object of a verb."
+        },
+        {
+          "term": "romką",
+          "form": "instrumental singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes being a Roma woman, e.g. 'jestem Romką'."
+        },
+        {
+          "term": "kurd",
+          "form": "nominative singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of Kurdish ethnicity."
+        },
+        {
+          "term": "kurda",
+          "form": "genitive/accusative singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes Kurdish ethnicity, e.g. 'pochodzenia kurda'."
+        },
+        {
+          "term": "kurdem",
+          "form": "instrumental singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes being a Kurdish person, e.g. 'jestem Kurdem'."
+        },
+        {
+          "term": "kurdyjka",
+          "form": "nominative singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a woman of Kurdish ethnicity."
+        },
+        {
+          "term": "kurdyjki",
+          "form": "genitive singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes Kurdish ethnicity, e.g. 'pochodzenia kurdyjki'."
+        },
+        {
+          "term": "kurdyjkę",
+          "form": "accusative singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Used when the Kurdish woman is the object of a verb."
+        },
+        {
+          "term": "kurdyjką",
+          "form": "instrumental singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes being a Kurdish woman, e.g. 'jestem Kurdyjką'."
+        },
+        {
+          "term": "metys",
+          "form": "nominative singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of mixed ethnic heritage."
+        },
+        {
+          "term": "metysa",
+          "form": "genitive/accusative singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Declined form of Metys, e.g. 'syn metysa'."
+        },
+        {
+          "term": "metysem",
+          "form": "instrumental singular masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes being a person of mixed heritage, e.g. 'jestem metysem'."
+        },
+        {
+          "term": "metyska",
+          "form": "nominative singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a woman of mixed ethnic heritage."
+        },
+        {
+          "term": "metyski",
+          "form": "genitive singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Declined form of Metyska, e.g. 'córka metyski'."
+        },
+        {
+          "term": "metyską",
+          "form": "instrumental singular feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes being a woman of mixed heritage, e.g. 'jestem metyską'."
+        },
+        {
+          "term": "rdzenny",
+          "form": "nominative singular masculine adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'native' for plants/animals.",
+          "justification": "When attributed to a person, means 'indigenous'."
+        },
+        {
+          "term": "rdzenna",
+          "form": "nominative singular feminine adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'native' for plants/animals.",
+          "justification": "Feminine form of 'indigenous' attributed to a person."
+        },
+        {
+          "term": "rdzennym",
+          "form": "instrumental singular masculine adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'native' for plants/animals.",
+          "justification": "Instrumental form of 'indigenous', e.g. 'jestem rdzennym mieszkańcem'."
+        },
+        {
+          "term": "rdzenną",
+          "form": "instrumental singular feminine adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'native' for plants/animals.",
+          "justification": "Instrumental form of 'indigenous', e.g. 'jestem rdzenną mieszkanką'."
+        },
+        {
+          "term": "mieszane pochodzenie",
+          "form": "nominative/accusative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly translates to 'mixed heritage/origin'."
+        },
+        {
+          "term": "mieszanego pochodzenia",
+          "form": "genitive",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Genitive form of 'mixed heritage', common in disclosures."
+        },
+        {
+          "term": "mieszanym pochodzeniem",
+          "form": "instrumental",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Instrumental form of 'mixed heritage'."
+        },
+        {
+          "term": "mniejszość etniczna",
+          "form": "nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly translates to 'ethnic minority'."
+        },
+        {
+          "term": "mniejszości etnicznej",
+          "form": "genitive",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Genitive form, e.g. 'członek mniejszości etnicznej'."
+        },
+        {
+          "term": "mniejszość etniczną",
+          "form": "accusative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Accusative form of 'ethnic minority'."
+        },
+        {
+          "term": "mniejszością etniczną",
+          "form": "instrumental",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Instrumental form, e.g. 'jestem mniejszością etniczną'."
+        },
+        {
+          "term": "narodowość",
+          "form": "nominative/accusative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can be abstract in social studies.",
+          "justification": "When possessive ('moja narodowość'), it is a disclosure of nationality."
+        },
+        {
+          "term": "narodowością",
+          "form": "instrumental",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Instrumental form of 'nationality', used in disclosures."
+        },
+        {
+          "term": "etniczność",
+          "form": "nominative/accusative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can be abstract in social studies.",
+          "justification": "When possessive ('moja etniczność'), it is a disclosure of ethnicity."
+        },
+        {
+          "term": "etnicznością",
+          "form": "instrumental",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Instrumental form of 'ethnicity', used in disclosures."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "rasa",
+          "reason": "Highly ambiguous; means 'breed' (animals) or 'race' (in sports)."
+        },
+        {
+          "term": "pochodzenie",
+          "reason": "Too generic; means 'origin' in many non-personal contexts."
+        },
+        {
+          "term": "cygan",
+          "reason": "Largely considered a pejorative slur, not a neutral self-identifier."
+        },
+        {
+          "term": "żyd",
+          "reason": "Primarily a religious identifier, better suited for the religion domain."
+        },
+        {
+          "term": "sinti",
+          "reason": "Less common and has more irregular declensions than Romani."
+        }
+      ]
+    },
+    {
+      "domain": "political-opinions",
+      "label": "political opinions or affiliation",
+      "prompt": "Target language: Polish (pl).\nArticle 9 special-category domain: political opinions or affiliation.\n\nWHAT TO RETURN\nPolitical-affiliation and opinion nouns/adjectives applied to a person (communist, socialist, anarchist, nationalist, feminist, far-right, \"party member\", \"political views\"). EXCLUDE words whose ordinary sense dominates in schoolwork — the local equivalents of English \"conservative\" (a conservative estimate), \"liberal\" (a liberal amount), \"green\", \"independent\", \"radical\", \"progressive\".\n\nMORPHOLOGY — this is the part generic answers get wrong.\nPolish declines. Give nominative, genitive, accusative and instrumental singular AND the masculine/feminine pair (katolik / katolika / katolikiem / katoliczka).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Polish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"komunista\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunisty\",\n      \"form\": \"genitive singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunistę\",\n      \"form\": \"accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunistą\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunistka\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunistki\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunistkę\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"komunistką\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalista\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalisty\",\n      \"form\": \"genitive singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalistę\",\n      \"form\": \"accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalistą\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalistka\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalistki\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalistkę\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"socjalistką\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalista\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalisty\",\n      \"form\": \"genitive singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalistę\",\n      \"form\": \"accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalistą\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalistka\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalistki\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalistkę\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"nacjonalistką\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"członek partii\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian 'parti' (you leave) is similar, but the phrase is unambiguous.\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"członka partii\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian 'parti' (you leave) is similar, but the phrase is unambiguous.\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"członkiem partii\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian 'parti' (you leave) is similar, but the phrase is unambiguous.\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"członkini partii\",\n      \"form\": \"nominative/genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian 'parti' (you leave) is similar, but the phrase is unambiguous.\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"członkinię partii\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian 'parti' (you leave) is similar, but the phrase is unambiguous.\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"członkinią partii\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Italian 'parti' (you leave) is similar, but the phrase is unambiguous.\",\n      \"justification\": \"Identifies a person's political affiliation.\"\n    },\n    {\n      \"term\": \"poglądy polityczne\",\n      \"form\": \"nominative/accusative plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views.\"\n    },\n    {\n      \"term\": \"poglądów politycznych\",\n      \"form\": \"genitive plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views.\"\n    },\n    {\n      \"term\": \"poglądami politycznymi\",\n      \"form\": \"instrumental plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"konserwatysta\",\n      \"reason\": \"Too close to 'conservative', a common word in other contexts (e.g. estimate).\"\n    },\n    {\n      \"term\": \"liberał\",\n      \"reason\": \"Too close to 'liberal', a common word in other contexts (e.g. amount).\"\n    },\n    {\n      \"term\": \"zielony\",\n      \"reason\": \"Primary meaning is the color 'green'.\"\n    },\n    {\n      \"term\": \"niezależny\",\n      \"reason\": \"Primary meaning is 'independent', common in non-political schoolwork.\"\n    },\n    {\n      \"term\": \"radykał\",\n      \"reason\": \"Too close to 'radical', a common word in other contexts.\"\n    },\n    {\n      \"term\": \"progresywny\",\n      \"reason\": \"Too close to 'progressive', a common word in other contexts.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 788,
+        "completion_tokens": 7246,
+        "total_tokens": 8034,
+        "cost": 0.073445,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.073445,
+          "upstream_inference_prompt_cost": 0.000985,
+          "upstream_inference_completions_cost": 0.07246
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4655,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "komunista",
+          "form": "nominative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunisty",
+          "form": "genitive singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunistę",
+          "form": "accusative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunistą",
+          "form": "instrumental singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunistka",
+          "form": "nominative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunistki",
+          "form": "genitive singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunistkę",
+          "form": "accusative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "komunistką",
+          "form": "instrumental singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalista",
+          "form": "nominative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalisty",
+          "form": "genitive singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalistę",
+          "form": "accusative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalistą",
+          "form": "instrumental singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalistka",
+          "form": "nominative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalistki",
+          "form": "genitive singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalistkę",
+          "form": "accusative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "socjalistką",
+          "form": "instrumental singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalista",
+          "form": "nominative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalisty",
+          "form": "genitive singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalistę",
+          "form": "accusative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalistą",
+          "form": "instrumental singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalistka",
+          "form": "nominative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalistki",
+          "form": "genitive singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalistkę",
+          "form": "accusative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "nacjonalistką",
+          "form": "instrumental singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "członek partii",
+          "form": "nominative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian 'parti' (you leave) is similar, but the phrase is unambiguous.",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "członka partii",
+          "form": "genitive/accusative singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian 'parti' (you leave) is similar, but the phrase is unambiguous.",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "członkiem partii",
+          "form": "instrumental singular masculine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian 'parti' (you leave) is similar, but the phrase is unambiguous.",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "członkini partii",
+          "form": "nominative/genitive singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian 'parti' (you leave) is similar, but the phrase is unambiguous.",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "członkinię partii",
+          "form": "accusative singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian 'parti' (you leave) is similar, but the phrase is unambiguous.",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "członkinią partii",
+          "form": "instrumental singular feminine",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Italian 'parti' (you leave) is similar, but the phrase is unambiguous.",
+          "justification": "Identifies a person's political affiliation."
+        },
+        {
+          "term": "poglądy polityczne",
+          "form": "nominative/accusative plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views."
+        },
+        {
+          "term": "poglądów politycznych",
+          "form": "genitive plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views."
+        },
+        {
+          "term": "poglądami politycznymi",
+          "form": "instrumental plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "konserwatysta",
+          "reason": "Too close to 'conservative', a common word in other contexts (e.g. estimate)."
+        },
+        {
+          "term": "liberał",
+          "reason": "Too close to 'liberal', a common word in other contexts (e.g. amount)."
+        },
+        {
+          "term": "zielony",
+          "reason": "Primary meaning is the color 'green'."
+        },
+        {
+          "term": "niezależny",
+          "reason": "Primary meaning is 'independent', common in non-political schoolwork."
+        },
+        {
+          "term": "radykał",
+          "reason": "Too close to 'radical', a common word in other contexts."
+        },
+        {
+          "term": "progresywny",
+          "reason": "Too close to 'progressive', a common word in other contexts."
+        }
+      ]
+    },
+    {
+      "domain": "religious-or-philosophical-beliefs",
+      "label": "religious or philosophical beliefs",
+      "prompt": "Target language: Polish (pl).\nArticle 9 special-category domain: religious or philosophical beliefs.\n\nWHAT TO RETURN\nReligious/denominational/philosophical affiliation applied to a person (Catholic, Protestant, Muslim, Jewish, Hindu, Buddhist, atheist, agnostic, devout, \"converted to Islam\", \"religious belief\"), plus belief-marking dress where it is unambiguous (hijab, kippah). EXCLUDE the local equivalent of bare \"orthodox\" (an orthodox method) and bare \"religious\"/\"religion\" (religious education is a school subject).\n\nMORPHOLOGY — this is the part generic answers get wrong.\nPolish declines. Give nominative, genitive, accusative and instrumental singular AND the masculine/feminine pair (katolik / katolika / katolikiem / katoliczka).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Polish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"katolik\",\n      \"form\": \"m. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"katolika\",\n      \"form\": \"m. gen./acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"katolikiem\",\n      \"form\": \"m. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"katoliczka\",\n      \"form\": \"f. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"katoliczki\",\n      \"form\": \"f. gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"katoliczkę\",\n      \"form\": \"f. acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"katoliczką\",\n      \"form\": \"f. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmanin\",\n      \"form\": \"m. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmanina\",\n      \"form\": \"m. gen./acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmaninem\",\n      \"form\": \"m. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmanka\",\n      \"form\": \"f. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmanki\",\n      \"form\": \"f. gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmankę\",\n      \"form\": \"f. acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"muzułmanką\",\n      \"form\": \"f. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żyd\",\n      \"form\": \"m. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żyda\",\n      \"form\": \"m. gen./acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żydem\",\n      \"form\": \"m. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żydówka\",\n      \"form\": \"f. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żydówki\",\n      \"form\": \"f. gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żydówkę\",\n      \"form\": \"f. acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"żydówką\",\n      \"form\": \"f. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation.\"\n    },\n    {\n      \"term\": \"ateista\",\n      \"form\": \"m. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Identical to Italian 'ateista' (atheist).\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateisty\",\n      \"form\": \"m. gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateistę\",\n      \"form\": \"m. acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateistą\",\n      \"form\": \"m. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateistka\",\n      \"form\": \"f. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateistki\",\n      \"form\": \"f. gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateistkę\",\n      \"form\": \"f. acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"ateistką\",\n      \"form\": \"f. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's philosophical belief.\"\n    },\n    {\n      \"term\": \"prawosławny\",\n      \"form\": \"m. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'correct'/'orthodox' but rarely in modern Polish.\",\n      \"justification\": \"Indicates a person's religious affiliation (Orthodox Christian).\"\n    },\n    {\n      \"term\": \"prawosławnego\",\n      \"form\": \"m. gen./acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation (Orthodox Christian).\"\n    },\n    {\n      \"term\": \"prawosławnym\",\n      \"form\": \"m. instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation (Orthodox Christian).\"\n    },\n    {\n      \"term\": \"prawosławna\",\n      \"form\": \"f. nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation (Orthodox Christian).\"\n    },\n    {\n      \"term\": \"prawosławnej\",\n      \"form\": \"f. gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation (Orthodox Christian).\"\n    },\n    {\n      \"term\": \"prawosławną\",\n      \"form\": \"f. acc./instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a person's religious affiliation (Orthodox Christian).\"\n    },\n    {\n      \"term\": \"hidżab\",\n      \"form\": \"nom./acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    },\n    {\n      \"term\": \"hidżabu\",\n      \"form\": \"gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    },\n    {\n      \"term\": \"hidżabem\",\n      \"form\": \"instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    },\n    {\n      \"term\": \"jarmułka\",\n      \"form\": \"nom. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    },\n    {\n      \"term\": \"jarmułki\",\n      \"form\": \"gen. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    },\n    {\n      \"term\": \"jarmułkę\",\n      \"form\": \"acc. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    },\n    {\n      \"term\": \"jarmułką\",\n      \"form\": \"instr. sg.\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Religious garment indicating affiliation.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"religia\",\n      \"reason\": \"Too ambiguous; common word in schoolwork (e.g., 'lekcja religii').\"\n    },\n    {\n      \"term\": \"religijny\",\n      \"reason\": \"Too ambiguous; common adjective in non-personal contexts (art, history).\"\n    },\n    {\n      \"term\": \"ortodoksyjny\",\n      \"reason\": \"Ambiguous; often means 'orthodox' in a non-religious, methodological sense.\"\n    },\n    {\n      \"term\": \"wierzący\",\n      \"reason\": \"Too general ('believer'); can refer to belief in non-religious concepts.\"\n    },\n    {\n      \"term\": \"niewierzący\",\n      \"reason\": \"Too general ('non-believer'); 'ateista' is more specific and less ambiguous.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 795,
+        "completion_tokens": 10606,
+        "total_tokens": 11401,
+        "cost": 0.10705375,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.10705375,
+          "upstream_inference_prompt_cost": 0.00099375,
+          "upstream_inference_completions_cost": 0.10606
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 7487,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "katolik",
+          "form": "m. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "katolika",
+          "form": "m. gen./acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "katolikiem",
+          "form": "m. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "katoliczka",
+          "form": "f. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "katoliczki",
+          "form": "f. gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "katoliczkę",
+          "form": "f. acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "katoliczką",
+          "form": "f. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmanin",
+          "form": "m. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmanina",
+          "form": "m. gen./acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmaninem",
+          "form": "m. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmanka",
+          "form": "f. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmanki",
+          "form": "f. gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmankę",
+          "form": "f. acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "muzułmanką",
+          "form": "f. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żyd",
+          "form": "m. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żyda",
+          "form": "m. gen./acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żydem",
+          "form": "m. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żydówka",
+          "form": "f. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żydówki",
+          "form": "f. gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żydówkę",
+          "form": "f. acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "żydówką",
+          "form": "f. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation."
+        },
+        {
+          "term": "ateista",
+          "form": "m. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Identical to Italian 'ateista' (atheist).",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateisty",
+          "form": "m. gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateistę",
+          "form": "m. acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateistą",
+          "form": "m. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateistka",
+          "form": "f. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateistki",
+          "form": "f. gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateistkę",
+          "form": "f. acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "ateistką",
+          "form": "f. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's philosophical belief."
+        },
+        {
+          "term": "prawosławny",
+          "form": "m. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'correct'/'orthodox' but rarely in modern Polish.",
+          "justification": "Indicates a person's religious affiliation (Orthodox Christian)."
+        },
+        {
+          "term": "prawosławnego",
+          "form": "m. gen./acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation (Orthodox Christian)."
+        },
+        {
+          "term": "prawosławnym",
+          "form": "m. instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation (Orthodox Christian)."
+        },
+        {
+          "term": "prawosławna",
+          "form": "f. nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation (Orthodox Christian)."
+        },
+        {
+          "term": "prawosławnej",
+          "form": "f. gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation (Orthodox Christian)."
+        },
+        {
+          "term": "prawosławną",
+          "form": "f. acc./instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a person's religious affiliation (Orthodox Christian)."
+        },
+        {
+          "term": "hidżab",
+          "form": "nom./acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        },
+        {
+          "term": "hidżabu",
+          "form": "gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        },
+        {
+          "term": "hidżabem",
+          "form": "instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        },
+        {
+          "term": "jarmułka",
+          "form": "nom. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        },
+        {
+          "term": "jarmułki",
+          "form": "gen. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        },
+        {
+          "term": "jarmułkę",
+          "form": "acc. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        },
+        {
+          "term": "jarmułką",
+          "form": "instr. sg.",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Religious garment indicating affiliation."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "religia",
+          "reason": "Too ambiguous; common word in schoolwork (e.g., 'lekcja religii')."
+        },
+        {
+          "term": "religijny",
+          "reason": "Too ambiguous; common adjective in non-personal contexts (art, history)."
+        },
+        {
+          "term": "ortodoksyjny",
+          "reason": "Ambiguous; often means 'orthodox' in a non-religious, methodological sense."
+        },
+        {
+          "term": "wierzący",
+          "reason": "Too general ('believer'); can refer to belief in non-religious concepts."
+        },
+        {
+          "term": "niewierzący",
+          "reason": "Too general ('non-believer'); 'ateista' is more specific and less ambiguous."
+        }
+      ]
+    },
+    {
+      "domain": "trade-union-membership",
+      "label": "trade-union membership",
+      "prompt": "Target language: Polish (pl).\nArticle 9 special-category domain: trade-union membership.\n\nWHAT TO RETURN\nMembership of, or office in, a trade union (union member, trade unionist, shop steward, union dues, unionised, \"member of a union\"). EXCLUDE the bare word for \"union\" on its own — it also names the European Union and, in mathematics, the union of sets.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nPolish declines. Give nominative, genitive, accusative and instrumental singular AND the masculine/feminine pair (katolik / katolika / katolikiem / katoliczka).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Polish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"związkowiec\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"związkowca\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"związkowcem\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"związkowczyni\",\n      \"form\": \"nominative/genitive/accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"związkowczynią\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"członek związku zawodowego\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"członka związku zawodowego\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"członkiem związku zawodowego\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"członkini związku zawodowego\",\n      \"form\": \"nominative/genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"członkinię związku zawodowego\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"członkinią związku zawodowego\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"działacz związkowy\",\n      \"form\": \"nominative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"działacza związkowego\",\n      \"form\": \"genitive/accusative singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"działaczem związkowym\",\n      \"form\": \"instrumental singular masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"działaczka związkowa\",\n      \"form\": \"nominative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"działaczki związkowej\",\n      \"form\": \"genitive singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"działaczkę związkową\",\n      \"form\": \"accusative singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"działaczką związkową\",\n      \"form\": \"instrumental singular feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"mąż zaufania\",\n      \"form\": \"nominative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific term for a shop steward or union representative.\"\n    },\n    {\n      \"term\": \"męża zaufania\",\n      \"form\": \"genitive/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific term for a shop steward or union representative.\"\n    },\n    {\n      \"term\": \"mężem zaufania\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific term for a shop steward or union representative.\"\n    },\n    {\n      \"term\": \"składki związkowe\",\n      \"form\": \"nominative/accusative plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to union dues, implying membership.\"\n    },\n    {\n      \"term\": \"składek związkowych\",\n      \"form\": \"genitive plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to union dues, implying membership.\"\n    },\n    {\n      \"term\": \"składkami związkowymi\",\n      \"form\": \"instrumental plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to union dues, implying membership.\"\n    },\n    {\n      \"term\": \"uzwiązkowiony\",\n      \"form\": \"adjective, masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person or workplace as being unionised.\"\n    },\n    {\n      \"term\": \"uzwiązkowiona\",\n      \"form\": \"adjective, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person or workplace as being unionised.\"\n    },\n    {\n      \"term\": \"członkostwo w związku zawodowym\",\n      \"form\": \"nominative/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'membership in a trade union'.\"\n    },\n    {\n      \"term\": \"członkostwa w związku zawodowym\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'membership in a trade union'.\"\n    },\n    {\n      \"term\": \"członkostwem w związku zawodowym\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'membership in a trade union'.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"związek\",\n      \"reason\": \"Too ambiguous. Means European Union, union of sets in math, relationship, etc.\"\n    },\n    {\n      \"term\": \"członek\",\n      \"reason\": \"Too ambiguous. Means 'member' of any group, not just a union.\"\n    },\n    {\n      \"term\": \"działacz\",\n      \"reason\": \"Too ambiguous. Means 'activist' for any cause, not just a union.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 769,
+        "completion_tokens": 4625,
+        "total_tokens": 5394,
+        "cost": 0.04721125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.04721125,
+          "upstream_inference_prompt_cost": 0.00096125,
+          "upstream_inference_completions_cost": 0.04625
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2391,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "związkowiec",
+          "form": "nominative singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "związkowca",
+          "form": "genitive/accusative singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "związkowcem",
+          "form": "instrumental singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "związkowczyni",
+          "form": "nominative/genitive/accusative singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "związkowczynią",
+          "form": "instrumental singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "członek związku zawodowego",
+          "form": "nominative singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "członka związku zawodowego",
+          "form": "genitive/accusative singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "członkiem związku zawodowego",
+          "form": "instrumental singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "członkini związku zawodowego",
+          "form": "nominative/genitive singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "członkinię związku zawodowego",
+          "form": "accusative singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "członkinią związku zawodowego",
+          "form": "instrumental singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "działacz związkowy",
+          "form": "nominative singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "działacza związkowego",
+          "form": "genitive/accusative singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "działaczem związkowym",
+          "form": "instrumental singular masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "działaczka związkowa",
+          "form": "nominative singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "działaczki związkowej",
+          "form": "genitive singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "działaczkę związkową",
+          "form": "accusative singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "działaczką związkową",
+          "form": "instrumental singular feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "mąż zaufania",
+          "form": "nominative singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific term for a shop steward or union representative."
+        },
+        {
+          "term": "męża zaufania",
+          "form": "genitive/accusative singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific term for a shop steward or union representative."
+        },
+        {
+          "term": "mężem zaufania",
+          "form": "instrumental singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific term for a shop steward or union representative."
+        },
+        {
+          "term": "składki związkowe",
+          "form": "nominative/accusative plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to union dues, implying membership."
+        },
+        {
+          "term": "składek związkowych",
+          "form": "genitive plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to union dues, implying membership."
+        },
+        {
+          "term": "składkami związkowymi",
+          "form": "instrumental plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to union dues, implying membership."
+        },
+        {
+          "term": "uzwiązkowiony",
+          "form": "adjective, masculine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person or workplace as being unionised."
+        },
+        {
+          "term": "uzwiązkowiona",
+          "form": "adjective, feminine",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person or workplace as being unionised."
+        },
+        {
+          "term": "członkostwo w związku zawodowym",
+          "form": "nominative/accusative singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states 'membership in a trade union'."
+        },
+        {
+          "term": "członkostwa w związku zawodowym",
+          "form": "genitive singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states 'membership in a trade union'."
+        },
+        {
+          "term": "członkostwem w związku zawodowym",
+          "form": "instrumental singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states 'membership in a trade union'."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "związek",
+          "reason": "Too ambiguous. Means European Union, union of sets in math, relationship, etc."
+        },
+        {
+          "term": "członek",
+          "reason": "Too ambiguous. Means 'member' of any group, not just a union."
+        },
+        {
+          "term": "działacz",
+          "reason": "Too ambiguous. Means 'activist' for any cause, not just a union."
+        }
+      ]
+    },
+    {
+      "domain": "sex-life-or-sexual-orientation",
+      "label": "sex life or sexual orientation",
+      "prompt": "Target language: Polish (pl).\nArticle 9 special-category domain: sex life or sexual orientation.\n\nWHAT TO RETURN\nSexual orientation and sex-life status applied to a person (gay, lesbian, bisexual, pansexual, queer, homosexual, heterosexual, LGBTQ, transgender, intersex, \"sexual orientation\", \"sexually active\"). EXCLUDE the local equivalent of \"straight\" (a straight line), of \"asexual\" (asexual reproduction is core biology), and of \"coming out\" (he is coming out of the room). EXCLUDE \"boyfriend\"/\"girlfriend\" — far too common to be a disclosure signal.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nPolish declines. Give nominative, genitive, accusative and instrumental singular AND the masculine/feminine pair (katolik / katolika / katolikiem / katoliczka).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Polish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"gej\",\n      \"form\": \"nominative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of male homosexual identity.\"\n    },\n    {\n      \"term\": \"geja\",\n      \"form\": \"genitive/accusative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of male homosexual identity.\"\n    },\n    {\n      \"term\": \"gejem\",\n      \"form\": \"instrumental masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of male homosexual identity.\"\n    },\n    {\n      \"term\": \"lesbijka\",\n      \"form\": \"nominative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of female homosexual identity.\"\n    },\n    {\n      \"term\": \"lesbijki\",\n      \"form\": \"genitive feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of female homosexual identity.\"\n    },\n    {\n      \"term\": \"lesbijkę\",\n      \"form\": \"accusative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of female homosexual identity.\"\n    },\n    {\n      \"term\": \"lesbijką\",\n      \"form\": \"instrumental feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of female homosexual identity.\"\n    },\n    {\n      \"term\": \"biseksualny\",\n      \"form\": \"nominative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of bisexual identity.\"\n    },\n    {\n      \"term\": \"biseksualnego\",\n      \"form\": \"genitive/accusative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of bisexual identity.\"\n    },\n    {\n      \"term\": \"biseksualnym\",\n      \"form\": \"instrumental masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of bisexual identity.\"\n    },\n    {\n      \"term\": \"biseksualna\",\n      \"form\": \"nominative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of bisexual identity.\"\n    },\n    {\n      \"term\": \"biseksualnej\",\n      \"form\": \"genitive feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of bisexual identity.\"\n    },\n    {\n      \"term\": \"biseksualną\",\n      \"form\": \"accusative/instrumental feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A direct statement of bisexual identity.\"\n    },\n    {\n      \"term\": \"panseksualny\",\n      \"form\": \"nominative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).\",\n      \"justification\": \"A direct statement of pansexual identity; full word is unambiguous.\"\n    },\n    {\n      \"term\": \"panseksualnego\",\n      \"form\": \"genitive/accusative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).\",\n      \"justification\": \"A direct statement of pansexual identity; full word is unambiguous.\"\n    },\n    {\n      \"term\": \"panseksualnym\",\n      \"form\": \"instrumental masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).\",\n      \"justification\": \"A direct statement of pansexual identity; full word is unambiguous.\"\n    },\n    {\n      \"term\": \"panseksualna\",\n      \"form\": \"nominative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).\",\n      \"justification\": \"A direct statement of pansexual identity; full word is unambiguous.\"\n    },\n    {\n      \"term\": \"panseksualnej\",\n      \"form\": \"genitive feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).\",\n      \"justification\": \"A direct statement of pansexual identity; full word is unambiguous.\"\n    },\n    {\n      \"term\": \"panseksualną\",\n      \"form\": \"accusative/instrumental feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).\",\n      \"justification\": \"A direct statement of pansexual identity; full word is unambiguous.\"\n    },\n    {\n      \"term\": \"queer\",\n      \"form\": \"indeclinable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English loanword, but specific in this context.\",\n      \"justification\": \"A common self-identifier for non-heteronormative identity.\"\n    },\n    {\n      \"term\": \"lgbtq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for the community; attribution indicates affiliation.\"\n    },\n    {\n      \"term\": \"transpłciowy\",\n      \"form\": \"nominative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Prefix 'trans' is common, but the full word is specific.\",\n      \"justification\": \"A direct statement of transgender identity.\"\n    },\n    {\n      \"term\": \"transpłciowego\",\n      \"form\": \"genitive/accusative masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Prefix 'trans' is common, but the full word is specific.\",\n      \"justification\": \"A direct statement of transgender identity.\"\n    },\n    {\n      \"term\": \"transpłciowym\",\n      \"form\": \"instrumental masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Prefix 'trans' is common, but the full word is specific.\",\n      \"justification\": \"A direct statement of transgender identity.\"\n    },\n    {\n      \"term\": \"transpłciowa\",\n      \"form\": \"nominative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Prefix 'trans' is common, but the full word is specific.\",\n      \"justification\": \"A direct statement of transgender identity.\"\n    },\n    {\n      \"term\": \"transpłciowej\",\n      \"form\": \"genitive feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Prefix 'trans' is common, but the full word is specific.\",\n      \"justification\": \"A direct statement of transgender identity.\"\n    },\n    {\n      \"term\": \"transpłciową\",\n      \"form\": \"accusative/instrumental feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Prefix 'trans' is common, but the full word is specific.\",\n      \"justification\": \"A direct statement of transgender identity.\"\n    },\n    {\n      \"term\": \"orientacja seksualna\",\n      \"form\": \"nominative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'orientacja' alone is ambiguous, but the phrase is specific.\",\n      \"justification\": \"The general term for sexual orientation; attribution is a disclosure.\"\n    },\n    {\n      \"term\": \"orientacji seksualnej\",\n      \"form\": \"genitive feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'orientacja' alone is ambiguous, but the phrase is specific.\",\n      \"justification\": \"The general term for sexual orientation; attribution is a disclosure.\"\n    },\n    {\n      \"term\": \"orientację seksualną\",\n      \"form\": \"accusative feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'orientacja' alone is ambiguous, but the phrase is specific.\",\n      \"justification\": \"The general term for sexual orientation; attribution is a disclosure.\"\n    },\n    {\n      \"term\": \"orientacją seksualną\",\n      \"form\": \"instrumental feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'orientacja' alone is ambiguous, but the phrase is specific.\",\n      \"justification\": \"The general term for sexual orientation; attribution is a disclosure.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"homoseksualny\",\n      \"reason\": \"More clinical term; gej/lesbijka are more common for personal attribution.\"\n    },\n    {\n      \"term\": \"heteroseksualny\",\n      \"reason\": \"Normative status, less likely to be a sensitive disclosure in most contexts.\"\n    },\n    {\n      \"term\": \"aktywny seksualnie\",\n      \"reason\": \"Excluded to meet term count, prioritizing identity terms over activity status.\"\n    },\n    {\n      \"term\": \"interpłciowy\",\n      \"reason\": \"Can be a medical diagnosis; health terms are covered elsewhere.\"\n    },\n    {\n      \"term\": \"aseksualny\",\n      \"reason\": \"High risk of false positives from biology context (asexual reproduction).\"\n    },\n    {\n      \"term\": \"coming out\",\n      \"reason\": \"Refers to an event, not a status, and is ambiguous.\"\n    },\n    {\n      \"term\": \"bi\",\n      \"reason\": \"Too ambiguous; common prefix (e.g., bilingual).\"\n    },\n    {\n      \"term\": \"trans\",\n      \"reason\": \"Too ambiguous; common prefix (e.g., transport).\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 810,
+        "completion_tokens": 10354,
+        "total_tokens": 11164,
+        "cost": 0.1045525,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.1045525,
+          "upstream_inference_prompt_cost": 0.0010125,
+          "upstream_inference_completions_cost": 0.10354
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 7651,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "gej",
+          "form": "nominative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of male homosexual identity."
+        },
+        {
+          "term": "geja",
+          "form": "genitive/accusative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of male homosexual identity."
+        },
+        {
+          "term": "gejem",
+          "form": "instrumental masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of male homosexual identity."
+        },
+        {
+          "term": "lesbijka",
+          "form": "nominative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of female homosexual identity."
+        },
+        {
+          "term": "lesbijki",
+          "form": "genitive feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of female homosexual identity."
+        },
+        {
+          "term": "lesbijkę",
+          "form": "accusative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of female homosexual identity."
+        },
+        {
+          "term": "lesbijką",
+          "form": "instrumental feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of female homosexual identity."
+        },
+        {
+          "term": "biseksualny",
+          "form": "nominative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of bisexual identity."
+        },
+        {
+          "term": "biseksualnego",
+          "form": "genitive/accusative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of bisexual identity."
+        },
+        {
+          "term": "biseksualnym",
+          "form": "instrumental masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of bisexual identity."
+        },
+        {
+          "term": "biseksualna",
+          "form": "nominative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of bisexual identity."
+        },
+        {
+          "term": "biseksualnej",
+          "form": "genitive feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of bisexual identity."
+        },
+        {
+          "term": "biseksualną",
+          "form": "accusative/instrumental feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A direct statement of bisexual identity."
+        },
+        {
+          "term": "panseksualny",
+          "form": "nominative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).",
+          "justification": "A direct statement of pansexual identity; full word is unambiguous."
+        },
+        {
+          "term": "panseksualnego",
+          "form": "genitive/accusative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).",
+          "justification": "A direct statement of pansexual identity; full word is unambiguous."
+        },
+        {
+          "term": "panseksualnym",
+          "form": "instrumental masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).",
+          "justification": "A direct statement of pansexual identity; full word is unambiguous."
+        },
+        {
+          "term": "panseksualna",
+          "form": "nominative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).",
+          "justification": "A direct statement of pansexual identity; full word is unambiguous."
+        },
+        {
+          "term": "panseksualnej",
+          "form": "genitive feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).",
+          "justification": "A direct statement of pansexual identity; full word is unambiguous."
+        },
+        {
+          "term": "panseksualną",
+          "form": "accusative/instrumental feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' means 'mister' (pl) or 'bread' (es, fr, it, pt).",
+          "justification": "A direct statement of pansexual identity; full word is unambiguous."
+        },
+        {
+          "term": "queer",
+          "form": "indeclinable",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English loanword, but specific in this context.",
+          "justification": "A common self-identifier for non-heteronormative identity."
+        },
+        {
+          "term": "lgbtq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for the community; attribution indicates affiliation."
+        },
+        {
+          "term": "transpłciowy",
+          "form": "nominative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Prefix 'trans' is common, but the full word is specific.",
+          "justification": "A direct statement of transgender identity."
+        },
+        {
+          "term": "transpłciowego",
+          "form": "genitive/accusative masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Prefix 'trans' is common, but the full word is specific.",
+          "justification": "A direct statement of transgender identity."
+        },
+        {
+          "term": "transpłciowym",
+          "form": "instrumental masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Prefix 'trans' is common, but the full word is specific.",
+          "justification": "A direct statement of transgender identity."
+        },
+        {
+          "term": "transpłciowa",
+          "form": "nominative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Prefix 'trans' is common, but the full word is specific.",
+          "justification": "A direct statement of transgender identity."
+        },
+        {
+          "term": "transpłciowej",
+          "form": "genitive feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Prefix 'trans' is common, but the full word is specific.",
+          "justification": "A direct statement of transgender identity."
+        },
+        {
+          "term": "transpłciową",
+          "form": "accusative/instrumental feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Prefix 'trans' is common, but the full word is specific.",
+          "justification": "A direct statement of transgender identity."
+        },
+        {
+          "term": "orientacja seksualna",
+          "form": "nominative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'orientacja' alone is ambiguous, but the phrase is specific.",
+          "justification": "The general term for sexual orientation; attribution is a disclosure."
+        },
+        {
+          "term": "orientacji seksualnej",
+          "form": "genitive feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'orientacja' alone is ambiguous, but the phrase is specific.",
+          "justification": "The general term for sexual orientation; attribution is a disclosure."
+        },
+        {
+          "term": "orientację seksualną",
+          "form": "accusative feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'orientacja' alone is ambiguous, but the phrase is specific.",
+          "justification": "The general term for sexual orientation; attribution is a disclosure."
+        },
+        {
+          "term": "orientacją seksualną",
+          "form": "instrumental feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'orientacja' alone is ambiguous, but the phrase is specific.",
+          "justification": "The general term for sexual orientation; attribution is a disclosure."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "homoseksualny",
+          "reason": "More clinical term; gej/lesbijka are more common for personal attribution."
+        },
+        {
+          "term": "heteroseksualny",
+          "reason": "Normative status, less likely to be a sensitive disclosure in most contexts."
+        },
+        {
+          "term": "aktywny seksualnie",
+          "reason": "Excluded to meet term count, prioritizing identity terms over activity status."
+        },
+        {
+          "term": "interpłciowy",
+          "reason": "Can be a medical diagnosis; health terms are covered elsewhere."
+        },
+        {
+          "term": "aseksualny",
+          "reason": "High risk of false positives from biology context (asexual reproduction)."
+        },
+        {
+          "term": "coming out",
+          "reason": "Refers to an event, not a status, and is ambiguous."
+        },
+        {
+          "term": "bi",
+          "reason": "Too ambiguous; common prefix (e.g., bilingual)."
+        },
+        {
+          "term": "trans",
+          "reason": "Too ambiguous; common prefix (e.g., transport)."
+        }
+      ]
+    },
+    {
+      "domain": "genetic-data",
+      "label": "genetic data",
+      "prompt": "Target language: Polish (pl).\nArticle 9 special-category domain: genetic data.\n\nWHAT TO RETURN\nONLY multi-word, inherently disclosure-shaped phrases about genetic testing or hereditary status (\"DNA test result\", \"genetic test\", \"genetic screening\", \"hereditary condition\"). Do NOT return bare \"DNA\", \"gene\" or \"chromosome\" — those are biology-curriculum vocabulary. Biometric data is deliberately out of scope: Article 9 defines it by the identification PURPOSE, not by any word a learner types, so return no biometric terms.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nPolish declines. Give nominative, genitive, accusative and instrumental singular AND the masculine/feminine pair (katolik / katolika / katolikiem / katoliczka).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Polish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"test genetyczny\",\n      \"form\": \"nominative/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a genetic test, a specific medical procedure.\"\n    },\n    {\n      \"term\": \"testu genetycznego\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a genetic test, a specific medical procedure.\"\n    },\n    {\n      \"term\": \"testem genetycznym\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a genetic test, a specific medical procedure.\"\n    },\n    {\n      \"term\": \"badanie genetyczne\",\n      \"form\": \"nominative/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a genetic study/test, a specific medical procedure.\"\n    },\n    {\n      \"term\": \"badania genetycznego\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a genetic study/test, a specific medical procedure.\"\n    },\n    {\n      \"term\": \"badaniem genetycznym\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a genetic study/test, a specific medical procedure.\"\n    },\n    {\n      \"term\": \"choroba genetyczna\",\n      \"form\": \"nominative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"choroby genetycznej\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"chorobę genetyczną\",\n      \"form\": \"accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"chorobą genetyczną\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"choroba dziedziczna\",\n      \"form\": \"nominative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition passed down through genes.\"\n    },\n    {\n      \"term\": \"choroby dziedzicznej\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition passed down through genes.\"\n    },\n    {\n      \"term\": \"chorobę dziedziczną\",\n      \"form\": \"accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition passed down through genes.\"\n    },\n    {\n      \"term\": \"chorobą dziedziczną\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health condition passed down through genes.\"\n    },\n    {\n      \"term\": \"obciążenie genetyczne\",\n      \"form\": \"nominative/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a hereditary predisposition to a condition.\"\n    },\n    {\n      \"term\": \"obciążenia genetycznego\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a hereditary predisposition to a condition.\"\n    },\n    {\n      \"term\": \"obciążeniem genetycznym\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a hereditary predisposition to a condition.\"\n    },\n    {\n      \"term\": \"mutacja genetyczna\",\n      \"form\": \"nominative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific change in a DNA sequence.\"\n    },\n    {\n      \"term\": \"mutacji genetycznej\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific change in a DNA sequence.\"\n    },\n    {\n      \"term\": \"mutację genetyczną\",\n      \"form\": \"accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific change in a DNA sequence.\"\n    },\n    {\n      \"term\": \"mutacją genetyczną\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific change in a DNA sequence.\"\n    },\n    {\n      \"term\": \"nosicielstwo genu\",\n      \"form\": \"nominative/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to being a carrier of a specific gene.\"\n    },\n    {\n      \"term\": \"nosicielstwa genu\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to being a carrier of a specific gene.\"\n    },\n    {\n      \"term\": \"nosicielstwem genu\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to being a carrier of a specific gene.\"\n    },\n    {\n      \"term\": \"wynik testu dna\",\n      \"form\": \"nominative/accusative singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the outcome of a genetic test.\"\n    },\n    {\n      \"term\": \"wyniku testu dna\",\n      \"form\": \"genitive singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the outcome of a genetic test.\"\n    },\n    {\n      \"term\": \"wynikiem testu dna\",\n      \"form\": \"instrumental singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the outcome of a genetic test.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"dna\",\n      \"reason\": \"Too common in biology curriculum; not inherently a disclosure.\"\n    },\n    {\n      \"term\": \"gen\",\n      \"reason\": \"Too common in biology curriculum; not inherently a disclosure.\"\n    },\n    {\n      \"term\": \"chromosom\",\n      \"reason\": \"Too common in biology curriculum; not inherently a disclosure.\"\n    },\n    {\n      \"term\": \"nosiciel\",\n      \"reason\": \"Ambiguous; can mean carrier of a bag, idea, or disease.\"\n    },\n    {\n      \"term\": \"nosicielka\",\n      \"reason\": \"Ambiguous; can mean carrier of a bag, idea, or disease.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 796,
+        "completion_tokens": 4833,
+        "total_tokens": 5629,
+        "cost": 0.049325,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.049325,
+          "upstream_inference_prompt_cost": 0.000995,
+          "upstream_inference_completions_cost": 0.04833
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2722,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "test genetyczny",
+          "form": "nominative/accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a genetic test, a specific medical procedure."
+        },
+        {
+          "term": "testu genetycznego",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a genetic test, a specific medical procedure."
+        },
+        {
+          "term": "testem genetycznym",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a genetic test, a specific medical procedure."
+        },
+        {
+          "term": "badanie genetyczne",
+          "form": "nominative/accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a genetic study/test, a specific medical procedure."
+        },
+        {
+          "term": "badania genetycznego",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a genetic study/test, a specific medical procedure."
+        },
+        {
+          "term": "badaniem genetycznym",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a genetic study/test, a specific medical procedure."
+        },
+        {
+          "term": "choroba genetyczna",
+          "form": "nominative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition caused by genetic abnormalities."
+        },
+        {
+          "term": "choroby genetycznej",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition caused by genetic abnormalities."
+        },
+        {
+          "term": "chorobę genetyczną",
+          "form": "accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition caused by genetic abnormalities."
+        },
+        {
+          "term": "chorobą genetyczną",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition caused by genetic abnormalities."
+        },
+        {
+          "term": "choroba dziedziczna",
+          "form": "nominative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition passed down through genes."
+        },
+        {
+          "term": "choroby dziedzicznej",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition passed down through genes."
+        },
+        {
+          "term": "chorobę dziedziczną",
+          "form": "accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition passed down through genes."
+        },
+        {
+          "term": "chorobą dziedziczną",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health condition passed down through genes."
+        },
+        {
+          "term": "obciążenie genetyczne",
+          "form": "nominative/accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a hereditary predisposition to a condition."
+        },
+        {
+          "term": "obciążenia genetycznego",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a hereditary predisposition to a condition."
+        },
+        {
+          "term": "obciążeniem genetycznym",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a hereditary predisposition to a condition."
+        },
+        {
+          "term": "mutacja genetyczna",
+          "form": "nominative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific change in a DNA sequence."
+        },
+        {
+          "term": "mutacji genetycznej",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific change in a DNA sequence."
+        },
+        {
+          "term": "mutację genetyczną",
+          "form": "accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific change in a DNA sequence."
+        },
+        {
+          "term": "mutacją genetyczną",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific change in a DNA sequence."
+        },
+        {
+          "term": "nosicielstwo genu",
+          "form": "nominative/accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to being a carrier of a specific gene."
+        },
+        {
+          "term": "nosicielstwa genu",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to being a carrier of a specific gene."
+        },
+        {
+          "term": "nosicielstwem genu",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to being a carrier of a specific gene."
+        },
+        {
+          "term": "wynik testu dna",
+          "form": "nominative/accusative singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the outcome of a genetic test."
+        },
+        {
+          "term": "wyniku testu dna",
+          "form": "genitive singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the outcome of a genetic test."
+        },
+        {
+          "term": "wynikiem testu dna",
+          "form": "instrumental singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the outcome of a genetic test."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "dna",
+          "reason": "Too common in biology curriculum; not inherently a disclosure."
+        },
+        {
+          "term": "gen",
+          "reason": "Too common in biology curriculum; not inherently a disclosure."
+        },
+        {
+          "term": "chromosom",
+          "reason": "Too common in biology curriculum; not inherently a disclosure."
+        },
+        {
+          "term": "nosiciel",
+          "reason": "Ambiguous; can mean carrier of a bag, idea, or disease."
+        },
+        {
+          "term": "nosicielka",
+          "reason": "Ambiguous; can mean carrier of a bag, idea, or disease."
+        }
+      ]
+    }
+  ]
+}

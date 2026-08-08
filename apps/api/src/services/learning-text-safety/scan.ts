@@ -198,8 +198,18 @@ function alternation(literals: readonly string[]): string {
  * only through the grammar of the corpus that declares the term. A bare mention
  * is invisible to the detector, which is what keeps a cross-language homograph
  * ("tea" the drink, "ads", "add") out of the broad path.
+ *
+ * `within-unnamed-attribution` — [WI-3142] as above, MINUS the Latin
+ * "capitalized token = person name" heuristic. The Article 9 status domains
+ * (religion, politics, ethnicity, union membership, orientation) use it so that
+ * `Martin Luther was Catholic.` — a historical figure, not the data subject —
+ * does not hard-block a learner's history note, while every construction naming
+ * a data subject still does.
  */
-type DetectionPolicy = 'standalone' | 'within-attribution';
+type DetectionPolicy =
+  | 'standalone'
+  | 'within-attribution'
+  | 'within-unnamed-attribution';
 
 /**
  * Every lexeme scope, as a value list that CANNOT drift from the union: the
@@ -208,6 +218,7 @@ type DetectionPolicy = 'standalone' | 'within-attribution';
 const ALL_LEXEME_SCOPES = Object.keys({
   broad: true,
   'attributed-only': true,
+  'unnamed-attribution-only': true,
 } satisfies Record<LexemeScope, true>) as readonly LexemeScope[];
 
 /**
@@ -223,6 +234,8 @@ function detectionPolicyFor(scope: LexemeScope): DetectionPolicy {
       return 'standalone';
     case 'attributed-only':
       return 'within-attribution';
+    case 'unnamed-attribution-only':
+      return 'within-unnamed-attribution';
     default: {
       const exhaustive: never = scope;
       throw new Error(`unhandled lexeme scope: ${String(exhaustive)}`);
@@ -371,7 +384,7 @@ interface CompiledGrammar {
  * (slot = every standalone lexeme) and, if it declares any, an attributed-only
  * set (slot = its own acronyms), and the two need different genitive handling.
  */
-type SetScope = 'standalone' | 'attributed-only';
+type SetScope = 'standalone' | 'attributed-only' | 'unnamed-attribution';
 
 function buildPatternSet(
   corpus: LanguageCorpus,
@@ -411,7 +424,15 @@ function buildPatternSet(
           ),
         );
       }
-      if (corpus.scriptHasCase) {
+      // THE BARE-NAME HEURISTIC IS SUPPRESSED FOR THE UNNAMED SCOPE. A
+      // capitalized token is the only evidence this pattern has that a person is
+      // being described, and over an Article 9 STATUS slot that evidence is
+      // wrong far too often: `Martin Luther was Catholic.`, `Gandhi was Hindu.`,
+      // `Lenin was a communist.` are history homework, not characterisations of
+      // the learner. Every other attribution shape (person reference, possessive,
+      // and the Japanese structural patterns below) survives, so a data subject
+      // referred to as `she`, `the learner` or `her` is still caught.
+      if (corpus.scriptHasCase && setScope !== 'unnamed-attribution') {
         namedPatterns.push(
           new RegExp(
             `${LATIN_LEFT_BOUNDARY}(?<person>[\\p{Lu}][\\p{L}\\p{M}'’-]{1,39})${LATIN_RIGHT_BOUNDARY}\\s+${hedge}${phrase}\\s+${postVerb}${lexeme}${LATIN_RIGHT_BOUNDARY}`,
@@ -490,31 +511,41 @@ function buildPatternSet(
 }
 
 /**
- * ALWAYS-ON, one per declaring corpus. Built once at module load: these do not
- * depend on the declared language, which is the point — an attributed-only term
- * is otherwise reachable by no grammar at all outside its own language, so the
- * ruling's three named strings would classify `clear` in nine of ten declared
- * languages while the standalone path fails closed in all ten.
+ * ALWAYS-ON, one per declaring corpus PER attribution scope. Built once at
+ * module load: these do not depend on the declared language, which is the point
+ * — an attribution-scoped term is otherwise reachable by no grammar at all
+ * outside its own language, so the ruling's three named strings would classify
+ * `clear` in nine of ten declared languages while the standalone path fails
+ * closed in all ten. [WI-3142] The same symmetry is why the Article 9 status
+ * sets are always-on: `The learner is Catholic.` must block under a declared
+ * `de` exactly as it does under `en`.
  */
-const ATTRIBUTED_ONLY_SETS: readonly AttributionPatternSet[] =
+const ATTRIBUTION_SCOPED_SETS: readonly AttributionPatternSet[] = (
+  [
+    ['within-attribution', 'attributed-only'],
+    ['within-unnamed-attribution', 'unnamed-attribution'],
+  ] as ReadonlyArray<readonly [DetectionPolicy, SetScope]>
+).flatMap(([policy, setScope]) =>
   CORPUS_LANGUAGES.flatMap((language) => {
     const corpus = LANGUAGE_CORPORA[language];
-    const terms = termsFor(corpus, 'within-attribution');
+    const terms = termsFor(corpus, policy);
     return terms.length
-      ? [
-          buildPatternSet(
-            corpus,
-            `(?:${alternation(terms)})`,
-            'attributed-only',
-          ),
-        ]
+      ? [buildPatternSet(corpus, `(?:${alternation(terms)})`, setScope)]
       : [];
-  });
-
-/** Matchers for EVERY corpus's attributed-only terms — count attribution only. */
-const ATTRIBUTED_ONLY_MATCHERS = buildLexemeMatchers(
-  termsAcrossCorpora('within-attribution'),
+  }),
 );
+
+/**
+ * Matchers for EVERY corpus's attribution-scoped terms, both scopes — used to
+ * count lexemes INSIDE a matched attribution span, never across the whole text.
+ * Missing a scope here would not lose a block (attribution is decided first),
+ * but it would report that block with a zero protected-lexeme count, which
+ * `scan.test.ts` treats as the loud signal that the derivation has drifted.
+ */
+const ATTRIBUTION_SCOPED_MATCHERS = buildLexemeMatchers([
+  ...termsAcrossCorpora('within-attribution'),
+  ...termsAcrossCorpora('within-unnamed-attribution'),
+]);
 
 function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
   // Standalone grammar = the declared language PLUS English. English is the
@@ -533,7 +564,7 @@ function compileGrammar(declared: ConversationLanguage): CompiledGrammar {
       ...corpora.map((corpus) =>
         buildPatternSet(corpus, `(?:${ANY_LEXEME_ALT})`, 'standalone'),
       ),
-      ...ATTRIBUTED_ONLY_SETS,
+      ...ATTRIBUTION_SCOPED_SETS,
     ],
   };
 }
@@ -710,7 +741,7 @@ export function scanLearningText(
   const normalized = normalizeForMatching(input.text);
   const standaloneLexemes = findLexemes(normalized, STANDALONE_LEXEME_MATCHERS);
   const attribution = findAttribution(normalized, grammar);
-  // An `attributed-only` term counts as a protected lexeme exactly when it sits
+  // An attribution-scoped term counts as a protected lexeme exactly when it sits
   // inside a found attribution span — never on its own. Scanning the span rather
   // than the whole text is what keeps the count honest about WHY the term was
   // protected here.
@@ -718,7 +749,7 @@ export function scanLearningText(
     ...standaloneLexemes,
     ...(attribution === null
       ? []
-      : findLexemes(attribution.span, ATTRIBUTED_ONLY_MATCHERS)),
+      : findLexemes(attribution.span, ATTRIBUTION_SCOPED_MATCHERS)),
   ]);
   const protectedLexemeCount = matchedLexemes.size;
 

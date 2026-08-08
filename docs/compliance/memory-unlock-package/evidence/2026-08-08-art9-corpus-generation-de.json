@@ -1,0 +1,2116 @@
+{
+  "workItem": "WI-3142",
+  "purpose": "Best-effort LLM-prepared Article 9 protected-lexeme corpus for a non-English conversation language. UNREVIEWED: not load-bearing as a compliance control. Native-speaker review is a precondition for enabling persistent memory in this language.",
+  "operatorRuling": "2026-08-08 — persistent memory is English-only at unlock; non-English corpora are prepared best-effort via LLM generation and marked model-generated.",
+  "language": "de",
+  "languageName": "German",
+  "generatedAt": "2026-08-08T17:47:02.939Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-pro",
+  "systemPrompt": "You are a native-speaker lexicographer working with a data-protection engineer. You are building a DETECTION corpus for a deterministic text scanner, not an encyclopedia. The scanner matches literal lowercase phrases inside person-attribution constructions only. A bare mention of a term never fires; only \"<person reference> <verb> <term>\" and \"<possessive> <term>\" do. Your job is therefore to maximise recall of PERSON-ATTRIBUTED STATUS ASSERTIONS while keeping ordinary schoolwork prose out. Answer with strict JSON only. No markdown, no code fences, no commentary.",
+  "appliedScope": "unnamed-attribution-only",
+  "appliedScopeNote": "Every accepted term is applied at unnamed-attribution-only regardless of the model recommendation. Promotion to broad is a human decision.",
+  "termCount": 191,
+  "domains": [
+    {
+      "domain": "racial-or-ethnic-origin",
+      "label": "racial or ethnic origin",
+      "prompt": "Target language: German (de).\nArticle 9 special-category domain: racial or ethnic origin.\n\nWHAT TO RETURN\nEthnic-group and origin nouns/adjectives that describe a PERSON (Roma, Sinti, Kurdish, indigenous, \"of mixed heritage\", \"ethnic minority\", \"immigrant background\", \"ethnicity\"). EXCLUDE bare colour words and bare continent/region adjectives — their attributed forms (\"my black cat\", \"their African elephant\") are ordinary prose far more often than an origin disclosure.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nGerman declines and forms compounds. Give nominative and genitive, the masculine/feminine pair (Katholik / Katholikin), and the adjectival forms actually used predicatively (katholisch, jüdisch).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary German prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"migrationshintergrund\",\n      \"form\": \"noun, masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's immigrant background, a key indicator of origin.\"\n    },\n    {\n      \"term\": \"migrationshintergrunds\",\n      \"form\": \"noun, masculine genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's immigrant background, a key indicator of origin.\"\n    },\n    {\n      \"term\": \"kurde\",\n      \"form\": \"noun, masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a member of the Kurdish ethnic group.\"\n    },\n    {\n      \"term\": \"kurdin\",\n      \"form\": \"noun, feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a member of the Kurdish ethnic group.\"\n    },\n    {\n      \"term\": \"kurdisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's Kurdish origin or heritage.\"\n    },\n    {\n      \"term\": \"jude\",\n      \"form\": \"noun, masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Rare slang for 'skirt' in Czech.\",\n      \"justification\": \"Identifies a person's Jewish ethnicity or origin.\"\n    },\n    {\n      \"term\": \"jüdin\",\n      \"form\": \"noun, feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's Jewish ethnicity or origin.\"\n    },\n    {\n      \"term\": \"jüdisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's Jewish origin or heritage.\"\n    },\n    {\n      \"term\": \"romni\",\n      \"form\": \"noun, feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a woman of the Romani ethnic group.\"\n    },\n    {\n      \"term\": \"jenischer\",\n      \"form\": \"adjectival noun, masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person of the Yenish ethnic group.\"\n    },\n    {\n      \"term\": \"jenische\",\n      \"form\": \"noun, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Polish 'je niszczę' (I destroy them) is two words.\",\n      \"justification\": \"Identifies a person of the Yenish ethnic group.\"\n    },\n    {\n      \"term\": \"jeside\",\n      \"form\": \"noun, masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person of the Yazidi ethno-religious group.\"\n    },\n    {\n      \"term\": \"jesidin\",\n      \"form\": \"noun, feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person of the Yazidi ethno-religious group.\"\n    },\n    {\n      \"term\": \"jesidisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's Yazidi origin or heritage.\"\n    },\n    {\n      \"term\": \"alevite\",\n      \"form\": \"noun, masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person of the Alevi ethno-religious group.\"\n    },\n    {\n      \"term\": \"alevitin\",\n      \"form\": \"noun, feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person of the Alevi ethno-religious group.\"\n    },\n    {\n      \"term\": \"alevitisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's Alevi origin or heritage.\"\n    },\n    {\n      \"term\": \"indigen\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being indigenous.\"\n    },\n    {\n      \"term\": \"ureinwohner\",\n      \"form\": \"noun, masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a native or aboriginal inhabitant.\"\n    },\n    {\n      \"term\": \"ureinwohnerin\",\n      \"form\": \"noun, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a native or aboriginal inhabitant.\"\n    },\n    {\n      \"term\": \"mischling\",\n      \"form\": \"noun, masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of mixed ethnic heritage, though can be pejorative.\"\n    },\n    {\n      \"term\": \"halbjude\",\n      \"form\": \"noun, masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A historical term for a person of partially Jewish descent.\"\n    },\n    {\n      \"term\": \"halbjüdin\",\n      \"form\": \"noun, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A historical term for a person of partially Jewish descent.\"\n    },\n    {\n      \"term\": \"ethnie\",\n      \"form\": \"noun, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's ethnicity, e.g. 'meine Ethnie'.\"\n    },\n    {\n      \"term\": \"volksgruppe\",\n      \"form\": \"noun, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's ethnic group, e.g. 'seine Volksgruppe'.\"\n    },\n    {\n      \"term\": \"ethnische zugehörigkeit\",\n      \"form\": \"noun phrase, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'ethnic affiliation'.\"\n    },\n    {\n      \"term\": \"volkszugehörigkeit\",\n      \"form\": \"noun, feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states 'ethnic affiliation' or 'nationality'.\"\n    },\n    {\n      \"term\": \"gemischter herkunft\",\n      \"form\": \"adjectival phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being 'of mixed origin'.\"\n    },\n    {\n      \"term\": \"ethnischer herkunft\",\n      \"form\": \"adjectival phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being 'of ethnic origin'.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"roma\",\n      \"reason\": \"High homograph risk; it is the name of the city Rome in Italian, Spanish, and Portuguese.\"\n    },\n    {\n      \"term\": \"sinto\",\n      \"reason\": \"High homograph risk; it means 'I feel' in Italian and Portuguese.\"\n    },\n    {\n      \"term\": \"sinti\",\n      \"reason\": \"High homograph risk; it means 'you feel' (plural) in Italian.\"\n    },\n    {\n      \"term\": \"araber\",\n      \"reason\": \"Ambiguous; commonly refers to the Arab horse breed ('sein Araber').\"\n    },\n    {\n      \"term\": \"ausländer\",\n      \"reason\": \"Refers to legal status (foreigner), not necessarily ethnic origin. High ambiguity.\"\n    },\n    {\n      \"term\": \"türke\",\n      \"reason\": \"Primarily denotes nationality, not ethnic origin. High potential for non-disclosure mentions.\"\n    },\n    {\n      \"term\": \"pole\",\n      \"reason\": \"Primarily nationality. Also a common word in English, French, etc. ('north pole').\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 794,
+        "completion_tokens": 6088,
+        "total_tokens": 6882,
+        "cost": 0.0618725,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0618725,
+          "upstream_inference_prompt_cost": 0.0009925,
+          "upstream_inference_completions_cost": 0.06088
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3743,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "migrationshintergrund",
+          "form": "noun, masculine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's immigrant background, a key indicator of origin."
+        },
+        {
+          "term": "migrationshintergrunds",
+          "form": "noun, masculine genitive",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's immigrant background, a key indicator of origin."
+        },
+        {
+          "term": "kurde",
+          "form": "noun, masculine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a member of the Kurdish ethnic group."
+        },
+        {
+          "term": "kurdin",
+          "form": "noun, feminine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a member of the Kurdish ethnic group."
+        },
+        {
+          "term": "kurdisch",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's Kurdish origin or heritage."
+        },
+        {
+          "term": "jude",
+          "form": "noun, masculine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Rare slang for 'skirt' in Czech.",
+          "justification": "Identifies a person's Jewish ethnicity or origin."
+        },
+        {
+          "term": "jüdin",
+          "form": "noun, feminine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's Jewish ethnicity or origin."
+        },
+        {
+          "term": "jüdisch",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's Jewish origin or heritage."
+        },
+        {
+          "term": "romni",
+          "form": "noun, feminine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a woman of the Romani ethnic group."
+        },
+        {
+          "term": "jenischer",
+          "form": "adjectival noun, masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person of the Yenish ethnic group."
+        },
+        {
+          "term": "jenische",
+          "form": "noun, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Polish 'je niszczę' (I destroy them) is two words.",
+          "justification": "Identifies a person of the Yenish ethnic group."
+        },
+        {
+          "term": "jeside",
+          "form": "noun, masculine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person of the Yazidi ethno-religious group."
+        },
+        {
+          "term": "jesidin",
+          "form": "noun, feminine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person of the Yazidi ethno-religious group."
+        },
+        {
+          "term": "jesidisch",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's Yazidi origin or heritage."
+        },
+        {
+          "term": "alevite",
+          "form": "noun, masculine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person of the Alevi ethno-religious group."
+        },
+        {
+          "term": "alevitin",
+          "form": "noun, feminine nominative",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person of the Alevi ethno-religious group."
+        },
+        {
+          "term": "alevitisch",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's Alevi origin or heritage."
+        },
+        {
+          "term": "indigen",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being indigenous."
+        },
+        {
+          "term": "ureinwohner",
+          "form": "noun, masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a native or aboriginal inhabitant."
+        },
+        {
+          "term": "ureinwohnerin",
+          "form": "noun, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a native or aboriginal inhabitant."
+        },
+        {
+          "term": "mischling",
+          "form": "noun, masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of mixed ethnic heritage, though can be pejorative."
+        },
+        {
+          "term": "halbjude",
+          "form": "noun, masculine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A historical term for a person of partially Jewish descent."
+        },
+        {
+          "term": "halbjüdin",
+          "form": "noun, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A historical term for a person of partially Jewish descent."
+        },
+        {
+          "term": "ethnie",
+          "form": "noun, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's ethnicity, e.g. 'meine Ethnie'."
+        },
+        {
+          "term": "volksgruppe",
+          "form": "noun, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's ethnic group, e.g. 'seine Volksgruppe'."
+        },
+        {
+          "term": "ethnische zugehörigkeit",
+          "form": "noun phrase, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states 'ethnic affiliation'."
+        },
+        {
+          "term": "volkszugehörigkeit",
+          "form": "noun, feminine",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states 'ethnic affiliation' or 'nationality'."
+        },
+        {
+          "term": "gemischter herkunft",
+          "form": "adjectival phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being 'of mixed origin'."
+        },
+        {
+          "term": "ethnischer herkunft",
+          "form": "adjectival phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being 'of ethnic origin'."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "roma",
+          "reason": "High homograph risk; it is the name of the city Rome in Italian, Spanish, and Portuguese."
+        },
+        {
+          "term": "sinto",
+          "reason": "High homograph risk; it means 'I feel' in Italian and Portuguese."
+        },
+        {
+          "term": "sinti",
+          "reason": "High homograph risk; it means 'you feel' (plural) in Italian."
+        },
+        {
+          "term": "araber",
+          "reason": "Ambiguous; commonly refers to the Arab horse breed ('sein Araber')."
+        },
+        {
+          "term": "ausländer",
+          "reason": "Refers to legal status (foreigner), not necessarily ethnic origin. High ambiguity."
+        },
+        {
+          "term": "türke",
+          "reason": "Primarily denotes nationality, not ethnic origin. High potential for non-disclosure mentions."
+        },
+        {
+          "term": "pole",
+          "reason": "Primarily nationality. Also a common word in English, French, etc. ('north pole')."
+        }
+      ]
+    },
+    {
+      "domain": "political-opinions",
+      "label": "political opinions or affiliation",
+      "prompt": "Target language: German (de).\nArticle 9 special-category domain: political opinions or affiliation.\n\nWHAT TO RETURN\nPolitical-affiliation and opinion nouns/adjectives applied to a person (communist, socialist, anarchist, nationalist, feminist, far-right, \"party member\", \"political views\"). EXCLUDE words whose ordinary sense dominates in schoolwork — the local equivalents of English \"conservative\" (a conservative estimate), \"liberal\" (a liberal amount), \"green\", \"independent\", \"radical\", \"progressive\".\n\nMORPHOLOGY — this is the part generic answers get wrong.\nGerman declines and forms compounds. Give nominative and genitive, the masculine/feminine pair (Katholik / Katholikin), and the adjectival forms actually used predicatively (katholisch, jüdisch).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary German prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"kommunist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a communist.\"\n    },\n    {\n      \"term\": \"kommunisten\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a communist.\"\n    },\n    {\n      \"term\": \"kommunistin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a communist.\"\n    },\n    {\n      \"term\": \"kommunistisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as communist.\"\n    },\n    {\n      \"term\": \"sozialist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a socialist.\"\n    },\n    {\n      \"term\": \"sozialisten\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a socialist.\"\n    },\n    {\n      \"term\": \"sozialistin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a socialist.\"\n    },\n    {\n      \"term\": \"sozialistisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as socialist.\"\n    },\n    {\n      \"term\": \"anarchist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as an anarchist.\"\n    },\n    {\n      \"term\": \"anarchisten\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as an anarchist.\"\n    },\n    {\n      \"term\": \"anarchistin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as an anarchist.\"\n    },\n    {\n      \"term\": \"anarchistisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as anarchist.\"\n    },\n    {\n      \"term\": \"nationalist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a nationalist.\"\n    },\n    {\n      \"term\": \"nationalisten\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a nationalist.\"\n    },\n    {\n      \"term\": \"nationalistin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a nationalist.\"\n    },\n    {\n      \"term\": \"nationalistisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as nationalist.\"\n    },\n    {\n      \"term\": \"feminist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a feminist.\"\n    },\n    {\n      \"term\": \"feministen\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a feminist.\"\n    },\n    {\n      \"term\": \"feministin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a feminist.\"\n    },\n    {\n      \"term\": \"feministisch\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as feminist.\"\n    },\n    {\n      \"term\": \"rechtsextrem\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as far-right.\"\n    },\n    {\n      \"term\": \"rechtsextremist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a far-right extremist.\"\n    },\n    {\n      \"term\": \"rechtsextremisten\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a far-right extremist.\"\n    },\n    {\n      \"term\": \"rechtsextremistin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a far-right extremist.\"\n    },\n    {\n      \"term\": \"linksextrem\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political views as far-left.\"\n    },\n    {\n      \"term\": \"linksextremist\",\n      \"form\": \"masculine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a far-left extremist.\"\n    },\n    {\n      \"term\": \"linksextremisten\",\n      \"form\": \"masculine genitive / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a far-left extremist.\"\n    },\n    {\n      \"term\": \"linksextremistin\",\n      \"form\": \"feminine nominative / genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a far-left extremist.\"\n    },\n    {\n      \"term\": \"parteimitglied\",\n      \"form\": \"neuter nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a member of a political party.\"\n    },\n    {\n      \"term\": \"parteimitglieds\",\n      \"form\": \"neuter genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a member of a political party.\"\n    },\n    {\n      \"term\": \"politische ansichten\",\n      \"form\": \"plural nominative/accusative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political views.\"\n    },\n    {\n      \"term\": \"politischen ansichten\",\n      \"form\": \"plural dative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political views.\"\n    },\n    {\n      \"term\": \"politische einstellung\",\n      \"form\": \"feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political attitude.\"\n    },\n    {\n      \"term\": \"politischer einstellung\",\n      \"form\": \"feminine genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political attitude.\"\n    },\n    {\n      \"term\": \"politische überzeugung\",\n      \"form\": \"feminine nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political conviction.\"\n    },\n    {\n      \"term\": \"politischer überzeugung\",\n      \"form\": \"feminine genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political conviction.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"konservativ\",\n      \"reason\": \"Too ambiguous. Common in non-political contexts, e.g., 'konservative Schätzung' (conservative estimate).\"\n    },\n    {\n      \"term\": \"liberal\",\n      \"reason\": \"Too ambiguous. Common in non-political contexts, e.g., 'liberale Menge' (liberal amount).\"\n    },\n    {\n      \"term\": \"grün\",\n      \"reason\": \"Too ambiguous. Primarily means the color green.\"\n    },\n    {\n      \"term\": \"unabhängig\",\n      \"reason\": \"Too ambiguous. Common in schoolwork, e.g., 'unabhängige Variable' (independent variable).\"\n    },\n    {\n      \"term\": \"radikal\",\n      \"reason\": \"Too ambiguous. Can mean 'thorough' or 'fundamental' in non-political contexts.\"\n    },\n    {\n      \"term\": \"progressiv\",\n      \"reason\": \"Too ambiguous. Used in medicine, grammar, and other non-political contexts.\"\n    },\n    {\n      \"term\": \"links\",\n      \"reason\": \"Too ambiguous. Means the direction 'left' and 'links' in English.\"\n    },\n    {\n      \"term\": \"rechts\",\n      \"reason\": \"Too ambiguous. Means the direction 'right' and legal concepts ('Recht').\"\n    },\n    {\n      \"term\": \"mitglied\",\n      \"reason\": \"Too general. Can refer to a member of any club or group, not just political.\"\n    },\n    {\n      \"term\": \"partei\",\n      \"reason\": \"Too ambiguous. Homograph for Italian 'partei' (you leave).\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 798,
+        "completion_tokens": 5277,
+        "total_tokens": 6075,
+        "cost": 0.0537675,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0537675,
+          "upstream_inference_prompt_cost": 0.0009975,
+          "upstream_inference_completions_cost": 0.05277
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2396,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "kommunist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a communist."
+        },
+        {
+          "term": "kommunisten",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a communist."
+        },
+        {
+          "term": "kommunistin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a communist."
+        },
+        {
+          "term": "kommunistisch",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as communist."
+        },
+        {
+          "term": "sozialist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a socialist."
+        },
+        {
+          "term": "sozialisten",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a socialist."
+        },
+        {
+          "term": "sozialistin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a socialist."
+        },
+        {
+          "term": "sozialistisch",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as socialist."
+        },
+        {
+          "term": "anarchist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as an anarchist."
+        },
+        {
+          "term": "anarchisten",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as an anarchist."
+        },
+        {
+          "term": "anarchistin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as an anarchist."
+        },
+        {
+          "term": "anarchistisch",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as anarchist."
+        },
+        {
+          "term": "nationalist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a nationalist."
+        },
+        {
+          "term": "nationalisten",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a nationalist."
+        },
+        {
+          "term": "nationalistin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a nationalist."
+        },
+        {
+          "term": "nationalistisch",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as nationalist."
+        },
+        {
+          "term": "feminist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a feminist."
+        },
+        {
+          "term": "feministen",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a feminist."
+        },
+        {
+          "term": "feministin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a feminist."
+        },
+        {
+          "term": "feministisch",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as feminist."
+        },
+        {
+          "term": "rechtsextrem",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as far-right."
+        },
+        {
+          "term": "rechtsextremist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a far-right extremist."
+        },
+        {
+          "term": "rechtsextremisten",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a far-right extremist."
+        },
+        {
+          "term": "rechtsextremistin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a far-right extremist."
+        },
+        {
+          "term": "linksextrem",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political views as far-left."
+        },
+        {
+          "term": "linksextremist",
+          "form": "masculine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a far-left extremist."
+        },
+        {
+          "term": "linksextremisten",
+          "form": "masculine genitive / plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a far-left extremist."
+        },
+        {
+          "term": "linksextremistin",
+          "form": "feminine nominative / genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a far-left extremist."
+        },
+        {
+          "term": "parteimitglied",
+          "form": "neuter nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a member of a political party."
+        },
+        {
+          "term": "parteimitglieds",
+          "form": "neuter genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a member of a political party."
+        },
+        {
+          "term": "politische ansichten",
+          "form": "plural nominative/accusative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political views."
+        },
+        {
+          "term": "politischen ansichten",
+          "form": "plural dative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political views."
+        },
+        {
+          "term": "politische einstellung",
+          "form": "feminine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political attitude."
+        },
+        {
+          "term": "politischer einstellung",
+          "form": "feminine genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political attitude."
+        },
+        {
+          "term": "politische überzeugung",
+          "form": "feminine nominative",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political conviction."
+        },
+        {
+          "term": "politischer überzeugung",
+          "form": "feminine genitive",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political conviction."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "konservativ",
+          "reason": "Too ambiguous. Common in non-political contexts, e.g., 'konservative Schätzung' (conservative estimate)."
+        },
+        {
+          "term": "liberal",
+          "reason": "Too ambiguous. Common in non-political contexts, e.g., 'liberale Menge' (liberal amount)."
+        },
+        {
+          "term": "grün",
+          "reason": "Too ambiguous. Primarily means the color green."
+        },
+        {
+          "term": "unabhängig",
+          "reason": "Too ambiguous. Common in schoolwork, e.g., 'unabhängige Variable' (independent variable)."
+        },
+        {
+          "term": "radikal",
+          "reason": "Too ambiguous. Can mean 'thorough' or 'fundamental' in non-political contexts."
+        },
+        {
+          "term": "progressiv",
+          "reason": "Too ambiguous. Used in medicine, grammar, and other non-political contexts."
+        },
+        {
+          "term": "links",
+          "reason": "Too ambiguous. Means the direction 'left' and 'links' in English."
+        },
+        {
+          "term": "rechts",
+          "reason": "Too ambiguous. Means the direction 'right' and legal concepts ('Recht')."
+        },
+        {
+          "term": "mitglied",
+          "reason": "Too general. Can refer to a member of any club or group, not just political."
+        },
+        {
+          "term": "partei",
+          "reason": "Too ambiguous. Homograph for Italian 'partei' (you leave)."
+        }
+      ]
+    },
+    {
+      "domain": "religious-or-philosophical-beliefs",
+      "label": "religious or philosophical beliefs",
+      "prompt": "Target language: German (de).\nArticle 9 special-category domain: religious or philosophical beliefs.\n\nWHAT TO RETURN\nReligious/denominational/philosophical affiliation applied to a person (Catholic, Protestant, Muslim, Jewish, Hindu, Buddhist, atheist, agnostic, devout, \"converted to Islam\", \"religious belief\"), plus belief-marking dress where it is unambiguous (hijab, kippah). EXCLUDE the local equivalent of bare \"orthodox\" (an orthodox method) and bare \"religious\"/\"religion\" (religious education is a school subject).\n\nMORPHOLOGY — this is the part generic answers get wrong.\nGerman declines and forms compounds. Give nominative and genitive, the masculine/feminine pair (Katholik / Katholikin), and the adjectival forms actually used predicatively (katholisch, jüdisch).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary German prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"katholik\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a male Catholic.\"\n    },\n    {\n      \"term\": \"des katholiken\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Catholicism to a male person.\"\n    },\n    {\n      \"term\": \"katholikin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female Catholic.\"\n    },\n    {\n      \"term\": \"der katholikin\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Catholicism to a female person.\"\n    },\n    {\n      \"term\": \"katholisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Catholic.\"\n    },\n    {\n      \"term\": \"protestant\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Homograph for English 'protestant'.\",\n      \"justification\": \"Identifies a person as a male Protestant.\"\n    },\n    {\n      \"term\": \"des protestanten\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Protestantism to a male person.\"\n    },\n    {\n      \"term\": \"protestantin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female Protestant.\"\n    },\n    {\n      \"term\": \"der protestantin\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Protestantism to a female person.\"\n    },\n    {\n      \"term\": \"protestantisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Protestant.\"\n    },\n    {\n      \"term\": \"evangelisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Protestant (Evangelical Church in Germany).\"\n    },\n    {\n      \"term\": \"muslim\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Homograph for English 'muslim'.\",\n      \"justification\": \"Identifies a person as a male Muslim.\"\n    },\n    {\n      \"term\": \"des muslims\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Islam to a male person.\"\n    },\n    {\n      \"term\": \"muslima\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female Muslim.\"\n    },\n    {\n      \"term\": \"der muslima\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Islam to a female person.\"\n    },\n    {\n      \"term\": \"muslimisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Muslim.\"\n    },\n    {\n      \"term\": \"jude\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a male Jew.\"\n    },\n    {\n      \"term\": \"des juden\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Judaism to a male person.\"\n    },\n    {\n      \"term\": \"jüdin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female Jew.\"\n    },\n    {\n      \"term\": \"der jüdin\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Judaism to a female person.\"\n    },\n    {\n      \"term\": \"jüdisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Jewish.\"\n    },\n    {\n      \"term\": \"hindu\",\n      \"form\": \"nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Homograph for English 'hindu'.\",\n      \"justification\": \"Identifies a person as a Hindu.\"\n    },\n    {\n      \"term\": \"hinduistin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female Hindu.\"\n    },\n    {\n      \"term\": \"hinduistisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Hindu.\"\n    },\n    {\n      \"term\": \"buddhist\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Homograph for English 'buddhist'.\",\n      \"justification\": \"Identifies a person as a male Buddhist.\"\n    },\n    {\n      \"term\": \"des buddhisten\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Buddhism to a male person.\"\n    },\n    {\n      \"term\": \"buddhistin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female Buddhist.\"\n    },\n    {\n      \"term\": \"der buddhistin\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing Buddhism to a female person.\"\n    },\n    {\n      \"term\": \"buddhistisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being Buddhist.\"\n    },\n    {\n      \"term\": \"atheist\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Homograph for English 'atheist'.\",\n      \"justification\": \"Identifies a person as a male atheist.\"\n    },\n    {\n      \"term\": \"des atheisten\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing atheism to a male person.\"\n    },\n    {\n      \"term\": \"atheistin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female atheist.\"\n    },\n    {\n      \"term\": \"der atheistin\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form attributing atheism to a female person.\"\n    },\n    {\n      \"term\": \"atheistisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being an atheist.\"\n    },\n    {\n      \"term\": \"agnostiker\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a male agnostic.\"\n    },\n    {\n      \"term\": \"agnostikerin\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as a female agnostic.\"\n    },\n    {\n      \"term\": \"agnostisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being agnostic.\"\n    },\n    {\n      \"term\": \"zum islam konvertiert\",\n      \"form\": \"verbal phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of conversion to Islam.\"\n    },\n    {\n      \"term\": \"religiöse überzeugung\",\n      \"form\": \"noun phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly refers to a person's religious belief.\"\n    },\n    {\n      \"term\": \"hidschab\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering worn by some Muslim women, indicating religious practice.\"\n    },\n    {\n      \"term\": \"kippa\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A skullcap worn by some Jewish men, indicating religious practice.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"orthodox\",\n      \"reason\": \"Too ambiguous; often means 'conventional' or refers to a method.\"\n    },\n    {\n      \"term\": \"religiös\",\n      \"reason\": \"Too ambiguous; common in schoolwork, e.g., 'religiöse Erziehung' (religious education).\"\n    },\n    {\n      \"term\": \"religion\",\n      \"reason\": \"Too ambiguous; refers to the general concept or a school subject.\"\n    },\n    {\n      \"term\": \"fromm\",\n      \"reason\": \"Ambiguous; can mean 'pious' but also 'wishful' as in 'frommer Wunsch'.\"\n    },\n    {\n      \"term\": \"glaube\",\n      \"reason\": \"Too general; means 'belief' or 'faith' in many non-religious contexts.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 805,
+        "completion_tokens": 7109,
+        "total_tokens": 7914,
+        "cost": 0.07209625,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.07209625,
+          "upstream_inference_prompt_cost": 0.00100625,
+          "upstream_inference_completions_cost": 0.07109
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4144,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "katholik",
+          "form": "nominative masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a male Catholic."
+        },
+        {
+          "term": "des katholiken",
+          "form": "genitive masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Catholicism to a male person."
+        },
+        {
+          "term": "katholikin",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female Catholic."
+        },
+        {
+          "term": "der katholikin",
+          "form": "genitive feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Catholicism to a female person."
+        },
+        {
+          "term": "katholisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being Catholic."
+        },
+        {
+          "term": "protestant",
+          "form": "nominative masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Homograph for English 'protestant'.",
+          "justification": "Identifies a person as a male Protestant."
+        },
+        {
+          "term": "des protestanten",
+          "form": "genitive masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Protestantism to a male person."
+        },
+        {
+          "term": "protestantin",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female Protestant."
+        },
+        {
+          "term": "der protestantin",
+          "form": "genitive feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Protestantism to a female person."
+        },
+        {
+          "term": "protestantisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being Protestant."
+        },
+        {
+          "term": "evangelisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being Protestant (Evangelical Church in Germany)."
+        },
+        {
+          "term": "muslim",
+          "form": "nominative masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Homograph for English 'muslim'.",
+          "justification": "Identifies a person as a male Muslim."
+        },
+        {
+          "term": "des muslims",
+          "form": "genitive masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Islam to a male person."
+        },
+        {
+          "term": "muslima",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female Muslim."
+        },
+        {
+          "term": "der muslima",
+          "form": "genitive feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Islam to a female person."
+        },
+        {
+          "term": "muslimisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being Muslim."
+        },
+        {
+          "term": "des juden",
+          "form": "genitive masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Judaism to a male person."
+        },
+        {
+          "term": "der jüdin",
+          "form": "genitive feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Judaism to a female person."
+        },
+        {
+          "term": "hindu",
+          "form": "nominative",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Homograph for English 'hindu'.",
+          "justification": "Identifies a person as a Hindu."
+        },
+        {
+          "term": "hinduistin",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female Hindu."
+        },
+        {
+          "term": "hinduistisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being Hindu."
+        },
+        {
+          "term": "buddhist",
+          "form": "nominative masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Homograph for English 'buddhist'.",
+          "justification": "Identifies a person as a male Buddhist."
+        },
+        {
+          "term": "des buddhisten",
+          "form": "genitive masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Buddhism to a male person."
+        },
+        {
+          "term": "buddhistin",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female Buddhist."
+        },
+        {
+          "term": "der buddhistin",
+          "form": "genitive feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing Buddhism to a female person."
+        },
+        {
+          "term": "buddhistisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being Buddhist."
+        },
+        {
+          "term": "atheist",
+          "form": "nominative masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Homograph for English 'atheist'.",
+          "justification": "Identifies a person as a male atheist."
+        },
+        {
+          "term": "des atheisten",
+          "form": "genitive masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing atheism to a male person."
+        },
+        {
+          "term": "atheistin",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female atheist."
+        },
+        {
+          "term": "der atheistin",
+          "form": "genitive feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form attributing atheism to a female person."
+        },
+        {
+          "term": "atheistisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being an atheist."
+        },
+        {
+          "term": "agnostiker",
+          "form": "nominative masculine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a male agnostic."
+        },
+        {
+          "term": "agnostikerin",
+          "form": "nominative feminine",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as a female agnostic."
+        },
+        {
+          "term": "agnostisch",
+          "form": "adjectival",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being agnostic."
+        },
+        {
+          "term": "zum islam konvertiert",
+          "form": "verbal phrase",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of conversion to Islam."
+        },
+        {
+          "term": "religiöse überzeugung",
+          "form": "noun phrase",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly refers to a person's religious belief."
+        },
+        {
+          "term": "hidschab",
+          "form": "noun",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering worn by some Muslim women, indicating religious practice."
+        },
+        {
+          "term": "kippa",
+          "form": "noun",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A skullcap worn by some Jewish men, indicating religious practice."
+        }
+      ],
+      "rejected": [
+        {
+          "term": "jude",
+          "reason": "duplicate — already present in corpus.ts or earlier in this run"
+        },
+        {
+          "term": "jüdin",
+          "reason": "duplicate — already present in corpus.ts or earlier in this run"
+        },
+        {
+          "term": "jüdisch",
+          "reason": "duplicate — already present in corpus.ts or earlier in this run"
+        }
+      ],
+      "modelExcluded": [
+        {
+          "term": "orthodox",
+          "reason": "Too ambiguous; often means 'conventional' or refers to a method."
+        },
+        {
+          "term": "religiös",
+          "reason": "Too ambiguous; common in schoolwork, e.g., 'religiöse Erziehung' (religious education)."
+        },
+        {
+          "term": "religion",
+          "reason": "Too ambiguous; refers to the general concept or a school subject."
+        },
+        {
+          "term": "fromm",
+          "reason": "Ambiguous; can mean 'pious' but also 'wishful' as in 'frommer Wunsch'."
+        },
+        {
+          "term": "glaube",
+          "reason": "Too general; means 'belief' or 'faith' in many non-religious contexts."
+        }
+      ]
+    },
+    {
+      "domain": "trade-union-membership",
+      "label": "trade-union membership",
+      "prompt": "Target language: German (de).\nArticle 9 special-category domain: trade-union membership.\n\nWHAT TO RETURN\nMembership of, or office in, a trade union (union member, trade unionist, shop steward, union dues, unionised, \"member of a union\"). EXCLUDE the bare word for \"union\" on its own — it also names the European Union and, in mathematics, the union of sets.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nGerman declines and forms compounds. Give nominative and genitive, the masculine/feminine pair (Katholik / Katholikin), and the adjectival forms actually used predicatively (katholisch, jüdisch).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary German prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"gewerkschafter\",\n      \"form\": \"m, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"gewerkschafters\",\n      \"form\": \"m, gen\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form for a trade union member.\"\n    },\n    {\n      \"term\": \"gewerkschafterin\",\n      \"form\": \"f, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A woman who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"gewerkschafterinnen\",\n      \"form\": \"f, pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Plural for women who are members of a trade union.\"\n    },\n    {\n      \"term\": \"gewerkschaftler\",\n      \"form\": \"m, nom (alternative)\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"gewerkschaftlerin\",\n      \"form\": \"f, nom (alternative)\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A woman who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"gewerkschaftsmitglied\",\n      \"form\": \"n, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"gewerkschaftsmitglieds\",\n      \"form\": \"n, gen\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form for a trade union member.\"\n    },\n    {\n      \"term\": \"gewerkschaftlich organisiert\",\n      \"form\": \"adjectival phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as being unionised.\"\n    },\n    {\n      \"term\": \"in der gewerkschaft\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of being 'in the union'.\"\n    },\n    {\n      \"term\": \"in einer gewerkschaft\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of being 'in a union'.\"\n    },\n    {\n      \"term\": \"mitglied der gewerkschaft\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of being a 'member of the union'.\"\n    },\n    {\n      \"term\": \"mitglied einer gewerkschaft\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of being a 'member of a union'.\"\n    },\n    {\n      \"term\": \"mitgliedschaft in der gewerkschaft\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of 'membership in the union'.\"\n    },\n    {\n      \"term\": \"gewerkschaftsbeitrag\",\n      \"form\": \"m, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Payment of union dues implies membership.\"\n    },\n    {\n      \"term\": \"gewerkschaftsbeiträge\",\n      \"form\": \"pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Payment of union dues implies membership.\"\n    },\n    {\n      \"term\": \"betriebsrat\",\n      \"form\": \"m, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can refer to the council, not the person.\",\n      \"justification\": \"A person holding office in a works council (shop steward).\"\n    },\n    {\n      \"term\": \"betriebsrätin\",\n      \"form\": \"f, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A woman holding office in a works council.\"\n    },\n    {\n      \"term\": \"betriebsratsmitglied\",\n      \"form\": \"n, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a works council.\"\n    },\n    {\n      \"term\": \"vertrauensmann\",\n      \"form\": \"m, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also mean 'confidant' in a general sense.\",\n      \"justification\": \"A person who is a shop steward or union representative.\"\n    },\n    {\n      \"term\": \"vertrauensfrau\",\n      \"form\": \"f, nom\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also mean 'confidante' in a general sense.\",\n      \"justification\": \"A woman who is a shop steward or union representative.\"\n    },\n    {\n      \"term\": \"vertrauensleute\",\n      \"form\": \"pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also mean 'confidants' in a general sense.\",\n      \"justification\": \"People who are shop stewards or union representatives.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"gewerkschaft\",\n      \"reason\": \"Avoids general discussion of unions not tied to a person.\"\n    },\n    {\n      \"term\": \"union\",\n      \"reason\": \"Highly ambiguous; means political party (CDU/CSU) in German.\"\n    },\n    {\n      \"term\": \"mitglied\",\n      \"reason\": \"Too generic; means 'member' of any group (club, gym).\"\n    },\n    {\n      \"term\": \"beitrag\",\n      \"reason\": \"Too generic; means 'contribution' or 'fee' for anything.\"\n    },\n    {\n      \"term\": \"organisiert\",\n      \"reason\": \"Too generic; means 'organized' in a general sense.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 779,
+        "completion_tokens": 6333,
+        "total_tokens": 7112,
+        "cost": 0.06430375,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.06430375,
+          "upstream_inference_prompt_cost": 0.00097375,
+          "upstream_inference_completions_cost": 0.06333
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4578,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "gewerkschafter",
+          "form": "m, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "gewerkschafters",
+          "form": "m, gen",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form for a trade union member."
+        },
+        {
+          "term": "gewerkschafterin",
+          "form": "f, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A woman who is a member of a trade union."
+        },
+        {
+          "term": "gewerkschafterinnen",
+          "form": "f, pl",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Plural for women who are members of a trade union."
+        },
+        {
+          "term": "gewerkschaftler",
+          "form": "m, nom (alternative)",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "gewerkschaftlerin",
+          "form": "f, nom (alternative)",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A woman who is a member of a trade union."
+        },
+        {
+          "term": "gewerkschaftsmitglied",
+          "form": "n, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "gewerkschaftsmitglieds",
+          "form": "n, gen",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form for a trade union member."
+        },
+        {
+          "term": "gewerkschaftlich organisiert",
+          "form": "adjectival phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as being unionised."
+        },
+        {
+          "term": "in der gewerkschaft",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of being 'in the union'."
+        },
+        {
+          "term": "in einer gewerkschaft",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of being 'in a union'."
+        },
+        {
+          "term": "mitglied der gewerkschaft",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of being a 'member of the union'."
+        },
+        {
+          "term": "mitglied einer gewerkschaft",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of being a 'member of a union'."
+        },
+        {
+          "term": "mitgliedschaft in der gewerkschaft",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of 'membership in the union'."
+        },
+        {
+          "term": "gewerkschaftsbeitrag",
+          "form": "m, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Payment of union dues implies membership."
+        },
+        {
+          "term": "gewerkschaftsbeiträge",
+          "form": "pl",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Payment of union dues implies membership."
+        },
+        {
+          "term": "betriebsrat",
+          "form": "m, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can refer to the council, not the person.",
+          "justification": "A person holding office in a works council (shop steward)."
+        },
+        {
+          "term": "betriebsrätin",
+          "form": "f, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A woman holding office in a works council."
+        },
+        {
+          "term": "betriebsratsmitglied",
+          "form": "n, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a works council."
+        },
+        {
+          "term": "vertrauensmann",
+          "form": "m, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also mean 'confidant' in a general sense.",
+          "justification": "A person who is a shop steward or union representative."
+        },
+        {
+          "term": "vertrauensfrau",
+          "form": "f, nom",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also mean 'confidante' in a general sense.",
+          "justification": "A woman who is a shop steward or union representative."
+        },
+        {
+          "term": "vertrauensleute",
+          "form": "pl",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also mean 'confidants' in a general sense.",
+          "justification": "People who are shop stewards or union representatives."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "gewerkschaft",
+          "reason": "Avoids general discussion of unions not tied to a person."
+        },
+        {
+          "term": "union",
+          "reason": "Highly ambiguous; means political party (CDU/CSU) in German."
+        },
+        {
+          "term": "mitglied",
+          "reason": "Too generic; means 'member' of any group (club, gym)."
+        },
+        {
+          "term": "beitrag",
+          "reason": "Too generic; means 'contribution' or 'fee' for anything."
+        },
+        {
+          "term": "organisiert",
+          "reason": "Too generic; means 'organized' in a general sense."
+        }
+      ]
+    },
+    {
+      "domain": "sex-life-or-sexual-orientation",
+      "label": "sex life or sexual orientation",
+      "prompt": "Target language: German (de).\nArticle 9 special-category domain: sex life or sexual orientation.\n\nWHAT TO RETURN\nSexual orientation and sex-life status applied to a person (gay, lesbian, bisexual, pansexual, queer, homosexual, heterosexual, LGBTQ, transgender, intersex, \"sexual orientation\", \"sexually active\"). EXCLUDE the local equivalent of \"straight\" (a straight line), of \"asexual\" (asexual reproduction is core biology), and of \"coming out\" (he is coming out of the room). EXCLUDE \"boyfriend\"/\"girlfriend\" — far too common to be a disclosure signal.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nGerman declines and forms compounds. Give nominative and genitive, the masculine/feminine pair (Katholik / Katholikin), and the adjectival forms actually used predicatively (katholisch, jüdisch).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary German prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"bisexuell\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bisexueller\",\n      \"form\": \"noun, masculine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"bisexuelle\",\n      \"form\": \"noun, feminine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"eingetragene lebenspartnerschaft\",\n      \"form\": \"noun phrase, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Former legal status for same-sex couples in Germany.\"\n    },\n    {\n      \"term\": \"eingetragenen lebenspartnerschaft\",\n      \"form\": \"noun phrase, genitive/dative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Former legal status for same-sex couples in Germany.\"\n    },\n    {\n      \"term\": \"gay\",\n      \"form\": \"adjectival/noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Archaic French 'cheerful', but modern usage is specific.\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterosexuell\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterosexueller\",\n      \"form\": \"noun, masculine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"heterosexuelle\",\n      \"form\": \"noun, feminine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"homosexuell\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"homosexueller\",\n      \"form\": \"noun, masculine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"homosexuelle\",\n      \"form\": \"noun, feminine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"intersexuell\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex characteristics.\"\n    },\n    {\n      \"term\": \"intersexuelle\",\n      \"form\": \"noun, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sex characteristics.\"\n    },\n    {\n      \"term\": \"lebenspartner\",\n      \"form\": \"noun, masculine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Often refers to a same-sex partner in a formal relationship.\"\n    },\n    {\n      \"term\": \"lebenspartners\",\n      \"form\": \"noun, masculine, genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possessive form of 'life partner', often implying a same-sex partner.\"\n    },\n    {\n      \"term\": \"lebenspartnerin\",\n      \"form\": \"noun, feminine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Often refers to a same-sex partner in a formal relationship.\"\n    },\n    {\n      \"term\": \"lesbe\",\n      \"form\": \"noun, feminine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a woman by her sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbisch\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a woman's sexual orientation.\"\n    },\n    {\n      \"term\": \"lgbt\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for sexual and gender identities.\"\n    },\n    {\n      \"term\": \"lgbtq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for sexual and gender identities.\"\n    },\n    {\n      \"term\": \"lsbti\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"German acronym for sexual and gender identities.\"\n    },\n    {\n      \"term\": \"lsbtiq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"German acronym for sexual and gender identities.\"\n    },\n    {\n      \"term\": \"pansexuell\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"'pan' is a word in English/Spanish, but the compound is specific.\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"pansexueller\",\n      \"form\": \"noun, masculine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"pansexuelle\",\n      \"form\": \"noun, feminine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person by their sexual orientation.\"\n    },\n    {\n      \"term\": \"queer\",\n      \"form\": \"adjectival/noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English 'strange', but modern usage is specific.\",\n      \"justification\": \"Describes a non-heteronormative identity.\"\n    },\n    {\n      \"term\": \"schwul\",\n      \"form\": \"adjectival\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Common term for a man's homosexual orientation.\"\n    },\n    {\n      \"term\": \"schwuler\",\n      \"form\": \"noun, masculine, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a man by his homosexual orientation.\"\n    },\n    {\n      \"term\": \"sexuell aktiv\",\n      \"form\": \"adjectival phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Direct statement about a person's sex life.\"\n    },\n    {\n      \"term\": \"sexuelle ausrichtung\",\n      \"form\": \"noun phrase, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A synonym for sexual orientation.\"\n    },\n    {\n      \"term\": \"sexuellen ausrichtung\",\n      \"form\": \"noun phrase, genitive/dative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A synonym for sexual orientation (inflected).\"\n    },\n    {\n      \"term\": \"sexuelle orientierung\",\n      \"form\": \"noun phrase, nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"The direct name of the protected characteristic.\"\n    },\n    {\n      \"term\": \"sexuellen orientierung\",\n      \"form\": \"noun phrase, genitive/dative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"The direct name of the protected characteristic (inflected).\"\n    },\n    {\n      \"term\": \"transgender\",\n      \"form\": \"adjectival/noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's gender identity.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"asexuell\",\n      \"reason\": \"Per instructions, excluded due to ambiguity with 'asexual reproduction' in biology.\"\n    },\n    {\n      \"term\": \"coming-out\",\n      \"reason\": \"Per instructions, excluded due to ambiguity of the English source phrase.\"\n    },\n    {\n      \"term\": \"freund\",\n      \"reason\": \"Per instructions, far too common as it also means 'friend'.\"\n    },\n    {\n      \"term\": \"freundin\",\n      \"reason\": \"Per instructions, far too common as it also means 'friend'.\"\n    },\n    {\n      \"term\": \"gerade\",\n      \"reason\": \"Per instructions ('straight'). Highly ambiguous, means 'straight line' or 'just now'.\"\n    },\n    {\n      \"term\": \"homo\",\n      \"reason\": \"Too ambiguous. Can be a prefix (homogen) or refer to Homo sapiens.\"\n    },\n    {\n      \"term\": \"trans\",\n      \"reason\": \"Too ambiguous. Common prefix for transport, transfer, transaction etc.\"\n    },\n    {\n      \"term\": \"inter\",\n      \"reason\": \"Too ambiguous. Common prefix for internet, international etc.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 820,
+        "completion_tokens": 8068,
+        "total_tokens": 8888,
+        "cost": 0.081705,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.081705,
+          "upstream_inference_prompt_cost": 0.001025,
+          "upstream_inference_completions_cost": 0.08068
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5341,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "bisexuell",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "bisexueller",
+          "form": "noun, masculine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "bisexuelle",
+          "form": "noun, feminine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "eingetragene lebenspartnerschaft",
+          "form": "noun phrase, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Former legal status for same-sex couples in Germany."
+        },
+        {
+          "term": "eingetragenen lebenspartnerschaft",
+          "form": "noun phrase, genitive/dative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Former legal status for same-sex couples in Germany."
+        },
+        {
+          "term": "gay",
+          "form": "adjectival/noun",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Archaic French 'cheerful', but modern usage is specific.",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "heterosexuell",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "heterosexueller",
+          "form": "noun, masculine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "heterosexuelle",
+          "form": "noun, feminine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "homosexuell",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "homosexueller",
+          "form": "noun, masculine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "homosexuelle",
+          "form": "noun, feminine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "intersexuell",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex characteristics."
+        },
+        {
+          "term": "intersexuelle",
+          "form": "noun, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sex characteristics."
+        },
+        {
+          "term": "lebenspartner",
+          "form": "noun, masculine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Often refers to a same-sex partner in a formal relationship."
+        },
+        {
+          "term": "lebenspartners",
+          "form": "noun, masculine, genitive",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possessive form of 'life partner', often implying a same-sex partner."
+        },
+        {
+          "term": "lebenspartnerin",
+          "form": "noun, feminine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Often refers to a same-sex partner in a formal relationship."
+        },
+        {
+          "term": "lesbe",
+          "form": "noun, feminine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a woman by her sexual orientation."
+        },
+        {
+          "term": "lesbisch",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a woman's sexual orientation."
+        },
+        {
+          "term": "lgbt",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for sexual and gender identities."
+        },
+        {
+          "term": "lgbtq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for sexual and gender identities."
+        },
+        {
+          "term": "lsbti",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "German acronym for sexual and gender identities."
+        },
+        {
+          "term": "lsbtiq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "German acronym for sexual and gender identities."
+        },
+        {
+          "term": "pansexuell",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "'pan' is a word in English/Spanish, but the compound is specific.",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "pansexueller",
+          "form": "noun, masculine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "pansexuelle",
+          "form": "noun, feminine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person by their sexual orientation."
+        },
+        {
+          "term": "queer",
+          "form": "adjectival/noun",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English 'strange', but modern usage is specific.",
+          "justification": "Describes a non-heteronormative identity."
+        },
+        {
+          "term": "schwul",
+          "form": "adjectival",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Common term for a man's homosexual orientation."
+        },
+        {
+          "term": "schwuler",
+          "form": "noun, masculine, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a man by his homosexual orientation."
+        },
+        {
+          "term": "sexuell aktiv",
+          "form": "adjectival phrase",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Direct statement about a person's sex life."
+        },
+        {
+          "term": "sexuelle ausrichtung",
+          "form": "noun phrase, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A synonym for sexual orientation."
+        },
+        {
+          "term": "sexuellen ausrichtung",
+          "form": "noun phrase, genitive/dative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A synonym for sexual orientation (inflected)."
+        },
+        {
+          "term": "sexuelle orientierung",
+          "form": "noun phrase, nominative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "The direct name of the protected characteristic."
+        },
+        {
+          "term": "sexuellen orientierung",
+          "form": "noun phrase, genitive/dative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "The direct name of the protected characteristic (inflected)."
+        },
+        {
+          "term": "transgender",
+          "form": "adjectival/noun",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's gender identity."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "asexuell",
+          "reason": "Per instructions, excluded due to ambiguity with 'asexual reproduction' in biology."
+        },
+        {
+          "term": "coming-out",
+          "reason": "Per instructions, excluded due to ambiguity of the English source phrase."
+        },
+        {
+          "term": "freund",
+          "reason": "Per instructions, far too common as it also means 'friend'."
+        },
+        {
+          "term": "freundin",
+          "reason": "Per instructions, far too common as it also means 'friend'."
+        },
+        {
+          "term": "gerade",
+          "reason": "Per instructions ('straight'). Highly ambiguous, means 'straight line' or 'just now'."
+        },
+        {
+          "term": "homo",
+          "reason": "Too ambiguous. Can be a prefix (homogen) or refer to Homo sapiens."
+        },
+        {
+          "term": "trans",
+          "reason": "Too ambiguous. Common prefix for transport, transfer, transaction etc."
+        },
+        {
+          "term": "inter",
+          "reason": "Too ambiguous. Common prefix for internet, international etc."
+        }
+      ]
+    },
+    {
+      "domain": "genetic-data",
+      "label": "genetic data",
+      "prompt": "Target language: German (de).\nArticle 9 special-category domain: genetic data.\n\nWHAT TO RETURN\nONLY multi-word, inherently disclosure-shaped phrases about genetic testing or hereditary status (\"DNA test result\", \"genetic test\", \"genetic screening\", \"hereditary condition\"). Do NOT return bare \"DNA\", \"gene\" or \"chromosome\" — those are biology-curriculum vocabulary. Biometric data is deliberately out of scope: Article 9 defines it by the identification PURPOSE, not by any word a learner types, so return no biometric terms.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nGerman declines and forms compounds. Give nominative and genitive, the masculine/feminine pair (Katholik / Katholikin), and the adjectival forms actually used predicatively (katholisch, jüdisch).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary German prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"genetischer test\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A procedure to analyze genetic material for traits or conditions.\"\n    },\n    {\n      \"term\": \"genetischen tests\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A procedure to analyze genetic material for traits or conditions.\"\n    },\n    {\n      \"term\": \"gentest\",\n      \"form\": \"nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A test analyzing genes for specific traits or conditions.\"\n    },\n    {\n      \"term\": \"gentests\",\n      \"form\": \"genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A test analyzing genes for specific traits or conditions.\"\n    },\n    {\n      \"term\": \"dna-test\",\n      \"form\": \"nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A test analyzing DNA, often for ancestry or health.\"\n    },\n    {\n      \"term\": \"dna-tests\",\n      \"form\": \"genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A test analyzing DNA, often for ancestry or health.\"\n    },\n    {\n      \"term\": \"dna-analyse\",\n      \"form\": \"nominative/genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the analysis of DNA, a type of genetic data.\"\n    },\n    {\n      \"term\": \"erbgut-analyse\",\n      \"form\": \"nominative/genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the analysis of hereditary material (genome).\"\n    },\n    {\n      \"term\": \"genetisches screening\",\n      \"form\": \"nominative neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to testing for genetic conditions in a population.\"\n    },\n    {\n      \"term\": \"genetischen screenings\",\n      \"form\": \"genitive neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to testing for genetic conditions in a population.\"\n    },\n    {\n      \"term\": \"genetische untersuchung\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A medical examination focused on genetic aspects.\"\n    },\n    {\n      \"term\": \"genetischer untersuchung\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A medical examination focused on genetic aspects.\"\n    },\n    {\n      \"term\": \"erbliche veranlagung\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a hereditary predisposition to a condition.\"\n    },\n    {\n      \"term\": \"erblicher veranlagung\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a hereditary predisposition to a condition.\"\n    },\n    {\n      \"term\": \"genetische veranlagung\",\n      \"form\": \"nominative feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a genetic predisposition to a condition.\"\n    },\n    {\n      \"term\": \"genetischer veranlagung\",\n      \"form\": \"genitive feminine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a genetic predisposition to a condition.\"\n    },\n    {\n      \"term\": \"chromosomenanalyse\",\n      \"form\": \"nominative/genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific type of genetic analysis (karyotyping).\"\n    },\n    {\n      \"term\": \"genomsequenzierung\",\n      \"form\": \"nominative/genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A procedure to determine the entire genetic makeup.\"\n    },\n    {\n      \"term\": \"vaterschaftstest\",\n      \"form\": \"nominative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific DNA test to determine paternity.\"\n    },\n    {\n      \"term\": \"vaterschaftstests\",\n      \"form\": \"genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific DNA test to determine paternity.\"\n    },\n    {\n      \"term\": \"abstammungsgutachten\",\n      \"form\": \"nominative neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"An expert report on ancestry, based on genetic data.\"\n    },\n    {\n      \"term\": \"abstammungsgutachtens\",\n      \"form\": \"genitive neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"An expert report on ancestry, based on genetic data.\"\n    },\n    {\n      \"term\": \"genetischer fingerabdruck\",\n      \"form\": \"nominative masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's unique DNA profile for identification.\"\n    },\n    {\n      \"term\": \"genetischen fingerabdrucks\",\n      \"form\": \"genitive masculine\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's unique DNA profile for identification.\"\n    },\n    {\n      \"term\": \"trägerstatus\",\n      \"form\": \"nominative/genitive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to being a carrier of a genetic trait or mutation.\"\n    },\n    {\n      \"term\": \"genetisches profil\",\n      \"form\": \"nominative neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's genetic information profile.\"\n    },\n    {\n      \"term\": \"genetischen profils\",\n      \"form\": \"genitive neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's genetic information profile.\"\n    },\n    {\n      \"term\": \"dna-profil\",\n      \"form\": \"nominative neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's DNA profile.\"\n    },\n    {\n      \"term\": \"dna-profils\",\n      \"form\": \"genitive neuter\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's DNA profile.\"\n    },\n    {\n      \"term\": \"genetische daten\",\n      \"form\": \"nominative plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly names the special category of data.\"\n    },\n    {\n      \"term\": \"genetischer daten\",\n      \"form\": \"genitive plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly names the special category of data.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"erbkrankheit\",\n      \"reason\": \"Already covered by health/disability terms.\"\n    },\n    {\n      \"term\": \"erbliche erkrankung\",\n      \"reason\": \"Already covered by health/disability terms.\"\n    },\n    {\n      \"term\": \"gen\",\n      \"reason\": \"Too common in biology curriculum; ambiguous.\"\n    },\n    {\n      \"term\": \"dna\",\n      \"reason\": \"Too common in biology curriculum; ambiguous.\"\n    },\n    {\n      \"term\": \"chromosom\",\n      \"reason\": \"Too common in biology curriculum; ambiguous.\"\n    },\n    {\n      \"term\": \"erbgut\",\n      \"reason\": \"Too general, similar to DNA/gene; ambiguous.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 806,
+        "completion_tokens": 6119,
+        "total_tokens": 6925,
+        "cost": 0.0621975,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0621975,
+          "upstream_inference_prompt_cost": 0.0010075,
+          "upstream_inference_completions_cost": 0.06119
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3762,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "genetischer test",
+          "form": "nominative masculine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A procedure to analyze genetic material for traits or conditions."
+        },
+        {
+          "term": "genetischen tests",
+          "form": "genitive masculine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A procedure to analyze genetic material for traits or conditions."
+        },
+        {
+          "term": "gentest",
+          "form": "nominative",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A test analyzing genes for specific traits or conditions."
+        },
+        {
+          "term": "gentests",
+          "form": "genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A test analyzing genes for specific traits or conditions."
+        },
+        {
+          "term": "dna-test",
+          "form": "nominative",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A test analyzing DNA, often for ancestry or health."
+        },
+        {
+          "term": "dna-tests",
+          "form": "genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A test analyzing DNA, often for ancestry or health."
+        },
+        {
+          "term": "dna-analyse",
+          "form": "nominative/genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the analysis of DNA, a type of genetic data."
+        },
+        {
+          "term": "erbgut-analyse",
+          "form": "nominative/genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the analysis of hereditary material (genome)."
+        },
+        {
+          "term": "genetisches screening",
+          "form": "nominative neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to testing for genetic conditions in a population."
+        },
+        {
+          "term": "genetischen screenings",
+          "form": "genitive neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to testing for genetic conditions in a population."
+        },
+        {
+          "term": "genetische untersuchung",
+          "form": "nominative feminine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A medical examination focused on genetic aspects."
+        },
+        {
+          "term": "genetischer untersuchung",
+          "form": "genitive feminine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A medical examination focused on genetic aspects."
+        },
+        {
+          "term": "erbliche veranlagung",
+          "form": "nominative feminine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a hereditary predisposition to a condition."
+        },
+        {
+          "term": "erblicher veranlagung",
+          "form": "genitive feminine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a hereditary predisposition to a condition."
+        },
+        {
+          "term": "genetische veranlagung",
+          "form": "nominative feminine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a genetic predisposition to a condition."
+        },
+        {
+          "term": "genetischer veranlagung",
+          "form": "genitive feminine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a genetic predisposition to a condition."
+        },
+        {
+          "term": "chromosomenanalyse",
+          "form": "nominative/genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific type of genetic analysis (karyotyping)."
+        },
+        {
+          "term": "genomsequenzierung",
+          "form": "nominative/genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A procedure to determine the entire genetic makeup."
+        },
+        {
+          "term": "vaterschaftstest",
+          "form": "nominative",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific DNA test to determine paternity."
+        },
+        {
+          "term": "vaterschaftstests",
+          "form": "genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific DNA test to determine paternity."
+        },
+        {
+          "term": "abstammungsgutachten",
+          "form": "nominative neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "An expert report on ancestry, based on genetic data."
+        },
+        {
+          "term": "abstammungsgutachtens",
+          "form": "genitive neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "An expert report on ancestry, based on genetic data."
+        },
+        {
+          "term": "genetischer fingerabdruck",
+          "form": "nominative masculine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's unique DNA profile for identification."
+        },
+        {
+          "term": "genetischen fingerabdrucks",
+          "form": "genitive masculine",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's unique DNA profile for identification."
+        },
+        {
+          "term": "trägerstatus",
+          "form": "nominative/genitive",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to being a carrier of a genetic trait or mutation."
+        },
+        {
+          "term": "genetisches profil",
+          "form": "nominative neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's genetic information profile."
+        },
+        {
+          "term": "genetischen profils",
+          "form": "genitive neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's genetic information profile."
+        },
+        {
+          "term": "dna-profil",
+          "form": "nominative neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's DNA profile."
+        },
+        {
+          "term": "dna-profils",
+          "form": "genitive neuter",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's DNA profile."
+        },
+        {
+          "term": "genetische daten",
+          "form": "nominative plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly names the special category of data."
+        },
+        {
+          "term": "genetischer daten",
+          "form": "genitive plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly names the special category of data."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "erbkrankheit",
+          "reason": "Already covered by health/disability terms."
+        },
+        {
+          "term": "erbliche erkrankung",
+          "reason": "Already covered by health/disability terms."
+        },
+        {
+          "term": "gen",
+          "reason": "Too common in biology curriculum; ambiguous."
+        },
+        {
+          "term": "dna",
+          "reason": "Too common in biology curriculum; ambiguous."
+        },
+        {
+          "term": "chromosom",
+          "reason": "Too common in biology curriculum; ambiguous."
+        },
+        {
+          "term": "erbgut",
+          "reason": "Too general, similar to DNA/gene; ambiguous."
+        }
+      ]
+    }
+  ]
+}

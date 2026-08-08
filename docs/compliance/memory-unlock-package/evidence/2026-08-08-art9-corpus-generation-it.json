@@ -1,0 +1,2180 @@
+{
+  "workItem": "WI-3142",
+  "purpose": "Best-effort LLM-prepared Article 9 protected-lexeme corpus for a non-English conversation language. UNREVIEWED: not load-bearing as a compliance control. Native-speaker review is a precondition for enabling persistent memory in this language.",
+  "operatorRuling": "2026-08-08 — persistent memory is English-only at unlock; non-English corpora are prepared best-effort via LLM generation and marked model-generated.",
+  "language": "it",
+  "languageName": "Italian",
+  "generatedAt": "2026-08-08T18:06:46.428Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-pro",
+  "systemPrompt": "You are a native-speaker lexicographer working with a data-protection engineer. You are building a DETECTION corpus for a deterministic text scanner, not an encyclopedia. The scanner matches literal lowercase phrases inside person-attribution constructions only. A bare mention of a term never fires; only \"<person reference> <verb> <term>\" and \"<possessive> <term>\" do. Your job is therefore to maximise recall of PERSON-ATTRIBUTED STATUS ASSERTIONS while keeping ordinary schoolwork prose out. Answer with strict JSON only. No markdown, no code fences, no commentary.",
+  "appliedScope": "unnamed-attribution-only",
+  "appliedScopeNote": "Every accepted term is applied at unnamed-attribution-only regardless of the model recommendation. Promotion to broad is a human decision.",
+  "termCount": 200,
+  "domains": [
+    {
+      "domain": "racial-or-ethnic-origin",
+      "label": "racial or ethnic origin",
+      "prompt": "Target language: Italian (it).\nArticle 9 special-category domain: racial or ethnic origin.\n\nWHAT TO RETURN\nEthnic-group and origin nouns/adjectives that describe a PERSON (Roma, Sinti, Kurdish, indigenous, \"of mixed heritage\", \"ethnic minority\", \"immigrant background\", \"ethnicity\"). EXCLUDE bare colour words and bare continent/region adjectives — their attributed forms (\"my black cat\", \"their African elephant\") are ordinary prose far more often than an origin disclosure.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nItalian inflects for gender and number. Give masculine and feminine, singular and plural (cattolico / cattolica / cattolici / cattoliche).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Italian prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"rom\",\n      \"form\": \"invariable noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English 'rum'; tech acronym 'ROM' (Read-Only Memory).\",\n      \"justification\": \"Refers to a person of Romani ethnicity. Attribution clarifies intent.\"\n    },\n    {\n      \"term\": \"sinto\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Portuguese/Spanish 'sinto'/'siento' (I feel).\",\n      \"justification\": \"Refers to a person of Sinti ethnicity, a specific Romani subgroup.\"\n    },\n    {\n      \"term\": \"sinta\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person of Sinti ethnicity, a specific Romani subgroup.\"\n    },\n    {\n      \"term\": \"sinti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to people of Sinti ethnicity, a specific Romani subgroup.\"\n    },\n    {\n      \"term\": \"sinte\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to people of Sinti ethnicity, a specific Romani subgroup.\"\n    },\n    {\n      \"term\": \"curdo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of Kurdish origin.\"\n    },\n    {\n      \"term\": \"curda\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of Kurdish origin.\"\n    },\n    {\n      \"term\": \"curdi\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes people of Kurdish origin.\"\n    },\n    {\n      \"term\": \"curde\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes people of Kurdish origin.\"\n    },\n    {\n      \"term\": \"indigeno\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of indigenous origin.\"\n    },\n    {\n      \"term\": \"indigena\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of indigenous origin.\"\n    },\n    {\n      \"term\": \"indigeni\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes people of indigenous origin.\"\n    },\n    {\n      \"term\": \"indigene\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes people of indigenous origin.\"\n    },\n    {\n      \"term\": \"aborigeno\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of aboriginal origin, particularly from Australia.\"\n    },\n    {\n      \"term\": \"aborigena\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person of aboriginal origin, particularly from Australia.\"\n    },\n    {\n      \"term\": \"aborigeni\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes people of aboriginal origin, particularly from Australia.\"\n    },\n    {\n      \"term\": \"aborigene\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes people of aboriginal origin, particularly from Australia.\"\n    },\n    {\n      \"term\": \"meticcio\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Also used for mixed-breed animals, a plausible schoolwork topic.\",\n      \"justification\": \"Describes a person of mixed ethnic or racial heritage.\"\n    },\n    {\n      \"term\": \"meticcia\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Also used for mixed-breed animals, a plausible schoolwork topic.\",\n      \"justification\": \"Describes a person of mixed ethnic or racial heritage.\"\n    },\n    {\n      \"term\": \"meticci\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Also used for mixed-breed animals, a plausible schoolwork topic.\",\n      \"justification\": \"Describes people of mixed ethnic or racial heritage.\"\n    },\n    {\n      \"term\": \"meticce\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Also used for mixed-breed animals, a plausible schoolwork topic.\",\n      \"justification\": \"Describes people of mixed ethnic or racial heritage.\"\n    },\n    {\n      \"term\": \"mulatto\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific, though dated, term for a person of mixed heritage.\"\n    },\n    {\n      \"term\": \"mulatta\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific, though dated, term for a person of mixed heritage.\"\n    },\n    {\n      \"term\": \"mulatti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific, though dated, term for people of mixed heritage.\"\n    },\n    {\n      \"term\": \"mulatte\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A specific, though dated, term for people of mixed heritage.\"\n    },\n    {\n      \"term\": \"creolo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also refer to a Creole language.\",\n      \"justification\": \"Describes a person of Creole origin.\"\n    },\n    {\n      \"term\": \"creola\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also refer to a Creole language.\",\n      \"justification\": \"Describes a person of Creole origin.\"\n    },\n    {\n      \"term\": \"creoli\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also refer to a Creole language.\",\n      \"justification\": \"Describes people of Creole origin.\"\n    },\n    {\n      \"term\": \"creole\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also refer to a Creole language.\",\n      \"justification\": \"Describes people of Creole origin.\"\n    },\n    {\n      \"term\": \"etnia\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly refers to ethnicity, a core concept for this category.\"\n    },\n    {\n      \"term\": \"etnie\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly refers to ethnicity, a core concept for this category.\"\n    },\n    {\n      \"term\": \"di etnia\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A standard phrase to introduce a person's specific ethnicity.\"\n    },\n    {\n      \"term\": \"di origine mista\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A common and clear way to state someone has mixed heritage.\"\n    },\n    {\n      \"term\": \"di origine immigrata\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Clearly states that a person has an immigrant background.\"\n    },\n    {\n      \"term\": \"minoranza etnica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's status as part of an ethnic minority.\"\n    },\n    {\n      \"term\": \"minoranze etniche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's status as part of an ethnic minority.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"mezzosangue\",\n      \"reason\": \"Too common in schoolwork analyzing fantasy literature (e.g., Harry Potter).\"\n    },\n    {\n      \"term\": \"di origine\",\n      \"reason\": \"Too general; frequently refers to products/objects, not just people's heritage.\"\n    },\n    {\n      \"term\": \"roma\",\n      \"reason\": \"High-frequency homograph for the city of Rome.\"\n    },\n    {\n      \"term\": \"zingaro\",\n      \"reason\": \"Often pejorative and ambiguous; used for lifestyle/appearance, not just ethnicity.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 782,
+        "completion_tokens": 6120,
+        "total_tokens": 6902,
+        "cost": 0.0621775,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0621775,
+          "upstream_inference_prompt_cost": 0.0009775,
+          "upstream_inference_completions_cost": 0.0612
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3435,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "rom",
+          "form": "invariable noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English 'rum'; tech acronym 'ROM' (Read-Only Memory).",
+          "justification": "Refers to a person of Romani ethnicity. Attribution clarifies intent."
+        },
+        {
+          "term": "sinto",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Portuguese/Spanish 'sinto'/'siento' (I feel).",
+          "justification": "Refers to a person of Sinti ethnicity, a specific Romani subgroup."
+        },
+        {
+          "term": "sinta",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person of Sinti ethnicity, a specific Romani subgroup."
+        },
+        {
+          "term": "sinti",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to people of Sinti ethnicity, a specific Romani subgroup."
+        },
+        {
+          "term": "sinte",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to people of Sinti ethnicity, a specific Romani subgroup."
+        },
+        {
+          "term": "curdo",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of Kurdish origin."
+        },
+        {
+          "term": "curda",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of Kurdish origin."
+        },
+        {
+          "term": "curdi",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes people of Kurdish origin."
+        },
+        {
+          "term": "curde",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes people of Kurdish origin."
+        },
+        {
+          "term": "indigeno",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of indigenous origin."
+        },
+        {
+          "term": "indigena",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of indigenous origin."
+        },
+        {
+          "term": "indigeni",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes people of indigenous origin."
+        },
+        {
+          "term": "indigene",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes people of indigenous origin."
+        },
+        {
+          "term": "aborigeno",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of aboriginal origin, particularly from Australia."
+        },
+        {
+          "term": "aborigena",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person of aboriginal origin, particularly from Australia."
+        },
+        {
+          "term": "aborigeni",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes people of aboriginal origin, particularly from Australia."
+        },
+        {
+          "term": "aborigene",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes people of aboriginal origin, particularly from Australia."
+        },
+        {
+          "term": "meticcio",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Also used for mixed-breed animals, a plausible schoolwork topic.",
+          "justification": "Describes a person of mixed ethnic or racial heritage."
+        },
+        {
+          "term": "meticcia",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Also used for mixed-breed animals, a plausible schoolwork topic.",
+          "justification": "Describes a person of mixed ethnic or racial heritage."
+        },
+        {
+          "term": "meticci",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Also used for mixed-breed animals, a plausible schoolwork topic.",
+          "justification": "Describes people of mixed ethnic or racial heritage."
+        },
+        {
+          "term": "meticce",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Also used for mixed-breed animals, a plausible schoolwork topic.",
+          "justification": "Describes people of mixed ethnic or racial heritage."
+        },
+        {
+          "term": "mulatto",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific, though dated, term for a person of mixed heritage."
+        },
+        {
+          "term": "mulatta",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific, though dated, term for a person of mixed heritage."
+        },
+        {
+          "term": "mulatti",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific, though dated, term for people of mixed heritage."
+        },
+        {
+          "term": "mulatte",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A specific, though dated, term for people of mixed heritage."
+        },
+        {
+          "term": "creolo",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also refer to a Creole language.",
+          "justification": "Describes a person of Creole origin."
+        },
+        {
+          "term": "creola",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also refer to a Creole language.",
+          "justification": "Describes a person of Creole origin."
+        },
+        {
+          "term": "creoli",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also refer to a Creole language.",
+          "justification": "Describes people of Creole origin."
+        },
+        {
+          "term": "creole",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also refer to a Creole language.",
+          "justification": "Describes people of Creole origin."
+        },
+        {
+          "term": "etnia",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly refers to ethnicity, a core concept for this category."
+        },
+        {
+          "term": "etnie",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly refers to ethnicity, a core concept for this category."
+        },
+        {
+          "term": "di etnia",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A standard phrase to introduce a person's specific ethnicity."
+        },
+        {
+          "term": "di origine mista",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A common and clear way to state someone has mixed heritage."
+        },
+        {
+          "term": "di origine immigrata",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Clearly states that a person has an immigrant background."
+        },
+        {
+          "term": "minoranza etnica",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's status as part of an ethnic minority."
+        },
+        {
+          "term": "minoranze etniche",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's status as part of an ethnic minority."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "mezzosangue",
+          "reason": "Too common in schoolwork analyzing fantasy literature (e.g., Harry Potter)."
+        },
+        {
+          "term": "di origine",
+          "reason": "Too general; frequently refers to products/objects, not just people's heritage."
+        },
+        {
+          "term": "roma",
+          "reason": "High-frequency homograph for the city of Rome."
+        },
+        {
+          "term": "zingaro",
+          "reason": "Often pejorative and ambiguous; used for lifestyle/appearance, not just ethnicity."
+        }
+      ]
+    },
+    {
+      "domain": "political-opinions",
+      "label": "political opinions or affiliation",
+      "prompt": "Target language: Italian (it).\nArticle 9 special-category domain: political opinions or affiliation.\n\nWHAT TO RETURN\nPolitical-affiliation and opinion nouns/adjectives applied to a person (communist, socialist, anarchist, nationalist, feminist, far-right, \"party member\", \"political views\"). EXCLUDE words whose ordinary sense dominates in schoolwork — the local equivalents of English \"conservative\" (a conservative estimate), \"liberal\" (a liberal amount), \"green\", \"independent\", \"radical\", \"progressive\".\n\nMORPHOLOGY — this is the part generic answers get wrong.\nItalian inflects for gender and number. Give masculine and feminine, singular and plural (cattolico / cattolica / cattolici / cattoliche).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Italian prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"comunista\",\n      \"form\": \"m/f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"comunisti\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"comuniste\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"socialista\",\n      \"form\": \"m/f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"socialisti\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"socialiste\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"anarchico\",\n      \"form\": \"m sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"anarchica\",\n      \"form\": \"f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"anarchici\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"anarchiche\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"nazionalista\",\n      \"form\": \"m/f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"nazionalisti\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"nazionaliste\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"femminista\",\n      \"form\": \"m/f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States an affiliation with a political/social movement.\"\n    },\n    {\n      \"term\": \"femministi\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States an affiliation with a political/social movement.\"\n    },\n    {\n      \"term\": \"femministe\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States an affiliation with a political/social movement.\"\n    },\n    {\n      \"term\": \"fascista\",\n      \"form\": \"m/f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"fascisti\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"fasciste\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"di destra\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'on the right' (location), but attribution makes it political.\",\n      \"justification\": \"Common phrase for right-wing political alignment.\"\n    },\n    {\n      \"term\": \"di sinistra\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can mean 'on the left' (location), but attribution makes it political.\",\n      \"justification\": \"Common phrase for left-wing political alignment.\"\n    },\n    {\n      \"term\": \"di estrema destra\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specific phrase for far-right political alignment.\"\n    },\n    {\n      \"term\": \"di estrema sinistra\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specific phrase for far-left political alignment.\"\n    },\n    {\n      \"term\": \"iscritto al partito\",\n      \"form\": \"m sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French 'parti' means 'left/gone'. Phrase is unambiguous in context.\",\n      \"justification\": \"Explicitly states membership in a political party.\"\n    },\n    {\n      \"term\": \"iscritta al partito\",\n      \"form\": \"f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French 'parti' means 'left/gone'. Phrase is unambiguous in context.\",\n      \"justification\": \"Explicitly states membership in a political party.\"\n    },\n    {\n      \"term\": \"iscritti al partito\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French 'parti' means 'left/gone'. Phrase is unambiguous in context.\",\n      \"justification\": \"Explicitly states membership in a political party.\"\n    },\n    {\n      \"term\": \"iscritte al partito\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French 'parti' means 'left/gone'. Phrase is unambiguous in context.\",\n      \"justification\": \"Explicitly states membership in a political party.\"\n    },\n    {\n      \"term\": \"opinioni politiche\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly refers to a person's political views.\"\n    },\n    {\n      \"term\": \"leghista\",\n      \"form\": \"m/f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Supporter of a specific Italian political party.\"\n    },\n    {\n      \"term\": \"leghisti\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Supporter of a specific Italian political party.\"\n    },\n    {\n      \"term\": \"leghiste\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Supporter of a specific Italian political party.\"\n    },\n    {\n      \"term\": \"democristiano\",\n      \"form\": \"m sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"democristiana\",\n      \"form\": \"f sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"democristiani\",\n      \"form\": \"m pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    },\n    {\n      \"term\": \"democristiane\",\n      \"form\": \"f pl\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a political affiliation.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"conservatore\",\n      \"reason\": \"Commonly means 'preservative' (food) or relates to a music conservatory.\"\n    },\n    {\n      \"term\": \"liberale\",\n      \"reason\": \"Commonly means 'generous' (e.g., a liberal donation). Too ambiguous.\"\n    },\n    {\n      \"term\": \"verde\",\n      \"reason\": \"Dominant meaning is the color 'green'. High false positive risk.\"\n    },\n    {\n      \"term\": \"indipendente\",\n      \"reason\": \"Very common in schoolwork (independent variable, independent clause).\"\n    },\n    {\n      \"term\": \"radicale\",\n      \"reason\": \"Commonly used in mathematics (radical sign) and means 'drastic'.\"\n    },\n    {\n      \"term\": \"progressista\",\n      \"reason\": \"Excluded per instructions due to ambiguity with non-political progress.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 786,
+        "completion_tokens": 5805,
+        "total_tokens": 6591,
+        "cost": 0.0590325,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0590325,
+          "upstream_inference_prompt_cost": 0.0009825,
+          "upstream_inference_completions_cost": 0.05805
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3227,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "comunista",
+          "form": "m/f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "comunisti",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "comuniste",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "socialista",
+          "form": "m/f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "socialisti",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "socialiste",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "anarchico",
+          "form": "m sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "anarchica",
+          "form": "f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "anarchici",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "anarchiche",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "nazionalista",
+          "form": "m/f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "nazionalisti",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "nazionaliste",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "femminista",
+          "form": "m/f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States an affiliation with a political/social movement."
+        },
+        {
+          "term": "femministi",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States an affiliation with a political/social movement."
+        },
+        {
+          "term": "femministe",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States an affiliation with a political/social movement."
+        },
+        {
+          "term": "fascista",
+          "form": "m/f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "fascisti",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "fasciste",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "di destra",
+          "form": "invariant",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'on the right' (location), but attribution makes it political.",
+          "justification": "Common phrase for right-wing political alignment."
+        },
+        {
+          "term": "di sinistra",
+          "form": "invariant",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can mean 'on the left' (location), but attribution makes it political.",
+          "justification": "Common phrase for left-wing political alignment."
+        },
+        {
+          "term": "di estrema destra",
+          "form": "invariant",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specific phrase for far-right political alignment."
+        },
+        {
+          "term": "di estrema sinistra",
+          "form": "invariant",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specific phrase for far-left political alignment."
+        },
+        {
+          "term": "iscritto al partito",
+          "form": "m sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French 'parti' means 'left/gone'. Phrase is unambiguous in context.",
+          "justification": "Explicitly states membership in a political party."
+        },
+        {
+          "term": "iscritta al partito",
+          "form": "f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French 'parti' means 'left/gone'. Phrase is unambiguous in context.",
+          "justification": "Explicitly states membership in a political party."
+        },
+        {
+          "term": "iscritti al partito",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French 'parti' means 'left/gone'. Phrase is unambiguous in context.",
+          "justification": "Explicitly states membership in a political party."
+        },
+        {
+          "term": "iscritte al partito",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French 'parti' means 'left/gone'. Phrase is unambiguous in context.",
+          "justification": "Explicitly states membership in a political party."
+        },
+        {
+          "term": "opinioni politiche",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly refers to a person's political views."
+        },
+        {
+          "term": "leghista",
+          "form": "m/f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Supporter of a specific Italian political party."
+        },
+        {
+          "term": "leghisti",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Supporter of a specific Italian political party."
+        },
+        {
+          "term": "leghiste",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Supporter of a specific Italian political party."
+        },
+        {
+          "term": "democristiano",
+          "form": "m sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "democristiana",
+          "form": "f sg",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "democristiani",
+          "form": "m pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        },
+        {
+          "term": "democristiane",
+          "form": "f pl",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a political affiliation."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "conservatore",
+          "reason": "Commonly means 'preservative' (food) or relates to a music conservatory."
+        },
+        {
+          "term": "liberale",
+          "reason": "Commonly means 'generous' (e.g., a liberal donation). Too ambiguous."
+        },
+        {
+          "term": "verde",
+          "reason": "Dominant meaning is the color 'green'. High false positive risk."
+        },
+        {
+          "term": "indipendente",
+          "reason": "Very common in schoolwork (independent variable, independent clause)."
+        },
+        {
+          "term": "radicale",
+          "reason": "Commonly used in mathematics (radical sign) and means 'drastic'."
+        },
+        {
+          "term": "progressista",
+          "reason": "Excluded per instructions due to ambiguity with non-political progress."
+        }
+      ]
+    },
+    {
+      "domain": "religious-or-philosophical-beliefs",
+      "label": "religious or philosophical beliefs",
+      "prompt": "Target language: Italian (it).\nArticle 9 special-category domain: religious or philosophical beliefs.\n\nWHAT TO RETURN\nReligious/denominational/philosophical affiliation applied to a person (Catholic, Protestant, Muslim, Jewish, Hindu, Buddhist, atheist, agnostic, devout, \"converted to Islam\", \"religious belief\"), plus belief-marking dress where it is unambiguous (hijab, kippah). EXCLUDE the local equivalent of bare \"orthodox\" (an orthodox method) and bare \"religious\"/\"religion\" (religious education is a school subject).\n\nMORPHOLOGY — this is the part generic answers get wrong.\nItalian inflects for gender and number. Give masculine and feminine, singular and plural (cattolico / cattolica / cattolici / cattoliche).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Italian prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"cattolico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with the Catholic faith.\"\n    },\n    {\n      \"term\": \"cattolica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with the Catholic faith.\"\n    },\n    {\n      \"term\": \"cattolici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with the Catholic faith.\"\n    },\n    {\n      \"term\": \"cattoliche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with the Catholic faith.\"\n    },\n    {\n      \"term\": \"protestante\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Protestantism.\"\n    },\n    {\n      \"term\": \"protestanti\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Protestantism.\"\n    },\n    {\n      \"term\": \"musulmano\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Islam.\"\n    },\n    {\n      \"term\": \"musulmana\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Islam.\"\n    },\n    {\n      \"term\": \"musulmani\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Islam.\"\n    },\n    {\n      \"term\": \"musulmane\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Islam.\"\n    },\n    {\n      \"term\": \"ebreo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Judaism.\"\n    },\n    {\n      \"term\": \"ebrea\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Judaism.\"\n    },\n    {\n      \"term\": \"ebrei\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Judaism.\"\n    },\n    {\n      \"term\": \"ebree\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Judaism.\"\n    },\n    {\n      \"term\": \"induista\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Hinduism.\"\n    },\n    {\n      \"term\": \"induisti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Hinduism.\"\n    },\n    {\n      \"term\": \"induiste\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Hinduism.\"\n    },\n    {\n      \"term\": \"buddista\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Buddhism.\"\n    },\n    {\n      \"term\": \"buddisti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Buddhism.\"\n    },\n    {\n      \"term\": \"buddiste\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Buddhism.\"\n    },\n    {\n      \"term\": \"ateo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"atea\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"atei\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"atee\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"agnostico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"agnostica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"agnostici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"agnostiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes the philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"sciita\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Shia Islam.\"\n    },\n    {\n      \"term\": \"sciiti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Shia Islam.\"\n    },\n    {\n      \"term\": \"sciite\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Shia Islam.\"\n    },\n    {\n      \"term\": \"sunnita\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Sunni Islam.\"\n    },\n    {\n      \"term\": \"sunniti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Sunni Islam.\"\n    },\n    {\n      \"term\": \"sunnite\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Sunni Islam.\"\n    },\n    {\n      \"term\": \"mormone\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Mormonism.\"\n    },\n    {\n      \"term\": \"mormoni\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Mormonism.\"\n    },\n    {\n      \"term\": \"testimone di geova\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Jehovah's Witnesses.\"\n    },\n    {\n      \"term\": \"testimoni di geova\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes affiliation with Jehovah's Witnesses.\"\n    },\n    {\n      \"term\": \"convertito all'islam\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes the act of converting to Islam.\"\n    },\n    {\n      \"term\": \"convertita all'islam\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes the act of converting to Islam.\"\n    },\n    {\n      \"term\": \"convertiti all'islam\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes the act of converting to Islam.\"\n    },\n    {\n      \"term\": \"convertite all'islam\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes the act of converting to Islam.\"\n    },\n    {\n      \"term\": \"hijab\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering worn by some Muslim women, indicating religious practice.\"\n    },\n    {\n      \"term\": \"kippah\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A skullcap worn by some Jewish men, indicating religious practice.\"\n    },\n    {\n      \"term\": \"credo religioso\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Spanish 'credo' means 'I believe', but phrase is specific.\",\n      \"justification\": \"Directly refers to a person's religious belief system.\"\n    },\n    {\n      \"term\": \"fede religiosa\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly refers to a person's religious faith.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"religione\",\n      \"reason\": \"Too broad, often appears in non-disclosure contexts like 'history of religion'.\"\n    },\n    {\n      \"term\": \"religioso\",\n      \"reason\": \"Per user instruction, to avoid schoolwork contexts like 'educazione religiosa'.\"\n    },\n    {\n      \"term\": \"devoto\",\n      \"reason\": \"Ambiguous; can mean 'devoted' in a secular, non-religious context.\"\n    },\n    {\n      \"term\": \"ortodosso\",\n      \"reason\": \"Ambiguous; can mean conventional (e.g., orthodox method), as noted by user.\"\n    },\n    {\n      \"term\": \"turbante\",\n      \"reason\": \"Common fashion accessory, not unambiguously religious.\"\n    },\n    {\n      \"term\": \"praticante\",\n      \"reason\": \"Homograph in Spanish for 'medical intern'. High false positive risk.\"\n    },\n    {\n      \"term\": \"non praticante\",\n      \"reason\": \"Contains 'praticante', a Spanish homograph for 'medical intern'.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 793,
+        "completion_tokens": 8338,
+        "total_tokens": 9131,
+        "cost": 0.08437125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.08437125,
+          "upstream_inference_prompt_cost": 0.00099125,
+          "upstream_inference_completions_cost": 0.08338
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5013,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "cattolico",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with the Catholic faith."
+        },
+        {
+          "term": "cattolica",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with the Catholic faith."
+        },
+        {
+          "term": "cattolici",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with the Catholic faith."
+        },
+        {
+          "term": "cattoliche",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with the Catholic faith."
+        },
+        {
+          "term": "protestante",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Protestantism."
+        },
+        {
+          "term": "protestanti",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Protestantism."
+        },
+        {
+          "term": "musulmano",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Islam."
+        },
+        {
+          "term": "musulmana",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Islam."
+        },
+        {
+          "term": "musulmani",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Islam."
+        },
+        {
+          "term": "musulmane",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Islam."
+        },
+        {
+          "term": "ebreo",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Judaism."
+        },
+        {
+          "term": "ebrea",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Judaism."
+        },
+        {
+          "term": "ebrei",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Judaism."
+        },
+        {
+          "term": "ebree",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Judaism."
+        },
+        {
+          "term": "induista",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Hinduism."
+        },
+        {
+          "term": "induisti",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Hinduism."
+        },
+        {
+          "term": "induiste",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Hinduism."
+        },
+        {
+          "term": "buddista",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Buddhism."
+        },
+        {
+          "term": "buddisti",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Buddhism."
+        },
+        {
+          "term": "buddiste",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Buddhism."
+        },
+        {
+          "term": "ateo",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of atheism."
+        },
+        {
+          "term": "atea",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of atheism."
+        },
+        {
+          "term": "atei",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of atheism."
+        },
+        {
+          "term": "atee",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of atheism."
+        },
+        {
+          "term": "agnostico",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of agnosticism."
+        },
+        {
+          "term": "agnostica",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of agnosticism."
+        },
+        {
+          "term": "agnostici",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of agnosticism."
+        },
+        {
+          "term": "agnostiche",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes the philosophical belief of agnosticism."
+        },
+        {
+          "term": "sciita",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Shia Islam."
+        },
+        {
+          "term": "sciiti",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Shia Islam."
+        },
+        {
+          "term": "sciite",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Shia Islam."
+        },
+        {
+          "term": "sunnita",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Sunni Islam."
+        },
+        {
+          "term": "sunniti",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Sunni Islam."
+        },
+        {
+          "term": "sunnite",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Sunni Islam."
+        },
+        {
+          "term": "mormone",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Mormonism."
+        },
+        {
+          "term": "mormoni",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Mormonism."
+        },
+        {
+          "term": "testimone di geova",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Jehovah's Witnesses."
+        },
+        {
+          "term": "testimoni di geova",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes affiliation with Jehovah's Witnesses."
+        },
+        {
+          "term": "convertito all'islam",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes the act of converting to Islam."
+        },
+        {
+          "term": "convertita all'islam",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes the act of converting to Islam."
+        },
+        {
+          "term": "convertiti all'islam",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes the act of converting to Islam."
+        },
+        {
+          "term": "convertite all'islam",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes the act of converting to Islam."
+        },
+        {
+          "term": "hijab",
+          "form": "invariable",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering worn by some Muslim women, indicating religious practice."
+        },
+        {
+          "term": "kippah",
+          "form": "invariable",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A skullcap worn by some Jewish men, indicating religious practice."
+        },
+        {
+          "term": "credo religioso",
+          "form": "invariable",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Spanish 'credo' means 'I believe', but phrase is specific.",
+          "justification": "Directly refers to a person's religious belief system."
+        },
+        {
+          "term": "fede religiosa",
+          "form": "invariable",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly refers to a person's religious faith."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "religione",
+          "reason": "Too broad, often appears in non-disclosure contexts like 'history of religion'."
+        },
+        {
+          "term": "religioso",
+          "reason": "Per user instruction, to avoid schoolwork contexts like 'educazione religiosa'."
+        },
+        {
+          "term": "devoto",
+          "reason": "Ambiguous; can mean 'devoted' in a secular, non-religious context."
+        },
+        {
+          "term": "ortodosso",
+          "reason": "Ambiguous; can mean conventional (e.g., orthodox method), as noted by user."
+        },
+        {
+          "term": "turbante",
+          "reason": "Common fashion accessory, not unambiguously religious."
+        },
+        {
+          "term": "praticante",
+          "reason": "Homograph in Spanish for 'medical intern'. High false positive risk."
+        },
+        {
+          "term": "non praticante",
+          "reason": "Contains 'praticante', a Spanish homograph for 'medical intern'."
+        }
+      ]
+    },
+    {
+      "domain": "trade-union-membership",
+      "label": "trade-union membership",
+      "prompt": "Target language: Italian (it).\nArticle 9 special-category domain: trade-union membership.\n\nWHAT TO RETURN\nMembership of, or office in, a trade union (union member, trade unionist, shop steward, union dues, unionised, \"member of a union\"). EXCLUDE the bare word for \"union\" on its own — it also names the European Union and, in mathematics, the union of sets.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nItalian inflects for gender and number. Give masculine and feminine, singular and plural (cattolico / cattolica / cattolici / cattoliche).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Italian prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"sindacalista\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person involved in trade union activities; a trade unionist.\"\n    },\n    {\n      \"term\": \"sindacalisti\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Plural for male or mixed-gender trade unionists.\"\n    },\n    {\n      \"term\": \"sindacaliste\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Plural for female trade unionists.\"\n    },\n    {\n      \"term\": \"iscritto al sindacato\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A male person registered with a trade union.\"\n    },\n    {\n      \"term\": \"iscritta al sindacato\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A female person registered with a trade union.\"\n    },\n    {\n      \"term\": \"iscritti al sindacato\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Male or mixed-gender persons registered with a trade union.\"\n    },\n    {\n      \"term\": \"iscritte al sindacato\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Female persons registered with a trade union.\"\n    },\n    {\n      \"term\": \"sindacalizzato\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a male person who is unionised.\"\n    },\n    {\n      \"term\": \"sindacalizzata\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a female person who is unionised.\"\n    },\n    {\n      \"term\": \"sindacalizzati\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes male or mixed-gender persons who are unionised.\"\n    },\n    {\n      \"term\": \"sindacalizzate\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes female persons who are unionised.\"\n    },\n    {\n      \"term\": \"delegato sindacale\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A male union delegate or shop steward.\"\n    },\n    {\n      \"term\": \"delegata sindacale\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A female union delegate or shop steward.\"\n    },\n    {\n      \"term\": \"delegati sindacali\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Male or mixed-gender union delegates or shop stewards.\"\n    },\n    {\n      \"term\": \"delegate sindacali\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Female union delegates or shop stewards.\"\n    },\n    {\n      \"term\": \"membro del sindacato\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a member of a trade union.\"\n    },\n    {\n      \"term\": \"membri del sindacato\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Persons who are members of a trade union.\"\n    },\n    {\n      \"term\": \"attivista sindacale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person who is a trade union activist.\"\n    },\n    {\n      \"term\": \"attivisti sindacali\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Male or mixed-gender trade union activists.\"\n    },\n    {\n      \"term\": \"attiviste sindacali\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Female trade union activists.\"\n    },\n    {\n      \"term\": \"tessera sindacale\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A union card, indicating membership via possession.\"\n    },\n    {\n      \"term\": \"tessere sindacali\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Union cards, indicating membership via possession.\"\n    },\n    {\n      \"term\": \"contributo sindacale\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Union due/contribution, indicating membership via payment.\"\n    },\n    {\n      \"term\": \"contributi sindacali\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Union dues/contributions, indicating membership via payment.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"sindacato\",\n      \"reason\": \"Ambiguous: also means European Union or union of sets in mathematics.\"\n    },\n    {\n      \"term\": \"unione\",\n      \"reason\": \"Highly ambiguous: means union in many contexts (EU, marriage, sets).\"\n    },\n    {\n      \"term\": \"iscritto\",\n      \"reason\": \"Too general. Means 'enrolled' or 'registered' for any activity (school, gym).\"\n    },\n    {\n      \"term\": \"membro\",\n      \"reason\": \"Too general. Means 'member' of any group, or 'limb'.\"\n    },\n    {\n      \"term\": \"delegato\",\n      \"reason\": \"Too general. Means 'delegate' for any purpose.\"\n    },\n    {\n      \"term\": \"tessera\",\n      \"reason\": \"Too general. Means 'card' or 'pass' for any purpose (library, gym).\"\n    },\n    {\n      \"term\": \"attivista\",\n      \"reason\": \"Too general. Means 'activist' for any cause.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 767,
+        "completion_tokens": 4821,
+        "total_tokens": 5588,
+        "cost": 0.04916875,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.04916875,
+          "upstream_inference_prompt_cost": 0.00095875,
+          "upstream_inference_completions_cost": 0.04821
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2875,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "sindacalista",
+          "form": "masculine/feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person involved in trade union activities; a trade unionist."
+        },
+        {
+          "term": "sindacalisti",
+          "form": "masculine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Plural for male or mixed-gender trade unionists."
+        },
+        {
+          "term": "sindacaliste",
+          "form": "feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Plural for female trade unionists."
+        },
+        {
+          "term": "iscritto al sindacato",
+          "form": "masculine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A male person registered with a trade union."
+        },
+        {
+          "term": "iscritta al sindacato",
+          "form": "feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A female person registered with a trade union."
+        },
+        {
+          "term": "iscritti al sindacato",
+          "form": "masculine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Male or mixed-gender persons registered with a trade union."
+        },
+        {
+          "term": "iscritte al sindacato",
+          "form": "feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Female persons registered with a trade union."
+        },
+        {
+          "term": "sindacalizzato",
+          "form": "masculine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a male person who is unionised."
+        },
+        {
+          "term": "sindacalizzata",
+          "form": "feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a female person who is unionised."
+        },
+        {
+          "term": "sindacalizzati",
+          "form": "masculine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes male or mixed-gender persons who are unionised."
+        },
+        {
+          "term": "sindacalizzate",
+          "form": "feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes female persons who are unionised."
+        },
+        {
+          "term": "delegato sindacale",
+          "form": "masculine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A male union delegate or shop steward."
+        },
+        {
+          "term": "delegata sindacale",
+          "form": "feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A female union delegate or shop steward."
+        },
+        {
+          "term": "delegati sindacali",
+          "form": "masculine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Male or mixed-gender union delegates or shop stewards."
+        },
+        {
+          "term": "delegate sindacali",
+          "form": "feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Female union delegates or shop stewards."
+        },
+        {
+          "term": "membro del sindacato",
+          "form": "masculine/feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a member of a trade union."
+        },
+        {
+          "term": "membri del sindacato",
+          "form": "masculine/feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Persons who are members of a trade union."
+        },
+        {
+          "term": "attivista sindacale",
+          "form": "masculine/feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person who is a trade union activist."
+        },
+        {
+          "term": "attivisti sindacali",
+          "form": "masculine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Male or mixed-gender trade union activists."
+        },
+        {
+          "term": "attiviste sindacali",
+          "form": "feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Female trade union activists."
+        },
+        {
+          "term": "tessera sindacale",
+          "form": "feminine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A union card, indicating membership via possession."
+        },
+        {
+          "term": "tessere sindacali",
+          "form": "feminine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Union cards, indicating membership via possession."
+        },
+        {
+          "term": "contributo sindacale",
+          "form": "masculine singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Union due/contribution, indicating membership via payment."
+        },
+        {
+          "term": "contributi sindacali",
+          "form": "masculine plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Union dues/contributions, indicating membership via payment."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "sindacato",
+          "reason": "Ambiguous: also means European Union or union of sets in mathematics."
+        },
+        {
+          "term": "unione",
+          "reason": "Highly ambiguous: means union in many contexts (EU, marriage, sets)."
+        },
+        {
+          "term": "iscritto",
+          "reason": "Too general. Means 'enrolled' or 'registered' for any activity (school, gym)."
+        },
+        {
+          "term": "membro",
+          "reason": "Too general. Means 'member' of any group, or 'limb'."
+        },
+        {
+          "term": "delegato",
+          "reason": "Too general. Means 'delegate' for any purpose."
+        },
+        {
+          "term": "tessera",
+          "reason": "Too general. Means 'card' or 'pass' for any purpose (library, gym)."
+        },
+        {
+          "term": "attivista",
+          "reason": "Too general. Means 'activist' for any cause."
+        }
+      ]
+    },
+    {
+      "domain": "sex-life-or-sexual-orientation",
+      "label": "sex life or sexual orientation",
+      "prompt": "Target language: Italian (it).\nArticle 9 special-category domain: sex life or sexual orientation.\n\nWHAT TO RETURN\nSexual orientation and sex-life status applied to a person (gay, lesbian, bisexual, pansexual, queer, homosexual, heterosexual, LGBTQ, transgender, intersex, \"sexual orientation\", \"sexually active\"). EXCLUDE the local equivalent of \"straight\" (a straight line), of \"asexual\" (asexual reproduction is core biology), and of \"coming out\" (he is coming out of the room). EXCLUDE \"boyfriend\"/\"girlfriend\" — far too common to be a disclosure signal.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nItalian inflects for gender and number. Give masculine and feminine, singular and plural (cattolico / cattolica / cattolici / cattoliche).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Italian prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"gay\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a woman's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a woman's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bisessuale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bisessuali\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"pansessuale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"pansessuali\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"queer\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"An umbrella term for sexual and gender minorities.\"\n    },\n    {\n      \"term\": \"omosessuale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"omosessuali\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"eterosessuale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"eterosessuali\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"etero\",\n      \"form\": \"masculine singular/plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"etera\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lgbt\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for sexual and gender minorities.\"\n    },\n    {\n      \"term\": \"lgbtq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for sexual and gender minorities.\"\n    },\n    {\n      \"term\": \"transgender\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's gender identity.\"\n    },\n    {\n      \"term\": \"transessuale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's gender identity.\"\n    },\n    {\n      \"term\": \"transessuali\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's gender identity.\"\n    },\n    {\n      \"term\": \"intersessuale\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex characteristics.\"\n    },\n    {\n      \"term\": \"intersessuali\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex characteristics.\"\n    },\n    {\n      \"term\": \"orientamento sessuale\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"The name of the special category data itself.\"\n    },\n    {\n      \"term\": \"sessualmente attivo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex life status.\"\n    },\n    {\n      \"term\": \"sessualmente attiva\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex life status.\"\n    },\n    {\n      \"term\": \"sessualmente attivi\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex life status.\"\n    },\n    {\n      \"term\": \"sessualmente attive\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex life status.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"asessuale\",\n      \"reason\": \"Common in biology (asexual reproduction).\"\n    },\n    {\n      \"term\": \"asessuato\",\n      \"reason\": \"Common in biology (asexual reproduction).\"\n    },\n    {\n      \"term\": \"dritto\",\n      \"reason\": \"Means 'straight' (line), very common word.\"\n    },\n    {\n      \"term\": \"diritto\",\n      \"reason\": \"Means 'straight' or 'right' (law), very common word.\"\n    },\n    {\n      \"term\": \"etere\",\n      \"reason\": \"High-risk homograph for 'ether'.\"\n    },\n    {\n      \"term\": \"coming out\",\n      \"reason\": \"Describes an action, not a status attribute.\"\n    },\n    {\n      \"term\": \"ragazzo\",\n      \"reason\": \"Too common, means 'boy' or 'boyfriend'.\"\n    },\n    {\n      \"term\": \"ragazza\",\n      \"reason\": \"Too common, means 'girl' or 'girlfriend'.\"\n    },\n    {\n      \"term\": \"fidanzato\",\n      \"reason\": \"Too common, means 'fiancé' or 'boyfriend'.\"\n    },\n    {\n      \"term\": \"fidanzata\",\n      \"reason\": \"Too common, means 'fiancée' or 'girlfriend'.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 808,
+        "completion_tokens": 5395,
+        "total_tokens": 6203,
+        "cost": 0.05496,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.05496,
+          "upstream_inference_prompt_cost": 0.00101,
+          "upstream_inference_completions_cost": 0.05395
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3178,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "gay",
+          "form": "invariable",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "lesbica",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a woman's sexual orientation."
+        },
+        {
+          "term": "lesbiche",
+          "form": "feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a woman's sexual orientation."
+        },
+        {
+          "term": "lesbico",
+          "form": "masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "lesbici",
+          "form": "masculine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "bisessuale",
+          "form": "masculine/feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "bisessuali",
+          "form": "masculine/feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "pansessuale",
+          "form": "masculine/feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "pansessuali",
+          "form": "masculine/feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "queer",
+          "form": "invariable",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "An umbrella term for sexual and gender minorities."
+        },
+        {
+          "term": "omosessuale",
+          "form": "masculine/feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "omosessuali",
+          "form": "masculine/feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "eterosessuale",
+          "form": "masculine/feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "eterosessuali",
+          "form": "masculine/feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "etero",
+          "form": "masculine singular/plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "etera",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "lgbt",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for sexual and gender minorities."
+        },
+        {
+          "term": "lgbtq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for sexual and gender minorities."
+        },
+        {
+          "term": "transgender",
+          "form": "invariable",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's gender identity."
+        },
+        {
+          "term": "transessuale",
+          "form": "masculine/feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's gender identity."
+        },
+        {
+          "term": "transessuali",
+          "form": "masculine/feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's gender identity."
+        },
+        {
+          "term": "intersessuale",
+          "form": "masculine/feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex characteristics."
+        },
+        {
+          "term": "intersessuali",
+          "form": "masculine/feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex characteristics."
+        },
+        {
+          "term": "orientamento sessuale",
+          "form": "masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "The name of the special category data itself."
+        },
+        {
+          "term": "sessualmente attivo",
+          "form": "masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex life status."
+        },
+        {
+          "term": "sessualmente attiva",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex life status."
+        },
+        {
+          "term": "sessualmente attivi",
+          "form": "masculine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex life status."
+        },
+        {
+          "term": "sessualmente attive",
+          "form": "feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex life status."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "asessuale",
+          "reason": "Common in biology (asexual reproduction)."
+        },
+        {
+          "term": "asessuato",
+          "reason": "Common in biology (asexual reproduction)."
+        },
+        {
+          "term": "dritto",
+          "reason": "Means 'straight' (line), very common word."
+        },
+        {
+          "term": "diritto",
+          "reason": "Means 'straight' or 'right' (law), very common word."
+        },
+        {
+          "term": "etere",
+          "reason": "High-risk homograph for 'ether'."
+        },
+        {
+          "term": "coming out",
+          "reason": "Describes an action, not a status attribute."
+        },
+        {
+          "term": "ragazzo",
+          "reason": "Too common, means 'boy' or 'boyfriend'."
+        },
+        {
+          "term": "ragazza",
+          "reason": "Too common, means 'girl' or 'girlfriend'."
+        },
+        {
+          "term": "fidanzato",
+          "reason": "Too common, means 'fiancé' or 'boyfriend'."
+        },
+        {
+          "term": "fidanzata",
+          "reason": "Too common, means 'fiancée' or 'girlfriend'."
+        }
+      ]
+    },
+    {
+      "domain": "genetic-data",
+      "label": "genetic data",
+      "prompt": "Target language: Italian (it).\nArticle 9 special-category domain: genetic data.\n\nWHAT TO RETURN\nONLY multi-word, inherently disclosure-shaped phrases about genetic testing or hereditary status (\"DNA test result\", \"genetic test\", \"genetic screening\", \"hereditary condition\"). Do NOT return bare \"DNA\", \"gene\" or \"chromosome\" — those are biology-curriculum vocabulary. Biometric data is deliberately out of scope: Article 9 defines it by the identification PURPOSE, not by any word a learner types, so return no biometric terms.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nItalian inflects for gender and number. Give masculine and feminine, singular and plural (cattolico / cattolica / cattolici / cattoliche).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Italian prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"analisi genetica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a medical procedure to analyze genetic material.\"\n    },\n    {\n      \"term\": \"analisi genetiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to medical procedures to analyze genetic material.\"\n    },\n    {\n      \"term\": \"condizione ereditaria\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a state or trait passed down genetically.\"\n    },\n    {\n      \"term\": \"condizioni ereditarie\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses states or traits passed down genetically.\"\n    },\n    {\n      \"term\": \"consulenza genetica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a medical service discussing genetic information.\"\n    },\n    {\n      \"term\": \"consulenze genetiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to medical services discussing genetic information.\"\n    },\n    {\n      \"term\": \"esame genetico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a medical procedure to analyze genetic material.\"\n    },\n    {\n      \"term\": \"esami genetici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to medical procedures to analyze genetic material.\"\n    },\n    {\n      \"term\": \"malattia ereditaria\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a health condition passed down genetically.\"\n    },\n    {\n      \"term\": \"malattie ereditarie\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses health conditions passed down genetically.\"\n    },\n    {\n      \"term\": \"mappatura genetica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the process of creating a genetic map.\"\n    },\n    {\n      \"term\": \"mappature genetiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the process of creating genetic maps.\"\n    },\n    {\n      \"term\": \"mutazione genetica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a specific alteration in a gene sequence.\"\n    },\n    {\n      \"term\": \"mutazioni genetiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses specific alterations in gene sequences.\"\n    },\n    {\n      \"term\": \"portatore sano\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses carrier status for a genetic trait or disease.\"\n    },\n    {\n      \"term\": \"portatrice sana\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses carrier status for a genetic trait or disease.\"\n    },\n    {\n      \"term\": \"portatori sani\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses carrier status for a genetic trait or disease.\"\n    },\n    {\n      \"term\": \"portatrici sane\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses carrier status for a genetic trait or disease.\"\n    },\n    {\n      \"term\": \"predisposizione genetica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses a genetic susceptibility to a condition.\"\n    },\n    {\n      \"term\": \"predisposizioni genetiche\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Discloses genetic susceptibilities to conditions.\"\n    },\n    {\n      \"term\": \"profilo genetico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to an individual's unique genetic makeup.\"\n    },\n    {\n      \"term\": \"profili genetici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to individuals' unique genetic makeups.\"\n    },\n    {\n      \"term\": \"risultato del test genetico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the outcome of a genetic analysis.\"\n    },\n    {\n      \"term\": \"risultati del test genetico\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the outcomes of a genetic analysis.\"\n    },\n    {\n      \"term\": \"screening genetico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to testing for genetic conditions in a population.\"\n    },\n    {\n      \"term\": \"screening genetici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to testing for genetic conditions in a population.\"\n    },\n    {\n      \"term\": \"sequenziamento del dna\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the process of determining a DNA sequence.\"\n    },\n    {\n      \"term\": \"sequenziamento genetico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the process of determining a genetic sequence.\"\n    },\n    {\n      \"term\": \"test del dna\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific type of genetic test.\"\n    },\n    {\n      \"term\": \"test genetico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a medical procedure to analyze genetic material.\"\n    },\n    {\n      \"term\": \"test genetici\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to medical procedures to analyze genetic material.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"dna\",\n      \"reason\": \"Common biology curriculum term, not inherently a disclosure.\"\n    },\n    {\n      \"term\": \"gene\",\n      \"reason\": \"Common biology curriculum term, not inherently a disclosure.\"\n    },\n    {\n      \"term\": \"cromosoma\",\n      \"reason\": \"Common biology curriculum term, not inherently a disclosure.\"\n    },\n    {\n      \"term\": \"genoma\",\n      \"reason\": \"Ambiguous between personal data and a general scientific concept.\"\n    },\n    {\n      \"term\": \"ereditarietà\",\n      \"reason\": \"Abstract concept, not a typical personal status assertion.\"\n    },\n    {\n      \"term\": \"trisomia\",\n      \"reason\": \"A specific medical diagnosis, out of scope for this list.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 794,
+        "completion_tokens": 7796,
+        "total_tokens": 8590,
+        "cost": 0.0789525,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0789525,
+          "upstream_inference_prompt_cost": 0.0009925,
+          "upstream_inference_completions_cost": 0.07796
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5455,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "analisi genetica",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a medical procedure to analyze genetic material."
+        },
+        {
+          "term": "analisi genetiche",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to medical procedures to analyze genetic material."
+        },
+        {
+          "term": "condizione ereditaria",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a state or trait passed down genetically."
+        },
+        {
+          "term": "condizioni ereditarie",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses states or traits passed down genetically."
+        },
+        {
+          "term": "consulenza genetica",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a medical service discussing genetic information."
+        },
+        {
+          "term": "consulenze genetiche",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to medical services discussing genetic information."
+        },
+        {
+          "term": "esame genetico",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a medical procedure to analyze genetic material."
+        },
+        {
+          "term": "esami genetici",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to medical procedures to analyze genetic material."
+        },
+        {
+          "term": "malattia ereditaria",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a health condition passed down genetically."
+        },
+        {
+          "term": "malattie ereditarie",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses health conditions passed down genetically."
+        },
+        {
+          "term": "mappatura genetica",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the process of creating a genetic map."
+        },
+        {
+          "term": "mappature genetiche",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the process of creating genetic maps."
+        },
+        {
+          "term": "mutazione genetica",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a specific alteration in a gene sequence."
+        },
+        {
+          "term": "mutazioni genetiche",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses specific alterations in gene sequences."
+        },
+        {
+          "term": "portatore sano",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses carrier status for a genetic trait or disease."
+        },
+        {
+          "term": "portatrice sana",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses carrier status for a genetic trait or disease."
+        },
+        {
+          "term": "portatori sani",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses carrier status for a genetic trait or disease."
+        },
+        {
+          "term": "portatrici sane",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses carrier status for a genetic trait or disease."
+        },
+        {
+          "term": "predisposizione genetica",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses a genetic susceptibility to a condition."
+        },
+        {
+          "term": "predisposizioni genetiche",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Discloses genetic susceptibilities to conditions."
+        },
+        {
+          "term": "profilo genetico",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to an individual's unique genetic makeup."
+        },
+        {
+          "term": "profili genetici",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to individuals' unique genetic makeups."
+        },
+        {
+          "term": "risultato del test genetico",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the outcome of a genetic analysis."
+        },
+        {
+          "term": "risultati del test genetico",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the outcomes of a genetic analysis."
+        },
+        {
+          "term": "screening genetico",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to testing for genetic conditions in a population."
+        },
+        {
+          "term": "screening genetici",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to testing for genetic conditions in a population."
+        },
+        {
+          "term": "sequenziamento del dna",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the process of determining a DNA sequence."
+        },
+        {
+          "term": "sequenziamento genetico",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the process of determining a genetic sequence."
+        },
+        {
+          "term": "test del dna",
+          "form": "invariant",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific type of genetic test."
+        },
+        {
+          "term": "test genetico",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a medical procedure to analyze genetic material."
+        },
+        {
+          "term": "test genetici",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to medical procedures to analyze genetic material."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "dna",
+          "reason": "Common biology curriculum term, not inherently a disclosure."
+        },
+        {
+          "term": "gene",
+          "reason": "Common biology curriculum term, not inherently a disclosure."
+        },
+        {
+          "term": "cromosoma",
+          "reason": "Common biology curriculum term, not inherently a disclosure."
+        },
+        {
+          "term": "genoma",
+          "reason": "Ambiguous between personal data and a general scientific concept."
+        },
+        {
+          "term": "ereditarietà",
+          "reason": "Abstract concept, not a typical personal status assertion."
+        },
+        {
+          "term": "trisomia",
+          "reason": "A specific medical diagnosis, out of scope for this list."
+        }
+      ]
+    }
+  ]
+}

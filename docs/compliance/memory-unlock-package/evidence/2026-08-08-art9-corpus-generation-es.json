@@ -1,0 +1,1974 @@
+{
+  "workItem": "WI-3142",
+  "purpose": "Best-effort LLM-prepared Article 9 protected-lexeme corpus for a non-English conversation language. UNREVIEWED: not load-bearing as a compliance control. Native-speaker review is a precondition for enabling persistent memory in this language.",
+  "operatorRuling": "2026-08-08 — persistent memory is English-only at unlock; non-English corpora are prepared best-effort via LLM generation and marked model-generated.",
+  "language": "es",
+  "languageName": "Spanish",
+  "generatedAt": "2026-08-08T17:52:01.017Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-pro",
+  "systemPrompt": "You are a native-speaker lexicographer working with a data-protection engineer. You are building a DETECTION corpus for a deterministic text scanner, not an encyclopedia. The scanner matches literal lowercase phrases inside person-attribution constructions only. A bare mention of a term never fires; only \"<person reference> <verb> <term>\" and \"<possessive> <term>\" do. Your job is therefore to maximise recall of PERSON-ATTRIBUTED STATUS ASSERTIONS while keeping ordinary schoolwork prose out. Answer with strict JSON only. No markdown, no code fences, no commentary.",
+  "appliedScope": "unnamed-attribution-only",
+  "appliedScopeNote": "Every accepted term is applied at unnamed-attribution-only regardless of the model recommendation. Promotion to broad is a human decision.",
+  "termCount": 178,
+  "domains": [
+    {
+      "domain": "racial-or-ethnic-origin",
+      "label": "racial or ethnic origin",
+      "prompt": "Target language: Spanish (es).\nArticle 9 special-category domain: racial or ethnic origin.\n\nWHAT TO RETURN\nEthnic-group and origin nouns/adjectives that describe a PERSON (Roma, Sinti, Kurdish, indigenous, \"of mixed heritage\", \"ethnic minority\", \"immigrant background\", \"ethnicity\"). EXCLUDE bare colour words and bare continent/region adjectives — their attributed forms (\"my black cat\", \"their African elephant\") are ordinary prose far more often than an origin disclosure.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nSpanish inflects for gender and number. Give masculine and feminine, singular and plural (católico / católica / católicos / católicas).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Spanish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"gitano\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person belonging to the Roma ethnic group.\"\n    },\n    {\n      \"term\": \"gitana\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person belonging to the Roma ethnic group.\"\n    },\n    {\n      \"term\": \"gitanos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People belonging to the Roma ethnic group.\"\n    },\n    {\n      \"term\": \"gitanas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People belonging to the Roma ethnic group.\"\n    },\n    {\n      \"term\": \"kurdo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person belonging to the Kurdish ethnic group.\"\n    },\n    {\n      \"term\": \"kurda\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person belonging to the Kurdish ethnic group.\"\n    },\n    {\n      \"term\": \"kurdos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People belonging to the Kurdish ethnic group.\"\n    },\n    {\n      \"term\": \"kurdas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People belonging to the Kurdish ethnic group.\"\n    },\n    {\n      \"term\": \"indígena\",\n      \"form\": \"gender-invariant singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person of indigenous origin from a particular region.\"\n    },\n    {\n      \"term\": \"indígenas\",\n      \"form\": \"gender-invariant plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People of indigenous origin from a particular region.\"\n    },\n    {\n      \"term\": \"mestizo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person of mixed European and Indigenous American ancestry.\"\n    },\n    {\n      \"term\": \"mestiza\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person of mixed European and Indigenous American ancestry.\"\n    },\n    {\n      \"term\": \"mestizos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People of mixed European and Indigenous American ancestry.\"\n    },\n    {\n      \"term\": \"mestizas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People of mixed European and Indigenous American ancestry.\"\n    },\n    {\n      \"term\": \"mulato\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person of mixed European and African ancestry.\"\n    },\n    {\n      \"term\": \"mulata\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A person of mixed European and African ancestry.\"\n    },\n    {\n      \"term\": \"mulatos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People of mixed European and African ancestry.\"\n    },\n    {\n      \"term\": \"mulatas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"People of mixed European and African ancestry.\"\n    },\n    {\n      \"term\": \"payo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A non-Roma person, as defined in contrast to Roma people.\"\n    },\n    {\n      \"term\": \"paya\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A non-Roma person, as defined in contrast to Roma people.\"\n    },\n    {\n      \"term\": \"payos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Non-Roma people, as defined in contrast to Roma people.\"\n    },\n    {\n      \"term\": \"payas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Non-Roma people, as defined in contrast to Roma people.\"\n    },\n    {\n      \"term\": \"de origen mixto\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's mixed ethnic origin.\"\n    },\n    {\n      \"term\": \"de herencia mixta\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's mixed ethnic heritage.\"\n    },\n    {\n      \"term\": \"de origen inmigrante\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States that a person has an immigrant background.\"\n    },\n    {\n      \"term\": \"minoría étnica\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies belonging to an ethnic minority group.\"\n    },\n    {\n      \"term\": \"etnia\",\n      \"form\": \"feminine singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"The word for ethnicity; 'mi etnia es...' is a direct disclosure.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"moro\",\n      \"reason\": \"Homograph for 'I die' (io moro) in Italian. Can also be pejorative.\"\n    },\n    {\n      \"term\": \"zamba\",\n      \"reason\": \"Homograph for a style of music and dance, e.g., 'mi zamba favorita'.\"\n    },\n    {\n      \"term\": \"negro\",\n      \"reason\": \"Bare color word. Far too common in non-disclosure contexts ('gato negro').\"\n    },\n    {\n      \"term\": \"blanco\",\n      \"reason\": \"Bare color word. Far too common in non-disclosure contexts ('papel blanco').\"\n    },\n    {\n      \"term\": \"africano\",\n      \"reason\": \"Bare continent adjective. Too common in other contexts ('arte africano').\"\n    },\n    {\n      \"term\": \"asiático\",\n      \"reason\": \"Bare continent adjective. Too common in other contexts ('mercado asiático').\"\n    },\n    {\n      \"term\": \"ladino\",\n      \"reason\": \"Ambiguous; can refer to a language (Judeo-Spanish) or different ethnic groups.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 777,
+        "completion_tokens": 6281,
+        "total_tokens": 7058,
+        "cost": 0.06378125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.06378125,
+          "upstream_inference_prompt_cost": 0.00097125,
+          "upstream_inference_completions_cost": 0.06281
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4184,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "gitano",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person belonging to the Roma ethnic group."
+        },
+        {
+          "term": "gitana",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person belonging to the Roma ethnic group."
+        },
+        {
+          "term": "gitanos",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People belonging to the Roma ethnic group."
+        },
+        {
+          "term": "gitanas",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People belonging to the Roma ethnic group."
+        },
+        {
+          "term": "kurdo",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person belonging to the Kurdish ethnic group."
+        },
+        {
+          "term": "kurda",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person belonging to the Kurdish ethnic group."
+        },
+        {
+          "term": "kurdos",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People belonging to the Kurdish ethnic group."
+        },
+        {
+          "term": "kurdas",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People belonging to the Kurdish ethnic group."
+        },
+        {
+          "term": "indígena",
+          "form": "gender-invariant singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person of indigenous origin from a particular region."
+        },
+        {
+          "term": "indígenas",
+          "form": "gender-invariant plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People of indigenous origin from a particular region."
+        },
+        {
+          "term": "mestizo",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person of mixed European and Indigenous American ancestry."
+        },
+        {
+          "term": "mestiza",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person of mixed European and Indigenous American ancestry."
+        },
+        {
+          "term": "mestizos",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People of mixed European and Indigenous American ancestry."
+        },
+        {
+          "term": "mestizas",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People of mixed European and Indigenous American ancestry."
+        },
+        {
+          "term": "mulato",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person of mixed European and African ancestry."
+        },
+        {
+          "term": "mulata",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A person of mixed European and African ancestry."
+        },
+        {
+          "term": "mulatos",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People of mixed European and African ancestry."
+        },
+        {
+          "term": "mulatas",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "People of mixed European and African ancestry."
+        },
+        {
+          "term": "payo",
+          "form": "masculine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A non-Roma person, as defined in contrast to Roma people."
+        },
+        {
+          "term": "paya",
+          "form": "feminine singular",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A non-Roma person, as defined in contrast to Roma people."
+        },
+        {
+          "term": "payos",
+          "form": "masculine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Non-Roma people, as defined in contrast to Roma people."
+        },
+        {
+          "term": "payas",
+          "form": "feminine plural",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Non-Roma people, as defined in contrast to Roma people."
+        },
+        {
+          "term": "de origen mixto",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's mixed ethnic origin."
+        },
+        {
+          "term": "de herencia mixta",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's mixed ethnic heritage."
+        },
+        {
+          "term": "de origen inmigrante",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States that a person has an immigrant background."
+        },
+        {
+          "term": "minoría étnica",
+          "form": "phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies belonging to an ethnic minority group."
+        },
+        {
+          "term": "etnia",
+          "form": "feminine singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "The word for ethnicity; 'mi etnia es...' is a direct disclosure."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "moro",
+          "reason": "Homograph for 'I die' (io moro) in Italian. Can also be pejorative."
+        },
+        {
+          "term": "zamba",
+          "reason": "Homograph for a style of music and dance, e.g., 'mi zamba favorita'."
+        },
+        {
+          "term": "negro",
+          "reason": "Bare color word. Far too common in non-disclosure contexts ('gato negro')."
+        },
+        {
+          "term": "blanco",
+          "reason": "Bare color word. Far too common in non-disclosure contexts ('papel blanco')."
+        },
+        {
+          "term": "africano",
+          "reason": "Bare continent adjective. Too common in other contexts ('arte africano')."
+        },
+        {
+          "term": "asiático",
+          "reason": "Bare continent adjective. Too common in other contexts ('mercado asiático')."
+        },
+        {
+          "term": "ladino",
+          "reason": "Ambiguous; can refer to a language (Judeo-Spanish) or different ethnic groups."
+        }
+      ]
+    },
+    {
+      "domain": "political-opinions",
+      "label": "political opinions or affiliation",
+      "prompt": "Target language: Spanish (es).\nArticle 9 special-category domain: political opinions or affiliation.\n\nWHAT TO RETURN\nPolitical-affiliation and opinion nouns/adjectives applied to a person (communist, socialist, anarchist, nationalist, feminist, far-right, \"party member\", \"political views\"). EXCLUDE words whose ordinary sense dominates in schoolwork — the local equivalents of English \"conservative\" (a conservative estimate), \"liberal\" (a liberal amount), \"green\", \"independent\", \"radical\", \"progressive\".\n\nMORPHOLOGY — this is the part generic answers get wrong.\nSpanish inflects for gender and number. Give masculine and feminine, singular and plural (católico / católica / católicos / católicas).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Spanish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"comunista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with communism.\"\n    },\n    {\n      \"term\": \"comunistas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with communism.\"\n    },\n    {\n      \"term\": \"socialista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with socialism.\"\n    },\n    {\n      \"term\": \"socialistas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with socialism.\"\n    },\n    {\n      \"term\": \"anarquista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with anarchism.\"\n    },\n    {\n      \"term\": \"anarquistas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with anarchism.\"\n    },\n    {\n      \"term\": \"nacionalista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with nationalism.\"\n    },\n    {\n      \"term\": \"nacionalistas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with nationalism.\"\n    },\n    {\n      \"term\": \"fascista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with fascism.\"\n    },\n    {\n      \"term\": \"fascistas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with fascism.\"\n    },\n    {\n      \"term\": \"feminista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with feminism.\"\n    },\n    {\n      \"term\": \"feministas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with feminism.\"\n    },\n    {\n      \"term\": \"militante\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"militant (en, fr, it)\",\n      \"justification\": \"Describes a person as a political activist or party member.\"\n    },\n    {\n      \"term\": \"militantes\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"militant (en, fr, it)\",\n      \"justification\": \"Describes a person as a political activist or party member.\"\n    },\n    {\n      \"term\": \"activista\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as a political activist.\"\n    },\n    {\n      \"term\": \"activistas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as a political activist.\"\n    },\n    {\n      \"term\": \"republicano\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"republican (en)\",\n      \"justification\": \"Asserts a person's affiliation with republicanism.\"\n    },\n    {\n      \"term\": \"republicana\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with republicanism.\"\n    },\n    {\n      \"term\": \"republicanos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"republican (en)\",\n      \"justification\": \"Asserts a person's affiliation with republicanism.\"\n    },\n    {\n      \"term\": \"republicanas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with republicanism.\"\n    },\n    {\n      \"term\": \"monárquico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with monarchism.\"\n    },\n    {\n      \"term\": \"monárquica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with monarchism.\"\n    },\n    {\n      \"term\": \"monárquicos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with monarchism.\"\n    },\n    {\n      \"term\": \"monárquicas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Asserts a person's affiliation with monarchism.\"\n    },\n    {\n      \"term\": \"afiliado al partido\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person is a member of a political party.\"\n    },\n    {\n      \"term\": \"afiliada al partido\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person is a member of a political party.\"\n    },\n    {\n      \"term\": \"afiliados al partido\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person is a member of a political party.\"\n    },\n    {\n      \"term\": \"afiliadas al partido\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person is a member of a political party.\"\n    },\n    {\n      \"term\": \"miembro del partido\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person is a member of a political party.\"\n    },\n    {\n      \"term\": \"miembros del partido\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person is a member of a political party.\"\n    },\n    {\n      \"term\": \"de extrema derecha\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political alignment as far-right.\"\n    },\n    {\n      \"term\": \"de extrema izquierda\",\n      \"form\": \"invariable\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's political alignment as far-left.\"\n    },\n    {\n      \"term\": \"opiniones políticas\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political views.\"\n    },\n    {\n      \"term\": \"ideología política\",\n      \"form\": \"singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's political ideology.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"conservador\",\n      \"reason\": \"Commonly means 'preservative' or 'cautious estimate'. High schoolwork ambiguity.\"\n    },\n    {\n      \"term\": \"liberal\",\n      \"reason\": \"Commonly means 'generous'. High schoolwork ambiguity.\"\n    },\n    {\n      \"term\": \"verde\",\n      \"reason\": \"Primarily means the color 'green'. High schoolwork ambiguity.\"\n    },\n    {\n      \"term\": \"independiente\",\n      \"reason\": \"Commonly means 'independent' in non-political contexts (e.g., math variables).\"\n    },\n    {\n      \"term\": \"radical\",\n      \"reason\": \"Commonly means 'root' in mathematics or 'drastic'. High schoolwork ambiguity.\"\n    },\n    {\n      \"term\": \"progresista\",\n      \"reason\": \"Can mean 'forward-thinking' in general, non-political contexts.\"\n    },\n    {\n      \"term\": \"partido\",\n      \"reason\": \"Commonly means 'game' or 'match' in sports, or 'split'.\"\n    },\n    {\n      \"term\": \"simpatizante\",\n      \"reason\": \"Means 'sympathizer' or 'fan', often used for sports teams.\"\n    },\n    {\n      \"term\": \"derecha\",\n      \"reason\": \"Primarily means the direction 'right' or the subject 'law'.\"\n    },\n    {\n      \"term\": \"izquierda\",\n      \"reason\": \"Primarily means the direction 'left'.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 781,
+        "completion_tokens": 8339,
+        "total_tokens": 9120,
+        "cost": 0.08436625,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.08436625,
+          "upstream_inference_prompt_cost": 0.00097625,
+          "upstream_inference_completions_cost": 0.08339
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5667,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "comunista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with communism."
+        },
+        {
+          "term": "comunistas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with communism."
+        },
+        {
+          "term": "socialista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with socialism."
+        },
+        {
+          "term": "socialistas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with socialism."
+        },
+        {
+          "term": "anarquista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with anarchism."
+        },
+        {
+          "term": "anarquistas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with anarchism."
+        },
+        {
+          "term": "nacionalista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with nationalism."
+        },
+        {
+          "term": "nacionalistas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with nationalism."
+        },
+        {
+          "term": "fascista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with fascism."
+        },
+        {
+          "term": "fascistas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with fascism."
+        },
+        {
+          "term": "feminista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with feminism."
+        },
+        {
+          "term": "feministas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with feminism."
+        },
+        {
+          "term": "militante",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "militant (en, fr, it)",
+          "justification": "Describes a person as a political activist or party member."
+        },
+        {
+          "term": "militantes",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "militant (en, fr, it)",
+          "justification": "Describes a person as a political activist or party member."
+        },
+        {
+          "term": "activista",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as a political activist."
+        },
+        {
+          "term": "activistas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as a political activist."
+        },
+        {
+          "term": "republicano",
+          "form": "masculine singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "republican (en)",
+          "justification": "Asserts a person's affiliation with republicanism."
+        },
+        {
+          "term": "republicana",
+          "form": "feminine singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with republicanism."
+        },
+        {
+          "term": "republicanos",
+          "form": "masculine plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "republican (en)",
+          "justification": "Asserts a person's affiliation with republicanism."
+        },
+        {
+          "term": "republicanas",
+          "form": "feminine plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with republicanism."
+        },
+        {
+          "term": "monárquico",
+          "form": "masculine singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with monarchism."
+        },
+        {
+          "term": "monárquica",
+          "form": "feminine singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with monarchism."
+        },
+        {
+          "term": "monárquicos",
+          "form": "masculine plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with monarchism."
+        },
+        {
+          "term": "monárquicas",
+          "form": "feminine plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Asserts a person's affiliation with monarchism."
+        },
+        {
+          "term": "afiliado al partido",
+          "form": "masculine singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person is a member of a political party."
+        },
+        {
+          "term": "afiliada al partido",
+          "form": "feminine singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person is a member of a political party."
+        },
+        {
+          "term": "afiliados al partido",
+          "form": "masculine plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person is a member of a political party."
+        },
+        {
+          "term": "afiliadas al partido",
+          "form": "feminine plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person is a member of a political party."
+        },
+        {
+          "term": "miembro del partido",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person is a member of a political party."
+        },
+        {
+          "term": "miembros del partido",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person is a member of a political party."
+        },
+        {
+          "term": "de extrema derecha",
+          "form": "invariable",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political alignment as far-right."
+        },
+        {
+          "term": "de extrema izquierda",
+          "form": "invariable",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's political alignment as far-left."
+        },
+        {
+          "term": "opiniones políticas",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political views."
+        },
+        {
+          "term": "ideología política",
+          "form": "singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's political ideology."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "conservador",
+          "reason": "Commonly means 'preservative' or 'cautious estimate'. High schoolwork ambiguity."
+        },
+        {
+          "term": "liberal",
+          "reason": "Commonly means 'generous'. High schoolwork ambiguity."
+        },
+        {
+          "term": "verde",
+          "reason": "Primarily means the color 'green'. High schoolwork ambiguity."
+        },
+        {
+          "term": "independiente",
+          "reason": "Commonly means 'independent' in non-political contexts (e.g., math variables)."
+        },
+        {
+          "term": "radical",
+          "reason": "Commonly means 'root' in mathematics or 'drastic'. High schoolwork ambiguity."
+        },
+        {
+          "term": "progresista",
+          "reason": "Can mean 'forward-thinking' in general, non-political contexts."
+        },
+        {
+          "term": "partido",
+          "reason": "Commonly means 'game' or 'match' in sports, or 'split'."
+        },
+        {
+          "term": "simpatizante",
+          "reason": "Means 'sympathizer' or 'fan', often used for sports teams."
+        },
+        {
+          "term": "derecha",
+          "reason": "Primarily means the direction 'right' or the subject 'law'."
+        },
+        {
+          "term": "izquierda",
+          "reason": "Primarily means the direction 'left'."
+        }
+      ]
+    },
+    {
+      "domain": "religious-or-philosophical-beliefs",
+      "label": "religious or philosophical beliefs",
+      "prompt": "Target language: Spanish (es).\nArticle 9 special-category domain: religious or philosophical beliefs.\n\nWHAT TO RETURN\nReligious/denominational/philosophical affiliation applied to a person (Catholic, Protestant, Muslim, Jewish, Hindu, Buddhist, atheist, agnostic, devout, \"converted to Islam\", \"religious belief\"), plus belief-marking dress where it is unambiguous (hijab, kippah). EXCLUDE the local equivalent of bare \"orthodox\" (an orthodox method) and bare \"religious\"/\"religion\" (religious education is a school subject).\n\nMORPHOLOGY — this is the part generic answers get wrong.\nSpanish inflects for gender and number. Give masculine and feminine, singular and plural (católico / católica / católicos / católicas).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Spanish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"católico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with the Catholic denomination of Christianity.\"\n    },\n    {\n      \"term\": \"católica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with the Catholic denomination of Christianity.\"\n    },\n    {\n      \"term\": \"católicos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with the Catholic denomination of Christianity.\"\n    },\n    {\n      \"term\": \"católicas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with the Catholic denomination of Christianity.\"\n    },\n    {\n      \"term\": \"protestante\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Protestantism.\"\n    },\n    {\n      \"term\": \"protestantes\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Protestantism.\"\n    },\n    {\n      \"term\": \"musulmán\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Islam.\"\n    },\n    {\n      \"term\": \"musulmana\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Islam.\"\n    },\n    {\n      \"term\": \"musulmanes\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Islam.\"\n    },\n    {\n      \"term\": \"musulmanas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Islam.\"\n    },\n    {\n      \"term\": \"judío\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Judaism.\"\n    },\n    {\n      \"term\": \"judía\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Also means 'green bean' in Spanish.\",\n      \"justification\": \"Identifies affiliation with Judaism; attribution context reduces ambiguity.\"\n    },\n    {\n      \"term\": \"judíos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Judaism.\"\n    },\n    {\n      \"term\": \"judías\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Also means 'green beans' in Spanish.\",\n      \"justification\": \"Identifies affiliation with Judaism; attribution context reduces ambiguity.\"\n    },\n    {\n      \"term\": \"hindú\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Hinduism.\"\n    },\n    {\n      \"term\": \"hindúes\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Hinduism.\"\n    },\n    {\n      \"term\": \"budista\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Buddhism.\"\n    },\n    {\n      \"term\": \"budistas\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's affiliation with Buddhism.\"\n    },\n    {\n      \"term\": \"ateo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"atea\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"ateos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"ateas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of atheism.\"\n    },\n    {\n      \"term\": \"agnóstico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"agnóstica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"agnósticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"agnósticas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief of agnosticism.\"\n    },\n    {\n      \"term\": \"evangélico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Evangelical Christianity.\"\n    },\n    {\n      \"term\": \"evangélica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Evangelical Christianity.\"\n    },\n    {\n      \"term\": \"evangélicos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Evangelical Christianity.\"\n    },\n    {\n      \"term\": \"evangélicas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Evangelical Christianity.\"\n    },\n    {\n      \"term\": \"testigo de jehová\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with the Jehovah's Witnesses denomination.\"\n    },\n    {\n      \"term\": \"testigos de jehová\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with the Jehovah's Witnesses denomination.\"\n    },\n    {\n      \"term\": \"suní\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Sunni Islam.\"\n    },\n    {\n      \"term\": \"suníes\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Sunni Islam.\"\n    },\n    {\n      \"term\": \"chií\",\n      \"form\": \"masculine/feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Shia Islam.\"\n    },\n    {\n      \"term\": \"chiíes\",\n      \"form\": \"masculine/feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Shia Islam.\"\n    },\n    {\n      \"term\": \"mormón\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Mormonism.\"\n    },\n    {\n      \"term\": \"mormona\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Mormonism.\"\n    },\n    {\n      \"term\": \"mormones\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Mormonism.\"\n    },\n    {\n      \"term\": \"mormonas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies affiliation with Mormonism.\"\n    },\n    {\n      \"term\": \"hijab\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering worn by some Muslim women, indicating religious practice.\"\n    },\n    {\n      \"term\": \"kipá\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A skullcap worn by some Jewish men, indicating religious practice.\"\n    },\n    {\n      \"term\": \"convertido al islam\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person has converted to Islam.\"\n    },\n    {\n      \"term\": \"convertida al islam\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person has converted to Islam.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"religioso\",\n      \"reason\": \"Too general. Common in phrases like 'arte religioso' or 'texto religioso'.\"\n    },\n    {\n      \"term\": \"ortodoxo\",\n      \"reason\": \"Too general. Common meaning is 'conventional', as in 'método ortodoxo'.\"\n    },\n    {\n      \"term\": \"devoto\",\n      \"reason\": \"Ambiguous. Can mean 'fan of' a secular figure, e.g., 'devoto de un artista'.\"\n    },\n    {\n      \"term\": \"fe\",\n      \"reason\": \"Too general. Means 'faith' or 'trust' in many non-religious contexts.\"\n    },\n    {\n      \"term\": \"creyente\",\n      \"reason\": \"Slightly more general ('believer') than specific denominational terms.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 788,
+        "completion_tokens": 9738,
+        "total_tokens": 10526,
+        "cost": 0.098365,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.098365,
+          "upstream_inference_prompt_cost": 0.000985,
+          "upstream_inference_completions_cost": 0.09738
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 6503,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "católico",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with the Catholic denomination of Christianity."
+        },
+        {
+          "term": "católica",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with the Catholic denomination of Christianity."
+        },
+        {
+          "term": "católicos",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with the Catholic denomination of Christianity."
+        },
+        {
+          "term": "católicas",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with the Catholic denomination of Christianity."
+        },
+        {
+          "term": "protestante",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Protestantism."
+        },
+        {
+          "term": "protestantes",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Protestantism."
+        },
+        {
+          "term": "musulmán",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Islam."
+        },
+        {
+          "term": "musulmana",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Islam."
+        },
+        {
+          "term": "musulmanes",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Islam."
+        },
+        {
+          "term": "musulmanas",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Islam."
+        },
+        {
+          "term": "judío",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Judaism."
+        },
+        {
+          "term": "judía",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Also means 'green bean' in Spanish.",
+          "justification": "Identifies affiliation with Judaism; attribution context reduces ambiguity."
+        },
+        {
+          "term": "judíos",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Judaism."
+        },
+        {
+          "term": "judías",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Also means 'green beans' in Spanish.",
+          "justification": "Identifies affiliation with Judaism; attribution context reduces ambiguity."
+        },
+        {
+          "term": "hindú",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Hinduism."
+        },
+        {
+          "term": "hindúes",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Hinduism."
+        },
+        {
+          "term": "budista",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Buddhism."
+        },
+        {
+          "term": "budistas",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's affiliation with Buddhism."
+        },
+        {
+          "term": "ateo",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of atheism."
+        },
+        {
+          "term": "atea",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of atheism."
+        },
+        {
+          "term": "ateos",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of atheism."
+        },
+        {
+          "term": "ateas",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of atheism."
+        },
+        {
+          "term": "agnóstico",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of agnosticism."
+        },
+        {
+          "term": "agnóstica",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of agnosticism."
+        },
+        {
+          "term": "agnósticos",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of agnosticism."
+        },
+        {
+          "term": "agnósticas",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief of agnosticism."
+        },
+        {
+          "term": "evangélico",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Evangelical Christianity."
+        },
+        {
+          "term": "evangélica",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Evangelical Christianity."
+        },
+        {
+          "term": "evangélicos",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Evangelical Christianity."
+        },
+        {
+          "term": "evangélicas",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Evangelical Christianity."
+        },
+        {
+          "term": "testigo de jehová",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with the Jehovah's Witnesses denomination."
+        },
+        {
+          "term": "testigos de jehová",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with the Jehovah's Witnesses denomination."
+        },
+        {
+          "term": "suní",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Sunni Islam."
+        },
+        {
+          "term": "suníes",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Sunni Islam."
+        },
+        {
+          "term": "chií",
+          "form": "masculine/feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Shia Islam."
+        },
+        {
+          "term": "chiíes",
+          "form": "masculine/feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Shia Islam."
+        },
+        {
+          "term": "mormón",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Mormonism."
+        },
+        {
+          "term": "mormona",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Mormonism."
+        },
+        {
+          "term": "mormones",
+          "form": "masculine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Mormonism."
+        },
+        {
+          "term": "mormonas",
+          "form": "feminine plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies affiliation with Mormonism."
+        },
+        {
+          "term": "hijab",
+          "form": "noun",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering worn by some Muslim women, indicating religious practice."
+        },
+        {
+          "term": "kipá",
+          "form": "noun",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A skullcap worn by some Jewish men, indicating religious practice."
+        },
+        {
+          "term": "convertido al islam",
+          "form": "masculine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person has converted to Islam."
+        },
+        {
+          "term": "convertida al islam",
+          "form": "feminine singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person has converted to Islam."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "religioso",
+          "reason": "Too general. Common in phrases like 'arte religioso' or 'texto religioso'."
+        },
+        {
+          "term": "ortodoxo",
+          "reason": "Too general. Common meaning is 'conventional', as in 'método ortodoxo'."
+        },
+        {
+          "term": "devoto",
+          "reason": "Ambiguous. Can mean 'fan of' a secular figure, e.g., 'devoto de un artista'."
+        },
+        {
+          "term": "fe",
+          "reason": "Too general. Means 'faith' or 'trust' in many non-religious contexts."
+        },
+        {
+          "term": "creyente",
+          "reason": "Slightly more general ('believer') than specific denominational terms."
+        }
+      ]
+    },
+    {
+      "domain": "trade-union-membership",
+      "label": "trade-union membership",
+      "prompt": "Target language: Spanish (es).\nArticle 9 special-category domain: trade-union membership.\n\nWHAT TO RETURN\nMembership of, or office in, a trade union (union member, trade unionist, shop steward, union dues, unionised, \"member of a union\"). EXCLUDE the bare word for \"union\" on its own — it also names the European Union and, in mathematics, the union of sets.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nSpanish inflects for gender and number. Give masculine and feminine, singular and plural (católico / católica / católicos / católicas).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Spanish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"sindicalista\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states the person is a trade unionist.\"\n    },\n    {\n      \"term\": \"sindicalistas\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states the people are trade unionists.\"\n    },\n    {\n      \"term\": \"afiliado a un sindicato\",\n      \"form\": \"m singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States affiliation with a trade union.\"\n    },\n    {\n      \"term\": \"afiliada a un sindicato\",\n      \"form\": \"f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States affiliation with a trade union.\"\n    },\n    {\n      \"term\": \"afiliados a un sindicato\",\n      \"form\": \"m plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States affiliation with a trade union.\"\n    },\n    {\n      \"term\": \"afiliadas a un sindicato\",\n      \"form\": \"f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States affiliation with a trade union.\"\n    },\n    {\n      \"term\": \"miembro de un sindicato\",\n      \"form\": \"m singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States membership in a trade union.\"\n    },\n    {\n      \"term\": \"miembros de un sindicato\",\n      \"form\": \"m plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States membership in a trade union.\"\n    },\n    {\n      \"term\": \"delegado sindical\",\n      \"form\": \"m singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the person is a union representative (shop steward).\"\n    },\n    {\n      \"term\": \"delegada sindical\",\n      \"form\": \"f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the person is a union representative (shop steward).\"\n    },\n    {\n      \"term\": \"delegados sindicales\",\n      \"form\": \"m plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the people are union representatives (shop stewards).\"\n    },\n    {\n      \"term\": \"delegadas sindicales\",\n      \"form\": \"f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the people are union representatives (shop stewards).\"\n    },\n    {\n      \"term\": \"cuota sindical\",\n      \"form\": \"f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to paying union dues, implying membership.\"\n    },\n    {\n      \"term\": \"cuotas sindicales\",\n      \"form\": \"f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to paying union dues, implying membership.\"\n    },\n    {\n      \"term\": \"sindicalizado\",\n      \"form\": \"m singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the person is unionized.\"\n    },\n    {\n      \"term\": \"sindicalizada\",\n      \"form\": \"f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the person is unionized.\"\n    },\n    {\n      \"term\": \"sindicalizados\",\n      \"form\": \"m plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the people are unionized.\"\n    },\n    {\n      \"term\": \"sindicalizadas\",\n      \"form\": \"f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States the people are unionized.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"sindicato\",\n      \"reason\": \"Too ambiguous; also means syndicate, cartel. Excluded per instructions.\"\n    },\n    {\n      \"term\": \"unión\",\n      \"reason\": \"Too ambiguous; European Union, union of sets, marriage. Excluded per instructions.\"\n    },\n    {\n      \"term\": \"afiliado\",\n      \"reason\": \"Too generic; can be affiliated with any organization, not just a union.\"\n    },\n    {\n      \"term\": \"miembro\",\n      \"reason\": \"Too generic; can be a member of any group, club, or team.\"\n    },\n    {\n      \"term\": \"delegado\",\n      \"reason\": \"Too generic; can be a representative for any group or purpose.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 762,
+        "completion_tokens": 3317,
+        "total_tokens": 4079,
+        "cost": 0.0341225,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0341225,
+          "upstream_inference_prompt_cost": 0.0009525,
+          "upstream_inference_completions_cost": 0.03317
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1918,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "sindicalista",
+          "form": "m/f singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states the person is a trade unionist."
+        },
+        {
+          "term": "sindicalistas",
+          "form": "m/f plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states the people are trade unionists."
+        },
+        {
+          "term": "afiliado a un sindicato",
+          "form": "m singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States affiliation with a trade union."
+        },
+        {
+          "term": "afiliada a un sindicato",
+          "form": "f singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States affiliation with a trade union."
+        },
+        {
+          "term": "afiliados a un sindicato",
+          "form": "m plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States affiliation with a trade union."
+        },
+        {
+          "term": "afiliadas a un sindicato",
+          "form": "f plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States affiliation with a trade union."
+        },
+        {
+          "term": "miembro de un sindicato",
+          "form": "m singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States membership in a trade union."
+        },
+        {
+          "term": "miembros de un sindicato",
+          "form": "m plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States membership in a trade union."
+        },
+        {
+          "term": "delegado sindical",
+          "form": "m singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the person is a union representative (shop steward)."
+        },
+        {
+          "term": "delegada sindical",
+          "form": "f singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the person is a union representative (shop steward)."
+        },
+        {
+          "term": "delegados sindicales",
+          "form": "m plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the people are union representatives (shop stewards)."
+        },
+        {
+          "term": "delegadas sindicales",
+          "form": "f plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the people are union representatives (shop stewards)."
+        },
+        {
+          "term": "cuota sindical",
+          "form": "f singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to paying union dues, implying membership."
+        },
+        {
+          "term": "cuotas sindicales",
+          "form": "f plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to paying union dues, implying membership."
+        },
+        {
+          "term": "sindicalizado",
+          "form": "m singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the person is unionized."
+        },
+        {
+          "term": "sindicalizada",
+          "form": "f singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the person is unionized."
+        },
+        {
+          "term": "sindicalizados",
+          "form": "m plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the people are unionized."
+        },
+        {
+          "term": "sindicalizadas",
+          "form": "f plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States the people are unionized."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "sindicato",
+          "reason": "Too ambiguous; also means syndicate, cartel. Excluded per instructions."
+        },
+        {
+          "term": "unión",
+          "reason": "Too ambiguous; European Union, union of sets, marriage. Excluded per instructions."
+        },
+        {
+          "term": "afiliado",
+          "reason": "Too generic; can be affiliated with any organization, not just a union."
+        },
+        {
+          "term": "miembro",
+          "reason": "Too generic; can be a member of any group, club, or team."
+        },
+        {
+          "term": "delegado",
+          "reason": "Too generic; can be a representative for any group or purpose."
+        }
+      ]
+    },
+    {
+      "domain": "sex-life-or-sexual-orientation",
+      "label": "sex life or sexual orientation",
+      "prompt": "Target language: Spanish (es).\nArticle 9 special-category domain: sex life or sexual orientation.\n\nWHAT TO RETURN\nSexual orientation and sex-life status applied to a person (gay, lesbian, bisexual, pansexual, queer, homosexual, heterosexual, LGBTQ, transgender, intersex, \"sexual orientation\", \"sexually active\"). EXCLUDE the local equivalent of \"straight\" (a straight line), of \"asexual\" (asexual reproduction is core biology), and of \"coming out\" (he is coming out of the room). EXCLUDE \"boyfriend\"/\"girlfriend\" — far too common to be a disclosure signal.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nSpanish inflects for gender and number. Give masculine and feminine, singular and plural (católico / católica / católicos / católicas).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Spanish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"gay\",\n      \"form\": \"masculine singular/plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English: 'happy' (archaic). French: 'gai' (happy). Low risk in attribution.\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"gays\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a group's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbiana\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbianas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a group's sexual orientation.\"\n    },\n    {\n      \"term\": \"bisexual\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bisexuales\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a group's sexual orientation.\"\n    },\n    {\n      \"term\": \"pansexual\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"pansexuales\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a group's sexual orientation.\"\n    },\n    {\n      \"term\": \"homosexual\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"homosexuales\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a group's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterosexual\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterosexuales\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a group's sexual orientation.\"\n    },\n    {\n      \"term\": \"queer\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"German: 'quer' (across, diagonal). Low risk in attribution.\",\n      \"justification\": \"An identity term for sexual/gender minorities.\"\n    },\n    {\n      \"term\": \"transgénero\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"States a person's gender identity.\"\n    },\n    {\n      \"term\": \"trans\",\n      \"form\": \"abbreviation\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"German: 'Tran' (fish oil). Low risk in attribution.\",\n      \"justification\": \"Common abbreviation for transgender.\"\n    },\n    {\n      \"term\": \"intersexual\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes variations in sex characteristics.\"\n    },\n    {\n      \"term\": \"intersexuales\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes variations in sex characteristics.\"\n    },\n    {\n      \"term\": \"intersex\",\n      \"form\": \"invariant\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes variations in sex characteristics.\"\n    },\n    {\n      \"term\": \"lgbt\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for sexual and gender minorities.\"\n    },\n    {\n      \"term\": \"lgbtq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for sexual and gender minorities.\"\n    },\n    {\n      \"term\": \"orientación sexual\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the category of sexual orientation.\"\n    },\n    {\n      \"term\": \"sexualmente activo\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex life status.\"\n    },\n    {\n      \"term\": \"sexualmente activa\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sex life status.\"\n    },\n    {\n      \"term\": \"sexualmente activos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a group's sex life status.\"\n    },\n    {\n      \"term\": \"sexualmente activas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a group's sex life status.\"\n    },\n    {\n      \"term\": \"arromántico\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's romantic orientation.\"\n    },\n    {\n      \"term\": \"arromántica\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's romantic orientation.\"\n    },\n    {\n      \"term\": \"arrománticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a group's romantic orientation.\"\n    },\n    {\n      \"term\": \"arrománticas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a group's romantic orientation.\"\n    },\n    {\n      \"term\": \"demisexual\",\n      \"form\": \"m/f singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"demisexuales\",\n      \"form\": \"m/f plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a group's sexual orientation.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"asexual\",\n      \"reason\": \"High risk of appearing in biology classwork (e.g., 'reproducción asexual').\"\n    },\n    {\n      \"term\": \"salir del armario\",\n      \"reason\": \"The verb 'salir' (to exit, to go out) is too common.\"\n    },\n    {\n      \"term\": \"recto\",\n      \"reason\": \"Means 'straight' as in a line, or 'rectum'. Highly ambiguous.\"\n    },\n    {\n      \"term\": \"derecho\",\n      \"reason\": \"Means 'right' (direction) or 'law'. Highly ambiguous.\"\n    },\n    {\n      \"term\": \"hetero\",\n      \"reason\": \"Common prefix in scientific terms (e.g., heterogeneous).\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 803,
+        "completion_tokens": 6177,
+        "total_tokens": 6980,
+        "cost": 0.06277375,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.06277375,
+          "upstream_inference_prompt_cost": 0.00100375,
+          "upstream_inference_completions_cost": 0.06177
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3884,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "gay",
+          "form": "masculine singular/plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English: 'happy' (archaic). French: 'gai' (happy). Low risk in attribution.",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "gays",
+          "form": "masculine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a group's sexual orientation."
+        },
+        {
+          "term": "lesbiana",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "lesbianas",
+          "form": "feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a group's sexual orientation."
+        },
+        {
+          "term": "bisexual",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "bisexuales",
+          "form": "m/f plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a group's sexual orientation."
+        },
+        {
+          "term": "pansexual",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "pansexuales",
+          "form": "m/f plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a group's sexual orientation."
+        },
+        {
+          "term": "homosexual",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "homosexuales",
+          "form": "m/f plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a group's sexual orientation."
+        },
+        {
+          "term": "heterosexual",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "heterosexuales",
+          "form": "m/f plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a group's sexual orientation."
+        },
+        {
+          "term": "queer",
+          "form": "invariant",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "German: 'quer' (across, diagonal). Low risk in attribution.",
+          "justification": "An identity term for sexual/gender minorities."
+        },
+        {
+          "term": "transgénero",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "States a person's gender identity."
+        },
+        {
+          "term": "trans",
+          "form": "abbreviation",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "German: 'Tran' (fish oil). Low risk in attribution.",
+          "justification": "Common abbreviation for transgender."
+        },
+        {
+          "term": "intersexual",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes variations in sex characteristics."
+        },
+        {
+          "term": "intersexuales",
+          "form": "m/f plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes variations in sex characteristics."
+        },
+        {
+          "term": "intersex",
+          "form": "invariant",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes variations in sex characteristics."
+        },
+        {
+          "term": "lgbt",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for sexual and gender minorities."
+        },
+        {
+          "term": "lgbtq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for sexual and gender minorities."
+        },
+        {
+          "term": "orientación sexual",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the category of sexual orientation."
+        },
+        {
+          "term": "sexualmente activo",
+          "form": "masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex life status."
+        },
+        {
+          "term": "sexualmente activa",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sex life status."
+        },
+        {
+          "term": "sexualmente activos",
+          "form": "masculine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a group's sex life status."
+        },
+        {
+          "term": "sexualmente activas",
+          "form": "feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a group's sex life status."
+        },
+        {
+          "term": "arromántico",
+          "form": "masculine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's romantic orientation."
+        },
+        {
+          "term": "arromántica",
+          "form": "feminine singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's romantic orientation."
+        },
+        {
+          "term": "arrománticos",
+          "form": "masculine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a group's romantic orientation."
+        },
+        {
+          "term": "arrománticas",
+          "form": "feminine plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a group's romantic orientation."
+        },
+        {
+          "term": "demisexual",
+          "form": "m/f singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's sexual orientation."
+        },
+        {
+          "term": "demisexuales",
+          "form": "m/f plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a group's sexual orientation."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "asexual",
+          "reason": "High risk of appearing in biology classwork (e.g., 'reproducción asexual')."
+        },
+        {
+          "term": "salir del armario",
+          "reason": "The verb 'salir' (to exit, to go out) is too common."
+        },
+        {
+          "term": "recto",
+          "reason": "Means 'straight' as in a line, or 'rectum'. Highly ambiguous."
+        },
+        {
+          "term": "derecho",
+          "reason": "Means 'right' (direction) or 'law'. Highly ambiguous."
+        },
+        {
+          "term": "hetero",
+          "reason": "Common prefix in scientific terms (e.g., heterogeneous)."
+        }
+      ]
+    },
+    {
+      "domain": "genetic-data",
+      "label": "genetic data",
+      "prompt": "Target language: Spanish (es).\nArticle 9 special-category domain: genetic data.\n\nWHAT TO RETURN\nONLY multi-word, inherently disclosure-shaped phrases about genetic testing or hereditary status (\"DNA test result\", \"genetic test\", \"genetic screening\", \"hereditary condition\"). Do NOT return bare \"DNA\", \"gene\" or \"chromosome\" — those are biology-curriculum vocabulary. Biometric data is deliberately out of scope: Article 9 defines it by the identification PURPOSE, not by any word a learner types, so return no biometric terms.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nSpanish inflects for gender and number. Give masculine and feminine, singular and plural (católico / católica / católicos / católicas).\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Spanish prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"análisis genético\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific medical analysis of genetic material.\"\n    },\n    {\n      \"term\": \"análisis genéticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific medical analyses of genetic material.\"\n    },\n    {\n      \"term\": \"condición hereditaria\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health status passed down through a family.\"\n    },\n    {\n      \"term\": \"condiciones hereditarias\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to health statuses passed down through a family.\"\n    },\n    {\n      \"term\": \"enfermedad genética\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a disease caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"enfermedades genéticas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to diseases caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"enfermedad hereditaria\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a disease passed down through a family.\"\n    },\n    {\n      \"term\": \"enfermedades hereditarias\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to diseases passed down through a family.\"\n    },\n    {\n      \"term\": \"mapa genético\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Mapa is 'map' in some languages, but phrase is specific.\",\n      \"justification\": \"Refers to the specific layout of an individual's genes.\"\n    },\n    {\n      \"term\": \"mapas genéticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Mapa is 'map' in some languages, but phrase is specific.\",\n      \"justification\": \"Refers to the specific layout of individuals' genes.\"\n    },\n    {\n      \"term\": \"marcador genético\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Marcador is 'marker' in English, but phrase is specific.\",\n      \"justification\": \"Refers to a gene variation associated with a trait or disease.\"\n    },\n    {\n      \"term\": \"marcadores genéticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Marcador is 'marker' in English, but phrase is specific.\",\n      \"justification\": \"Refers to gene variations associated with traits or diseases.\"\n    },\n    {\n      \"term\": \"perfil genético\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Perfil is 'profile' in many languages, but phrase is specific.\",\n      \"justification\": \"Refers to an individual's unique genetic makeup.\"\n    },\n    {\n      \"term\": \"perfiles genéticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Perfil is 'profile' in many languages, but phrase is specific.\",\n      \"justification\": \"Refers to individuals' unique genetic makeups.\"\n    },\n    {\n      \"term\": \"predisposición genética\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to an increased likelihood of developing a disease.\"\n    },\n    {\n      \"term\": \"predisposiciones genéticas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to increased likelihoods of developing diseases.\"\n    },\n    {\n      \"term\": \"prueba de adn\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific test to analyze DNA.\"\n    },\n    {\n      \"term\": \"pruebas de adn\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific tests to analyze DNA.\"\n    },\n    {\n      \"term\": \"prueba genética\",\n      \"form\": \"feminine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific medical test to analyze genetic material.\"\n    },\n    {\n      \"term\": \"pruebas genéticas\",\n      \"form\": \"feminine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific medical tests to analyze genetic material.\"\n    },\n    {\n      \"term\": \"riesgo genético\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Riesgo is 'risk' in many languages, but phrase is specific.\",\n      \"justification\": \"Refers to the likelihood of developing a genetic condition.\"\n    },\n    {\n      \"term\": \"riesgos genéticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Riesgo is 'risk' in many languages, but phrase is specific.\",\n      \"justification\": \"Refers to the likelihoods of developing genetic conditions.\"\n    },\n    {\n      \"term\": \"trastorno genético\",\n      \"form\": \"masculine singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a health problem caused by genetic abnormalities.\"\n    },\n    {\n      \"term\": \"trastornos genéticos\",\n      \"form\": \"masculine plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to health problems caused by genetic abnormalities.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"adn\",\n      \"reason\": \"Bare term, common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"gen\",\n      \"reason\": \"Bare term, common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"cromosoma\",\n      \"reason\": \"Bare term, common biology curriculum vocabulary.\"\n    },\n    {\n      \"term\": \"mutación genética\",\n      \"reason\": \"High frequency in non-personal scientific and educational contexts.\"\n    },\n    {\n      \"term\": \"genético\",\n      \"reason\": \"Adjective alone is too ambiguous and not a status assertion.\"\n    },\n    {\n      \"term\": \"hereditario\",\n      \"reason\": \"Adjective alone is too ambiguous and not a status assertion.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 789,
+        "completion_tokens": 5177,
+        "total_tokens": 5966,
+        "cost": 0.05275625,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.05275625,
+          "upstream_inference_prompt_cost": 0.00098625,
+          "upstream_inference_completions_cost": 0.05177
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3198,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "análisis genético",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific medical analysis of genetic material."
+        },
+        {
+          "term": "análisis genéticos",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific medical analyses of genetic material."
+        },
+        {
+          "term": "condición hereditaria",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health status passed down through a family."
+        },
+        {
+          "term": "condiciones hereditarias",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to health statuses passed down through a family."
+        },
+        {
+          "term": "enfermedad genética",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a disease caused by genetic abnormalities."
+        },
+        {
+          "term": "enfermedades genéticas",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to diseases caused by genetic abnormalities."
+        },
+        {
+          "term": "enfermedad hereditaria",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a disease passed down through a family."
+        },
+        {
+          "term": "enfermedades hereditarias",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to diseases passed down through a family."
+        },
+        {
+          "term": "mapa genético",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Mapa is 'map' in some languages, but phrase is specific.",
+          "justification": "Refers to the specific layout of an individual's genes."
+        },
+        {
+          "term": "mapas genéticos",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Mapa is 'map' in some languages, but phrase is specific.",
+          "justification": "Refers to the specific layout of individuals' genes."
+        },
+        {
+          "term": "marcador genético",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Marcador is 'marker' in English, but phrase is specific.",
+          "justification": "Refers to a gene variation associated with a trait or disease."
+        },
+        {
+          "term": "marcadores genéticos",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Marcador is 'marker' in English, but phrase is specific.",
+          "justification": "Refers to gene variations associated with traits or diseases."
+        },
+        {
+          "term": "perfil genético",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Perfil is 'profile' in many languages, but phrase is specific.",
+          "justification": "Refers to an individual's unique genetic makeup."
+        },
+        {
+          "term": "perfiles genéticos",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Perfil is 'profile' in many languages, but phrase is specific.",
+          "justification": "Refers to individuals' unique genetic makeups."
+        },
+        {
+          "term": "predisposición genética",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to an increased likelihood of developing a disease."
+        },
+        {
+          "term": "predisposiciones genéticas",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to increased likelihoods of developing diseases."
+        },
+        {
+          "term": "prueba de adn",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific test to analyze DNA."
+        },
+        {
+          "term": "pruebas de adn",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific tests to analyze DNA."
+        },
+        {
+          "term": "prueba genética",
+          "form": "feminine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific medical test to analyze genetic material."
+        },
+        {
+          "term": "pruebas genéticas",
+          "form": "feminine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific medical tests to analyze genetic material."
+        },
+        {
+          "term": "riesgo genético",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Riesgo is 'risk' in many languages, but phrase is specific.",
+          "justification": "Refers to the likelihood of developing a genetic condition."
+        },
+        {
+          "term": "riesgos genéticos",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Riesgo is 'risk' in many languages, but phrase is specific.",
+          "justification": "Refers to the likelihoods of developing genetic conditions."
+        },
+        {
+          "term": "trastorno genético",
+          "form": "masculine singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a health problem caused by genetic abnormalities."
+        },
+        {
+          "term": "trastornos genéticos",
+          "form": "masculine plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to health problems caused by genetic abnormalities."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "adn",
+          "reason": "Bare term, common biology curriculum vocabulary."
+        },
+        {
+          "term": "gen",
+          "reason": "Bare term, common biology curriculum vocabulary."
+        },
+        {
+          "term": "cromosoma",
+          "reason": "Bare term, common biology curriculum vocabulary."
+        },
+        {
+          "term": "mutación genética",
+          "reason": "High frequency in non-personal scientific and educational contexts."
+        },
+        {
+          "term": "genético",
+          "reason": "Adjective alone is too ambiguous and not a status assertion."
+        },
+        {
+          "term": "hereditario",
+          "reason": "Adjective alone is too ambiguous and not a status assertion."
+        }
+      ]
+    }
+  ]
+}

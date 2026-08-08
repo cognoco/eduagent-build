@@ -623,3 +623,38 @@ describe('[WI-2628] content-addressed keys — evaluate before a transaction, re
     expect(isContentSafe(result, 'We read about volc\u200Banoes.')).toBe(false);
   });
 });
+
+describe('[WI-3142] Article 9 status domains survive composition into the batch', () => {
+  // The corpus extension is only a control if it reaches the thing the eight
+  // write-time call sites actually call. Both cases run under the suite's
+  // declared `cs`, which also demonstrates the always-on symmetry: an English
+  // status attribution must block whatever conversation language is declared.
+  const STATUS_ATTRIBUTION = 'The learner is Catholic.';
+  const STATUS_MENTION =
+    'The Reformation split the Catholic Church in the sixteenth century.';
+
+  const evaluateProfileField = (text: string) =>
+    evaluateLearningTextFields({
+      fields: [{ key: 'f', fieldKind: 'learner_profile_field', text }],
+      conversationLanguage: DECLARED_LANGUAGE,
+      provenance: 'llm',
+      producerVendor: PRODUCER_VENDOR,
+    });
+
+  it('blocks a religious-status attribution before it can be persisted', async () => {
+    const result = await evaluateProfileField(STATUS_ATTRIBUTION);
+    expect(result.isSafe('f')).toBe(false);
+    expect(result.reasonFor('f')).toBe('person_attribution');
+    // Decided deterministically, so the disclosure never leaves the process —
+    // the same guarantee the health domain carries.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it('leaves the educational mention safe, and costs no judge call to say so', async () => {
+    const result = await evaluateProfileField(STATUS_MENTION);
+    expect(result.isSafe('f')).toBe(true);
+    // The point of the attribution-scoped default: schoolwork on the
+    // Reformation is `clear`, not `refer`, so it never reaches the judge.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+});

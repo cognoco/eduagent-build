@@ -1,0 +1,2071 @@
+{
+  "workItem": "WI-3142",
+  "purpose": "Best-effort LLM-prepared Article 9 protected-lexeme corpus for a non-English conversation language. UNREVIEWED: not load-bearing as a compliance control. Native-speaker review is a precondition for enabling persistent memory in this language.",
+  "operatorRuling": "2026-08-08 — persistent memory is English-only at unlock; non-English corpora are prepared best-effort via LLM generation and marked model-generated.",
+  "language": "nb",
+  "languageName": "Norwegian Bokmål",
+  "generatedAt": "2026-08-08T18:30:34.811Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-pro",
+  "systemPrompt": "You are a native-speaker lexicographer working with a data-protection engineer. You are building a DETECTION corpus for a deterministic text scanner, not an encyclopedia. The scanner matches literal lowercase phrases inside person-attribution constructions only. A bare mention of a term never fires; only \"<person reference> <verb> <term>\" and \"<possessive> <term>\" do. Your job is therefore to maximise recall of PERSON-ATTRIBUTED STATUS ASSERTIONS while keeping ordinary schoolwork prose out. Answer with strict JSON only. No markdown, no code fences, no commentary.",
+  "appliedScope": "unnamed-attribution-only",
+  "appliedScopeNote": "Every accepted term is applied at unnamed-attribution-only regardless of the model recommendation. Promotion to broad is a human decision.",
+  "termCount": 191,
+  "domains": [
+    {
+      "domain": "racial-or-ethnic-origin",
+      "label": "racial or ethnic origin",
+      "prompt": "Target language: Norwegian Bokmål (nb).\nArticle 9 special-category domain: racial or ethnic origin.\n\nWHAT TO RETURN\nEthnic-group and origin nouns/adjectives that describe a PERSON (Roma, Sinti, Kurdish, indigenous, \"of mixed heritage\", \"ethnic minority\", \"immigrant background\", \"ethnicity\"). EXCLUDE bare colour words and bare continent/region adjectives — their attributed forms (\"my black cat\", \"their African elephant\") are ordinary prose far more often than an origin disclosure.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nNorwegian Bokmål inflects for definiteness and number. Give indefinite and definite singular and the plural (katolikk / katolikken / katolikker), plus adjectival forms used predicatively.\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Norwegian Bokmål prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"romen\",\n      \"form\": \"definite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's ethnicity as Romani (the Romani person).\"\n    },\n    {\n      \"term\": \"romer\",\n      \"form\": \"plural noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a group's ethnicity as Romani.\"\n    },\n    {\n      \"term\": \"romsk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Adjective describing Romani origin or culture.\"\n    },\n    {\n      \"term\": \"sinti\",\n      \"form\": \"indefinite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's ethnicity as Sinti.\"\n    },\n    {\n      \"term\": \"sintien\",\n      \"form\": \"definite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's ethnicity as Sinti (the Sinti person).\"\n    },\n    {\n      \"term\": \"sintier\",\n      \"form\": \"plural noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a group's ethnicity as Sinti.\"\n    },\n    {\n      \"term\": \"kurder\",\n      \"form\": \"indefinite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's ethnicity as Kurdish.\"\n    },\n    {\n      \"term\": \"kurderen\",\n      \"form\": \"definite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's ethnicity as Kurdish (the Kurd).\"\n    },\n    {\n      \"term\": \"kurdere\",\n      \"form\": \"plural noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a group's ethnicity as Kurdish.\"\n    },\n    {\n      \"term\": \"kurdisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Adjective describing Kurdish origin or culture.\"\n    },\n    {\n      \"term\": \"samen\",\n      \"form\": \"definite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a person's ethnicity as Sami (the Sami person).\"\n    },\n    {\n      \"term\": \"samer\",\n      \"form\": \"plural noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Specifies a group's ethnicity as Sami.\"\n    },\n    {\n      \"term\": \"samisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Adjective describing Sami origin or culture.\"\n    },\n    {\n      \"term\": \"urfolk\",\n      \"form\": \"indefinite singular/plural noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person or group as indigenous.\"\n    },\n    {\n      \"term\": \"urfolket\",\n      \"form\": \"definite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person or group as indigenous (the indigenous people).\"\n    },\n    {\n      \"term\": \"urfolksbakgrunn\",\n      \"form\": \"compound noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person's indigenous background.\"\n    },\n    {\n      \"term\": \"innvandrerbakgrunn\",\n      \"form\": \"compound noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person's immigrant background.\"\n    },\n    {\n      \"term\": \"flerkulturell\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as multicultural.\"\n    },\n    {\n      \"term\": \"flerkulturell bakgrunn\",\n      \"form\": \"adjectival phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person's multicultural background.\"\n    },\n    {\n      \"term\": \"blandet bakgrunn\",\n      \"form\": \"adjectival phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person's mixed background.\"\n    },\n    {\n      \"term\": \"etnisk minoritet\",\n      \"form\": \"noun phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a person's ethnic minority status.\"\n    },\n    {\n      \"term\": \"etniske minoriteter\",\n      \"form\": \"plural noun phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicitly states a group's ethnic minority status.\"\n    },\n    {\n      \"term\": \"etnisitet\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the concept of a person's ethnicity.\"\n    },\n    {\n      \"term\": \"avstamning\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's descent or lineage.\"\n    },\n    {\n      \"term\": \"herkomst\",\n      \"form\": \"noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's origin or provenance.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"rom\",\n      \"reason\": \"High risk. Homograph for 'room' in Norwegian and 'rum' in English.\"\n    },\n    {\n      \"term\": \"same\",\n      \"reason\": \"High risk. Homograph for the common English word 'same'.\"\n    },\n    {\n      \"term\": \"innvandrer\",\n      \"reason\": \"Too broad. Can refer to a person's legal status, not just origin.\"\n    },\n    {\n      \"term\": \"utlending\",\n      \"reason\": \"Too broad. Means 'foreigner' and is used in many non-disclosure contexts.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 798,
+        "completion_tokens": 5579,
+        "total_tokens": 6377,
+        "cost": 0.0567875,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0567875,
+          "upstream_inference_prompt_cost": 0.0009975,
+          "upstream_inference_completions_cost": 0.05579
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3710,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "romen",
+          "form": "definite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's ethnicity as Romani (the Romani person)."
+        },
+        {
+          "term": "romer",
+          "form": "plural noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a group's ethnicity as Romani."
+        },
+        {
+          "term": "romsk",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Adjective describing Romani origin or culture."
+        },
+        {
+          "term": "sinti",
+          "form": "indefinite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's ethnicity as Sinti."
+        },
+        {
+          "term": "sintien",
+          "form": "definite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's ethnicity as Sinti (the Sinti person)."
+        },
+        {
+          "term": "sintier",
+          "form": "plural noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a group's ethnicity as Sinti."
+        },
+        {
+          "term": "kurder",
+          "form": "indefinite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's ethnicity as Kurdish."
+        },
+        {
+          "term": "kurderen",
+          "form": "definite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's ethnicity as Kurdish (the Kurd)."
+        },
+        {
+          "term": "kurdere",
+          "form": "plural noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a group's ethnicity as Kurdish."
+        },
+        {
+          "term": "kurdisk",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Adjective describing Kurdish origin or culture."
+        },
+        {
+          "term": "samen",
+          "form": "definite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a person's ethnicity as Sami (the Sami person)."
+        },
+        {
+          "term": "samer",
+          "form": "plural noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Specifies a group's ethnicity as Sami."
+        },
+        {
+          "term": "samisk",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Adjective describing Sami origin or culture."
+        },
+        {
+          "term": "urfolk",
+          "form": "indefinite singular/plural noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person or group as indigenous."
+        },
+        {
+          "term": "urfolket",
+          "form": "definite singular noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person or group as indigenous (the indigenous people)."
+        },
+        {
+          "term": "urfolksbakgrunn",
+          "form": "compound noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person's indigenous background."
+        },
+        {
+          "term": "innvandrerbakgrunn",
+          "form": "compound noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person's immigrant background."
+        },
+        {
+          "term": "flerkulturell",
+          "form": "adjective",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as multicultural."
+        },
+        {
+          "term": "flerkulturell bakgrunn",
+          "form": "adjectival phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person's multicultural background."
+        },
+        {
+          "term": "blandet bakgrunn",
+          "form": "adjectival phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person's mixed background."
+        },
+        {
+          "term": "etnisk minoritet",
+          "form": "noun phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a person's ethnic minority status."
+        },
+        {
+          "term": "etniske minoriteter",
+          "form": "plural noun phrase",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicitly states a group's ethnic minority status."
+        },
+        {
+          "term": "etnisitet",
+          "form": "noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the concept of a person's ethnicity."
+        },
+        {
+          "term": "avstamning",
+          "form": "noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's descent or lineage."
+        },
+        {
+          "term": "herkomst",
+          "form": "noun",
+          "domain": "racial-or-ethnic-origin",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's origin or provenance."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "rom",
+          "reason": "High risk. Homograph for 'room' in Norwegian and 'rum' in English."
+        },
+        {
+          "term": "same",
+          "reason": "High risk. Homograph for the common English word 'same'."
+        },
+        {
+          "term": "innvandrer",
+          "reason": "Too broad. Can refer to a person's legal status, not just origin."
+        },
+        {
+          "term": "utlending",
+          "reason": "Too broad. Means 'foreigner' and is used in many non-disclosure contexts."
+        }
+      ]
+    },
+    {
+      "domain": "political-opinions",
+      "label": "political opinions or affiliation",
+      "prompt": "Target language: Norwegian Bokmål (nb).\nArticle 9 special-category domain: political opinions or affiliation.\n\nWHAT TO RETURN\nPolitical-affiliation and opinion nouns/adjectives applied to a person (communist, socialist, anarchist, nationalist, feminist, far-right, \"party member\", \"political views\"). EXCLUDE words whose ordinary sense dominates in schoolwork — the local equivalents of English \"conservative\" (a conservative estimate), \"liberal\" (a liberal amount), \"green\", \"independent\", \"radical\", \"progressive\".\n\nMORPHOLOGY — this is the part generic answers get wrong.\nNorwegian Bokmål inflects for definiteness and number. Give indefinite and definite singular and the plural (katolikk / katolikken / katolikker), plus adjectival forms used predicatively.\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Norwegian Bokmål prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"kommunist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"kommunisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"kommunister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"kommunistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"sosialist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"sosialisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"sosialister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"sosialistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"anarkist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"anarkisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"anarkister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"anarkistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"nasjonalist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"nasjonalisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"nasjonalister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"nasjonalistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"feminist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political/social ideology.\"\n    },\n    {\n      \"term\": \"feministen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political/social ideology.\"\n    },\n    {\n      \"term\": \"feminister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political/social ideology.\"\n    },\n    {\n      \"term\": \"feministisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's specific political/social ideology.\"\n    },\n    {\n      \"term\": \"høyreekstremist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"høyreekstremisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"høyreekstremister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"høyreekstrem\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's specific political ideology.\"\n    },\n    {\n      \"term\": \"partimedlem\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states membership in a political party.\"\n    },\n    {\n      \"term\": \"partimedlemmet\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states membership in a political party.\"\n    },\n    {\n      \"term\": \"partimedlemmer\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states membership in a political party.\"\n    },\n    {\n      \"term\": \"politiske syn\",\n      \"form\": \"plural noun phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"`syn` can mean sight, but the phrase is specific.\",\n      \"justification\": \"Directly refers to a person's political views.\"\n    },\n    {\n      \"term\": \"politiske holdninger\",\n      \"form\": \"plural noun phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly refers to a person's political attitudes.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"konservativ\",\n      \"reason\": \"Commonly means 'cautious' (e.g., a conservative estimate).\"\n    },\n    {\n      \"term\": \"liberal\",\n      \"reason\": \"Commonly means 'generous' (e.g., a liberal amount).\"\n    },\n    {\n      \"term\": \"grønn\",\n      \"reason\": \"Primarily means the color green.\"\n    },\n    {\n      \"term\": \"uavhengig\",\n      \"reason\": \"Commonly means 'independent' in non-political contexts (e.g., science).\"\n    },\n    {\n      \"term\": \"radikal\",\n      \"reason\": \"Commonly means 'drastic' or 'thorough' in non-political contexts.\"\n    },\n    {\n      \"term\": \"progressiv\",\n      \"reason\": \"Commonly used in non-political contexts (e.g., progressive taxation).\"\n    },\n    {\n      \"term\": \"høyre\",\n      \"reason\": \"Primarily means the direction 'right'.\"\n    },\n    {\n      \"term\": \"venstre\",\n      \"reason\": \"Primarily means the direction 'left'.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 802,
+        "completion_tokens": 5029,
+        "total_tokens": 5831,
+        "cost": 0.0512925,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0512925,
+          "upstream_inference_prompt_cost": 0.0010025,
+          "upstream_inference_completions_cost": 0.05029
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2781,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "kommunist",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "kommunisten",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "kommunister",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "kommunistisk",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's specific political ideology."
+        },
+        {
+          "term": "sosialist",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "sosialisten",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "sosialister",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "sosialistisk",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's specific political ideology."
+        },
+        {
+          "term": "anarkist",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "anarkisten",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "anarkister",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "anarkistisk",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's specific political ideology."
+        },
+        {
+          "term": "nasjonalist",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "nasjonalisten",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "nasjonalister",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "nasjonalistisk",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's specific political ideology."
+        },
+        {
+          "term": "feminist",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political/social ideology."
+        },
+        {
+          "term": "feministen",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political/social ideology."
+        },
+        {
+          "term": "feminister",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political/social ideology."
+        },
+        {
+          "term": "feministisk",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's specific political/social ideology."
+        },
+        {
+          "term": "høyreekstremist",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "høyreekstremisten",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "høyreekstremister",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's specific political ideology."
+        },
+        {
+          "term": "høyreekstrem",
+          "form": "adjective",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's specific political ideology."
+        },
+        {
+          "term": "partimedlem",
+          "form": "indefinite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states membership in a political party."
+        },
+        {
+          "term": "partimedlemmet",
+          "form": "definite singular",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states membership in a political party."
+        },
+        {
+          "term": "partimedlemmer",
+          "form": "plural",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states membership in a political party."
+        },
+        {
+          "term": "politiske syn",
+          "form": "plural noun phrase",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "`syn` can mean sight, but the phrase is specific.",
+          "justification": "Directly refers to a person's political views."
+        },
+        {
+          "term": "politiske holdninger",
+          "form": "plural noun phrase",
+          "domain": "political-opinions",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly refers to a person's political attitudes."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "konservativ",
+          "reason": "Commonly means 'cautious' (e.g., a conservative estimate)."
+        },
+        {
+          "term": "liberal",
+          "reason": "Commonly means 'generous' (e.g., a liberal amount)."
+        },
+        {
+          "term": "grønn",
+          "reason": "Primarily means the color green."
+        },
+        {
+          "term": "uavhengig",
+          "reason": "Commonly means 'independent' in non-political contexts (e.g., science)."
+        },
+        {
+          "term": "radikal",
+          "reason": "Commonly means 'drastic' or 'thorough' in non-political contexts."
+        },
+        {
+          "term": "progressiv",
+          "reason": "Commonly used in non-political contexts (e.g., progressive taxation)."
+        },
+        {
+          "term": "høyre",
+          "reason": "Primarily means the direction 'right'."
+        },
+        {
+          "term": "venstre",
+          "reason": "Primarily means the direction 'left'."
+        }
+      ]
+    },
+    {
+      "domain": "religious-or-philosophical-beliefs",
+      "label": "religious or philosophical beliefs",
+      "prompt": "Target language: Norwegian Bokmål (nb).\nArticle 9 special-category domain: religious or philosophical beliefs.\n\nWHAT TO RETURN\nReligious/denominational/philosophical affiliation applied to a person (Catholic, Protestant, Muslim, Jewish, Hindu, Buddhist, atheist, agnostic, devout, \"converted to Islam\", \"religious belief\"), plus belief-marking dress where it is unambiguous (hijab, kippah). EXCLUDE the local equivalent of bare \"orthodox\" (an orthodox method) and bare \"religious\"/\"religion\" (religious education is a school subject).\n\nMORPHOLOGY — this is the part generic answers get wrong.\nNorwegian Bokmål inflects for definiteness and number. Give indefinite and definite singular and the plural (katolikk / katolikken / katolikker), plus adjectival forms used predicatively.\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Norwegian Bokmål prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"ateist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief about deities.\"\n    },\n    {\n      \"term\": \"ateisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief about deities.\"\n    },\n    {\n      \"term\": \"ateister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's philosophical belief about deities.\"\n    },\n    {\n      \"term\": \"agnostiker\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief about knowledge of deities.\"\n    },\n    {\n      \"term\": \"agnostikeren\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's philosophical belief about knowledge of deities.\"\n    },\n    {\n      \"term\": \"agnostikere\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's philosophical belief about knowledge of deities.\"\n    },\n    {\n      \"term\": \"buddhist\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Buddhism.\"\n    },\n    {\n      \"term\": \"buddhisten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Buddhism.\"\n    },\n    {\n      \"term\": \"buddhister\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's adherence to Buddhism.\"\n    },\n    {\n      \"term\": \"hindu\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Hinduism.\"\n    },\n    {\n      \"term\": \"hinduen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Hinduism.\"\n    },\n    {\n      \"term\": \"hinduer\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's adherence to Hinduism.\"\n    },\n    {\n      \"term\": \"jøde\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Judaism.\"\n    },\n    {\n      \"term\": \"jøden\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Judaism.\"\n    },\n    {\n      \"term\": \"jøder\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's adherence to Judaism.\"\n    },\n    {\n      \"term\": \"katolikk\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Catholicism.\"\n    },\n    {\n      \"term\": \"katolikken\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Catholicism.\"\n    },\n    {\n      \"term\": \"katolikker\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's adherence to Catholicism.\"\n    },\n    {\n      \"term\": \"muslim\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Islam.\"\n    },\n    {\n      \"term\": \"muslimen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Islam.\"\n    },\n    {\n      \"term\": \"muslimer\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's adherence to Islam.\"\n    },\n    {\n      \"term\": \"protestant\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Protestantism.\"\n    },\n    {\n      \"term\": \"protestanten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person's adherence to Protestantism.\"\n    },\n    {\n      \"term\": \"protestanter\",\n      \"form\": \"plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a group's adherence to Protestantism.\"\n    },\n    {\n      \"term\": \"kristen\",\n      \"form\": \"adjective / indefinite singular noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person as Christian.\"\n    },\n    {\n      \"term\": \"kristne\",\n      \"form\": \"plural adjective / plural noun\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Identifies a person or group as Christian.\"\n    },\n    {\n      \"term\": \"agnostisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's philosophical belief about knowledge of deities.\"\n    },\n    {\n      \"term\": \"ateistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person's philosophical belief about deities.\"\n    },\n    {\n      \"term\": \"buddhistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as adhering to Buddhism.\"\n    },\n    {\n      \"term\": \"hinduistisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as adhering to Hinduism.\"\n    },\n    {\n      \"term\": \"jødisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as adhering to Judaism.\"\n    },\n    {\n      \"term\": \"katolsk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as adhering to Catholicism.\"\n    },\n    {\n      \"term\": \"muslimsk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as adhering to Islam.\"\n    },\n    {\n      \"term\": \"protestantisk\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as adhering to Protestantism.\"\n    },\n    {\n      \"term\": \"religiøs\",\n      \"form\": \"adjective\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a person as having religious beliefs.\"\n    },\n    {\n      \"term\": \"hijab\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering indicating religious belief, used with a possessive.\"\n    },\n    {\n      \"term\": \"hijaben\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering indicating religious belief, used with a possessive.\"\n    },\n    {\n      \"term\": \"kippa\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering indicating religious belief, used with a possessive.\"\n    },\n    {\n      \"term\": \"kippaen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"A head covering indicating religious belief, used with a possessive.\"\n    },\n    {\n      \"term\": \"livssyn\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's life philosophy, often religious or secular.\"\n    },\n    {\n      \"term\": \"livssynet\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's life philosophy, often religious or secular.\"\n    },\n    {\n      \"term\": \"religion\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Cognate in EN/FR, not a false positive.\",\n      \"justification\": \"When attributed, specifies a person's religious system.\"\n    },\n    {\n      \"term\": \"religionen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"When attributed, specifies a person's religious system.\"\n    },\n    {\n      \"term\": \"tro\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Low; rare PT word 'tró'.\",\n      \"justification\": \"Refers to a person's faith or belief, typically religious.\"\n    },\n    {\n      \"term\": \"troen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a person's faith or belief, typically religious.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"from\",\n      \"reason\": \"High-risk homograph for the common English preposition 'from'.\"\n    },\n    {\n      \"term\": \"ortodoks\",\n      \"reason\": \"Ambiguous; can mean 'conventional' as well as Orthodox faith.\"\n    },\n    {\n      \"term\": \"åndelig\",\n      \"reason\": \"Too broad; 'spiritual' can be used in many non-religious contexts.\"\n    },\n    {\n      \"term\": \"humanist\",\n      \"reason\": \"Ambiguous; can refer to Renaissance humanism or secular humanism.\"\n    },\n    {\n      \"term\": \"religiøs tro\",\n      \"reason\": \"Redundant; 'religiøs' and 'tro' are captured separately and more precisely.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 809,
+        "completion_tokens": 8678,
+        "total_tokens": 9487,
+        "cost": 0.08779125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.08779125,
+          "upstream_inference_prompt_cost": 0.00101125,
+          "upstream_inference_completions_cost": 0.08678
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5444,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "ateist",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief about deities."
+        },
+        {
+          "term": "ateisten",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief about deities."
+        },
+        {
+          "term": "ateister",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's philosophical belief about deities."
+        },
+        {
+          "term": "agnostiker",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief about knowledge of deities."
+        },
+        {
+          "term": "agnostikeren",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's philosophical belief about knowledge of deities."
+        },
+        {
+          "term": "agnostikere",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's philosophical belief about knowledge of deities."
+        },
+        {
+          "term": "buddhist",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Buddhism."
+        },
+        {
+          "term": "buddhisten",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Buddhism."
+        },
+        {
+          "term": "buddhister",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's adherence to Buddhism."
+        },
+        {
+          "term": "hindu",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Hinduism."
+        },
+        {
+          "term": "hinduen",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Hinduism."
+        },
+        {
+          "term": "hinduer",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's adherence to Hinduism."
+        },
+        {
+          "term": "jøde",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Judaism."
+        },
+        {
+          "term": "jøden",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Judaism."
+        },
+        {
+          "term": "jøder",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's adherence to Judaism."
+        },
+        {
+          "term": "katolikk",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Catholicism."
+        },
+        {
+          "term": "katolikken",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Catholicism."
+        },
+        {
+          "term": "katolikker",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's adherence to Catholicism."
+        },
+        {
+          "term": "muslim",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Islam."
+        },
+        {
+          "term": "muslimen",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Islam."
+        },
+        {
+          "term": "muslimer",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's adherence to Islam."
+        },
+        {
+          "term": "protestant",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Protestantism."
+        },
+        {
+          "term": "protestanten",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person's adherence to Protestantism."
+        },
+        {
+          "term": "protestanter",
+          "form": "plural",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a group's adherence to Protestantism."
+        },
+        {
+          "term": "kristen",
+          "form": "adjective / indefinite singular noun",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person as Christian."
+        },
+        {
+          "term": "kristne",
+          "form": "plural adjective / plural noun",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Identifies a person or group as Christian."
+        },
+        {
+          "term": "agnostisk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's philosophical belief about knowledge of deities."
+        },
+        {
+          "term": "ateistisk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person's philosophical belief about deities."
+        },
+        {
+          "term": "buddhistisk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as adhering to Buddhism."
+        },
+        {
+          "term": "hinduistisk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as adhering to Hinduism."
+        },
+        {
+          "term": "jødisk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as adhering to Judaism."
+        },
+        {
+          "term": "katolsk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as adhering to Catholicism."
+        },
+        {
+          "term": "muslimsk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as adhering to Islam."
+        },
+        {
+          "term": "protestantisk",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as adhering to Protestantism."
+        },
+        {
+          "term": "religiøs",
+          "form": "adjective",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a person as having religious beliefs."
+        },
+        {
+          "term": "hijab",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering indicating religious belief, used with a possessive."
+        },
+        {
+          "term": "hijaben",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering indicating religious belief, used with a possessive."
+        },
+        {
+          "term": "kippa",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering indicating religious belief, used with a possessive."
+        },
+        {
+          "term": "kippaen",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "A head covering indicating religious belief, used with a possessive."
+        },
+        {
+          "term": "livssyn",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's life philosophy, often religious or secular."
+        },
+        {
+          "term": "livssynet",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's life philosophy, often religious or secular."
+        },
+        {
+          "term": "religion",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Cognate in EN/FR, not a false positive.",
+          "justification": "When attributed, specifies a person's religious system."
+        },
+        {
+          "term": "religionen",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "When attributed, specifies a person's religious system."
+        },
+        {
+          "term": "tro",
+          "form": "indefinite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Low; rare PT word 'tró'.",
+          "justification": "Refers to a person's faith or belief, typically religious."
+        },
+        {
+          "term": "troen",
+          "form": "definite singular",
+          "domain": "religious-or-philosophical-beliefs",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a person's faith or belief, typically religious."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "from",
+          "reason": "High-risk homograph for the common English preposition 'from'."
+        },
+        {
+          "term": "ortodoks",
+          "reason": "Ambiguous; can mean 'conventional' as well as Orthodox faith."
+        },
+        {
+          "term": "åndelig",
+          "reason": "Too broad; 'spiritual' can be used in many non-religious contexts."
+        },
+        {
+          "term": "humanist",
+          "reason": "Ambiguous; can refer to Renaissance humanism or secular humanism."
+        },
+        {
+          "term": "religiøs tro",
+          "reason": "Redundant; 'religiøs' and 'tro' are captured separately and more precisely."
+        }
+      ]
+    },
+    {
+      "domain": "trade-union-membership",
+      "label": "trade-union membership",
+      "prompt": "Target language: Norwegian Bokmål (nb).\nArticle 9 special-category domain: trade-union membership.\n\nWHAT TO RETURN\nMembership of, or office in, a trade union (union member, trade unionist, shop steward, union dues, unionised, \"member of a union\"). EXCLUDE the bare word for \"union\" on its own — it also names the European Union and, in mathematics, the union of sets.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nNorwegian Bokmål inflects for definiteness and number. Give indefinite and definite singular and the plural (katolikk / katolikken / katolikker), plus adjectival forms used predicatively.\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Norwegian Bokmål prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"fagforeningsmedlem\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states person is a union member.\"\n    },\n    {\n      \"term\": \"fagforeningsmedlemmet\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states person is a union member.\"\n    },\n    {\n      \"term\": \"fagforeningsmedlemmer\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states people are union members.\"\n    },\n    {\n      \"term\": \"fagforeningsmedlemmene\",\n      \"form\": \"definite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states people are union members.\"\n    },\n    {\n      \"term\": \"fagorganisert\",\n      \"form\": \"adjective, predicative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states the status of being unionised.\"\n    },\n    {\n      \"term\": \"uorganisert\",\n      \"form\": \"adjective, predicative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can also mean 'disorganized', but clear in labor context.\",\n      \"justification\": \"States non-membership, which reveals status on the matter.\"\n    },\n    {\n      \"term\": \"tillitsvalgt\",\n      \"form\": \"indefinite singular / predicative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can be used outside unions, but a strong indicator.\",\n      \"justification\": \"Denotes holding a union representative office.\"\n    },\n    {\n      \"term\": \"tillitsvalgte\",\n      \"form\": \"definite singular / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Can be used outside unions, but a strong indicator.\",\n      \"justification\": \"Denotes holding a union representative office.\"\n    },\n    {\n      \"term\": \"hovedtillitsvalgt\",\n      \"form\": \"indefinite singular / predicative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes holding a specific, senior union office.\"\n    },\n    {\n      \"term\": \"hovedtillitsvalgte\",\n      \"form\": \"definite singular / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes holding a specific, senior union office.\"\n    },\n    {\n      \"term\": \"plasstillitsvalgt\",\n      \"form\": \"indefinite singular / predicative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes holding a specific, local union office.\"\n    },\n    {\n      \"term\": \"plasstillitsvalgte\",\n      \"form\": \"definite singular / plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes holding a specific, local union office.\"\n    },\n    {\n      \"term\": \"streikevakt\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes participation in union strike action (picket).\"\n    },\n    {\n      \"term\": \"streikevakten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes participation in union strike action (picket).\"\n    },\n    {\n      \"term\": \"streikevakter\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes participation in union strike action (picket).\"\n    },\n    {\n      \"term\": \"streikevaktene\",\n      \"form\": \"definite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Denotes participation in union strike action (picket).\"\n    },\n    {\n      \"term\": \"fagforeningskontingent\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possession or payment of union dues implies membership.\"\n    },\n    {\n      \"term\": \"fagforeningskontingenten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Possession or payment of union dues implies membership.\"\n    },\n    {\n      \"term\": \"medlem av en fagforening\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of union membership.\"\n    },\n    {\n      \"term\": \"medlem av fagforeningen\",\n      \"form\": \"phrase\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Explicit statement of union membership.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"union\",\n      \"reason\": \"Too ambiguous; means European Union, set theory union.\"\n    },\n    {\n      \"term\": \"forening\",\n      \"reason\": \"Too general; can be any club or association (e.g., sports).\"\n    },\n    {\n      \"term\": \"medlem\",\n      \"reason\": \"Too general; can be a member of anything.\"\n    },\n    {\n      \"term\": \"organisert\",\n      \"reason\": \"Too ambiguous; commonly means a person is tidy or methodical.\"\n    },\n    {\n      \"term\": \"klubbleder\",\n      \"reason\": \"Ambiguous; can refer to a sports club or other non-union leader.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 783,
+        "completion_tokens": 6500,
+        "total_tokens": 7283,
+        "cost": 0.06597875,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.06597875,
+          "upstream_inference_prompt_cost": 0.00097875,
+          "upstream_inference_completions_cost": 0.065
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4889,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "fagforeningsmedlem",
+          "form": "indefinite singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states person is a union member."
+        },
+        {
+          "term": "fagforeningsmedlemmet",
+          "form": "definite singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states person is a union member."
+        },
+        {
+          "term": "fagforeningsmedlemmer",
+          "form": "indefinite plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states people are union members."
+        },
+        {
+          "term": "fagforeningsmedlemmene",
+          "form": "definite plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states people are union members."
+        },
+        {
+          "term": "fagorganisert",
+          "form": "adjective, predicative",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states the status of being unionised."
+        },
+        {
+          "term": "uorganisert",
+          "form": "adjective, predicative",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can also mean 'disorganized', but clear in labor context.",
+          "justification": "States non-membership, which reveals status on the matter."
+        },
+        {
+          "term": "tillitsvalgt",
+          "form": "indefinite singular / predicative",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can be used outside unions, but a strong indicator.",
+          "justification": "Denotes holding a union representative office."
+        },
+        {
+          "term": "tillitsvalgte",
+          "form": "definite singular / plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Can be used outside unions, but a strong indicator.",
+          "justification": "Denotes holding a union representative office."
+        },
+        {
+          "term": "hovedtillitsvalgt",
+          "form": "indefinite singular / predicative",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes holding a specific, senior union office."
+        },
+        {
+          "term": "hovedtillitsvalgte",
+          "form": "definite singular / plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes holding a specific, senior union office."
+        },
+        {
+          "term": "plasstillitsvalgt",
+          "form": "indefinite singular / predicative",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes holding a specific, local union office."
+        },
+        {
+          "term": "plasstillitsvalgte",
+          "form": "definite singular / plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes holding a specific, local union office."
+        },
+        {
+          "term": "streikevakt",
+          "form": "indefinite singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes participation in union strike action (picket)."
+        },
+        {
+          "term": "streikevakten",
+          "form": "definite singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes participation in union strike action (picket)."
+        },
+        {
+          "term": "streikevakter",
+          "form": "indefinite plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes participation in union strike action (picket)."
+        },
+        {
+          "term": "streikevaktene",
+          "form": "definite plural",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Denotes participation in union strike action (picket)."
+        },
+        {
+          "term": "fagforeningskontingent",
+          "form": "indefinite singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possession or payment of union dues implies membership."
+        },
+        {
+          "term": "fagforeningskontingenten",
+          "form": "definite singular",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Possession or payment of union dues implies membership."
+        },
+        {
+          "term": "medlem av en fagforening",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of union membership."
+        },
+        {
+          "term": "medlem av fagforeningen",
+          "form": "phrase",
+          "domain": "trade-union-membership",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Explicit statement of union membership."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "union",
+          "reason": "Too ambiguous; means European Union, set theory union."
+        },
+        {
+          "term": "forening",
+          "reason": "Too general; can be any club or association (e.g., sports)."
+        },
+        {
+          "term": "medlem",
+          "reason": "Too general; can be a member of anything."
+        },
+        {
+          "term": "organisert",
+          "reason": "Too ambiguous; commonly means a person is tidy or methodical."
+        },
+        {
+          "term": "klubbleder",
+          "reason": "Ambiguous; can refer to a sports club or other non-union leader."
+        }
+      ]
+    },
+    {
+      "domain": "sex-life-or-sexual-orientation",
+      "label": "sex life or sexual orientation",
+      "prompt": "Target language: Norwegian Bokmål (nb).\nArticle 9 special-category domain: sex life or sexual orientation.\n\nWHAT TO RETURN\nSexual orientation and sex-life status applied to a person (gay, lesbian, bisexual, pansexual, queer, homosexual, heterosexual, LGBTQ, transgender, intersex, \"sexual orientation\", \"sexually active\"). EXCLUDE the local equivalent of \"straight\" (a straight line), of \"asexual\" (asexual reproduction is core biology), and of \"coming out\" (he is coming out of the room). EXCLUDE \"boyfriend\"/\"girlfriend\" — far too common to be a disclosure signal.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nNorwegian Bokmål inflects for definiteness and number. Give indefinite and definite singular and the plural (katolikk / katolikken / katolikker), plus adjectival forms used predicatively.\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Norwegian Bokmål prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"homofil\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"homofilen\",\n      \"form\": \"noun, def sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"homofile\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbisk\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lesbiske\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bifil\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bifilen\",\n      \"form\": \"noun, def sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"bifile\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"panfil\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"A surname in Polish. Attribution reduces ambiguity.\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"panfilen\",\n      \"form\": \"noun, def sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"panfile\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"gay\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"French 'gay' (cheerful), but orientation meaning is dominant.\",\n      \"justification\": \"Common loanword for a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"queer\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"English 'strange', but orientation meaning is dominant.\",\n      \"justification\": \"Common loanword for a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"homoseksuell\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"homoseksuelle\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterofil\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterofilen\",\n      \"form\": \"noun, def sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heterofile\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heteroseksuell\",\n      \"form\": \"adj / noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"heteroseksuelle\",\n      \"form\": \"adj / noun, plural / definite\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual orientation.\"\n    },\n    {\n      \"term\": \"lhbt\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for lesbian, gay, bisexual, trans; refers to orientation/identity.\"\n    },\n    {\n      \"term\": \"lhbtq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for lesbian, gay, bisexual, trans, queer; refers to orientation/identity.\"\n    },\n    {\n      \"term\": \"lhbtiq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym including intersex and queer; refers to orientation/identity.\"\n    },\n    {\n      \"term\": \"lgbt\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for lesbian, gay, bisexual, trans; refers to orientation/identity.\"\n    },\n    {\n      \"term\": \"lgbtq\",\n      \"form\": \"acronym\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Acronym for lesbian, gay, bisexual, trans, queer; refers to orientation/identity.\"\n    },\n    {\n      \"term\": \"transperson\",\n      \"form\": \"noun, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's gender identity.\"\n    },\n    {\n      \"term\": \"transpersonen\",\n      \"form\": \"noun, def sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's gender identity.\"\n    },\n    {\n      \"term\": \"transpersoner\",\n      \"form\": \"noun, plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's gender identity.\"\n    },\n    {\n      \"term\": \"transkjønnet\",\n      \"form\": \"adjective, predicative\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's gender identity.\"\n    },\n    {\n      \"term\": \"interkjønn\",\n      \"form\": \"noun / adj\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's intersex status.\"\n    },\n    {\n      \"term\": \"seksuell legning\",\n      \"form\": \"noun phrase, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific category of sexual orientation.\"\n    },\n    {\n      \"term\": \"seksuelle legning\",\n      \"form\": \"noun phrase, used with possessive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific category of sexual orientation.\"\n    },\n    {\n      \"term\": \"seksuelle legninger\",\n      \"form\": \"noun phrase, plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific category of sexual orientation.\"\n    },\n    {\n      \"term\": \"seksuell orientering\",\n      \"form\": \"noun phrase, indef sg\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific category of sexual orientation.\"\n    },\n    {\n      \"term\": \"seksuelle orientering\",\n      \"form\": \"noun phrase, used with possessive\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific category of sexual orientation.\"\n    },\n    {\n      \"term\": \"seksuelle orienteringer\",\n      \"form\": \"noun phrase, plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to the specific category of sexual orientation.\"\n    },\n    {\n      \"term\": \"seksuelt aktiv\",\n      \"form\": \"adjective phrase, singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual activity status.\"\n    },\n    {\n      \"term\": \"seksuelt aktive\",\n      \"form\": \"adjective phrase, plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Directly states a person's sexual activity status.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"skeiv\",\n      \"reason\": \"Means 'crooked' or 'askew'. High risk of false positives in non-personal contexts.\"\n    },\n    {\n      \"term\": \"skeiven\",\n      \"reason\": \"Means 'the crooked one'. High risk of false positives in non-personal contexts.\"\n    },\n    {\n      \"term\": \"skeive\",\n      \"reason\": \"Means 'crooked' (plural/definite). High risk of false positives.\"\n    },\n    {\n      \"term\": \"aseksuell\",\n      \"reason\": \"Common term in biology for asexual reproduction, a schoolwork topic.\"\n    },\n    {\n      \"term\": \"rett\",\n      \"reason\": \"Means 'straight' (line), 'correct', or 'right'. Far too ambiguous.\"\n    },\n    {\n      \"term\": \"komme ut\",\n      \"reason\": \"Extremely common verb phrase ('to come out'). Idiom requires more context.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 824,
+        "completion_tokens": 9410,
+        "total_tokens": 10234,
+        "cost": 0.09513,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.09513,
+          "upstream_inference_prompt_cost": 0.00103,
+          "upstream_inference_completions_cost": 0.0941
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 6462,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "homofil",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "homofilen",
+          "form": "noun, def sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "homofile",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "lesbisk",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "lesbiske",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "bifil",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "bifilen",
+          "form": "noun, def sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "bifile",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "panfil",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "A surname in Polish. Attribution reduces ambiguity.",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "panfilen",
+          "form": "noun, def sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "panfile",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "gay",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "French 'gay' (cheerful), but orientation meaning is dominant.",
+          "justification": "Common loanword for a person's sexual orientation."
+        },
+        {
+          "term": "queer",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "English 'strange', but orientation meaning is dominant.",
+          "justification": "Common loanword for a person's sexual orientation."
+        },
+        {
+          "term": "homoseksuell",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "homoseksuelle",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "heterofil",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "heterofilen",
+          "form": "noun, def sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "heterofile",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "heteroseksuell",
+          "form": "adj / noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "heteroseksuelle",
+          "form": "adj / noun, plural / definite",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual orientation."
+        },
+        {
+          "term": "lhbt",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for lesbian, gay, bisexual, trans; refers to orientation/identity."
+        },
+        {
+          "term": "lhbtq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for lesbian, gay, bisexual, trans, queer; refers to orientation/identity."
+        },
+        {
+          "term": "lhbtiq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym including intersex and queer; refers to orientation/identity."
+        },
+        {
+          "term": "lgbt",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for lesbian, gay, bisexual, trans; refers to orientation/identity."
+        },
+        {
+          "term": "lgbtq",
+          "form": "acronym",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Acronym for lesbian, gay, bisexual, trans, queer; refers to orientation/identity."
+        },
+        {
+          "term": "transperson",
+          "form": "noun, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's gender identity."
+        },
+        {
+          "term": "transpersonen",
+          "form": "noun, def sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's gender identity."
+        },
+        {
+          "term": "transpersoner",
+          "form": "noun, plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's gender identity."
+        },
+        {
+          "term": "transkjønnet",
+          "form": "adjective, predicative",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's gender identity."
+        },
+        {
+          "term": "interkjønn",
+          "form": "noun / adj",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's intersex status."
+        },
+        {
+          "term": "seksuell legning",
+          "form": "noun phrase, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific category of sexual orientation."
+        },
+        {
+          "term": "seksuelle legning",
+          "form": "noun phrase, used with possessive",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific category of sexual orientation."
+        },
+        {
+          "term": "seksuelle legninger",
+          "form": "noun phrase, plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific category of sexual orientation."
+        },
+        {
+          "term": "seksuell orientering",
+          "form": "noun phrase, indef sg",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific category of sexual orientation."
+        },
+        {
+          "term": "seksuelle orientering",
+          "form": "noun phrase, used with possessive",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific category of sexual orientation."
+        },
+        {
+          "term": "seksuelle orienteringer",
+          "form": "noun phrase, plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to the specific category of sexual orientation."
+        },
+        {
+          "term": "seksuelt aktiv",
+          "form": "adjective phrase, singular",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual activity status."
+        },
+        {
+          "term": "seksuelt aktive",
+          "form": "adjective phrase, plural",
+          "domain": "sex-life-or-sexual-orientation",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Directly states a person's sexual activity status."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "skeiv",
+          "reason": "Means 'crooked' or 'askew'. High risk of false positives in non-personal contexts."
+        },
+        {
+          "term": "skeiven",
+          "reason": "Means 'the crooked one'. High risk of false positives in non-personal contexts."
+        },
+        {
+          "term": "skeive",
+          "reason": "Means 'crooked' (plural/definite). High risk of false positives."
+        },
+        {
+          "term": "aseksuell",
+          "reason": "Common term in biology for asexual reproduction, a schoolwork topic."
+        },
+        {
+          "term": "rett",
+          "reason": "Means 'straight' (line), 'correct', or 'right'. Far too ambiguous."
+        },
+        {
+          "term": "komme ut",
+          "reason": "Extremely common verb phrase ('to come out'). Idiom requires more context."
+        }
+      ]
+    },
+    {
+      "domain": "genetic-data",
+      "label": "genetic data",
+      "prompt": "Target language: Norwegian Bokmål (nb).\nArticle 9 special-category domain: genetic data.\n\nWHAT TO RETURN\nONLY multi-word, inherently disclosure-shaped phrases about genetic testing or hereditary status (\"DNA test result\", \"genetic test\", \"genetic screening\", \"hereditary condition\"). Do NOT return bare \"DNA\", \"gene\" or \"chromosome\" — those are biology-curriculum vocabulary. Biometric data is deliberately out of scope: Article 9 defines it by the identification PURPOSE, not by any word a learner types, so return no biometric terms.\n\nMORPHOLOGY — this is the part generic answers get wrong.\nNorwegian Bokmål inflects for definiteness and number. Give indefinite and definite singular and the plural (katolikk / katolikken / katolikker), plus adjectival forms used predicatively.\nList every form as its OWN entry. Never return a bare stem: the scanner matches literal strings with word boundaries, so a stem both over-fires on unrelated words and under-fires on the case endings it does not carry.\n\nCONSTRAINTS\n- Between 8 and 45 included terms.\n- Each term is a literal phrase, lowercase (Japanese excepted, which has no case), no regex, no wildcards, no punctuation beyond internal spaces, hyphens and apostrophes.\n- The corpus already covers health, disability and diagnostic terms. Do not return those.\n- The scanner runs all ten supported languages' term lists against every text (English, Czech, German, Spanish, French, Italian, Japanese, Norwegian, Polish, Portuguese). A term that is an ordinary word in ANOTHER of those languages is a cross-language false positive.\n\nPER-TERM ANALYSIS — required for every entry.\nFor each term state whether the string means something else in ordinary Norwegian Bokmål prose, or in any of the other nine languages, and whether \"<possessive> <term>\" or \"<the learner> is <term>\" would plausibly appear in schoolwork that is NOT a disclosure. If the term is too ambiguous to include at all, put it in \"excluded\" with the reason instead of in \"terms\".\nKeep every \"homographRisk\" and \"justification\" value under 15 words. They are audit notes, not essays, and a long answer will be truncated mid-JSON.\n\nSCOPE\nRecommend \"unnamed-attribution-only\" for essentially every term — that is the ruled default for this domain set. Recommend \"broad\" (matched on bare mention, in any language) ONLY if the term is near-exclusively disclosure-shaped in all ten languages; expect to recommend it for none.\n\nOUTPUT — strict JSON, exactly this shape:\n{\n  \"terms\": [\n    {\n      \"term\": \"<literal phrase>\",\n      \"form\": \"<which inflected/variant form this is>\",\n      \"recommendedScope\": \"unnamed-attribution-only\" | \"broad\",\n      \"homographRisk\": \"<other meanings in this or another supported language, or 'none'>\",\n      \"justification\": \"<why an attributed use of this string is a status disclosure>\"\n    }\n  ],\n  \"excluded\": [\n    { \"term\": \"<phrase considered>\", \"reason\": \"<why it is too ambiguous to include>\" }\n  ]\n}",
+      "rawResponse": "{\n  \"terms\": [\n    {\n      \"term\": \"genetisk test\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic investigation.\"\n    },\n    {\n      \"term\": \"genetiske testen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic investigation.\"\n    },\n    {\n      \"term\": \"genetiske tester\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific genetic investigations.\"\n    },\n    {\n      \"term\": \"dna-test\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic investigation using DNA.\"\n    },\n    {\n      \"term\": \"dna-testen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic investigation using DNA.\"\n    },\n    {\n      \"term\": \"dna-tester\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific genetic investigations using DNA.\"\n    },\n    {\n      \"term\": \"gentest\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Same word in German; means 'gene test'. No risk.\",\n      \"justification\": \"Refers to a specific genetic investigation.\"\n    },\n    {\n      \"term\": \"gentesten\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic investigation.\"\n    },\n    {\n      \"term\": \"gentester\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific genetic investigations.\"\n    },\n    {\n      \"term\": \"genetisk analyse\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"Cognates exist in other languages (e.g. 'analyse'), but context is specific.\",\n      \"justification\": \"Refers to a specific genetic investigation.\"\n    },\n    {\n      \"term\": \"genetiske analysen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic investigation.\"\n    },\n    {\n      \"term\": \"genetiske analyser\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to specific genetic investigations.\"\n    },\n    {\n      \"term\": \"arvelig tilstand\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a health status passed through genes.\"\n    },\n    {\n      \"term\": \"arvelige tilstanden\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a health status passed through genes.\"\n    },\n    {\n      \"term\": \"arvelige tilstander\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes health statuses passed through genes.\"\n    },\n    {\n      \"term\": \"arvelig sykdom\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a disease passed through genes.\"\n    },\n    {\n      \"term\": \"arvelige sykdommen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes a disease passed through genes.\"\n    },\n    {\n      \"term\": \"arvelige sykdommer\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Describes diseases passed through genes.\"\n    },\n    {\n      \"term\": \"genfeil\",\n      \"form\": \"indefinite singular/plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic abnormality.\"\n    },\n    {\n      \"term\": \"genfeilen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific genetic abnormality.\"\n    },\n    {\n      \"term\": \"kromosomfeil\",\n      \"form\": \"indefinite singular/plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific chromosomal abnormality.\"\n    },\n    {\n      \"term\": \"kromosomfeilen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a specific chromosomal abnormality.\"\n    },\n    {\n      \"term\": \"genetisk screening\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a procedure to detect genetic conditions.\"\n    },\n    {\n      \"term\": \"genetiske screeningen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to a procedure to detect genetic conditions.\"\n    },\n    {\n      \"term\": \"genetiske screeninger\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to procedures to detect genetic conditions.\"\n    },\n    {\n      \"term\": \"genetisk kartlegging\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to genetic mapping, a form of genetic analysis.\"\n    },\n    {\n      \"term\": \"genetiske kartleggingen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to genetic mapping, a form of genetic analysis.\"\n    },\n    {\n      \"term\": \"genetiske kartlegginger\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Refers to genetic mapping, a form of genetic analysis.\"\n    },\n    {\n      \"term\": \"arvelig belastning\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a hereditary predisposition to disease.\"\n    },\n    {\n      \"term\": \"arvelige belastningen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates a hereditary predisposition to disease.\"\n    },\n    {\n      \"term\": \"arvelige belastninger\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Indicates hereditary predispositions to disease.\"\n    },\n    {\n      \"term\": \"mutasjon\",\n      \"form\": \"indefinite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Attributed to a person, it refers to a specific genetic alteration.\"\n    },\n    {\n      \"term\": \"mutasjonen\",\n      \"form\": \"definite singular\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Attributed to a person, it refers to a specific genetic alteration.\"\n    },\n    {\n      \"term\": \"mutasjoner\",\n      \"form\": \"indefinite plural\",\n      \"recommendedScope\": \"unnamed-attribution-only\",\n      \"homographRisk\": \"none\",\n      \"justification\": \"Attributed to a person, it refers to specific genetic alterations.\"\n    }\n  ],\n  \"excluded\": [\n    {\n      \"term\": \"arv\",\n      \"reason\": \"Means 'inheritance' or 'heritage', too broad and ambiguous.\"\n    },\n    {\n      \"term\": \"genetikk\",\n      \"reason\": \"The field of study, not inherently a personal status disclosure.\"\n    },\n    {\n      \"term\": \"dna\",\n      \"reason\": \"Core biology vocabulary, not inherently a disclosure. Excluded by prompt.\"\n    },\n    {\n      \"term\": \"gen\",\n      \"reason\": \"Core biology vocabulary, not inherently a disclosure. Excluded by prompt.\"\n    },\n    {\n      \"term\": \"kromosom\",\n      \"reason\": \"Core biology vocabulary, not inherently a disclosure. Excluded by prompt.\"\n    }\n  ]\n}",
+      "usage": {
+        "prompt_tokens": 810,
+        "completion_tokens": 7446,
+        "total_tokens": 8256,
+        "cost": 0.0754725,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0754725,
+          "upstream_inference_prompt_cost": 0.0010125,
+          "upstream_inference_completions_cost": 0.07446
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4930,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "accepted": [
+        {
+          "term": "genetisk test",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic investigation."
+        },
+        {
+          "term": "genetiske testen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic investigation."
+        },
+        {
+          "term": "genetiske tester",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific genetic investigations."
+        },
+        {
+          "term": "dna-test",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic investigation using DNA."
+        },
+        {
+          "term": "dna-testen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic investigation using DNA."
+        },
+        {
+          "term": "dna-tester",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific genetic investigations using DNA."
+        },
+        {
+          "term": "gentest",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Same word in German; means 'gene test'. No risk.",
+          "justification": "Refers to a specific genetic investigation."
+        },
+        {
+          "term": "gentesten",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic investigation."
+        },
+        {
+          "term": "gentester",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific genetic investigations."
+        },
+        {
+          "term": "genetisk analyse",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "Cognates exist in other languages (e.g. 'analyse'), but context is specific.",
+          "justification": "Refers to a specific genetic investigation."
+        },
+        {
+          "term": "genetiske analysen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic investigation."
+        },
+        {
+          "term": "genetiske analyser",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to specific genetic investigations."
+        },
+        {
+          "term": "arvelig tilstand",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a health status passed through genes."
+        },
+        {
+          "term": "arvelige tilstanden",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a health status passed through genes."
+        },
+        {
+          "term": "arvelige tilstander",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes health statuses passed through genes."
+        },
+        {
+          "term": "arvelig sykdom",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a disease passed through genes."
+        },
+        {
+          "term": "arvelige sykdommen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes a disease passed through genes."
+        },
+        {
+          "term": "arvelige sykdommer",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Describes diseases passed through genes."
+        },
+        {
+          "term": "genfeil",
+          "form": "indefinite singular/plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic abnormality."
+        },
+        {
+          "term": "genfeilen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific genetic abnormality."
+        },
+        {
+          "term": "kromosomfeil",
+          "form": "indefinite singular/plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific chromosomal abnormality."
+        },
+        {
+          "term": "kromosomfeilen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a specific chromosomal abnormality."
+        },
+        {
+          "term": "genetisk screening",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a procedure to detect genetic conditions."
+        },
+        {
+          "term": "genetiske screeningen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to a procedure to detect genetic conditions."
+        },
+        {
+          "term": "genetiske screeninger",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to procedures to detect genetic conditions."
+        },
+        {
+          "term": "genetisk kartlegging",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to genetic mapping, a form of genetic analysis."
+        },
+        {
+          "term": "genetiske kartleggingen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to genetic mapping, a form of genetic analysis."
+        },
+        {
+          "term": "genetiske kartlegginger",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Refers to genetic mapping, a form of genetic analysis."
+        },
+        {
+          "term": "arvelig belastning",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a hereditary predisposition to disease."
+        },
+        {
+          "term": "arvelige belastningen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates a hereditary predisposition to disease."
+        },
+        {
+          "term": "arvelige belastninger",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Indicates hereditary predispositions to disease."
+        },
+        {
+          "term": "mutasjon",
+          "form": "indefinite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Attributed to a person, it refers to a specific genetic alteration."
+        },
+        {
+          "term": "mutasjonen",
+          "form": "definite singular",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Attributed to a person, it refers to a specific genetic alteration."
+        },
+        {
+          "term": "mutasjoner",
+          "form": "indefinite plural",
+          "domain": "genetic-data",
+          "recommendedScope": "unnamed-attribution-only",
+          "appliedScope": "unnamed-attribution-only",
+          "homographRisk": "none",
+          "justification": "Attributed to a person, it refers to specific genetic alterations."
+        }
+      ],
+      "rejected": [],
+      "modelExcluded": [
+        {
+          "term": "arv",
+          "reason": "Means 'inheritance' or 'heritage', too broad and ambiguous."
+        },
+        {
+          "term": "genetikk",
+          "reason": "The field of study, not inherently a personal status disclosure."
+        },
+        {
+          "term": "dna",
+          "reason": "Core biology vocabulary, not inherently a disclosure. Excluded by prompt."
+        },
+        {
+          "term": "gen",
+          "reason": "Core biology vocabulary, not inherently a disclosure. Excluded by prompt."
+        },
+        {
+          "term": "kromosom",
+          "reason": "Core biology vocabulary, not inherently a disclosure. Excluded by prompt."
+        }
+      ]
+    }
+  ]
+}
