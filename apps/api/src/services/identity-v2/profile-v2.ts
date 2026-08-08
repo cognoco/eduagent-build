@@ -49,8 +49,10 @@ export interface PersonProfileScope {
 /**
  * Reverse jurisdiction map for profileMeta.location: person.residence_jurisdiction
  * ('US' | 'EU' | 'ROW' | …) → the legacy location enum ('US' | 'EU' | 'OTHER')
- * | null. The inverse of locationToJurisdiction; UNKNOWN/anything-else → null
- * (matching the reseed's 'UNKNOWN' sentinel and the legacy nullable location).
+ * | null. UNKNOWN/anything-else → null (matching the reseed's 'UNKNOWN'
+ * sentinel and the legacy nullable location). READ-ONLY DIRECTION: the forward
+ * map was deleted with WI-2743's ISO cutover, so nothing writes these buckets
+ * any more — this exists to decode rows persisted before it.
  *
  * [WI-2750] THE SOLE IMPLEMENTATION. export-v2.ts previously declared a private
  * second copy that returned 'OTHER' for an unrecognised jurisdiction, so the
@@ -65,7 +67,7 @@ export interface PersonProfileScope {
  * for them. `null` states the truth — no legacy bucket applies — and the export
  * contract already permits it (publicProfileSchema.location is
  * locationSchema.nullable()). The competing argument for 'OTHER', mirroring
- * locationToJurisdiction's OTHER↔ROW symmetry, only holds for values that have
+ * the old forward map's OTHER↔ROW symmetry, only holds for values that have
  * a forward pre-image; 'DE' has none. The three legacy buckets both copies
  * always agreed on ('US' | 'EU' | 'ROW') are unchanged.
  *

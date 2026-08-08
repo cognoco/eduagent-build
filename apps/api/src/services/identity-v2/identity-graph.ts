@@ -68,27 +68,6 @@ const LOGIN_CLERK_UNIQUE = 'login_clerk_user_id_unique';
 const LOGIN_EMAIL_UNIQUE = 'login_email_unique';
 
 /**
- * Reverse jurisdiction map: the profile-create `location` input
- * ('EU' | 'US' | 'OTHER') → `person.residence_jurisdiction`
- * ('EU' | 'US' | 'ROW'). The inverse of the reseed JURISDICTION_CASE
- * (verify-identity-reseed.mjs): US→US, EU→EU, OTHER→ROW. Absent location maps
- * to 'ROW' (the legacy NULL-location row reseeds to the 'OTHER'→'ROW' default).
- */
-export function locationToJurisdiction(
-  location: 'EU' | 'US' | 'OTHER' | null | undefined,
-): string {
-  switch (location) {
-    case 'US':
-      return 'US';
-    case 'EU':
-      return 'EU';
-    case 'OTHER':
-    default:
-      return 'ROW';
-  }
-}
-
-/**
  * [WI-2743] The legacy "we do not know where this person lives" bucket. Kept as
  * a named constant rather than a bare 'ROW' literal so the AC-4 sweep and the
  * country-policy resolver's fail-closed path refer to the same thing.

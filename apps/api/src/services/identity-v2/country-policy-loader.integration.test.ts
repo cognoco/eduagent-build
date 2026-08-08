@@ -325,8 +325,8 @@ const GOOD_ASSURANCE = {
     });
 
     it('rejects a legacy three-way jurisdiction bucket as a country code', async () => {
-      // `locationToJurisdiction` still emits EU/US/ROW; a leaked bucket must not
-      // be mistaken for a country.
+      // Rows persisted before the ISO cutover still hold EU/US/ROW; a leaked
+      // bucket must not be mistaken for a country.
       const decision = await resolveJurisdiction(db, {
         habitualResidence: 'EU',
         birthDate: ADULT_BIRTH_DATE,

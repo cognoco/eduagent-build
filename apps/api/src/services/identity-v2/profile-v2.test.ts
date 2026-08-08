@@ -41,17 +41,6 @@ describe('jurisdictionToLocation (profileMeta.location reverse-map)', () => {
     expect(jurisdictionToLocation('PL')).toBeNull();
     expect(jurisdictionToLocation('GB')).toBeNull();
   });
-
-  it('round-trips with locationToJurisdiction for the three legacy values', async () => {
-    // Importing here to avoid a circular module-load surprise at top level.
-    const { locationToJurisdiction } = await import('./identity-graph');
-    // US and EU round-trip exactly; OTHER↔ROW is the asymmetric pair.
-    expect(jurisdictionToLocation(locationToJurisdiction('US'))).toBe('US');
-    expect(jurisdictionToLocation(locationToJurisdiction('EU'))).toBe('EU');
-    expect(jurisdictionToLocation(locationToJurisdiction('OTHER'))).toBe(
-      'OTHER',
-    );
-  });
 });
 
 // ---------------------------------------------------------------------------

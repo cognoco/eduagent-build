@@ -41,11 +41,7 @@ import {
 } from '@eduagent/database';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
-import {
-  createIdentityGraph,
-  buildValidatedBirthDate,
-  locationToJurisdiction,
-} from './identity-graph';
+import { createIdentityGraph, buildValidatedBirthDate } from './identity-graph';
 import { resolveLatestConsentSetStatusAnyBasis } from './consent-status-v2';
 
 // Populate process.env.DATABASE_URL from the test env (no-op if already set).
@@ -544,15 +540,5 @@ describe('buildValidatedBirthDate', () => {
   it('rejects month 13 / day 0', () => {
     expect(() => buildValidatedBirthDate(2000, 13, 1)).toThrow();
     expect(() => buildValidatedBirthDate(2000, 1, 0)).toThrow();
-  });
-});
-
-describe('locationToJurisdiction', () => {
-  it('maps US→US, EU→EU, OTHER→ROW, null→ROW (inverse of the reseed map)', () => {
-    expect(locationToJurisdiction('US')).toBe('US');
-    expect(locationToJurisdiction('EU')).toBe('EU');
-    expect(locationToJurisdiction('OTHER')).toBe('ROW');
-    expect(locationToJurisdiction(null)).toBe('ROW');
-    expect(locationToJurisdiction(undefined)).toBe('ROW');
   });
 });
