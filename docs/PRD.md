@@ -77,7 +77,7 @@ Motivated learners aged 13+ who really want to learn—not casual browsers:
 
 ### Pricing Structure
 
-> **Note:** All pricing is preliminary and subject to beta validation. See Pricing Specification (`docs/Legacy/eduagent-pricing-specification.md`) for full details.
+> **Note:** All pricing is preliminary and subject to beta validation. See Subscription Management, below, for full details.
 
 - **Tiers:** Free → Plus → Family → Pro (account required for all tiers)
 - **Pricing:** €18.99/mo (Plus) | €28.99/mo (Family, up to 4 users) | €48.99/mo (Pro, up to 6 users)
@@ -387,7 +387,7 @@ Ask Anything starts without a required topic. It can resolve or ask for a subjec
 - Can produce (speak/write) learned material
 - Retains vocabulary long-term (12+ exposures)
 
-*Note: Detailed journey maps for certification seekers, career changers, and serious students to be created during Epics phase. See `docs/analysis/epics-inputs.md`.*
+*Note: Detailed journey maps for certification seekers, career changers, and serious students to be created during Epics phase. `docs/analysis/epics-inputs.md`, previously cited here, was deleted in commit `fdb5099a0`.*
 
 ---
 
@@ -1494,8 +1494,6 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 ### Subscription Management
 
-> **Canonical Source:** Full pricing specification in `docs/Legacy/eduagent-pricing-specification.md`
-
 **Subscription Tiers:**
 
 | Tier | Monthly | Annual | Users | Questions/Month | Top-Up Price |
@@ -1768,7 +1766,7 @@ BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT P
 
 ## Appendix
 
-*Epic-level planning content (7 epics with representative stories and success indicators) has been moved to `docs/analysis/epics-inputs.md` for use during Epics & Stories phase.*
+*Epic-level planning content (7 epics with representative stories and success indicators) was moved to `docs/analysis/epics-inputs.md` for use during Epics & Stories phase; that file was later deleted in commit `fdb5099a0`.*
 
 ---
 
