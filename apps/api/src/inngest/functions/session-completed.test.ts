@@ -19,6 +19,29 @@ import {
 } from '@eduagent/test-utils';
 
 const col = (name: string) => ({ name });
+
+// [WI-3141] The embedding input is the summary-safe text built from the
+// session_summaries row, not the transcript. The real
+// loadSummarySafeEmbeddingContent runs against the mocked db module below
+// (no extra module mock), so the summary row has to be complete for the
+// happy-path embedding tests. SUMMARY_SAFE_EMBEDDING_TEXT is exactly what it
+// produces from this row.
+const SESSION_SUMMARY_LLM_SUMMARY = {
+  narrative:
+    'Worked through introductory algebra and balanced simple equations.',
+  topicsCovered: ['algebra', 'equations'],
+  sessionState: 'completed',
+  reEntryRecommendation:
+    'Resume with a two-step equation and ask for the rule.',
+};
+const SESSION_SUMMARY_LEARNER_RECAP = 'You balanced both sides of an equation.';
+const SUMMARY_SAFE_EMBEDDING_TEXT = [
+  `Narrative: ${SESSION_SUMMARY_LLM_SUMMARY.narrative}`,
+  `Topics: ${SESSION_SUMMARY_LLM_SUMMARY.topicsCovered.join(', ')}`,
+  `Session state: ${SESSION_SUMMARY_LLM_SUMMARY.sessionState}`,
+  `Learner recap: ${SESSION_SUMMARY_LEARNER_RECAP}`,
+  `Resume here: ${SESSION_SUMMARY_LLM_SUMMARY.reEntryRecommendation}`,
+].join('\n');
 // Joinable terminal: supports both direct .where()/.limit() (no joins)
 // and chained .innerJoin().innerJoin()...where()/.limit() (loadTopicTitle's
 // topics ⋈ books ⋈ subjects parent-chain ownership check, H3.2).
@@ -56,11 +79,17 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     learningSessions: {
       findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
     },
-    // generate-session-insights reads summary row and profile
+    // generate-session-insights reads summary row and profile;
+    // [WI-3141] generate-embeddings reads llmSummary + learnerRecap from it.
     sessionSummaries: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValue({ id: 'summary-1', sessionId: 'session-1' }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'summary-1',
+        sessionId: 'session-1',
+        topicId: null,
+        llmSummary: SESSION_SUMMARY_LLM_SUMMARY,
+        learnerRecap: SESSION_SUMMARY_LEARNER_RECAP,
+        purgedAt: null,
+      }),
     },
     profiles: {
       findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
@@ -199,12 +228,9 @@ const validProfileId = TEST_PROFILE_ID_2;
 const validSessionId = TEST_SESSION_ID_2;
 
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
-const mockExtractSessionContent = jest
-  .fn()
-  .mockResolvedValue('User: What is algebra?\n\nAI: Algebra is...');
 
 jest.mock(
-  '../../services/embeddings' /* gc1-allow: storeSessionEmbedding runs an LLM embedding + pgvector write; extractSessionContent reads Neon — no LLM/DB in the unit runtime */,
+  '../../services/embeddings' /* gc1-allow: storeSessionEmbedding runs an LLM embedding + pgvector write — no LLM/DB in the unit runtime */,
   () => {
     const actual = jest.requireActual(
       '../../services/embeddings',
@@ -213,8 +239,6 @@ jest.mock(
       ...actual,
       storeSessionEmbedding: (...args: unknown[]) =>
         mockStoreSessionEmbedding(...args),
-      extractSessionContent: (...args: unknown[]) =>
-        mockExtractSessionContent(...args),
     };
   },
 );
@@ -2218,17 +2242,7 @@ describe('sessionCompleted', () => {
   });
 
   describe('generate-embeddings step', () => {
-    it('extracts real session content for embedding', async () => {
-      await executeSteps(createEventData());
-
-      expect(mockExtractSessionContent).toHaveBeenCalledWith(
-        expect.anything(),
-        SESSION_ID,
-        PROFILE_ID,
-      );
-    });
-
-    it('calls storeSessionEmbedding with extracted content and API key', async () => {
+    it('[WI-3141] stores the summary-safe text, never the transcript', async () => {
       await executeSteps(createEventData());
 
       expect(mockStoreSessionEmbedding).toHaveBeenCalledWith(
@@ -2236,8 +2250,46 @@ describe('sessionCompleted', () => {
         SESSION_ID,
         PROFILE_ID,
         TOPIC_ID,
-        'User: What is algebra?\n\nAI: Algebra is...',
+        SUMMARY_SAFE_EMBEDDING_TEXT,
         'pa-test-key-123',
+      );
+    });
+
+    it('[WI-3141 break] fails closed — writes nothing when the summary is incomplete', async () => {
+      // A soft upstream step (generate-llm-summary) failed, so llmSummary is
+      // still null at embed time. The step must write NO row rather than fall
+      // back to the transcript; session-embedding-backfill writes it later.
+      //
+      // Persistent (not ...Once): generate-llm-summary reads the same
+      // findFirst earlier in the pipeline, so a one-shot override would be
+      // consumed before generate-embeddings runs. The afterEach below restores
+      // the complete row — jest.clearAllMocks does not reset implementations.
+      mockSessionCompletedDb.query.sessionSummaries.findFirst.mockResolvedValue(
+        {
+          id: 'summary-1',
+          sessionId: 'session-1',
+          topicId: null,
+          llmSummary: null,
+          learnerRecap: SESSION_SUMMARY_LEARNER_RECAP,
+          purgedAt: null,
+        },
+      );
+
+      await executeSteps(createEventData());
+
+      expect(mockStoreSessionEmbedding).not.toHaveBeenCalled();
+    });
+
+    afterEach(() => {
+      mockSessionCompletedDb.query.sessionSummaries.findFirst.mockResolvedValue(
+        {
+          id: 'summary-1',
+          sessionId: 'session-1',
+          topicId: null,
+          llmSummary: SESSION_SUMMARY_LLM_SUMMARY,
+          learnerRecap: SESSION_SUMMARY_LEARNER_RECAP,
+          purgedAt: null,
+        },
       );
     });
 
@@ -2266,7 +2318,8 @@ describe('sessionCompleted', () => {
 
       await executeSteps(createEventData());
 
-      expect(mockExtractSessionContent).not.toHaveBeenCalled();
+      // [WI-3141] The transcript extractor this used to also assert on is
+      // gone; nothing is embedded at all, which is the property that matters.
       expect(mockStoreSessionEmbedding).not.toHaveBeenCalled();
     });
   });

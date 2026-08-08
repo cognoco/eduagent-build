@@ -5,8 +5,12 @@ import {
   sessionSummaries,
   type Database,
 } from '@eduagent/database';
-import { llmSummarySchema, type LlmSummary } from '@eduagent/schemas';
+import { llmSummarySchema } from '@eduagent/schemas';
 import { generateEmbedding } from './embeddings';
+// [WI-3141] The summary-safe embedding text is now written at the INITIAL
+// embed too, so its builder lives with the rest of the session-embedding
+// content rules rather than here. Same string, one definition.
+import { buildSummaryEmbeddingText } from './session-embedding-content';
 import { createLogger } from './logger';
 
 const logger = createLogger();
@@ -21,32 +25,16 @@ export interface TranscriptPurgeResult {
   purgedAt?: Date;
 }
 
-export function buildSummaryEmbeddingText(
-  summary: LlmSummary,
-  learnerRecap: string | null
-): string {
-  const lines = [
-    `Narrative: ${summary.narrative}`,
-    `Topics: ${summary.topicsCovered.join(', ')}`,
-    `Session state: ${summary.sessionState}`,
-  ];
-  if (learnerRecap) {
-    lines.push(`Learner recap: ${learnerRecap}`);
-  }
-  lines.push(`Resume here: ${summary.reEntryRecommendation}`);
-  return lines.join('\n');
-}
-
 export async function purgeSessionTranscript(
   db: Database,
   profileId: string,
   sessionSummaryId: string,
-  voyageApiKey: string
+  voyageApiKey: string,
 ): Promise<TranscriptPurgeResult> {
   const row = await db.query.sessionSummaries.findFirst({
     where: and(
       eq(sessionSummaries.id, sessionSummaryId),
-      eq(sessionSummaries.profileId, profileId)
+      eq(sessionSummaries.profileId, profileId),
     ),
     columns: {
       id: true,
@@ -141,8 +129,8 @@ export async function purgeSessionTranscript(
         and(
           eq(sessionSummaries.id, sessionSummaryId),
           eq(sessionSummaries.profileId, profileId),
-          isNull(sessionSummaries.purgedAt)
-        )
+          isNull(sessionSummaries.purgedAt),
+        ),
       )
       .returning({ id: sessionSummaries.id });
 
@@ -159,8 +147,8 @@ export async function purgeSessionTranscript(
       .where(
         and(
           eq(sessionEmbeddings.sessionId, row.sessionId),
-          eq(sessionEmbeddings.profileId, profileId)
-        )
+          eq(sessionEmbeddings.profileId, profileId),
+        ),
       )
       .returning({ id: sessionEmbeddings.id });
 
@@ -187,8 +175,8 @@ export async function purgeSessionTranscript(
       .where(
         and(
           eq(sessionEvents.sessionId, row.sessionId),
-          eq(sessionEvents.profileId, profileId)
-        )
+          eq(sessionEvents.profileId, profileId),
+        ),
       )
       .returning({ id: sessionEvents.id });
 

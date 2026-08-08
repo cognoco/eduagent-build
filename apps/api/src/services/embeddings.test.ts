@@ -1,14 +1,13 @@
 import {
   getEmbeddingConfig,
   generateEmbedding,
-  extractSessionContent,
   storeSessionEmbedding,
+  upsertSessionEmbedding,
   EmbeddingDimensionMismatchError,
   VoyageEmbeddingHttpError,
   parseVoyageRetryAfterMs,
 } from './embeddings';
 import type { Database } from '@eduagent/database';
-import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
 function mockDatabaseModuleFactory() {
   const { createDatabaseModuleMock } =
@@ -17,7 +16,10 @@ function mockDatabaseModuleFactory() {
   return createDatabaseModuleMock({
     exports: {
       storeEmbedding: jest.fn().mockResolvedValue(undefined),
-      sessionEvents: {},
+      sessionEmbeddings: {
+        sessionId: 'session_id',
+        profileId: 'profile_id',
+      },
       // VECTOR_DIM is consumed by generateEmbedding() to validate the
       // Voyage response length. It must be a real number here — leaving
       // it undefined would defeat the dimension-mismatch guard in tests.
@@ -175,7 +177,10 @@ describe('generateEmbedding', () => {
 
     await expect(
       generateEmbedding('Some text', TEST_API_KEY),
-    ).rejects.not.toHaveProperty('message', expect.stringContaining(providerBody));
+    ).rejects.not.toHaveProperty(
+      'message',
+      expect.stringContaining(providerBody),
+    );
   });
 
   it('carries a bounded Retry-After delay on a 429 response', async () => {
@@ -279,126 +284,33 @@ describe('parseVoyageRetryAfterMs', () => {
   });
 
   it('parses an HTTP date', () => {
-    expect(
-      parseVoyageRetryAfterMs('Sat, 01 Aug 2026 12:02:00 GMT', now),
-    ).toBe(120_000);
+    expect(parseVoyageRetryAfterMs('Sat, 01 Aug 2026 12:02:00 GMT', now)).toBe(
+      120_000,
+    );
   });
 
   it('caps excessive provider delays at fifteen minutes', () => {
     expect(parseVoyageRetryAfterMs('86400', now)).toBe(15 * 60_000);
   });
 
-  it.each([null, '', '-1', '1.5', 'not-a-date', 'Sat, 01 Aug 2026 11:00:00 GMT'])(
-    'returns null for an unusable Retry-After value %p',
-    (value) => {
-      expect(parseVoyageRetryAfterMs(value, now)).toBeNull();
-    },
-  );
+  it.each([
+    null,
+    '',
+    '-1',
+    '1.5',
+    'not-a-date',
+    'Sat, 01 Aug 2026 11:00:00 GMT',
+  ])('returns null for an unusable Retry-After value %p', (value) => {
+    expect(parseVoyageRetryAfterMs(value, now)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
-// extractSessionContent
+// [WI-3141] `extractSessionContent` \u2014 the raw-transcript join that used to be
+// the embedding input \u2014 was deleted along with its tests. The embedding input
+// is now the summary-safe text built by
+// services/session-embedding-content.ts, tested there.
 // ---------------------------------------------------------------------------
-
-function createMockDb(
-  events: Array<{ eventType: string; content: string }>,
-): Database {
-  return {
-    query: {
-      sessionEvents: {
-        findMany: jest.fn().mockResolvedValue(events),
-      },
-    },
-  } as unknown as Database;
-}
-
-const SESSION_ID = TEST_SESSION_ID;
-const PROFILE_ID = TEST_PROFILE_ID;
-
-describe('extractSessionContent', () => {
-  it('concatenates user_message and ai_response content', async () => {
-    const db = createMockDb([
-      { eventType: 'user_message', content: 'What is photosynthesis?' },
-      {
-        eventType: 'ai_response',
-        content: 'Photosynthesis is how plants convert light to energy.',
-      },
-      { eventType: 'user_message', content: 'How does chlorophyll work?' },
-      {
-        eventType: 'ai_response',
-        content: 'Chlorophyll absorbs light energy from the sun.',
-      },
-    ]);
-
-    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
-
-    expect(result).toBe(
-      'What is photosynthesis?\n\n' +
-        'Photosynthesis is how plants convert light to energy.\n\n' +
-        'How does chlorophyll work?\n\n' +
-        'Chlorophyll absorbs light energy from the sun.',
-    );
-  });
-
-  it('returns fallback when no events found', async () => {
-    const db = createMockDb([]);
-
-    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
-
-    expect(result).toBe(
-      `Session ${SESSION_ID} \u2014 no conversation events recorded`,
-    );
-  });
-
-  it('filters out non-conversation events', async () => {
-    const db = createMockDb([
-      { eventType: 'session_start', content: 'Session started' },
-      { eventType: 'user_message', content: 'Hello' },
-      { eventType: 'escalation', content: 'Escalated to level 2' },
-      { eventType: 'ai_response', content: 'Hi there!' },
-      { eventType: 'hint', content: 'Think about it differently' },
-      { eventType: 'session_end', content: 'Session ended' },
-    ]);
-
-    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
-
-    expect(result).toBe('Hello\n\nHi there!');
-  });
-
-  it('[WI-207] projects raw ai_response envelopes before building embedding input', async () => {
-    const rawEnvelope = JSON.stringify({
-      reply: 'Only this visible reply should be embedded.',
-      signals: { close: true },
-      ui_hints: { note_prompt: { show: false } },
-    });
-    const db = createMockDb([
-      { eventType: 'user_message', content: 'What should we remember?' },
-      { eventType: 'ai_response', content: rawEnvelope },
-    ]);
-
-    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
-
-    expect(result).toBe(
-      'What should we remember?\n\nOnly this visible reply should be embedded.',
-    );
-    expect(result).not.toContain('"signals"');
-    expect(result).not.toContain('"ui_hints"');
-  });
-
-  it('truncates to 8000 characters max', async () => {
-    const longMessage = 'A'.repeat(5000);
-    const db = createMockDb([
-      { eventType: 'user_message', content: longMessage },
-      { eventType: 'ai_response', content: longMessage },
-    ]);
-
-    const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
-
-    // 5000 + '\n\n' (2) + 5000 = 10002, should be truncated to 8000
-    expect(result.length).toBe(8000);
-    expect(result).toBe((longMessage + '\n\n' + longMessage).slice(0, 8000));
-  });
-});
 
 // ---------------------------------------------------------------------------
 // storeSessionEmbedding
@@ -463,5 +375,54 @@ describe('storeSessionEmbedding', () => {
       content: 'Test content',
       embedding: sampleVector,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// upsertSessionEmbedding — [WI-3141] catch-up write path
+// ---------------------------------------------------------------------------
+
+describe('upsertSessionEmbedding', () => {
+  const sampleVector = Array.from({ length: 1024 }, (_, i) => i * 0.001);
+
+  beforeEach(() => {
+    mockFetchSuccess(sampleVector);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('writes through onConflictDoUpdate so a pre-existing row is replaced, not rejected', async () => {
+    const onConflictDoUpdate = jest.fn().mockResolvedValue(undefined);
+    const values = jest.fn().mockReturnValue({ onConflictDoUpdate });
+    const insert = jest.fn().mockReturnValue({ values });
+    const db = { insert } as unknown as Database;
+
+    await upsertSessionEmbedding(
+      db,
+      'session-001',
+      'profile-001',
+      'topic-001',
+      'Narrative: summary-safe text',
+      TEST_API_KEY,
+    );
+
+    expect(values).toHaveBeenCalledWith({
+      sessionId: 'session-001',
+      profileId: 'profile-001',
+      topicId: 'topic-001',
+      content: 'Narrative: summary-safe text',
+      embedding: sampleVector,
+    });
+    expect(onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: {
+          topicId: 'topic-001',
+          content: 'Narrative: summary-safe text',
+          embedding: sampleVector,
+        },
+      }),
+    );
   });
 });

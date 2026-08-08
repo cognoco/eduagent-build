@@ -5,15 +5,13 @@
 // Provider: Voyage AI voyage-3.5 (1024 dimensions)
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
 import {
   storeEmbedding,
-  sessionEvents,
+  sessionEmbeddings,
   VECTOR_DIM,
   type Database,
 } from '@eduagent/database';
 
-import { projectAiResponseContent } from './llm/project-response';
 import { filterLearnerAuthoredTextForEgress } from './learner-egress-filter';
 import { assertLearnerDataEgressAllowed } from './llm/transfer-evidence-gate';
 import { isNodeTestEnv } from '../config';
@@ -222,59 +220,16 @@ export async function generateEmbedding(
 }
 
 // ---------------------------------------------------------------------------
-// Session content extraction (for embedding input)
-// ---------------------------------------------------------------------------
-
-/** Max characters for embedding input text */
-const MAX_EMBEDDING_CHARS = 8000;
-
-/** Event types that represent actual conversation content */
-const CONVERSATION_EVENT_TYPES = ['user_message', 'ai_response'] as const;
-
-/**
- * Extracts conversation content from session events for embedding generation.
- *
- * Queries the `session_events` table and concatenates user_message + ai_response
- * content. Non-conversation events (session_start, escalation, hint, etc.) are
- * filtered out. Output is truncated to 8 000 chars to stay within typical
- * embedding model input limits.
- */
-export async function extractSessionContent(
-  db: Database,
-  sessionId: string,
-  profileId: string,
-): Promise<string> {
-  const events = await db.query.sessionEvents.findMany({
-    where: and(
-      eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId),
-    ),
-    orderBy: (table, { asc }) => [asc(table.createdAt)],
-  });
-
-  const conversationEvents = events.filter((e) =>
-    (CONVERSATION_EVENT_TYPES as readonly string[]).includes(e.eventType),
-  );
-
-  if (conversationEvents.length === 0) {
-    return `Session ${sessionId} \u2014 no conversation events recorded`;
-  }
-
-  const joined = conversationEvents
-    .map((e) =>
-      e.eventType === 'ai_response'
-        ? projectAiResponseContent(e.content, { silent: true })
-        : e.content,
-    )
-    .join('\n\n');
-
-  return joined.length > MAX_EMBEDDING_CHARS
-    ? joined.slice(0, MAX_EMBEDDING_CHARS)
-    : joined;
-}
-
-// ---------------------------------------------------------------------------
 // DB-aware embedding storage (used by inngest/functions/session-completed.ts)
+// ---------------------------------------------------------------------------
+//
+// [WI-3141] `content` here is written verbatim into the queryable
+// `session_embeddings.content` column, so it must already be summary-safe.
+// Callers build it through `loadSummarySafeEmbeddingContent`
+// (services/session-embedding-content.ts) and fail closed when it is
+// unavailable \u2014 never pass a raw transcript. The raw-transcript extractor
+// that used to live in this file was deleted with WI-3141 so no caller can
+// reach for it again.
 // ---------------------------------------------------------------------------
 
 /**
@@ -298,4 +253,35 @@ export async function storeSessionEmbedding(
     content,
     embedding: result.vector,
   });
+}
+
+/**
+ * Same write, but tolerant of an existing row for (sessionId, profileId).
+ *
+ * Used by the WI-3141 catch-up backfill, which can race the initial write or
+ * the purge rewrite; a plain insert would hit the unique constraint. Mirrors
+ * the conflict target the purge uses (transcript-purge.ts).
+ */
+export async function upsertSessionEmbedding(
+  db: Database,
+  sessionId: string,
+  profileId: string,
+  topicId: string | null,
+  content: string,
+  apiKey: string,
+): Promise<void> {
+  const result = await generateEmbedding(content, apiKey);
+  await db
+    .insert(sessionEmbeddings)
+    .values({
+      sessionId,
+      profileId,
+      topicId: topicId ?? null,
+      content,
+      embedding: result.vector,
+    })
+    .onConflictDoUpdate({
+      target: [sessionEmbeddings.sessionId, sessionEmbeddings.profileId],
+      set: { topicId: topicId ?? null, content, embedding: result.vector },
+    });
 }
