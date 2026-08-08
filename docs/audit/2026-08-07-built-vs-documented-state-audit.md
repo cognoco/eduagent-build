@@ -22,7 +22,7 @@ Sixteen verified contradictions across the 74-file bounded population. Twelve ar
 are live, and an epic-status row marking Epic 7 **DONE** on the strength of a `topic_prerequisites`
 table that was never created. Two are
 dead evidence pointers inside Accepted ADRs. Two are `w-state-stale`: the live `ACTIVE` program
-roster reports five Work Items as Executing/Reviewing that Cosmo has Closed, and the approved
+roster makes stale lifecycle claims about six Work Items that Cosmo has Closed, and the approved
 docs-tree mapping still plans against a `docs/meetings/` directory that has already moved. No
 finding is remediated here; each is filed as its own Work Item.
 
@@ -53,7 +53,8 @@ Reproducible from this repo root at the audited commit.
 3. **Resolution by artifact, not by document.** Each distinct token was resolved once against the
    repository — `git ls-files` for paths, `rg --fixed-strings --hidden` over `apps/ packages/
    scripts/ config/ eslint-rules/ tools/ tests/ .github/` for identifiers, `apps/api/drizzle/*.sql`
-   (89 `CREATE TABLE` statements) for tables, `package.json` scripts for runners. One authoritative
+   (105 `CREATE TABLE` statements naming 87 distinct tables) for tables, `package.json` scripts for
+   runners. One authoritative
    answer per artifact, applied to every line that names it.
 4. **Hand adjudication of the residue.** Tokens that failed to resolve were read in context and
    judged against the candidate rule. Every token behind a finding below was then re-verified by
@@ -61,8 +62,18 @@ Reproducible from this repo root at the audited commit.
 5. **Two targeted passes the token sieve cannot reach**, because their assertions are about absence
    or status rather than about a name: negative-polarity claims (`no X`, `not yet`, `English only`,
    `deferred`) and status/epic tables (`DONE`, `Executing`, `Reviewing`).
-6. **Cosmo verification** via `bun …/skills/execute/execute.ts fetch <WI-NN>` for the Work Items
-   named in status claims in the live trackers.
+6. **Cosmo verification** for the Work Items named in status claims in the live trackers. This
+   step needs an **external prerequisite** that the repository does not vendor — the `zdx-marketplace`
+   `cosmo` plugin and a `NOTION_TOKEN` in the environment — so it is reproducible only on a machine
+   that has them. Concrete form, run from the repo root, one per Work Item:
+   ```
+   COSMO=~/.claude/plugins/cache/zdx-marketplace/cosmo/0.9.11/skills/execute/execute.ts
+   for w in WI-805 WI-814 WI-817 WI-578 WI-587 WI-569 WI-779; do
+     bun "$COSMO" fetch "$w" .workitem-artifacts/chk/"$w" --supervised >/dev/null
+     echo "$w $(jq -r .stage .workitem-artifacts/chk/"$w"/workitem.json)"
+   done
+   ```
+   Steps 1–5 need only `rg`, `fd`, `git` and `jq` and are reproducible from a bare checkout.
 
 ### Extraction rule as applied
 
@@ -206,8 +217,8 @@ severity / effort / track fields are omitted — sizing belongs to the spawned c
 
 ### Finding 1 — Epic 7 is marked DONE on a table that was never created
 
-- **Claim:** `docs/architecture.md:1738` — `| Epic 7: Self-Building Library | `topic_prerequisites` join table, shelf/book/chapter hierarchy … | DONE |`
-- **Contradicted by:** no `topic_prerequisites` table exists. `rg --fixed-strings topic_prerequisites` and `topicPrerequisites` return zero hits across `apps/` and `packages/`; no `CREATE TABLE topic_prerequisites` appears in any of the 89 tables declared across `apps/api/drizzle/*.sql`. The only in-repo occurrences are in documentation and one memory file.
+- **Claim:** `docs/architecture.md:1738` — the row reads: `| Epic 7: Self-Building Library |` … `topic_prerequisites` join table, shelf/book/chapter hierarchy … `| DONE |`
+- **Contradicted by:** no `topic_prerequisites` table exists. `rg --fixed-strings topic_prerequisites` and `topicPrerequisites` return zero hits across `apps/` and `packages/`; no `CREATE TABLE topic_prerequisites` appears among the 87 distinct tables declared by the 105 `CREATE TABLE` statements across `apps/api/drizzle/` (172 `.sql` files). The only in-repo occurrences are in documentation and one memory file.
 - **Direction:** `doc-ahead`
 - **Captured as:** WI-3147 (Epic 7 DONE cites a topic_prerequisites table that was never created)
 
@@ -241,14 +252,14 @@ severity / effort / track fields are omitted — sizing belongs to the spawned c
 
 ### Finding 6 — the Stripe webhook route is documented at the wrong path
 
-- **Claim:** `docs/architecture.md:1500` — `| `/v1/stripe-webhook` | Stripe event processing | Stripe | Webhook signing secret |`
+- **Claim:** `docs/architecture.md:1500` — the row lists `/v1/stripe-webhook` as "Stripe event processing", authenticated by the webhook signing secret
 - **Contradicted by:** `apps/api/src/routes/stripe-webhook.ts:53` registers `.post('/stripe/webhook', …)`; the app mounts routes under `.basePath('/v1')` (`apps/api/src/index.ts:455`). The live path is `/v1/stripe/webhook`.
 - **Direction:** `doc-ahead`
 - **Captured as:** WI-3152 (architecture.md lists /v1/stripe-webhook; the route is /v1/stripe/webhook)
 
 ### Finding 7 — a `/v1/parking-lot/*` route family is documented but not registered
 
-- **Claim:** `docs/architecture.md:1500` — `| `/v1/parking-lot/*` | Parking lot topics | — | Clerk JWT |`
+- **Claim:** `docs/architecture.md:1500` — the row lists `/v1/parking-lot/*` as "Parking lot topics", authenticated by Clerk JWT
 - **Contradicted by:** `apps/api/src/routes/parking-lot.ts:48,64,80` — the only parking-lot paths are `/sessions/:sessionId/parking-lot` and `/subjects/:subjectId/topics/:topicId/parking-lot`. No route is registered under a `/parking-lot` prefix.
 - **Direction:** `doc-ahead`
 - **Captured as:** WI-3153 (architecture.md lists an unregistered /v1/parking-lot/* route family)
@@ -302,16 +313,28 @@ severity / effort / track fields are omitted — sizing belongs to the spawned c
 - **Direction:** `doc-ahead`
 - **Captured as:** WI-3160 (MMT-ADR-0015 cites a charge-terminology sweep report never committed)
 
-### Finding 15 — the live program roster reports five Closed Work Items as still in flight
+### Finding 15 — the live program roster makes stale lifecycle claims about six Closed Work Items
 
 - **Claim:** `_wip/umbrella-program/program-roster.md` (`status: ACTIVE`) — `:605` and `:698`/`:245`: "WI-805 (drop legacy subscriptions) + WI-814 (staging reseed) **Executing**; WI-779/817 gated behind 805"; `:887`: "**G4 hangs on `WI-578` alone** (Executing)"; `:596`/`:140`: "WI-587 now **Reviewing**; only a manual `/cosmo:review` close remains"; `:73`: "`WI-569` executed + PR #845 merged (**Reviewing**)".
-- **Contradicted by:** Cosmo at the audited time — **WI-805 Closed, WI-814 Closed, WI-817 Closed, WI-578 Closed, WI-587 Closed, WI-569 Closed** (`WI-779` is `Ready/Parked`, consistent with "gated"). Read via `bun …/skills/execute/execute.ts fetch <WI-NN>`.
+- **Contradicted by:** Cosmo at the audited time. Six of the seven Work Items the roster makes a lifecycle claim about are **Closed**, so every one of those claims is stale:
+
+  | Work Item | Roster says | Cosmo |
+  |---|---|---|
+  | `WI-805` — CUT-B billing fast-follow: drop legacy subscriptions + sweep billing/quota readers to v2 | Executing | **Closed** |
+  | `WI-814` — Staging rehearsal data: decide reseed (discard vs preserve) + execute | Executing | **Closed** |
+  | `WI-817` — Post-cutover: drive the flag-on integration lane green + make-required | gated behind WI-805 | **Closed** |
+  | `WI-578` — WP-W3-pii-step-state: remove minor-PII from memoized Inngest step returns | Executing; "G4 hangs on it alone" | **Closed** |
+  | `WI-587` — Finalize residual WI-387 memory-triage dispositions (19 items) | Reviewing; "only a manual close remains" | **Closed** |
+  | `WI-569` — WP-W0-baseline: reset the migration chain to a clean 8-table baseline (MMT-ADR-0012) | Reviewing | **Closed** |
+  | `WI-779` — WP-FLAG: remove `IDENTITY_V2_ENABLED` + legacy schema/twins | gated behind WI-805 | `Ready` / `Parked` — **consistent** |
+
+  Read with the Cosmo fetch loop in Methodology step 6.
 - **Direction:** `w-state-stale`
-- **Captured as:** WI-3162 (program-roster.md reports five Closed Work Items as Executing/Reviewing)
+- **Captured as:** WI-3162 (program-roster.md makes stale lifecycle claims about six Closed Work Items)
 
 ### Finding 16 — the approved docs-tree mapping plans against a directory that has already moved
 
-- **Claim:** `_wip/umbrella-program/2026-07-14-s2-02-docs-tree-mapping.md:278` (§4.14 "`docs/meetings/**`"), rows 23 and 24 at `:152-153`, and `:281`, `:336`, `:358`; plus `_wip/umbrella-program/2026-07-14-s2-01-decision-census.md:464`. Status `APPROVED`, execution assigned to WI-2074/WI-2076 — so these rows are the instruction set a future executor reads.
+- **Claim:** `_wip/umbrella-program/2026-07-14-s2-02-docs-tree-mapping.md:278` (§4.14 "`docs/meetings/**`"), rows 23 and 24 at `:152-153`, and `:281`, `:336`, `:358`; plus `_wip/umbrella-program/2026-07-14-s2-01-decision-census.md:464`. Status `APPROVED`, execution assigned to `WI-2074` (S2-11: execute the docs/ tree reorg per the approved mapping) and `WI-2076` (S2-13: audience-matrix + flows lockstep move to `registers/`) — so these rows are the instruction set a future executor reads.
 - **Contradicted by:** `docs/meetings/` does not exist. All four named files now live in `docs/compliance/history/` — `2026-06-04-age-floor-decision-minutes.md`, `2026-06-05-launch-posture-decision-brief.md`, `2026-06-07-minors-compliance-requirements.md`, `age-country-explorer.html`. Both the source rows and the prescribed targets (`docs/_archive/meetings/`, `docs/compliance/minors-compliance-requirements.md`) are stated against a tree that has already moved, as is the §6 blocker the document flags.
 - **Direction:** `w-state-stale`
 - **Captured as:** WI-3161 (s2-02 docs-tree mapping plans against a docs/meetings/ that already moved) — the capture pipeline's dedup judge auto-linked it as a related item to **`WI-2066` (S2-02: docs-tree reorg mapping table — legacy doc → target home per ADR-0000 §I.4; `Stage=Backlog`)**, i.e. to the very item that would execute this mapping. The link is apt but the two are not duplicates: WI-2066 executes the mapping, WI-3161 says the mapping's source rows must be re-derived first. Triage should keep both.
@@ -322,9 +345,12 @@ All sixteen findings were filed via `/cosmo:capture` with `--origin-wi WI-3122`,
 `Stage=Captured`, `WI-3147`–`WI-3162`. Two notes a reviewer should have rather than discover:
 
 - **`Workstream` is deliberately unset on all sixteen.** Workstream routing for audit/governance
-  items is an open question with the MentoMate PgM — `WI-3091`, `WI-3102` and `WI-3122` itself are
-  already waiting on that ruling — so guessing a home for a batch of sixteen would be harder to
-  undo than leaving them blank. `--origin-wi` inheritance (WI-1206) auto-copied `WI-3122`'s own
+  items is an open question with the MentoMate PgM — `WI-3091` (MMT-ADR-0046 override audit across
+  every model-driven surface), `WI-3102` (`check-adr-provenance` misses `Proposed → Accepted` flips
+  on existing ADR files) and `WI-3122` itself are already waiting on that ruling — so guessing a
+  home for a batch of sixteen would be harder to undo than leaving them blank. The capture
+  pipeline's `--origin-wi` Workstream/Sprint inheritance (the ZDX capability change tracked as
+  `WI-1206`) auto-copied `WI-3122`'s own
   Workstream ("Stream 2 — Estate-Canon Drain (PRG-20)") onto every row at creation; it was cleared
   on all sixteen immediately afterwards by a direct property PATCH. That PATCH is the only
   out-of-band Cosmo write this audit made, it touched no lifecycle field (`Stage`, `Fixed In`,
