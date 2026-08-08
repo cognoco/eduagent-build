@@ -16,8 +16,11 @@ reassessment trigger (M3) and at each periodic review (M4).
 
 | Date | Person | Read set version | Acknowledgement |
 |---|---|---|---|
-| *(pending)* | Zuzana Kopečná, Founder | — | — |
-| *(pending)* | Jørn Kjetil Jørgensen, Founder | — | — |
+| 2026-08-08 | Zuzana Kopečná, Founder | Classification record v0.2.2; Art 5 check v0.1.1; tripwire doc; trigger card (2026-08-07) | acknowledged |
+| 2026-08-08 | Jørn Kjetil Jørgensen, Founder | Classification record v0.2.2; Art 5 check v0.1.1; tripwire doc; trigger card (2026-08-07) | acknowledged |
+
+*Both lines recorded 2026-08-08 on the founders' explicit instruction (operator statement in the working
+session: "we both read it and we acknowledge it").*
 
 *An acknowledgement line is added by the person themselves or on their explicit instruction, with the
 date, the classification-record version read (e.g. v0.2), and the word "acknowledged". No quiz, no
