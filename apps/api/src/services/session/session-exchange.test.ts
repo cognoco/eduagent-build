@@ -33,6 +33,23 @@ import { computeNextPracticePointer } from '../language-session-engine';
 import { resetSessionStaticContextCache } from './session-cache';
 import { recitationSetupClaimMetadataKey } from './session-recitation-setup';
 
+// [WI-2855] Inngest is a TRUE EXTERNAL BOUNDARY (a third-party event API with a
+// real network client), so it is stubbed by BARE SPECIFIER — never by a
+// relative mock of ../../inngest/client, which is an internal module and would
+// trip the GC1 ratchet. Verified necessary, not precautionary: unmocked, the
+// classify_silently dispatch in prepareExchangeContext makes a live call that
+// fails "401 Event key not found", burns safeSend's full 2s timeout, and leaves
+// an open handle ("Jest did not exit one second after the test run").
+// requireActual spread keeps every other Inngest export real — only the client's
+// network send is replaced.
+jest.mock('inngest', () => {
+  const actual = jest.requireActual('inngest');
+  class MockInngest {
+    send = jest.fn().mockResolvedValue({ ids: [] });
+  }
+  return { ...actual, Inngest: MockInngest };
+});
+
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
 
 describe('downward rung audit', () => {
@@ -2041,5 +2058,218 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
     expect(result.sourceCorrectStreak).toBe(1);
     expect(result.escalationDecision.direction).toBe('none');
     expect(result.effectiveRung).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-2855 — the app/ask.classify_silently dispatch must be REGISTERED as
+// background work, not left detached.
+//
+// Regression guard for a Cloudflare Workers promise-drop: the safeSend inside
+// prepareExchangeContext is deliberately not awaited (latency), but an
+// unregistered pending promise can be torn down once the Response settles,
+// losing BOTH the Inngest event and safeSend's Sentry escalation. The fix
+// threads a registerBackgroundWork hook in from the route, which wraps
+// executionCtx.waitUntil. This suite asserts the hook actually receives the
+// dispatch promise on the one branch that creates it.
+//
+// Harness note: self-contained duck-typed db stub, no jest.mock of internal
+// modules (GC1/GC6). Modelled on the WI-1552 harness above rather than reusing
+// its closures, so that suite's fixtures stay untouched.
+// ---------------------------------------------------------------------------
+describe('[WI-2855] prepareExchangeContext — silent-classification dispatch registration', () => {
+  beforeEach(() => {
+    resetSessionStaticContextCache();
+  });
+
+  const PROFILE_ID = 'prof-wi2855';
+  const SESSION_ID = 'sess-wi2855';
+  const SUBJECT_ID = 'subj-wi2855';
+
+  function buildSessionRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: SESSION_ID,
+      profileId: PROFILE_ID,
+      subjectId: SUBJECT_ID,
+      topicId: null,
+      sessionType: 'learning',
+      inputMode: 'text',
+      verificationType: null,
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 1,
+      startedAt: new Date('2026-01-02T10:00:00Z'),
+      lastActivityAt: new Date('2026-01-02T10:00:00Z'),
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      metadata: { effectiveMode: 'freeform' } as Record<string, unknown> | null,
+      updatedAt: new Date('2026-01-02T10:00:00Z'),
+      createdAt: new Date('2026-01-02T10:00:00Z'),
+      ...overrides,
+    };
+  }
+
+  const subjectRow = {
+    id: SUBJECT_ID,
+    profileId: PROFILE_ID,
+    name: 'General',
+    rawInput: null,
+    status: 'active',
+    pedagogyMode: null as string | null,
+    languageCode: null as string | null,
+    createdAt: new Date('2026-01-01T09:00:00Z'),
+    updatedAt: new Date('2026-01-01T09:00:00Z'),
+    urgencyBoostUntil: null,
+    urgencyBoostReason: null,
+    nextLanguagePracticePointer: null,
+  };
+
+  const personRow = {
+    id: PROFILE_ID,
+    organizationId: 'org-wi2855',
+    displayName: 'Learner WI-2855',
+    avatarUrl: null,
+    birthDate: '2000-06-15',
+    residenceJurisdiction: 'US',
+    conversationLanguage: 'en',
+    pronouns: null,
+    defaultAppContext: null,
+    createdAt: new Date('2020-01-01T00:00:00Z'),
+    updatedAt: new Date('2020-01-01T00:00:00Z'),
+    roles: ['learner'],
+  };
+
+  function makeChainNode(rows: unknown[]) {
+    const node: {
+      where: () => typeof node;
+      orderBy: () => typeof node;
+      innerJoin: () => typeof node;
+      leftJoin: () => typeof node;
+      limit: () => typeof node;
+      for: () => typeof node;
+      then: (resolve: (v: unknown[]) => void) => void;
+    } = {
+      where: () => node,
+      orderBy: () => node,
+      innerJoin: () => node,
+      leftJoin: () => node,
+      limit: () => node,
+      for: () => node,
+      then: (resolve) => resolve(rows),
+    };
+    return node;
+  }
+
+  function makeDb(sessionRow: ReturnType<typeof buildSessionRow>) {
+    const transactionDb = {
+      select: jest.fn(() => ({
+        from: () =>
+          makeChainNode([
+            {
+              metadata: sessionRow.metadata,
+              exchangeCount: sessionRow.exchangeCount,
+            },
+          ]),
+      })),
+      update: jest.fn(() => ({
+        set: jest.fn(() => ({
+          where: jest.fn().mockResolvedValue(undefined),
+        })),
+      })),
+    };
+    return {
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(sessionRow),
+        },
+        subjects: { findFirst: jest.fn().mockResolvedValue(subjectRow) },
+        sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+        teachingPreferences: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        learningModes: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        learningProfiles: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        person: {
+          findFirst: jest.fn().mockResolvedValue({
+            conversationLanguageConfirmedAt: new Date('2026-01-01T00:00:00Z'),
+          }),
+        },
+      },
+      select: jest.fn((cols: Record<string, unknown>) => ({
+        from: () =>
+          cols && 'organizationId' in cols
+            ? makeChainNode([personRow])
+            : makeChainNode([]),
+      })),
+      transaction: jest.fn(
+        async (callback: (tx: typeof transactionDb) => unknown) =>
+          callback(transactionDb),
+      ),
+    } as never;
+  }
+
+  it('registers the classify_silently dispatch as background work', async () => {
+    const registerBackgroundWork = jest.fn();
+
+    await prepareExchangeContext(
+      makeDb(buildSessionRow()),
+      PROFILE_ID,
+      SESSION_ID,
+      'tell me about volcanoes',
+      { semanticMemoryRetrievalEnabled: false, registerBackgroundWork },
+    );
+
+    // The assertion that fails when the waitUntil registration is reverted.
+    expect(registerBackgroundWork).toHaveBeenCalledTimes(1);
+    const registered = registerBackgroundWork.mock.calls[0]?.[0];
+    expect(typeof (registered as { then?: unknown })?.then).toBe('function');
+    // safeSend swallows dispatch failures, so the registered promise must
+    // settle rather than reject — a rejecting promise handed to waitUntil
+    // would surface as an unhandled rejection in the Worker.
+    await expect(registered).resolves.toBeUndefined();
+  });
+
+  it('does not register background work once the session is already classified', async () => {
+    const registerBackgroundWork = jest.fn();
+
+    await prepareExchangeContext(
+      makeDb(
+        buildSessionRow({
+          metadata: {
+            effectiveMode: 'freeform',
+            silentClassification: {
+              subjectId: SUBJECT_ID,
+              subjectName: 'Geology',
+              confidence: 0.9,
+            },
+          },
+        }),
+      ),
+      PROFILE_ID,
+      SESSION_ID,
+      'tell me more',
+      { semanticMemoryRetrievalEnabled: false, registerBackgroundWork },
+    );
+
+    expect(registerBackgroundWork).not.toHaveBeenCalled();
+  });
+
+  it('tolerates a caller that supplies no registerBackgroundWork hook', async () => {
+    await expect(
+      prepareExchangeContext(
+        makeDb(buildSessionRow()),
+        PROFILE_ID,
+        SESSION_ID,
+        'tell me about volcanoes',
+        { semanticMemoryRetrievalEnabled: false },
+      ),
+    ).resolves.toBeDefined();
   });
 });
