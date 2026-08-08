@@ -65,6 +65,19 @@ export async function runBlockedSafetyDigestIngest(
     return { status: 'skipped' as const, reason: 'invalid_payload' as const };
   }
 
+  // [WI-1900] The post-display adult judge reuses the suitability_blocked event
+  // to raise its alarm, but it detects AFTER display — no reply was replaced and
+  // no learner was protected. Counting it in suitabilityBlockedCount would tell
+  // an operator a block happened when none did. The alarm still fires (the event
+  // is sent, logged, and available to any other consumer); only the digest
+  // counter declines it. Absent mode === 'enforced' (every pre-WI-1900 event).
+  if (
+    parsed.data.name === 'app/safety.suitability_blocked' &&
+    parsed.data.mode === 'observed'
+  ) {
+    return { status: 'skipped' as const, reason: 'observed_only' as const };
+  }
+
   const result = await step.run('record-blocked-safety-event', () =>
     dependencies.record(parsed.data),
   );

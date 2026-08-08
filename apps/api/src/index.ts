@@ -217,6 +217,8 @@ type Bindings = {
   CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;
   JUDGE_FRAMEWORK_ENABLED?: string;
+  // [WI-1900] Adult post-display coverage fraction; parsed, not trusted.
+  JUDGE_ADULT_SUITABILITY_SAMPLING?: string;
   JUDGE_ENFORCEMENT_ENABLED?: string;
   LLM_ROUTING_V2_ENABLED?: string;
   MODE_NAV_V2_ENABLED?: string;

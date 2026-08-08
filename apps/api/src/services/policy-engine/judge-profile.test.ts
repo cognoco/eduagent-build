@@ -66,3 +66,51 @@ describe('shouldJudge', () => {
     expect(shouldJudge('adult', ADULT_SUITABILITY_SAMPLING)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-1900] Config-valued adult coverage (operator ruling 2026-08-04): the
+// adult rate must be tunable by configuration so coverage can ratchet toward
+// full-async WITHOUT a redesign. The minor path is untouched — these tests are
+// the guard that a future rate change can never reach minors.
+// ---------------------------------------------------------------------------
+describe('[WI-1900] config-valued adult sampling', () => {
+  it('honours an explicit adult rate over the launch default', () => {
+    expect(resolveSuitabilityProfile('adult', 0.5)).toEqual({ sampling: 0.5 });
+    // A draw that the 0.1 launch rate would SKIP is judged at 0.5.
+    expect(shouldJudge('adult', 0.3, 0.5)).toBe(true);
+    expect(shouldJudge('adult', 0.3)).toBe(false);
+  });
+
+  it('supports ratcheting adult coverage to full (1.0) by config alone', () => {
+    // The ruling's stated purpose: reach full adult coverage by configuration.
+    expect(shouldJudge('adult', 0.99, 1.0)).toBe(true);
+  });
+
+  it('supports switching adult coverage fully off (0) by config alone', () => {
+    expect(shouldJudge('adult', 0, 0)).toBe(false);
+    expect(shouldJudge('adult', 0.99, 0)).toBe(false);
+  });
+
+  it('NEVER lets the adult rate reduce minor coverage', () => {
+    // The load-bearing guarantee. Even an adult rate of 0 leaves every minor
+    // and every unknown-age learner at full coverage.
+    expect(resolveSuitabilityProfile('child', 0)).toEqual({ sampling: 1.0 });
+    expect(resolveSuitabilityProfile('adolescent', 0)).toEqual({
+      sampling: 1.0,
+    });
+    expect(resolveSuitabilityProfile(null, 0)).toEqual({ sampling: 1.0 });
+    expect(resolveSuitabilityProfile(undefined, 0)).toEqual({ sampling: 1.0 });
+    expect(shouldJudge('child', 0.99, 0)).toBe(true);
+    expect(shouldJudge('adolescent', 0.99, 0)).toBe(true);
+    expect(shouldJudge(null, 0.99, 0)).toBe(true);
+  });
+
+  it('falls back to the launch default when no rate is supplied', () => {
+    // Omitting the override must not change shipped behaviour — this is what
+    // makes landing the config key a zero-behaviour-change refactor.
+    expect(resolveSuitabilityProfile('adult', undefined)).toEqual({
+      sampling: ADULT_SUITABILITY_SAMPLING,
+    });
+    expect(shouldJudge('adult', 0.05, undefined)).toBe(true);
+  });
+});

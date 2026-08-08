@@ -99,6 +99,7 @@ import {
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
   isJudgeFrameworkEnabled,
+  resolveAdultSuitabilitySampling,
   isJudgeEnforcementEnabled,
   isMentorNoticeEnabled,
   isAnswerEvaluationRuntimeEnabled,
@@ -161,6 +162,8 @@ type SessionRouteEnv = {
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
     JUDGE_FRAMEWORK_ENABLED?: string;
+    // [WI-1900] Adult post-display coverage fraction; parsed, not trusted.
+    JUDGE_ADULT_SUITABILITY_SAMPLING?: string;
     JUDGE_ENFORCEMENT_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
@@ -550,6 +553,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
+      // [WI-1900] Adult post-display coverage fraction — config-valued so
+      // coverage ratchets by configuration, not redesign.
+      const judgeAdultSuitabilitySampling = resolveAdultSuitabilitySampling(
+        c.env.JUDGE_ADULT_SUITABILITY_SAMPLING,
+      );
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
@@ -576,6 +584,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             mentorNoticeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
+            judgeAdultSuitabilitySampling,
             judgeEnforcementEnabled,
             answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
@@ -717,6 +726,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
+      // [WI-1900] Adult post-display coverage fraction — config-valued so
+      // coverage ratchets by configuration, not redesign.
+      const judgeAdultSuitabilitySampling = resolveAdultSuitabilitySampling(
+        c.env.JUDGE_ADULT_SUITABILITY_SAMPLING,
+      );
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
@@ -751,6 +765,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             mentorNoticeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
+            judgeAdultSuitabilitySampling,
             judgeEnforcementEnabled,
             answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(

@@ -300,8 +300,16 @@ export async function emitSuitabilityBlockedEvent(context: {
   provider?: string;
   model?: string;
   flags: JudgeFlagCategory[];
+  /**
+   * [WI-1900] Which rail raised this. Omit (or 'enforced') for the synchronous
+   * minor gate, which actually replaced the reply. 'observed' for the
+   * post-display adult judge, which detects AFTER display — the alarm is real
+   * but nothing was blocked, so the operator digest declines to count it.
+   */
+  mode?: 'enforced' | 'observed';
 }): Promise<void> {
   const eventId = crypto.randomUUID();
+  const mode = context.mode ?? 'enforced';
   logger.warn('safety.suitability_blocked', {
     event_id: eventId,
     flow: context.flow,
@@ -310,13 +318,17 @@ export async function emitSuitabilityBlockedEvent(context: {
     provider: context.provider,
     model: context.model,
     flags: context.flags,
+    mode,
   });
   await safeSend(
     () =>
       inngest.send({
-        // The learner-facing response already replaced the blocked reply. The
-        // metadata-only digest consumer counts this event for operators;
-        // safeSend keeps its dispatch non-core to the learner response.
+        // For the enforced (minor) rail the learner-facing response already
+        // replaced the blocked reply, and the metadata-only digest consumer
+        // counts this event for operators. For the observed (adult) rail the
+        // reply was already displayed and the digest skips the counter — see
+        // inngest/functions/blocked-safety-digest.ts. safeSend keeps the
+        // dispatch non-core to the learner response either way.
         name: 'app/safety.suitability_blocked',
         data: {
           eventId,
@@ -327,6 +339,7 @@ export async function emitSuitabilityBlockedEvent(context: {
           model: SUITABILITY_GATE_MODEL,
           tutorModel: context.model,
           flags: context.flags,
+          mode,
           timestamp: new Date().toISOString(),
         },
       }),

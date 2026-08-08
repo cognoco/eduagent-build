@@ -42,11 +42,15 @@ export interface SuitabilityProfile {
  */
 export function resolveSuitabilityProfile(
   ageBracket: AgeBracket | null | undefined,
+  adultSampling: number = ADULT_SUITABILITY_SAMPLING,
 ): SuitabilityProfile {
   if (ageBracket === 'adult') {
-    return { sampling: ADULT_SUITABILITY_SAMPLING };
+    return { sampling: adultSampling };
   }
-  // child, adolescent, and unknown (null/undefined) → full coverage.
+  // child, adolescent, and unknown (null/undefined) → full coverage. The
+  // adultSampling override is deliberately NOT consulted here: minors are
+  // never sampled down by configuration (WI-1900 operator ruling — the minor
+  // path is untouched).
   return { sampling: MINOR_SUITABILITY_SAMPLING };
 }
 
@@ -59,6 +63,7 @@ export function resolveSuitabilityProfile(
 export function shouldJudge(
   ageBracket: AgeBracket | null | undefined,
   rng: number,
+  adultSampling?: number,
 ): boolean {
-  return rng < resolveSuitabilityProfile(ageBracket).sampling;
+  return rng < resolveSuitabilityProfile(ageBracket, adultSampling).sampling;
 }

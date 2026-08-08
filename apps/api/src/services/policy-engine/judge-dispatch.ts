@@ -49,6 +49,12 @@ export interface SuitabilityJudgeDispatchInput {
   conversationLanguage?: ConversationLanguage;
   /** Injected uniform draw in [0, 1) for the coverage sampling decision. */
   rng: number;
+  /**
+   * [WI-1900] Adult coverage fraction from `JUDGE_ADULT_SUITABILITY_SAMPLING`.
+   * Omitted → the shipped launch default in `judge-profile.ts`. Minors are
+   * never affected by this value (always full coverage).
+   */
+  adultSampling?: number;
   /** Injected ISO timestamp for the event payload. */
   timestamp: string;
 }
@@ -82,7 +88,7 @@ export function resolveSuitabilityJudgeDispatch(
         )
       : 'child';
 
-  if (!shouldJudge(ageBracket, input.rng)) return null;
+  if (!shouldJudge(ageBracket, input.rng, input.adultSampling)) return null;
 
   return {
     profileId: input.profileId,

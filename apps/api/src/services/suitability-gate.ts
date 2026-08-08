@@ -72,7 +72,13 @@ void _allowlistIsSubset;
  * A 'concern', an 'ok', or a 'violation' whose flags are exclusively
  * `over_blocking` / `topic_drift` all return false.
  */
-export function shouldBlockSuitabilityVerdict(verdict: JudgeVerdict): boolean {
+export function shouldBlockSuitabilityVerdict(
+  // [WI-1900] Narrowed from JudgeVerdict to the two fields actually read, so
+  // the post-display adult rail — which only carries overall+flags across the
+  // Inngest step boundary (raw text and rationale deliberately stay inside the
+  // step closure) — can reuse this predicate without an unsafe cast.
+  verdict: Pick<JudgeVerdict, 'overall' | 'flags'> & { rationale?: string },
+): boolean {
   if (verdict.overall !== 'violation') return false;
   return verdict.flags.some(
     (flag) => !SUITABILITY_GATE_ALLOWLIST.includes(flag),

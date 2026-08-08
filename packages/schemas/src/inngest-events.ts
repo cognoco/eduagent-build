@@ -936,6 +936,20 @@ export const blockedSafetyDigestEventSchema = z.discriminatedUnion('name', [
   z.object({
     name: z.literal('app/safety.suitability_blocked'),
     ...blockedSafetyDigestIdentityShape,
+    /**
+     * [WI-1900] Which rail raised this. 'enforced' = the synchronous minor gate
+     * actually replaced the reply. 'observed' = the post-display adult judge
+     * flagged a violation AFTER the reply was displayed — nothing was blocked.
+     *
+     * ABSENT means 'enforced': every event emitted before WI-1900 came from the
+     * minor enforcing gate, so the optional field is backward compatible and no
+     * historical event is reclassified.
+     *
+     * The digest counts ONLY 'enforced'. Counting an observed detection in
+     * suitabilityBlockedCount would tell an operator a learner was protected
+     * when none was — a false compliance signal, worse than no signal.
+     */
+    mode: z.enum(['enforced', 'observed']).optional(),
   }),
 ]);
 export type BlockedSafetyDigestEvent = z.infer<

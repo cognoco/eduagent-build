@@ -193,6 +193,7 @@ function buildProcessOptions(
     mentorNoticeEnabled: options.mentorNoticeEnabled,
     reviewCallbackOpenerEnabled: options.reviewCallbackOpenerEnabled,
     judgeFrameworkEnabled: options.judgeFrameworkEnabled,
+    judgeAdultSuitabilitySampling: options.judgeAdultSuitabilitySampling,
     judgeEnforcementEnabled: options.judgeEnforcementEnabled,
   };
 }
