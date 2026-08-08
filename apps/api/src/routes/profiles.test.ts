@@ -158,10 +158,13 @@ function makeApp(overrides?: {
   profileId?: string;
   user?: AuthUser & { factorVerificationAge?: [number, number] };
   callerPersonId?: string | null;
+  // [WI-2743] Routes whose handler reads a table directly need a db shaped for
+  // that read; the default stub only serves the scoped `.where().limit()` path.
+  db?: Database;
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('db', createUncredentialedDb());
+    c.set('db', overrides?.db ?? createUncredentialedDb());
     c.set(
       'user',
       overrides?.user ?? {
@@ -949,6 +952,146 @@ describe('POST /v1/profiles', () => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /v1/profiles/residence-countries
+//
+// [WI-2743] This block exists because the route's registration order is
+// load-bearing and NOTHING else proves it. Hono matches in registration order,
+// so the literal path must be registered before `/profiles/:id`; swap them and
+// "residence-countries" is swallowed as an `:id`. The service-level coverage
+// for listResidenceCountries never goes through the router, so it cannot see
+// that regression at all — which is precisely why asserting the property in a
+// comment was not enough.
+//
+// The REAL listResidenceCountries runs here; only the Database is stubbed. So
+// effective-dating, latest-name-wins and sort order are exercised through the
+// router rather than asserted a second time against a mock.
+// ---------------------------------------------------------------------------
+
+describe('GET /v1/profiles/residence-countries', () => {
+  /**
+   * listResidenceCountries awaits `select().from()` and iterates the result
+   * directly, unlike the scoped reads the default stub serves, which end in
+   * `.where().limit()`. So `from` must resolve to the rows themselves.
+   */
+  function makeRegistryDb(
+    rows: Array<{
+      countryCode: string;
+      countryName: string;
+      effectiveAt: Date;
+      expiresAt?: Date | null;
+    }>,
+  ): Database {
+    return {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockResolvedValue(rows),
+      }),
+    } as unknown as Database;
+  }
+
+  it('returns one entry per country, carrying the latest name, sorted by name', async () => {
+    const res = await makeApp({
+      db: makeRegistryDb([
+        // Two effective-dated rows for one country: the later name must win,
+        // and the country must still appear exactly once.
+        {
+          countryCode: 'DE',
+          countryName: 'Federal Republic of Germany',
+          effectiveAt: new Date('1970-01-01T00:00:00Z'),
+        },
+        {
+          countryCode: 'DE',
+          countryName: 'Germany',
+          effectiveAt: new Date('1990-10-03T00:00:00Z'),
+        },
+        {
+          countryCode: 'AT',
+          countryName: 'Austria',
+          effectiveAt: new Date('1995-01-01T00:00:00Z'),
+        },
+      ]),
+    }).request('/v1/profiles/residence-countries');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      countries: [
+        { countryCode: 'AT', countryName: 'Austria' },
+        { countryCode: 'DE', countryName: 'Germany' },
+      ],
+    });
+  });
+
+  it('[BREAK] shows the name IN FORCE, not a rename scheduled for the future', async () => {
+    // The registry is effective-dated so a rename can be STAGED ahead of its
+    // legal date. Picking the newest row by effectiveAt alone would publish
+    // that rename early, in a picker a user chooses their residence from.
+    const res = await makeApp({
+      db: makeRegistryDb([
+        {
+          countryCode: 'DE',
+          countryName: 'Germany',
+          effectiveAt: new Date('1990-10-03T00:00:00Z'),
+          expiresAt: null,
+        },
+        {
+          countryCode: 'DE',
+          countryName: 'Germany (renamed, not yet in force)',
+          effectiveAt: new Date('3000-01-01T00:00:00Z'),
+          expiresAt: null,
+        },
+      ]),
+    }).request('/v1/profiles/residence-countries');
+
+    expect(await res.json()).toEqual({
+      countries: [{ countryCode: 'DE', countryName: 'Germany' }],
+    });
+  });
+
+  it('[BREAK] still lists a country whose only row is out of the window', async () => {
+    // Membership is deliberately NOT window-filtered, for the same reason it is
+    // not filtered by launch status: habitual residence is a fact about the
+    // person, not a permission. A country with only an expired or not-yet-
+    // effective row is still a real place someone lives, and dropping it would
+    // leave them unable to say where that is.
+    const res = await makeApp({
+      db: makeRegistryDb([
+        {
+          countryCode: 'XA',
+          countryName: 'Expired Only',
+          effectiveAt: new Date('1990-01-01T00:00:00Z'),
+          expiresAt: new Date('1991-01-01T00:00:00Z'),
+        },
+        {
+          countryCode: 'XF',
+          countryName: 'Future Only',
+          effectiveAt: new Date('3000-01-01T00:00:00Z'),
+          expiresAt: null,
+        },
+      ]),
+    }).request('/v1/profiles/residence-countries');
+
+    expect(await res.json()).toEqual({
+      countries: [
+        { countryCode: 'XA', countryName: 'Expired Only' },
+        { countryCode: 'XF', countryName: 'Future Only' },
+      ],
+    });
+  });
+
+  it('[BREAK] resolves the literal path rather than being shadowed by /profiles/:id', async () => {
+    const res = await makeApp({ db: makeRegistryDb([]) }).request(
+      '/v1/profiles/residence-countries',
+    );
+
+    // The decisive assertion is NOT the 200 — it is that the `:id` handler
+    // never ran. getPersonScope is the first thing that handler reaches for, so
+    // a reordering that lets "residence-countries" be captured as an `:id`
+    // shows up here as a call that should have been impossible.
+    expect(getPersonScopeMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // GET /v1/profiles/:id
 // ---------------------------------------------------------------------------
 
@@ -1045,6 +1188,30 @@ describe('PATCH /v1/profiles/:id', () => {
     });
 
     expect(res.status).toBe(400);
+    expect(updateProfileV2Mock).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK][WI-2743] REJECTS habitualResidenceCountry rather than accepting and dropping it', async () => {
+    // Before this guard the field validated, returned 200, and vanished:
+    // updateProfileV2 never reads it, so the caller was told the residence
+    // changed while the stored country and the resolved jurisdiction both
+    // stayed put. A silent no-op at a write boundary is worse than a refusal.
+    // Residence CHANGE re-resolves jurisdiction and belongs to WI-2744.
+    //
+    // The service is mocked to SUCCEED deliberately. Without it the revert
+    // check fails with 404 (an unconfigured mock) instead of 200, which would
+    // prove only that validation passed and would quietly misrepresent the
+    // defect this guard exists for.
+    updateProfileV2Mock.mockResolvedValue(makeProfileRow({ id: PROFILE_ID_A }));
+
+    const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_A}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ habitualResidenceCountry: 'DE' }),
+    });
+
+    expect(res.status).toBe(400);
+    // The decisive half: it must never reach the service to be dropped there.
     expect(updateProfileV2Mock).not.toHaveBeenCalled();
   });
 

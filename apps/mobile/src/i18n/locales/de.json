@@ -4750,5 +4750,13 @@
       "completeDecisions": "Gib den Familien-Code ein und prüfe alle drei Optionen, bevor du fortfährst.",
       "guardianNotReady": "Familien-Code, Rückmeldung des Anbieters und Sichtbarkeitsauswahl des Vormunds sind erforderlich."
     }
+  },
+  "residenceCountryPicker": {
+    "label": "Wohnsitzland",
+    "hint": "Wo du normalerweise lebst. Nicht deine Staatsangehörigkeit, nicht dein Rechnungsland und nicht das Land deines App Stores.",
+    "childHint": "Wo dein Kind normalerweise lebt. Nicht seine/ihre Staatsangehörigkeit, nicht dein Rechnungsland und nicht das Land deines App Stores.",
+    "errorTitle": "Länderliste konnte nicht geladen werden",
+    "errorBody": "Überprüfe deine Verbindung und versuche es erneut.",
+    "empty": "Noch keine Länder verfügbar."
   }
 }

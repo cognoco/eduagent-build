@@ -41,11 +41,7 @@ import {
 } from '@eduagent/database';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { ConflictError } from '../../errors';
-import {
-  createIdentityGraph,
-  buildValidatedBirthDate,
-  locationToJurisdiction,
-} from './identity-graph';
+import { createIdentityGraph, buildValidatedBirthDate } from './identity-graph';
 import { resolveLatestConsentSetStatusAnyBasis } from './consent-status-v2';
 
 // Populate process.env.DATABASE_URL from the test env (no-op if already set).
@@ -192,7 +188,10 @@ async function cleanupByClerk(
       birthYear: 1990,
       birthMonth: 6,
       birthDay: 15,
-      location: 'US',
+      // [WI-2743] The ISO habitual-residence country is what the writer
+      // persists now. `location` is superseded and no longer read — see the
+      // residenceJurisdiction expectation below.
+      habitualResidenceCountry: 'US',
       timezone: 'America/New_York',
     });
 
@@ -206,6 +205,13 @@ async function cleanupByClerk(
       where: eq(person.id, graph.personId),
     });
     expect(personRow?.birthDate).toBe('1990-06-15');
+    // [WI-2743 AC-4 sweep] Previously this passed location:'US' and asserted
+    // 'US' arrived via locationToJurisdiction. The writer now persists the
+    // collected ISO habitual-residence country VERBATIM, so the assertion is
+    // the same string for a different — and now literal — reason. Safe to
+    // change: createIdentityGraph has exactly ONE production caller
+    // (routes/profiles.ts), and no client populates the legacy `location`
+    // field, so no shipped path regressed.
     expect(personRow?.residenceJurisdiction).toBe('US');
     expect(personRow?.loginId).toBeTruthy(); // reverse circular wire
     expect(personRow?.hasOwnAccount).toBe(true);
@@ -534,15 +540,5 @@ describe('buildValidatedBirthDate', () => {
   it('rejects month 13 / day 0', () => {
     expect(() => buildValidatedBirthDate(2000, 13, 1)).toThrow();
     expect(() => buildValidatedBirthDate(2000, 1, 0)).toThrow();
-  });
-});
-
-describe('locationToJurisdiction', () => {
-  it('maps US→US, EU→EU, OTHER→ROW, null→ROW (inverse of the reseed map)', () => {
-    expect(locationToJurisdiction('US')).toBe('US');
-    expect(locationToJurisdiction('EU')).toBe('EU');
-    expect(locationToJurisdiction('OTHER')).toBe('ROW');
-    expect(locationToJurisdiction(null)).toBe('ROW');
-    expect(locationToJurisdiction(undefined)).toBe('ROW');
   });
 });

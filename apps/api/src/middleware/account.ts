@@ -72,6 +72,14 @@ const PRE_GRAPH_ALLOWLIST: readonly PreGraphRoute[] = [
   { method: 'GET', path: '/v1/subscription/status' },
   { method: 'GET', path: '/v1/consent/my-status' },
   { method: 'POST', path: '/v1/activation-events' },
+  // [WI-2743] The habitual-residence country picker is rendered DURING signup,
+  // before the identity graph exists — the caller is authenticated but
+  // account-less by definition, which is the exact population this middleware
+  // 401s. Without this entry the route is unreachable by the only users who
+  // need it. It carries no personal data: it is the public country matrix.
+  // Guarded by account.identity-v2.test.ts's allowlist table — delete this line
+  // and that row goes red with a 401, which is the production symptom itself.
+  { method: 'GET', path: '/v1/profiles/residence-countries' },
 ];
 
 function isPreGraphAllowed(method: string, path: string): boolean {

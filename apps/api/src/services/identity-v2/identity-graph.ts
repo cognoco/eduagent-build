@@ -68,24 +68,37 @@ const LOGIN_CLERK_UNIQUE = 'login_clerk_user_id_unique';
 const LOGIN_EMAIL_UNIQUE = 'login_email_unique';
 
 /**
- * Reverse jurisdiction map: the profile-create `location` input
- * ('EU' | 'US' | 'OTHER') → `person.residence_jurisdiction`
- * ('EU' | 'US' | 'ROW'). The inverse of the reseed JURISDICTION_CASE
- * (verify-identity-reseed.mjs): US→US, EU→EU, OTHER→ROW. Absent location maps
- * to 'ROW' (the legacy NULL-location row reseeds to the 'OTHER'→'ROW' default).
+ * [WI-2743] The legacy "we do not know where this person lives" bucket. Kept as
+ * a named constant rather than a bare 'ROW' literal so the AC-4 sweep and the
+ * country-policy resolver's fail-closed path refer to the same thing.
  */
-export function locationToJurisdiction(
-  location: 'EU' | 'US' | 'OTHER' | null | undefined,
+export const LEGACY_UNKNOWN_RESIDENCE_BUCKET = 'ROW';
+
+/**
+ * [WI-2743] The value written to `person.residence_jurisdiction` at create
+ * time. ONE implementation, shared by both create-time writers
+ * (`createIdentityGraph`, `createChildProfileV2`) — deliberately, because this
+ * column already produced one two-copies-that-disagree bug (WI-2750) and a
+ * second hand-written copy is exactly how that happened.
+ *
+ * A collected ISO 3166-1 alpha-2 habitual-residence country is persisted
+ * VERBATIM: it is not collapsed into the legacy three-way bucket, which is what
+ * made the whole country registry inert (every row read 'ROW', so
+ * `resolveJurisdiction` could never resolve anything).
+ *
+ * When no country was collected, the legacy unknown bucket is written, exactly
+ * as before. That is NOT a policy decision smuggled in here — this item
+ * collects residence, it does not gate on it. 'ROW' has no registry row keyed
+ * to it, so `resolveCountryPolicy` answers COUNTRY_UNSUPPORTED and fails
+ * closed; turning that into an actual refusal at the admission path is
+ * WI-2927's enforcement leg.
+ */
+export function residenceJurisdictionForCreate(
+  habitualResidenceCountry: string | null | undefined,
 ): string {
-  switch (location) {
-    case 'US':
-      return 'US';
-    case 'EU':
-      return 'EU';
-    case 'OTHER':
-    default:
-      return 'ROW';
-  }
+  return habitualResidenceCountry
+    ? habitualResidenceCountry
+    : LEGACY_UNKNOWN_RESIDENCE_BUCKET;
 }
 
 /**
@@ -192,7 +205,10 @@ export interface CreateIdentityGraphInput {
   /** WI-297 optional full date — when present, persisted as the exact birth_date. */
   birthMonth?: number;
   birthDay?: number;
+  /** [WI-2743] Superseded by habitualResidenceCountry; no longer read. */
   location?: 'EU' | 'US' | 'OTHER' | null;
+  /** [WI-2743] ISO 3166-1 alpha-2 habitual-residence country, persisted verbatim. */
+  habitualResidenceCountry?: string | null;
   conversationLanguage?: string;
   pronouns?: string | null;
   avatarUrl?: string | null;
@@ -324,7 +340,9 @@ export async function createIdentityGraph(
         .values({
           displayName: input.displayName,
           birthDate,
-          residenceJurisdiction: locationToJurisdiction(input.location),
+          residenceJurisdiction: residenceJurisdictionForCreate(
+            input.habitualResidenceCountry,
+          ),
           ...(input.conversationLanguage !== undefined
             ? { conversationLanguage: input.conversationLanguage }
             : {}),

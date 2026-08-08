@@ -4750,5 +4750,13 @@
       "completeDecisions": "Introduza o código familiar e reveja as três escolhas antes de continuar.",
       "guardianNotReady": "O código familiar, o retorno do fornecedor e a escolha de visibilidade do tutor são necessários."
     }
+  },
+  "residenceCountryPicker": {
+    "label": "País de residência",
+    "hint": "Onde você mora normalmente. Não é a sua nacionalidade, nem o seu país de cobrança, nem o país da sua App Store.",
+    "childHint": "Onde seu filho(a) mora normalmente. Não é a nacionalidade dele(a), nem o seu país de cobrança, nem o país da sua App Store.",
+    "errorTitle": "Não foi possível carregar a lista de países",
+    "errorBody": "Verifique sua conexão e tente novamente.",
+    "empty": "Nenhum país disponível ainda."
   }
 }

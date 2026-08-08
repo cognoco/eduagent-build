@@ -51,6 +51,8 @@ function buildApp(seed: {
   app.use('*', requireAccountMiddleware);
   app.get('/profiles', (c) => c.json({ ok: 'list' }));
   app.post('/profiles', (c) => c.json({ ok: 'bootstrap' }, 201));
+  // [WI-2743] Stub for the signup-time residence-country list.
+  app.get('/profiles/residence-countries', (c) => c.json({ ok: 'countries' }));
   app.get('/billing/status', (c) => c.json({ ok: 'billing' }));
   app.get('/subscription/status', (c) => c.json({ ok: 'sub' }));
   app.get('/consent/my-status', (c) => c.json({ ok: 'consent' }));
@@ -78,6 +80,11 @@ describe('requireAccountMiddleware — v2 pre-graph allowlist (flag-on)', () => 
     ['GET', '/billing/status'],
     ['GET', '/subscription/status'],
     ['GET', '/consent/my-status'],
+    // [WI-2743] Rendered during signup, before the identity graph exists. This
+    // row is the only thing that proves it: profiles.test.ts mounts
+    // profileRoutes directly and never runs requireAccountMiddleware, so the
+    // route's own tests pass whether or not it is reachable in production.
+    ['GET', '/profiles/residence-countries'],
   ])('allows %s %s pre-graph', async (method, path) => {
     const { call } = buildApp(preGraph);
     const res = await call(path, method, env);

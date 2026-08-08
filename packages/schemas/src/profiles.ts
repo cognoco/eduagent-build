@@ -2,7 +2,21 @@ import { z } from 'zod';
 import { PROFILE_MINIMUM_AGE } from './age.ts';
 import { isoDateField } from './common.ts';
 import { consentStatusSchema } from './consent.ts';
+import { countryCodeSchema } from './country-policy.ts';
 
+/**
+ * The legacy three-way residence bucket.
+ *
+ * [WI-2743] SUPERSEDED ON THE REQUEST SIDE, retained on the response side.
+ * `habitualResidenceCountry` (ISO 3166-1 alpha-2, below) is what profile
+ * creation now collects and what `person.residence_jurisdiction` now stores.
+ * This enum is NOT widened to admit country codes: it is still the exact
+ * vocabulary `publicProfileSchema.location` promises its readers, and
+ * `jurisdictionToLocation` keeps that promise honest by answering `null` for
+ * any stored value outside {'US','EU','ROW'} rather than inventing a bucket.
+ * Widening it here would make the response type admit values no code path can
+ * produce — a contract that lies.
+ */
 export const locationSchema = z.enum(['EU', 'US', 'OTHER']);
 export type LocationType = z.infer<typeof locationSchema>;
 
@@ -85,7 +99,27 @@ const profileCreateObjectSchema = z
     birthMonth: z.number().int().min(1).max(12).optional(),
     birthDay: z.number().int().min(1).max(31).optional(),
     avatarUrl: z.string().url().optional(),
+    /**
+     * [WI-2743] SUPERSEDED by `habitualResidenceCountry`. No shipped client
+     * sends this field (mobile has never collected a location), and neither
+     * create-time writer reads it any more. Retained only so a caller that
+     * still sends it is not rejected by this schema's `.strict()` mode; it is
+     * ignored. Removed by the AC-4 legacy-vocabulary sweep.
+     */
     location: locationSchema.optional(),
+    /**
+     * [WI-2743] Where the learner HABITUALLY LIVES, as an ISO 3166-1 alpha-2
+     * code — not nationality, not billing country, not the app-store country.
+     * Persisted verbatim to `person.residence_jurisdiction`; it is the input
+     * the country-policy resolver needs to decide anything at all.
+     *
+     * OPTIONAL ON THE WIRE, DELIBERATELY. This item COLLECTS residence; it does
+     * not gate on it. A create that omits it still writes the legacy unknown
+     * bucket, which resolves fail-closed through `resolveCountryPolicy` — so
+     * refusing such a create is WI-2927's enforcement decision to make, not a
+     * side effect of adding a field here.
+     */
+    habitualResidenceCountry: countryCodeSchema.optional(),
     conversationLanguage: conversationLanguageSchema.optional(),
     pronouns: pronounsSchema.nullable().optional(),
     // WI-811: add-child discriminator. Absent = owner bootstrap/replay (the
@@ -173,6 +207,14 @@ export const profileUpdateSchema = profileCreateObjectSchema
     birthDay: true,
     // WI-811: `kind` is create-only (owner-vs-child at creation), never patched.
     kind: true,
+    // [WI-2743] Create-only, and deliberately NOT "not implemented yet".
+    // Changing habitual residence must RE-RESOLVE jurisdiction — that is
+    // WI-2744's whole subject. A bare PATCH would move the country while
+    // leaving the resolved jurisdiction stale, which is worse than refusing:
+    // it is a launch-perimeter decision silently made from an outdated axis.
+    // Left in the schema it would validate, return 200 and be dropped, since
+    // updateProfileV2 never reads it.
+    habitualResidenceCountry: true,
   })
   .strict();
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;

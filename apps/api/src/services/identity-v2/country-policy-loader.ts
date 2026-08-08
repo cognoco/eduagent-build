@@ -18,8 +18,10 @@ import {
 } from '@eduagent/database';
 import {
   countryPolicyRecordSchema,
+  residenceCountryOptionSchema,
   type CountryPolicyDecision,
   type CountryPolicyRecord,
+  type ResidenceCountryOption,
 } from '@eduagent/schemas';
 import { resolveCountryPolicy } from './country-policy';
 
@@ -85,6 +87,83 @@ export async function loadCountryPolicies(
       sourceProvenance: reviveSourceProvenance(row.sourceProvenance),
     }),
   );
+}
+
+/**
+ * [WI-2743] The selectable habitual-residence countries, mastered by the
+ * registry (AC-1 forbids a hard-coded picker list). One entry per country, not
+ * per registry row: the registry is effective-dated and carries several rows
+ * per country, but a picker wants the country once.
+ *
+ * `countryName` is taken from the row IN FORCE at `now` — not simply the newest
+ * row — so a rename staged ahead of its legal date is not published early. Ties
+ * and out-of-window-only countries fall back to the latest effectiveAt, which
+ * is also what makes the name deterministic rather than whichever row the
+ * database happened to return first.
+ *
+ * Unfiltered by launch status, deliberately — see residenceCountryOptionSchema.
+ * Sorted by country name so the caller does not have to, and so the order is
+ * stable across calls.
+ */
+export async function listResidenceCountries(
+  db: CountryPolicyReader,
+  now: Date = new Date(),
+): Promise<ResidenceCountryOption[]> {
+  const rows = await db
+    .select({
+      countryCode: countryPolicyRegistry.countryCode,
+      countryName: countryPolicyRegistry.countryName,
+      effectiveAt: countryPolicyRegistry.effectiveAt,
+      expiresAt: countryPolicyRegistry.expiresAt,
+    })
+    .from(countryPolicyRegistry);
+
+  // The name comes from the row IN FORCE, not merely the newest one. Choosing
+  // by latest effectiveAt alone would show a scheduled rename before it takes
+  // effect — the registry is effective-dated precisely so a rename can be
+  // staged ahead of time, so "newest row" and "current row" genuinely differ.
+  //
+  // MEMBERSHIP IS NOT FILTERED BY THE WINDOW, deliberately, and for the same
+  // reason the list is unfiltered by launch status: habitual residence is a
+  // fact about the person, not a permission. A country whose only registry row
+  // is expired or not yet effective is still a real place someone lives, and
+  // dropping it here would leave them unable to state where that is. The
+  // fallback below therefore always yields a name.
+  // `== null` rather than `=== null`: expires_at is a nullable column, and an
+  // open-ended row must read as in force whether the driver hands back null or
+  // leaves the field absent.
+  const isInForce = (r: {
+    effectiveAt: Date;
+    expiresAt: Date | null;
+  }): boolean =>
+    r.effectiveAt <= now && (r.expiresAt == null || r.expiresAt > now);
+
+  const bestByCode = new Map<
+    string,
+    { name: string; effectiveAt: Date; inForce: boolean }
+  >();
+  for (const row of rows) {
+    const candidate = {
+      name: row.countryName,
+      effectiveAt: row.effectiveAt,
+      inForce: isInForce(row),
+    };
+    const seen = bestByCode.get(row.countryCode);
+    // An in-force row always beats an out-of-window one; between two rows of
+    // the same standing, the later effectiveAt wins.
+    const better =
+      !seen ||
+      (candidate.inForce && !seen.inForce) ||
+      (candidate.inForce === seen.inForce &&
+        candidate.effectiveAt > seen.effectiveAt);
+    if (better) bestByCode.set(row.countryCode, candidate);
+  }
+
+  return [...bestByCode.entries()]
+    .map(([countryCode, { name }]) =>
+      residenceCountryOptionSchema.parse({ countryCode, countryName: name }),
+    )
+    .sort((a, b) => a.countryName.localeCompare(b.countryName));
 }
 
 export interface ResolveJurisdictionInput {

@@ -4750,5 +4750,13 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Usage: {{used}} of {{limit}} questions used"
+  },
+  "residenceCountryPicker": {
+    "label": "Country of residence",
+    "hint": "Where you usually live. Not your nationality, not your billing country, and not your App Store country.",
+    "childHint": "Where your child usually lives. Not their nationality, not your billing country, and not your App Store country.",
+    "errorTitle": "Couldn't load the country list",
+    "errorBody": "Check your connection and try again.",
+    "empty": "No countries are available yet."
   }
 }

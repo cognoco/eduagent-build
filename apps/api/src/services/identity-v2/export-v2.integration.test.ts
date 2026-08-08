@@ -52,6 +52,7 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { CONSENT_PURPOSES } from '@eduagent/schemas';
 import { generateExportV2 } from './export-v2';
+import { jurisdictionToLocation } from './profile-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
@@ -576,3 +577,114 @@ describeIfPostDrop(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// [WI-2750] jurisdictionToLocation cross-surface divergence — runs on ANY DB
+// with the v2 identity tables (NOT post-drop-gated).
+//
+// Two independent reverse-mappers existed for the same
+// person.residence_jurisdiction column: profile-v2.ts's exported
+// jurisdictionToLocation (`default: return null` — the deliberate
+// "unknown, do not guess" stance, serving all five profile-read call sites)
+// and a module-private copy here in export-v2.ts (`default: return 'OTHER'`).
+// For the three legacy bucket values ('US' | 'EU' | 'ROW') they agree, so the
+// divergence was LATENT. It goes LIVE the moment a value outside {'US','EU'}
+// is persisted — a real ISO alpha-2 such as 'DE' (which WI-2743 starts
+// writing), or any malformed/legacy string: the GDPR Art-15 export then
+// rendered location:'OTHER' while every profile-read surface rendered null for
+// the SAME person. That is a cross-surface inconsistency inside a compliance
+// document the data subject downloads, which is what makes it a bug rather
+// than a coverage gap.
+//
+// Red-green-revert: restore export-v2.ts's private jurisdictionToLocation copy
+// (`default: return 'OTHER'`) → the 'DE' assertion FAILS with received
+// 'OTHER'. Delete it and import the shared profile-v2 implementation → GREEN.
+// ---------------------------------------------------------------------------
+describeIfDb('generateExportV2 jurisdictionToLocation dedupe [WI-2750]', () => {
+  let db: Database;
+  const personIds: string[] = [];
+  const orgIds: string[] = [];
+
+  beforeAll(() => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    for (const pid of personIds) {
+      await db.delete(login).where(eq(login.personId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of orgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+    personIds.length = 0;
+    orgIds.length = 0;
+  });
+
+  it('renders location:null for an unrecognised residence jurisdiction, matching the profile-read surface, and still maps the legacy buckets', async () => {
+    const [org] = await db
+      .insert(organization)
+      .values({ name: 'Export V2 Jurisdiction Dedupe Org' })
+      .returning();
+    orgIds.push(org!.id);
+
+    // The person WI-2743 will produce: a real ISO alpha-2 in the column.
+    const [isoPerson] = await db
+      .insert(person)
+      .values({
+        displayName: 'ISO Residence',
+        birthDate: '1980-01-01',
+        residenceJurisdiction: 'DE',
+      })
+      .returning();
+    personIds.push(isoPerson!.id);
+    await db.insert(membership).values({
+      personId: isoPerson!.id,
+      organizationId: org!.id,
+      roles: ['admin'],
+    });
+    await db.insert(login).values({
+      personId: isoPerson!.id,
+      clerkUserId: `export-v2-juris-clerk-${isoPerson!.id}`,
+      email: `export-v2-juris-${isoPerson!.id}@integration.test`,
+    });
+
+    // A legacy-bucket person, to pin that the surviving map does NOT regress
+    // the three values both copies always agreed on.
+    const [rowPerson] = await db
+      .insert(person)
+      .values({
+        displayName: 'Legacy Bucket',
+        birthDate: '1990-01-01',
+        residenceJurisdiction: 'ROW',
+      })
+      .returning();
+    personIds.push(rowPerson!.id);
+    await db.insert(membership).values({
+      personId: rowPerson!.id,
+      organizationId: org!.id,
+      // membership.roles is a CLOSED set — only 'admin' | 'learner'
+      // (identity.ts membership_roles_valid). A non-owner here must be
+      // 'learner'; anything else is rejected at the storage layer.
+      roles: ['learner'],
+    });
+
+    const result = await generateExportV2(db, org!.id);
+
+    const exported = new Map(result.profiles.map((p) => [p.id, p]));
+    expect(exported.size).toBe(2);
+
+    // THE BUG: pre-fix this is 'OTHER' on the export surface while every
+    // profile-read surface answers null for the same row.
+    expect(exported.get(isoPerson!.id)!.location).toBeNull();
+
+    // Non-regression: the legacy bucket both copies agreed on still maps.
+    expect(exported.get(rowPerson!.id)!.location).toBe('OTHER');
+
+    // The export surface and the shared implementation are now the same
+    // function, so they cannot drift apart again.
+    expect(jurisdictionToLocation('DE')).toBeNull();
+    expect(jurisdictionToLocation('ROW')).toBe('OTHER');
+  });
+});
